@@ -14,8 +14,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
 
       - name: Set up JDK
         uses: actions/setup-java@v3
