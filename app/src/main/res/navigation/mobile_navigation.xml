@@ -22,4 +22,19 @@
         android:name="com.example.skoolswap.ui.slideshow.SlideshowFragment"
         android:label="@string/menu_slideshow"
         tools:layout="@layout/fragment_slideshow" />
+
+    <!-- ADD THIS -->
+    <fragment
+        android:id="@+id/viewPagerFragment"
+        android:name="com.example.skoolswap.ui.onboarding.ViewPagerFragment"
+        android:label="Onboarding"
+        tools:layout="@layout/fragment_view_pager" />
+
+    <!-- ADD LOGIN -->
+<!--    <fragment
+        android:id="@+id/loginFragment"
+        android:name="com.example.skoolswap.ui.login.LoginFragment"
+        android:label="Login"
+        tools:layout="@layout/fragment_login" />-->
+
 </navigation>

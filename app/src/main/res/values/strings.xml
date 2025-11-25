@@ -10,4 +10,12 @@
     <string name="menu_home">Home</string>
     <string name="menu_gallery">Gallery</string>
     <string name="menu_slideshow">Slideshow</string>
+    <string name="sell_easily">Sell Easily</string>
+    <string name="sell_easy_disc">Sell your school’s preloved items—from uniforms and accessories to sports gear—all through your phone.</string>
+    <string name="trusted_community">Trusted Community</string>
+    <string name="trust_desc">Buy and Sell with your school community, safely.</string>
+    <string name="secure_payments">Secure Payments</string>
+    <string name="secure_desc">Trade confidently with secure payments</string>
+    <string name="todo">TODO</string>
+    <string name="finish">Finish</string>
 </resources>
