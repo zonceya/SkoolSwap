@@ -13,7 +13,6 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 class OnboardingThirdScreen : Fragment() {
 
-    // Use the shared MainViewModel (activity-scoped)
     private val mainViewModel: MainViewModel by activityViewModels()
 
     override fun onCreateView(
@@ -22,6 +21,8 @@ class OnboardingThirdScreen : Fragment() {
     ): View {
         val view = inflater.inflate(R.layout.fragment_onboarding_third_screen, container, false)
         val finishButton = view.findViewById<TextView>(R.id.finish)
+
+        // Safe FAB hiding
         val fab = activity?.findViewById<FloatingActionButton>(R.id.fab)
         fab?.visibility = View.GONE
 
@@ -31,5 +32,12 @@ class OnboardingThirdScreen : Fragment() {
         }
 
         return view
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        // Safe FAB showing
+        val fab = activity?.findViewById<FloatingActionButton>(R.id.fab)
+        fab?.visibility = View.VISIBLE
     }
 }

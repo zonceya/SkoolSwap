@@ -3,8 +3,39 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mobile_navigation"
-    app:startDestination="@+id/nav_home">
+    app:startDestination="@+id/viewPagerFragment"> <!-- Start with onboarding -->
 
+    <!-- Onboarding Flow -->
+    <fragment
+        android:id="@+id/viewPagerFragment"
+        android:name="com.example.skoolswap.ui.onboarding.ViewPagerFragment"
+        android:label="Onboarding"
+        tools:layout="@layout/fragment_view_pager">
+
+        <!-- ADD ACTION to go to login after onboarding -->
+        <action
+            android:id="@+id/action_viewPagerFragment_to_loginFragment"
+            app:destination="@id/loginFragment"
+            app:popUpTo="@id/viewPagerFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <!-- Login Flow -->
+    <fragment
+        android:id="@+id/loginFragment"
+        android:name="com.example.skoolswap.ui.login.LoginFragment"
+        android:label="Login"
+        tools:layout="@layout/fragment_login">
+
+        <!-- ADD ACTION to go to home after login -->
+        <action
+            android:id="@+id/action_loginFragment_to_nav_home"
+            app:destination="@id/nav_home"
+            app:popUpTo="@id/loginFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <!-- Main App Flow -->
     <fragment
         android:id="@+id/nav_home"
         android:name="com.example.skoolswap.ui.home.HomeFragment"
@@ -22,19 +53,5 @@
         android:name="com.example.skoolswap.ui.slideshow.SlideshowFragment"
         android:label="@string/menu_slideshow"
         tools:layout="@layout/fragment_slideshow" />
-
-    <!-- ADD THIS -->
-    <fragment
-        android:id="@+id/viewPagerFragment"
-        android:name="com.example.skoolswap.ui.onboarding.ViewPagerFragment"
-        android:label="Onboarding"
-        tools:layout="@layout/fragment_view_pager" />
-
-    <!-- ADD LOGIN -->
-<!--    <fragment
-        android:id="@+id/loginFragment"
-        android:name="com.example.skoolswap.ui.login.LoginFragment"
-        android:label="Login"
-        tools:layout="@layout/fragment_login" />-->
 
 </navigation>
