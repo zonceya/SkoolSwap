@@ -51,24 +51,16 @@ class ViewPagerFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Hide the ActionBar
-        (activity as? AppCompatActivity)?.supportActionBar?.hide()
-        val drawerLayout = (activity as MainActivity).findViewById<DrawerLayout>(R.id.drawer_layout)
-        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
-        // Hide the FloatingActionButton
-        val fab: FloatingActionButton? = activity?.findViewById(R.id.fab)
-        fab?.visibility = View.GONE
+    }
+
+    override fun onResume() {
+        super.onResume()
+
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
 
-        // Show the ActionBar again
-        (activity as? AppCompatActivity)?.supportActionBar?.show()
-        val drawerLayout = (activity as MainActivity).findViewById<DrawerLayout>(R.id.drawer_layout)
-        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
-        // Show the FloatingActionButton again
-        val fab: FloatingActionButton? = activity?.findViewById(R.id.fab)
-        fab?.visibility = View.VISIBLE
+
     }
 }

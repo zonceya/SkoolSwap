@@ -3,6 +3,7 @@ package com.example.skoolswap
 
 import android.app.Application
 import com.example.skoolswap.data.local.AppPreferences
+import com.google.firebase.FirebaseApp
 
 class SkoolSwapApplication : Application() {
 
@@ -13,5 +14,6 @@ class SkoolSwapApplication : Application() {
 
         // Initialize DataStore Preferences
         appPreferences = AppPreferences(this)
+       // FirebaseApp.initialize(this)
     }
 }

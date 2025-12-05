@@ -2,6 +2,7 @@ package com.example.skoolswap.ui.main
 
 import android.os.Bundle
 import android.view.Menu
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.Lifecycle
@@ -39,8 +40,10 @@ class MainActivity : AppCompatActivity() {
         viewModel = ViewModelProvider(this, MainViewModelFactory(preferences))[MainViewModel::class.java]
 
         setSupportActionBar(binding.appBarMain.toolbar)
-        setupNavigationDrawer()
 
+        setupNavigationDrawer()
+        setupNavigationListener()
+        checkInitialNavigation()
         observeNavigation()
     }
 
@@ -82,6 +85,24 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+    private fun setupNavigationListener() {
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            when (destination.id) {
+                R.id.viewPagerFragment, R.id.loginFragment -> {
+                    // Hide UI for onboarding and login
+                    supportActionBar?.hide()
+                    binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                    binding.appBarMain.fab.visibility = View.GONE
+                }
+                else -> {
+                    // Show UI for main app screens
+                    supportActionBar?.show()
+                    binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
+                    binding.appBarMain.fab.visibility = View.VISIBLE
+                }
+            }
+        }
+    }
     private fun navigateToDestination(destination: NavigationDestination) {
         when (destination) {
             NavigationDestination.ONBOARDING -> {
@@ -93,10 +114,18 @@ class MainActivity : AppCompatActivity() {
                     navController.navigate(R.id.nav_home)
             }
             NavigationDestination.LOGIN -> {
-                // TODO: Navigate to login screen
-                // For now, navigate to home as fallback
-                if (navController.currentDestination?.id != R.id.nav_home)
-                    navController.navigate(R.id.nav_home)
+                if (navController.currentDestination?.id != R.id.loginFragment)
+                    navController.navigate(R.id.loginFragment)
+            }
+        }
+    }
+    private fun checkInitialNavigation() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // Get the initial destination from ViewModel
+                viewModel.navigationDestination.observe(this@MainActivity) { destination ->
+                    navigateToDestination(destination)
+                }
             }
         }
     }
