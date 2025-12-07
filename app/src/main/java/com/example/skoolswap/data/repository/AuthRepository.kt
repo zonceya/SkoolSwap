@@ -15,6 +15,9 @@ import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.tasks.await
+import com.google.firebase.auth.FirebaseUser
+
+
 
 class AuthRepository(private val context: Context) {
 
@@ -26,7 +29,13 @@ class AuthRepository(private val context: Context) {
 
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading
+    private val _userName = MutableStateFlow<String?>(null)
+    val userName: StateFlow<String?> = _userName
 
+    private val _userProfileImage = MutableStateFlow<String?>(null)
+    val userProfileImage: StateFlow<String?> = _userProfileImage
+    private val _userEmail = MutableStateFlow<String?>(null)
+    val userEmail: StateFlow<String?> = _userEmail
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
@@ -99,6 +108,17 @@ class AuthRepository(private val context: Context) {
             else -> throw Exception("Unexpected credential type")
         }
     }
+    private fun fetchUserProfile(user: FirebaseUser) {
+        val name = user.displayName ?: "User"
+        val email = user.email ?: ""
+        val photoUrl = user.photoUrl?.toString()
+
+        _userName.value = name
+        _userEmail.value = email // Set the email
+        _userProfileImage.value = photoUrl
+
+        println("User Profile - Name: $name, Email: $email, Photo URL: $photoUrl")
+    }
     fun clearError() {
         _error.value = null
     }
@@ -110,9 +130,15 @@ class AuthRepository(private val context: Context) {
     fun signOut() {
         auth.signOut()
         _currentUser.value = null
+        _userName.value = null
+        _userEmail.value = null // Clear email on sign out
+        _userProfileImage.value = null
     }
 
     fun checkCurrentUser() {
-        _currentUser.value = auth.currentUser
+        val user = auth.currentUser
+        _currentUser.value = user
+        user?.let { fetchUserProfile(it) }
     }
+
 }
