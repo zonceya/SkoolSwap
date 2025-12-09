@@ -12,7 +12,20 @@
           "package_name": "com.example.skoolswap"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "63644777044-h0lc83uunpgvi1ivqbmogstvckfo1l7g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.skoolswap",
+            "certificate_hash": "a9afc64f873cd5953cfc55ce7f675c15ddd4e59d"
+          }
+        },
+        {
+          "client_id": "63644777044-5ttve1jvt4nr35s31b2gp2b48ev2tp3h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAO1S76gKjGwTnjSio6Ayu-ejFT7HiW40s"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "63644777044-5ttve1jvt4nr35s31b2gp2b48ev2tp3h.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
