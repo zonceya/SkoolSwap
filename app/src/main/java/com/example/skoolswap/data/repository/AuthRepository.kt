@@ -8,12 +8,14 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetCredentialResponse
 import androidx.credentials.exceptions.GetCredentialException
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.ErrorConstants
 import com.example.skoolswap.data.local.database.SkoolSwapDatabase
 import com.example.skoolswap.data.mapper.toDomain
 import com.example.skoolswap.data.mapper.toEntity
 import com.example.skoolswap.data.remote.api.UserApiService
 import com.example.skoolswap.data.remote.models.request.SignInRequest
 import com.example.skoolswap.data.remote.models.response.SignInResponse
+import com.example.skoolswap.data.remote.network.NetworkUtils
 import com.example.skoolswap.domain.model.User
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
@@ -90,7 +92,7 @@ class AuthRepository @Inject constructor(
         return try {
             _loading.value = true
             _error.value = null
-
+            logNetworkStatus()
             // 1. Get Google ID token
             val googleIdToken = getGoogleIdToken(activity)
 
@@ -210,47 +212,31 @@ class AuthRepository @Inject constructor(
             handleCredentialException(e)
         }
     }
-       private fun handleCredentialException(e: GetCredentialException): Nothing {
+    private fun handleCredentialException(e: GetCredentialException): Nothing {
         Log.e(TAG, "Credential exception: ${e.javaClass.simpleName} - ${e.message}")
 
         when (e) {
             is androidx.credentials.exceptions.NoCredentialException -> {
-                // First check network connectivity
+                // Check network stability first
                 if (!isNetworkAvailable()) {
-                    throw IllegalStateException("No internet connection. Please check your network and try again.")
+                    throw IllegalStateException(ErrorConstants.Auth.NO_INTERNET)
                 }
 
-                // Check if there are Google accounts on device (offline check)
-                val hasGoogleAccounts = checkForGoogleAccountsOffline()
-                if (!hasGoogleAccounts) {
-                    throw IllegalStateException("No Google accounts found on device. Please add one in Settings.")
-                } else {
-                    throw IllegalStateException("Google Sign-In requires internet connection. Please connect to the internet.")
+                // Check if network is stable (not flaky)
+                if (!NetworkUtils.isNetworkStable(context)) {
+                    throw IllegalStateException(ErrorConstants.Auth.UNSTABLE_CONNECTION)
                 }
+
+                // If network is available and stable, then it's truly no Google accounts
+                throw IllegalStateException(ErrorConstants.Auth.NO_GOOGLE_ACCOUNTS)
             }
             is androidx.credentials.exceptions.GetCredentialCancellationException -> {
-                throw IllegalStateException("Sign-in was cancelled by user")
+                throw IllegalStateException(ErrorConstants.Auth.SIGN_IN_CANCELLED)
             }
-            else -> throw IllegalStateException("Google sign-in failed: ${e.message}")
-        }
-    }
-
-    private fun isNetworkAvailable(): Boolean {
-        return try {
-            val connectivityManager = context.getSystemService(
-                android.content.Context.CONNECTIVITY_SERVICE
-            ) as android.net.ConnectivityManager
-
-            val network = connectivityManager.activeNetwork
-            val capabilities = connectivityManager.getNetworkCapabilities(network)
-            capabilities != null && (
-                    capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) ||
-                            capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                            capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)
-                    )
-        } catch (e: Exception) {
-            Log.e(TAG, "Error checking network connectivity", e)
-            false
+            else -> {
+                val errorMessage = ErrorConstants.format(ErrorConstants.Auth.GOOGLE_SIGN_IN_FAILED, e.message ?: "Unknown error")
+                throw IllegalStateException(errorMessage)
+            }
         }
     }
 
@@ -285,5 +271,19 @@ class AuthRepository @Inject constructor(
 
     private fun generateNonce(): String {
         return UUID.randomUUID().toString()
+    }
+    private fun isNetworkAvailable(): Boolean {
+        return NetworkUtils.isNetworkAvailable(context)
+    }
+    private fun logNetworkStatus() {
+        if (isNetworkAvailable()) {
+            val networkType = NetworkUtils.getNetworkType(context)
+            Log.d(TAG, "Network is available. Type: $networkType")
+
+            val isStable = NetworkUtils.isNetworkStable(context)
+            Log.d(TAG, "Network stability: ${if (isStable) "Stable" else "Unstable"}")
+        } else {
+            Log.w(TAG, "Network is NOT available")
+        }
     }
 }

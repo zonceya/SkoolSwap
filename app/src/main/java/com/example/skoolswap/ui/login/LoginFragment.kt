@@ -1,7 +1,7 @@
-// ui/login/LoginFragment.kt
 package com.example.skoolswap.ui.login
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,6 +10,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.ErrorConstants
 import com.example.skoolswap.databinding.FragmentLoginBinding
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
@@ -62,26 +63,72 @@ class LoginFragment : Fragment() {
             }
         }
 
-        // In LoginFragment.kt, modify the error observer:
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.error.collectLatest { error ->
-                error?.let {
-                    val message = when {
-                        it.contains("No internet connection", ignoreCase = true) -> {
-                            "📡 No internet connection. Please check your Wi-Fi or mobile data."
-                        }
-                        it.contains("Google accounts", ignoreCase = true) -> {
-                            "👤 No Google accounts found. Please add a Google account in device Settings."
-                        }
-                        it.contains("cancelled", ignoreCase = true) -> {
-                            "Sign-in was cancelled. Please try again."
-                        }
-                        else -> it
+                error?.let { errorMessage ->
+                    // Log the actual error for debugging
+                    Log.e("LoginFragment", "Auth Error: $errorMessage")
+
+                    val userFriendlyMessage = getFriendlyErrorMessage(errorMessage)
+
+                    // Create a longer-lasting Snackbar for important errors
+                    val duration = if (errorMessage.contains("network", ignoreCase = true) ||
+                        errorMessage.contains("internet", ignoreCase = true)) {
+                        Snackbar.LENGTH_INDEFINITE
+                    } else {
+                        Snackbar.LENGTH_LONG
                     }
-                    Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
+
+                    val snackbar = Snackbar.make(binding.root, userFriendlyMessage, duration)
+
+                    // Add action for network errors
+                    if (errorMessage.contains("network", ignoreCase = true) ||
+                        errorMessage.contains("internet", ignoreCase = true)) {
+                        snackbar.setAction("RETRY") {
+                            viewModel.signInWithGoogle(requireActivity())
+                        }
+                    }
+
+                    snackbar.show()
                     viewModel.clearError()
                 }
             }
+        }
+    }
+
+    private fun getFriendlyErrorMessage(errorMessage: String): String {
+        return when {
+            // Network-related errors
+            errorMessage.contains(ErrorConstants.Auth.NO_INTERNET, ignoreCase = true) -> {
+                "${ErrorConstants.UserFriendly.NO_INTERNET_TITLE}\n${ErrorConstants.UserFriendly.NO_INTERNET_MESSAGE}"
+            }
+            errorMessage.contains(ErrorConstants.Auth.UNSTABLE_CONNECTION, ignoreCase = true) -> {
+                "${ErrorConstants.UserFriendly.UNSTABLE_CONNECTION_TITLE}\n${ErrorConstants.UserFriendly.UNSTABLE_CONNECTION_MESSAGE}"
+            }
+            errorMessage.contains(ErrorConstants.Network.CONNECTION_UNSTABLE, ignoreCase = true) -> {
+                "${ErrorConstants.UserFriendly.UNSTABLE_CONNECTION_TITLE}\n${ErrorConstants.UserFriendly.UNSTABLE_CONNECTION_MESSAGE}"
+            }
+
+            // Google account errors
+            errorMessage.contains(ErrorConstants.Auth.NO_GOOGLE_ACCOUNTS, ignoreCase = true) -> {
+                "${ErrorConstants.UserFriendly.NO_GOOGLE_ACCOUNTS_TITLE}\n${ErrorConstants.UserFriendly.NO_GOOGLE_ACCOUNTS_MESSAGE}"
+            }
+            errorMessage.contains("Google services", ignoreCase = true) -> {
+                "${ErrorConstants.UserFriendly.GOOGLE_SERVICES_DOWN_TITLE}\n${ErrorConstants.UserFriendly.GOOGLE_SERVICES_DOWN_MESSAGE}"
+            }
+
+            // Cancellation errors
+            errorMessage.contains(ErrorConstants.Auth.SIGN_IN_CANCELLED, ignoreCase = true) -> {
+                "${ErrorConstants.UserFriendly.SIGN_IN_CANCELLED_TITLE}\n${ErrorConstants.UserFriendly.SIGN_IN_CANCELLED_MESSAGE}"
+            }
+
+            // Server errors
+            errorMessage.contains("server", ignoreCase = true) -> {
+                "🔧 Server Error\nOur servers are having issues. Please try again in a few moments."
+            }
+
+            // Generic errors
+            else -> "❌ Error\n$errorMessage"
         }
     }
 
@@ -96,6 +143,6 @@ class LoginFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        viewModel.clearError() // Clear any stale errors
+        viewModel.clearError()
     }
 }
