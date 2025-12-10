@@ -10,10 +10,6 @@ import com.example.skoolswap.R
 import com.example.skoolswap.ui.onboarding.screens.OnboardingFirstScreen
 import com.example.skoolswap.ui.onboarding.screens.OnboardingSecondScreen
 import com.example.skoolswap.ui.onboarding.screens.OnboardingThirdScreen
-import com.google.android.material.floatingactionbutton.FloatingActionButton
-import androidx.appcompat.app.AppCompatActivity
-import androidx.drawerlayout.widget.DrawerLayout
-import com.example.skoolswap.ui.main.MainActivity
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayoutMediator
 

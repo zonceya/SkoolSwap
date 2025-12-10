@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.google.services)
     id("kotlin-kapt")
-
+    alias(libs.plugins.hilt.android)
 }
 
 android {
@@ -29,21 +29,46 @@ android {
             )
         }
     }
+    kapt {
+        correctErrorTypes = true
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
     kotlinOptions {
         jvmTarget = "11"
+
+    }
+    packagingOptions {
+        // Fix INDEX.LIST conflict
+        exclude("META-INF/INDEX.LIST")
+        exclude("META-INF/DEPENDENCIES")
+
+        // Fix Netty conflict
+        exclude("META-INF/io.netty.versions.properties")
+
+        // Prevent other common conflicts
+        exclude("META-INF/*.kotlin_module")
+        exclude("META-INF/AL2.0")
+        exclude("META-INF/LGPL2.1")
+        exclude("META-INF/LICENSE")
+        exclude("META-INF/LICENSE.txt")
+        exclude("META-INF/NOTICE")
+        exclude("META-INF/NOTICE.txt")
+
+        // Use pickFirst for critical files
+        pickFirst("META-INF/licenses/ASL-2.0.txt")
+        pickFirst("META-INF/licenses/LICENSE-2.0.txt")
     }
     buildFeatures {
-        viewBinding = true
-        dataBinding = true
+      viewBinding = true
+    //  dataBinding = true
     }
 }
 
 dependencies {
-
+    // Core Android
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
@@ -55,14 +80,39 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.datastore.core)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.annotation)
+
+    // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
-    // Modern Google Sign-In (Credential Manager)
+
+    // Authentication
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
+
+    // Image Loading
     implementation(libs.glide)
-    implementation(libs.androidx.annotation)
+
+    // Networking
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.gson)
+    implementation(libs.okhttp.logging)
+
+    // Database
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    kapt(libs.room.compiler)
+
+    // Dependency Injection
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.compiler)
+    implementation(libs.hilt.navigation.fragment)
+
+    // Work Manager
+    implementation(libs.work.runtime)
+
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

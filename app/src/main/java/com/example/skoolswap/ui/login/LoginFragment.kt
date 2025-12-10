@@ -5,30 +5,28 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.ErrorConstants
 import com.example.skoolswap.databinding.FragmentLoginBinding
-import com.example.skoolswap.ui.main.MainActivity
-import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class LoginFragment : Fragment() {
 
     private var _binding: FragmentLoginBinding? = null
     private val binding get() = _binding!!
-
-    private val viewModel: LoginViewModel by viewModels {
-        LoginViewModelFactory(requireContext())
-    }
+    private val viewModel: LoginViewModel by viewModels()
 
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
+        inflater: LayoutInflater,
+        container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentLoginBinding.inflate(inflater, container, false)
@@ -37,52 +35,104 @@ class LoginFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         setupUI()
         setupObservers()
-        viewModel.checkCurrentUser()
     }
 
     private fun setupUI() {
-        // Fixed Google Sign-In button reference
         binding.signInButton.setOnClickListener {
             viewModel.clearError()
-            viewModel.signInWithGoogle()
+            viewModel.signInWithGoogle(requireActivity())
         }
     }
 
     private fun setupObservers() {
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.currentUser.collectLatest { user ->
+            viewModel.user.collectLatest { user ->
                 user?.let {
-                    viewModel.clearError()
-                    Snackbar.make(binding.root, "Login successful!", Snackbar.LENGTH_SHORT).show()
                     navigateToHome()
                 }
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.loading.collectLatest { isLoading ->
+            viewModel.isLoading.collectLatest { isLoading ->
                 binding.loadingIndicator.visibility =
                     if (isLoading) View.VISIBLE else View.GONE
-
-                // Fixed button reference
                 binding.signInButton.isEnabled = !isLoading
             }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.error.collectLatest { error ->
-                error?.let {
-                    Snackbar.make(binding.root, error, Snackbar.LENGTH_LONG).show()
+                error?.let { errorMessage ->
+                    // Log the actual error for debugging
+                    Log.e("LoginFragment", "Auth Error: $errorMessage")
+
+                    val userFriendlyMessage = getFriendlyErrorMessage(errorMessage)
+
+                    // Create a longer-lasting Snackbar for important errors
+                    val duration = if (errorMessage.contains("network", ignoreCase = true) ||
+                        errorMessage.contains("internet", ignoreCase = true)) {
+                        Snackbar.LENGTH_INDEFINITE
+                    } else {
+                        Snackbar.LENGTH_LONG
+                    }
+
+                    val snackbar = Snackbar.make(binding.root, userFriendlyMessage, duration)
+
+                    // Add action for network errors
+                    if (errorMessage.contains("network", ignoreCase = true) ||
+                        errorMessage.contains("internet", ignoreCase = true)) {
+                        snackbar.setAction("RETRY") {
+                            viewModel.signInWithGoogle(requireActivity())
+                        }
+                    }
+
+                    snackbar.show()
+                    viewModel.clearError()
                 }
             }
         }
     }
 
+    private fun getFriendlyErrorMessage(errorMessage: String): String {
+        return when {
+            // Network-related errors
+            errorMessage.contains(ErrorConstants.Auth.NO_INTERNET, ignoreCase = true) -> {
+                "${ErrorConstants.UserFriendly.NO_INTERNET_TITLE}\n${ErrorConstants.UserFriendly.NO_INTERNET_MESSAGE}"
+            }
+            errorMessage.contains(ErrorConstants.Auth.UNSTABLE_CONNECTION, ignoreCase = true) -> {
+                "${ErrorConstants.UserFriendly.UNSTABLE_CONNECTION_TITLE}\n${ErrorConstants.UserFriendly.UNSTABLE_CONNECTION_MESSAGE}"
+            }
+            errorMessage.contains(ErrorConstants.Network.CONNECTION_UNSTABLE, ignoreCase = true) -> {
+                "${ErrorConstants.UserFriendly.UNSTABLE_CONNECTION_TITLE}\n${ErrorConstants.UserFriendly.UNSTABLE_CONNECTION_MESSAGE}"
+            }
+
+            // Google account errors
+            errorMessage.contains(ErrorConstants.Auth.NO_GOOGLE_ACCOUNTS, ignoreCase = true) -> {
+                "${ErrorConstants.UserFriendly.NO_GOOGLE_ACCOUNTS_TITLE}\n${ErrorConstants.UserFriendly.NO_GOOGLE_ACCOUNTS_MESSAGE}"
+            }
+            errorMessage.contains("Google services", ignoreCase = true) -> {
+                "${ErrorConstants.UserFriendly.GOOGLE_SERVICES_DOWN_TITLE}\n${ErrorConstants.UserFriendly.GOOGLE_SERVICES_DOWN_MESSAGE}"
+            }
+
+            // Cancellation errors
+            errorMessage.contains(ErrorConstants.Auth.SIGN_IN_CANCELLED, ignoreCase = true) -> {
+                "${ErrorConstants.UserFriendly.SIGN_IN_CANCELLED_TITLE}\n${ErrorConstants.UserFriendly.SIGN_IN_CANCELLED_MESSAGE}"
+            }
+
+            // Server errors
+            errorMessage.contains("server", ignoreCase = true) -> {
+                "🔧 Server Error\nOur servers are having issues. Please try again in a few moments."
+            }
+
+            // Generic errors
+            else -> "❌ Error\n$errorMessage"
+        }
+    }
+
     private fun navigateToHome() {
-        // Use your app's R class, not navigation R class
         findNavController().navigate(R.id.nav_home)
     }
 
@@ -90,8 +140,9 @@ class LoginFragment : Fragment() {
         super.onDestroyView()
         _binding = null
     }
+
     override fun onResume() {
         super.onResume()
-        viewModel.clearError() // Clear any stale errors
+        viewModel.clearError()
     }
 }

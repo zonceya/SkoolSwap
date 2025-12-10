@@ -1,20 +1,28 @@
+// ui/main/MainViewModel.kt
 package com.example.skoolswap.ui.main
 
-
-import androidx.lifecycle.*
-import com.example.skoolswap.data.local.AppPreferences
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.asLiveData
+import androidx.lifecycle.viewModelScope
+import com.example.skoolswap.data.local.datastore.AppPreferences
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 enum class NavigationDestination { ONBOARDING, LOGIN, HOME }
 
-class MainViewModel(private val preferences: AppPreferences) : ViewModel() {
+@HiltViewModel
+class MainViewModel @Inject constructor(
+    private val preferences: AppPreferences
+) : ViewModel() {
 
     private val _forceNavigation = MutableLiveData<NavigationDestination?>(null)
-    val forceNavigation: LiveData<NavigationDestination?> = _forceNavigation
+    val forceNavigation = _forceNavigation
 
     // Combine onboarding + login Flows to determine destination
-    val navigationDestination: LiveData<NavigationDestination> = combine(
+    val navigationDestination = combine(
         preferences.isOnboardingFinished,
         preferences.isLoggedIn
     ) { onboardingFinished, loggedIn ->
