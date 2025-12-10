@@ -5,10 +5,10 @@ import android.view.Menu
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavController
@@ -19,23 +19,23 @@ import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
-import com.example.skoolswap.data.local.AppPreferences
-import com.example.skoolswap.data.repository.AuthRepository
 import com.example.skoolswap.databinding.ActivityMainBinding
 import com.example.skoolswap.ui.navigationheader.NavigationHeaderViewModel
-import com.example.skoolswap.ui.navigationheader.NavigationHeaderViewModelFactory
 import com.google.android.material.navigation.NavigationView
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
     private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var binding: ActivityMainBinding
-    private lateinit var viewModel: MainViewModel
+    private val viewModel: MainViewModel by viewModels()
+    private val navHeaderViewModel: NavigationHeaderViewModel  by viewModels()
+
     private lateinit var navController: NavController
-    private lateinit var navHeaderViewModel: NavigationHeaderViewModel
-    private lateinit var authRepository: AuthRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,17 +44,6 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         navController = findNavController(R.id.nav_host_fragment_content_main)
-        val preferences = AppPreferences(this)
-
-        // ✅ CRITICAL: Initialize authRepository FIRST
-        authRepository = AuthRepository(this)
-        authRepository.checkCurrentUser()
-
-        // ✅ Now initialize ViewModels
-        viewModel = ViewModelProvider(this, MainViewModelFactory(preferences))[MainViewModel::class.java]
-
-        val navHeaderViewModelFactory = NavigationHeaderViewModelFactory(authRepository)
-        navHeaderViewModel = ViewModelProvider(this, navHeaderViewModelFactory)[NavigationHeaderViewModel::class.java]
 
         setSupportActionBar(binding.appBarMain.toolbar)
 
@@ -120,7 +109,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ... rest of your methods remain the same ...
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main, menu)
         return true
@@ -131,18 +119,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun observeNavigation() {
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.navigationDestination.observe(this@MainActivity) { destination ->
-                    navigateToDestination(destination)
-                }
+        viewModel.navigationDestination.observe(this) { destination ->
+            navigateToDestination(destination)
+        }
 
-                viewModel.forceNavigation.observe(this@MainActivity) { destination ->
-                    destination?.let {
-                        navigateToDestination(it)
-                        viewModel.clearForceNavigation()
-                    }
-                }
+        viewModel.forceNavigation.observe(this) { destination ->
+            destination?.let {
+                navigateToDestination(it)
+                viewModel.clearForceNavigation()
             }
         }
     }
@@ -182,12 +166,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkInitialNavigation() {
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.navigationDestination.observe(this@MainActivity) { destination ->
-                    navigateToDestination(destination)
-                }
-            }
+        viewModel.navigationDestination.observe(this) { destination ->
+            navigateToDestination(destination)
         }
     }
 }

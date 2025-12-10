@@ -35,8 +35,7 @@
     <string name="invalid_password">Password must be >5 characters</string>
     <string name="login_failed">"Login failed"</string>
     <string name="sign_in_with_google">Continue with Google</string>
-    <string name="default_web_client_id">63644777044-5ttve1jvt4nr35s31b2gp2b48ev2tp3h.apps.googleusercontent.com
-</string>
+    <string name="default_web_client_id" translatable="false">63644777044-5ttve1jvt4nr35s31b2gp2b48ev2tp3h.apps.googleusercontent.com</string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
 </resources>

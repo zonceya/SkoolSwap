@@ -1,16 +1,25 @@
-package com.example.skoolswap.data.local
+// data/local/AppPreferences.kt
+package com.example.skoolswap.data.local.datastore
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
 
-// DataStore delegate
-private val Context.dataStore by preferencesDataStore("app_prefs")
+// Extension property for DataStore
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "app_prefs")
 
-class AppPreferences(private val context: Context) {
+@Singleton
+class AppPreferences @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
 
     companion object {
         val ONBOARDING_FINISHED = booleanPreferencesKey("onboarding_finished")
@@ -28,18 +37,26 @@ class AppPreferences(private val context: Context) {
         .map { it[FIRST_TIME_LOGIN] ?: true }
 
     suspend fun setOnboardingFinished(finished: Boolean = true) {
-        context.dataStore.edit { it[ONBOARDING_FINISHED] = finished }
+        context.dataStore.edit { preferences ->
+            preferences[ONBOARDING_FINISHED] = finished
+        }
     }
 
     suspend fun setLoggedIn(loggedIn: Boolean = true) {
-        context.dataStore.edit { it[LOGGED_IN] = loggedIn }
+        context.dataStore.edit { preferences ->
+            preferences[LOGGED_IN] = loggedIn
+        }
     }
 
     suspend fun setFirstTimeLogin(firstTime: Boolean = true) {
-        context.dataStore.edit { it[FIRST_TIME_LOGIN] = firstTime }
+        context.dataStore.edit { preferences ->
+            preferences[FIRST_TIME_LOGIN] = firstTime
+        }
     }
 
     suspend fun clearPreferences() {
-        context.dataStore.edit { it.clear() }
+        context.dataStore.edit { preferences ->
+            preferences.clear()
+        }
     }
 }
