@@ -2,9 +2,11 @@ package com.example.skoolswap
 
 
 import android.app.Application
-import com.example.skoolswap.data.local.AppPreferences
+import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.google.firebase.FirebaseApp
+import dagger.hilt.android.HiltAndroidApp
 
+@HiltAndroidApp
 class SkoolSwapApplication : Application() {
 
     lateinit var appPreferences: AppPreferences
@@ -14,6 +16,6 @@ class SkoolSwapApplication : Application() {
 
         // Initialize DataStore Preferences
         appPreferences = AppPreferences(this)
-       // FirebaseApp.initialize(this)
+        FirebaseApp.initializeApp(this)
     }
 }

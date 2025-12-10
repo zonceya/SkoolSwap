@@ -3,24 +3,44 @@ package com.example.skoolswap.ui.navigationheader
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.skoolswap.data.repository.AuthRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import javax.inject.Inject
 
-/**
- * Simple ViewModel for navigation header
- * This only exposes data from AuthRepository - no business logic
- */
-class NavigationHeaderViewModel(
+@HiltViewModel
+class NavigationHeaderViewModel @Inject constructor(
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
-    // Just expose the flows from AuthRepository
-    val userName: StateFlow<String?> = authRepository.userName
-    val userProfileImage: StateFlow<String?> = authRepository.userProfileImage
-    val userEmail: StateFlow<String?> = authRepository.userEmail
-    val isLoggedIn: StateFlow<Boolean> = authRepository.currentUser
+    // Get user data from serverUser flow
+    val userName: StateFlow<String?> = authRepository.getServerUser()
+        .map { user -> user?.name }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
+
+    val userProfileImage: StateFlow<String?> = authRepository.getServerUser()
+        .map { user -> user?.profilePictureUrl }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
+
+    val userEmail: StateFlow<String?> = authRepository.getServerUser()
+        .map { user -> user?.email }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
+
+    val isLoggedIn: StateFlow<Boolean> = authRepository.getServerUser()
         .map { user -> user != null }
         .stateIn(
             scope = viewModelScope,
