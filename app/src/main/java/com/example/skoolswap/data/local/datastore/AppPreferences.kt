@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -47,7 +48,9 @@ class AppPreferences @Inject constructor(
             preferences[LOGGED_IN] = loggedIn
         }
     }
-
+    suspend fun getLoggedInState(): Boolean {
+        return context.dataStore.data.map { it[LOGGED_IN] ?: false }.first()
+    }
     suspend fun setFirstTimeLogin(firstTime: Boolean = true) {
         context.dataStore.edit { preferences ->
             preferences[FIRST_TIME_LOGIN] = firstTime

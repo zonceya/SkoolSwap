@@ -1,13 +1,16 @@
-// ui/main/MainViewModel.kt
 package com.example.skoolswap.ui.main
 
+import android.util.Log
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
+import com.example.skoolswap.data.repository.AuthRepository
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -15,30 +18,47 @@ enum class NavigationDestination { ONBOARDING, LOGIN, HOME }
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val preferences: AppPreferences
+    private val preferences: AppPreferences,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _forceNavigation = MutableLiveData<NavigationDestination?>(null)
     val forceNavigation = _forceNavigation
 
-    // Combine onboarding + login Flows to determine destination
+    // Combine onboarding + auth state from Room database
     val navigationDestination = combine(
         preferences.isOnboardingFinished,
-        preferences.isLoggedIn
-    ) { onboardingFinished, loggedIn ->
+        authRepository.getServerUser()
+    ) { onboardingFinished, user ->
         when {
             !onboardingFinished -> NavigationDestination.ONBOARDING
-            !loggedIn -> NavigationDestination.LOGIN
+            user == null -> NavigationDestination.LOGIN
             else -> NavigationDestination.HOME
         }
     }.asLiveData()
 
-    // Helper functions to update preferences
+    // Check auth state on initialization
+    init {
+        viewModelScope.launch {
+            checkAuthState()
+        }
+    }
+     fun checkAuthState() {
+        viewModelScope.launch {
+            authRepository.checkCurrentUser()
+
+            // Check DataStore login state
+            val isLoggedIn = preferences.isLoggedIn.firstOrNull() ?: false
+
+            if (!isLoggedIn) {
+                _forceNavigation.value = NavigationDestination.LOGIN
+            }
+        }
+    }
+
     fun finishOnboarding() {
         viewModelScope.launch {
             preferences.setOnboardingFinished(true)
-            // Force immediate navigation to login
-            _forceNavigation.value = NavigationDestination.LOGIN // or HOME if you want to skip login
         }
     }
 
@@ -49,6 +69,15 @@ class MainViewModel @Inject constructor(
     fun setLoggedIn() {
         viewModelScope.launch {
             preferences.setLoggedIn(true)
+        }
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            authRepository.signOut()
+            preferences.setLoggedIn(false)
+            // Force navigation to login
+            _forceNavigation.value = NavigationDestination.LOGIN
         }
     }
 }
