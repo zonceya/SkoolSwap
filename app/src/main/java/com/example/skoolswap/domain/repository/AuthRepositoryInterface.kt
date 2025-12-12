@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface AuthRepositoryInterface {
     suspend fun signInWithGoogle(activity: Activity): Result<User>
+    suspend fun updateMobile(mobile: String): Result<Boolean>
     suspend fun signOut()
     fun clearError()
     fun checkCurrentUser()
@@ -20,4 +21,5 @@ interface AuthRepositoryInterface {
     val currentUser: StateFlow<FirebaseUser?>
     val loading: StateFlow<Boolean>
     val error: StateFlow<String?>
+
 }

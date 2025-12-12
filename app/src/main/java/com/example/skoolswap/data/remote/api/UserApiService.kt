@@ -1,10 +1,14 @@
 package com.example.skoolswap.data.remote.api
 
 import com.example.skoolswap.data.remote.models.request.SignInRequest
+import com.example.skoolswap.data.remote.models.request.UpdateMobileRequest
 import com.example.skoolswap.data.remote.models.response.SignInResponse
+import com.example.skoolswap.data.remote.models.response.UpdateMobileResponse
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.Header
 import retrofit2.http.POST
+import retrofit2.http.PUT
 
 interface UserApiService {
 
@@ -12,4 +16,10 @@ interface UserApiService {
     suspend fun signIn(
         @Body request: SignInRequest
     ): Response<SignInResponse>
+
+    @PUT("api/v1/users/update_mobile")
+    suspend fun updateMobile(
+        @Header("Authorization") authToken: String,
+        @Body request: UpdateMobileRequest
+    ): Response<UpdateMobileResponse>
 }

@@ -1,120 +1,150 @@
-package com.example.sekeni.ui.profile
+package com.example.skoolswap.ui.profile
 
+import android.content.Context
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
-import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
-import androidx.drawerlayout.widget.DrawerLayout
+import android.view.inputmethod.InputMethodManager
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.load.resource.bitmap.CircleCrop
-import com.bumptech.glide.request.RequestOptions
-import com.example.sekeni.R
-import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.example.skoolswap.R
+import com.example.skoolswap.databinding.FragmentProfileBinding
+import com.example.skoolswap.domain.repository.AuthRepositoryInterface
+import com.google.android.material.snackbar.Snackbar
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class ProfileFragment : Fragment() {
-    private lateinit var profileViewModel: ProfileViewModel
-    private lateinit var profileImage: ImageView
-    private lateinit var profileName: TextView
+
+    private var _binding: FragmentProfileBinding? = null
+    private val binding get() = _binding!!
+    private val viewModel: ProfileViewModel by viewModels()
+
+    @Inject
+    lateinit var authRepository: AuthRepositoryInterface
+
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
+        inflater: LayoutInflater,
+        container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
-        val view = inflater.inflate(R.layout.fragment_profile, container, false)
+    ): View {
+        _binding = FragmentProfileBinding.inflate(inflater, container, false)
+        return binding.root
+    }
 
-        // Hide the FAB
-        val fab = activity?.findViewById<FloatingActionButton>(R.id.fab)
-        fab?.visibility = View.GONE
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
 
-        // Set up the toolbar with back button and title
-        val toolbar = activity?.findViewById<Toolbar>(R.id.toolbar)
-        toolbar?.title = "User Profile"  // Set the title
-        (activity as AppCompatActivity).setSupportActionBar(toolbar)
+        setupUI()
+        setupObservers()
+        loadUserData()
+    }
 
-        //(activity as AppCompatActivity).supportActionBar?.setDisplayHomeAsUpEnabled(true)  // Show back button
+    private fun setupUI() {
+        // Make contact number editable
+        binding.contactNumber.apply {
+            isClickable = true
+            isFocusable = true
+            isCursorVisible = true
+            isEnabled = true // Enable editing
 
-        // Override back button press to handle going back to previous fragment
-        toolbar?.setNavigationOnClickListener {
-            activity?.onBackPressed()  // Navigate back to the previous fragment
+            setOnClickListener {
+                // Optional: Show keyboard
+                showKeyboard()
+            }
         }
 
-        // Hide the navigation drawer
-        val drawerLayout = activity?.findViewById<DrawerLayout>(R.id.drawer_layout)
-        drawerLayout?.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
-        profileViewModel = ViewModelProvider(requireActivity()).get(ProfileViewModel::class.java)
-
-        // Initialize views
-        profileImage = view.findViewById(R.id.profileImage)
-        profileName = view.findViewById(R.id.profile_name)
-
-        //loadingIndicator = view.findViewById(R.id.loadingIndicator)
-
-        // Update UI with fetched data
-        updateUI(profileViewModel.userName, profileViewModel.userProfilePicUrl)
-        return view
-    }
-    private fun updateUI(name: String?, profilePicUrl: String?) {
-        // Check if name and profilePicUrl are valid
-        if (name.isNullOrEmpty() || profilePicUrl.isNullOrEmpty()) {
-            Log.e("HomeFragment", "Name or Profile Picture is missing")
-            // Handle the error (e.g., show a default image or prompt the user)
-            return
+        binding.submitButton.setOnClickListener {
+            val mobile = binding.contactNumber.text.toString().trim()
+            if (mobile.isNotEmpty()) {
+                viewModel.updateMobile(mobile)
+            } else {
+                Snackbar.make(binding.root, "Please enter a mobile number", Snackbar.LENGTH_SHORT).show()
+            }
         }
 
-        //showLoadingIndicator()
+        // Handle delete profile
+        binding.deleteProfile.setOnClickListener {
+            // Handle delete profile logic
+        }
 
-        profileName.text =  getString(R.string.profileUsername, name)
-        profileName.visibility = View.VISIBLE
-        loadProfileImage(profilePicUrl)
-        profileImage.visibility = View.VISIBLE
-
-
-        // hideLoadingIndicator()
+        // Handle sign out
+        binding.signOutButton.setOnClickListener {
+            // Handle sign out logic
+        }
     }
-    private fun loadProfileImage(profilePicUrl: String) {
-        val requestOptions = RequestOptions()
-            .override(300, 300)
-            .fitCenter()
-            .diskCacheStrategy(DiskCacheStrategy.ALL)
 
-        Glide.with(this)
-            .load(profilePicUrl)
-            .apply(requestOptions)
-            .transform(CircleCrop())
-            .placeholder(R.drawable.ic_launcher_foreground)
-            .error(R.drawable.rectangular)
-            .into(profileImage)
+    private fun setupObservers() {
+        viewLifecycleOwner.lifecycleScope.launchWhenStarted {
+            viewModel.isLoading.collectLatest { isLoading ->
+                binding.profileProgressLayout.visibility =
+                    if (isLoading) View.VISIBLE else View.GONE
+                binding.submitButton.isEnabled = !isLoading
+                binding.contactNumber.isEnabled = !isLoading
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launchWhenStarted {
+            viewModel.error.collectLatest { error ->
+                error?.let {
+                    Snackbar.make(binding.root, it, Snackbar.LENGTH_LONG).show()
+                    viewModel.clearError()
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launchWhenStarted {
+            viewModel.updateSuccess.collectLatest { success ->
+                if (success) {
+                    Snackbar.make(binding.root, "Mobile number updated successfully!", Snackbar.LENGTH_SHORT).show()
+                    viewModel.clearSuccess()
+                }
+            }
+        }
     }
+
+    private fun loadUserData() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            authRepository.getServerUser().collect { user ->
+                user?.let {
+                    // FIX: Use setText() instead of .text assignment
+                    binding.profileName.setText(it.name)
+                    binding.contactNumber.setText(it.mobile ?: "")
+
+                    // Load profile picture
+                    loadProfilePicture(it.profilePictureUrl)
+                }
+            }
+        }
+    }
+
+    private fun loadProfilePicture(url: String) {
+        try {
+            Glide.with(requireContext())
+                .load(url)
+                .placeholder(R.drawable.ic_user)
+                .error(R.drawable.ic_user)
+                .circleCrop()
+                .into(binding.profileImage)
+        } catch (e: Exception) {
+            // Handle error
+        }
+    }
+
+    private fun showKeyboard() {
+        binding.contactNumber.requestFocus()
+        val imm = context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.showSoftInput(binding.contactNumber, InputMethodManager.SHOW_IMPLICIT)
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
-
-        // Unlock the navigation drawer when leaving the fragment
-        val drawerLayout = activity?.findViewById<DrawerLayout>(R.id.drawer_layout)
-        drawerLayout?.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
-
-        // Remove the back button and restore toolbar functionality
-        val toolbar = activity?.findViewById<Toolbar>(R.id.toolbar)
-        (activity as AppCompatActivity).setSupportActionBar(toolbar)
-        (activity as AppCompatActivity).supportActionBar?.setDisplayHomeAsUpEnabled(false)
-    }
-    override fun onResume() {
-        super.onResume()
-        val toolbar = activity?.findViewById<Toolbar>(R.id.toolbar)
-        (activity as AppCompatActivity).setSupportActionBar(toolbar)
-        (activity as AppCompatActivity).supportActionBar?.apply {
-           // setDisplayHomeAsUpEnabled(true)
-           // setHomeAsUpIndicator(com.google.android.material.R.drawable.ic_arrow_back_black_24) // Optional custom back icon
-            title = "User Profile"
-        }
-        toolbar?.setNavigationOnClickListener {
-            activity?.onBackPressed()
-        }
+        _binding = null
     }
 }

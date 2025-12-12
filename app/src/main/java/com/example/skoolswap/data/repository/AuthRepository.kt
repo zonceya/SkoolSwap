@@ -14,6 +14,7 @@ import com.example.skoolswap.data.mapper.toDomain
 import com.example.skoolswap.data.mapper.toEntity
 import com.example.skoolswap.data.remote.api.UserApiService
 import com.example.skoolswap.data.remote.models.request.SignInRequest
+import com.example.skoolswap.data.remote.models.request.UpdateMobileRequest
 import com.example.skoolswap.data.remote.models.response.SignInResponse
 import com.example.skoolswap.data.remote.network.NetworkUtils
 import com.example.skoolswap.domain.model.User
@@ -284,6 +285,43 @@ class AuthRepository @Inject constructor(
             Log.d(TAG, "Network stability: ${if (isStable) "Stable" else "Unstable"}")
         } else {
             Log.w(TAG, "Network is NOT available")
+        }
+    }
+    override suspend fun updateMobile(mobile: String): Result<Boolean> {
+        return try {
+            val token = _authToken.value ?: return Result.failure(Exception("Not authenticated"))
+
+            val request = UpdateMobileRequest(mobile = mobile)
+            val response = userApiService.updateMobile("Bearer $token", request)
+
+            if (response.isSuccessful) {
+                val updateResponse = response.body()
+                if (updateResponse?.cacheUpdated == true) {
+                    Log.d(TAG, "Mobile updated and Redis cache refreshed")
+                }
+
+                // Update local user cache if user data is returned
+                updateResponse?.user?.let { userResponse ->
+                    val currentUser = _serverUser.value
+                    if (currentUser != null) {
+                        val updatedUser = currentUser.copy(mobile = mobile)
+                        _serverUser.value = updatedUser
+
+                        // Update database
+                        userDao.insertUser(updatedUser.toEntity())
+                    }
+                }
+
+                Result.success(true)
+            } else {
+                val errorMsg = "Failed to update mobile: ${response.code()}"
+                _error.value = errorMsg
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            _error.value = "Update mobile failed: ${e.localizedMessage}"
+            Log.e(TAG, "Update mobile failed", e)
+            Result.failure(e)
         }
     }
 }
