@@ -24,6 +24,11 @@ class ProfileViewModel @Inject constructor(
     private val _updateSuccess = MutableStateFlow(false)
     val updateSuccess: StateFlow<Boolean> = _updateSuccess.asStateFlow()
 
+    init {
+        // Clear any previous errors
+        clearError()
+    }
+
     fun updateMobile(mobile: String) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -34,6 +39,7 @@ class ProfileViewModel @Inject constructor(
 
             result.onSuccess {
                 _updateSuccess.value = true
+                refreshUserProfile()
             }.onFailure { throwable ->
                 _error.value = throwable.message ?: "Failed to update mobile"
             }
@@ -42,6 +48,20 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
+    fun refreshUserProfile() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+
+            val result = authRepository.refreshUserProfile()
+
+            result.onFailure { throwable ->
+                _error.value = "Failed to refresh profile: ${throwable.message}"
+            }
+
+            _isLoading.value = false
+        }
+    }
     fun clearError() {
         _error.value = null
     }

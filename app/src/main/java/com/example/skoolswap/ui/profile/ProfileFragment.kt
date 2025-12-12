@@ -2,6 +2,9 @@ package com.example.skoolswap.ui.profile
 
 import android.content.Context
 import android.os.Bundle
+import android.text.Editable
+import android.text.InputType
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,6 +16,7 @@ import com.bumptech.glide.Glide
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentProfileBinding
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
+import com.example.skoolswap.utils.extensions.MobileValidator
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
@@ -40,57 +44,56 @@ class ProfileFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         setupUI()
         setupObservers()
         loadUserData()
     }
 
     private fun setupUI() {
-        // Make contact number editable
         binding.contactNumber.apply {
-            isClickable = true
-            isFocusable = true
-            isCursorVisible = true
-            isEnabled = true // Enable editing
+            inputType = InputType.TYPE_CLASS_PHONE
+
+            setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) {
+                    selectAll()
+                }
+            }
 
             setOnClickListener {
-                // Optional: Show keyboard
-                showKeyboard()
+                requestFocus()
             }
+
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                override fun afterTextChanged(s: Editable?) {
+                    validateMobileNumber(s.toString())
+                }
+            })
         }
 
+        // ADD THIS: Setup submit button click listener
         binding.submitButton.setOnClickListener {
-            val mobile = binding.contactNumber.text.toString().trim()
-            if (mobile.isNotEmpty()) {
-                viewModel.updateMobile(mobile)
-            } else {
-                Snackbar.make(binding.root, "Please enter a mobile number", Snackbar.LENGTH_SHORT).show()
-            }
-        }
-
-        // Handle delete profile
-        binding.deleteProfile.setOnClickListener {
-            // Handle delete profile logic
-        }
-
-        // Handle sign out
-        binding.signOutButton.setOnClickListener {
-            // Handle sign out logic
+            submitMobileNumber()
         }
     }
 
     private fun setupObservers() {
-        viewLifecycleOwner.lifecycleScope.launchWhenStarted {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.isLoading.collectLatest { isLoading ->
-                binding.profileProgressLayout.visibility =
-                    if (isLoading) View.VISIBLE else View.GONE
-                binding.submitButton.isEnabled = !isLoading
-                binding.contactNumber.isEnabled = !isLoading
+                if (isLoading) {
+                    binding.profileProgressLayout.visibility = View.VISIBLE
+                    binding.submitButton.isEnabled = false
+                    binding.contactNumber.isEnabled = false
+                } else {
+                    binding.profileProgressLayout.visibility = View.GONE
+                    binding.submitButton.isEnabled = true
+                    binding.contactNumber.isEnabled = true
+                }
             }
         }
 
-        viewLifecycleOwner.lifecycleScope.launchWhenStarted {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.error.collectLatest { error ->
                 error?.let {
                     Snackbar.make(binding.root, it, Snackbar.LENGTH_LONG).show()
@@ -99,11 +102,17 @@ class ProfileFragment : Fragment() {
             }
         }
 
-        viewLifecycleOwner.lifecycleScope.launchWhenStarted {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.updateSuccess.collectLatest { success ->
                 if (success) {
                     Snackbar.make(binding.root, "Mobile number updated successfully!", Snackbar.LENGTH_SHORT).show()
                     viewModel.clearSuccess()
+
+                    // Hide keyboard after successful update
+                    hideKeyboard()
+
+                    // Clear focus from EditText
+                    binding.contactNumber.clearFocus()
                 }
             }
         }
@@ -113,15 +122,43 @@ class ProfileFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             authRepository.getServerUser().collect { user ->
                 user?.let {
-                    // FIX: Use setText() instead of .text assignment
                     binding.profileName.setText(it.name)
-                    binding.contactNumber.setText(it.mobile ?: "")
 
-                    // Load profile picture
+                    val displayMobile = it.mobile?.let { mobile ->
+                        if (MobileValidator.formatToLocal(mobile) != mobile) {
+                            MobileValidator.formatToLocal(mobile)
+                        } else {
+                            mobile
+                        }
+                    } ?: ""
+
+                    binding.contactNumber.setText(displayMobile)
                     loadProfilePicture(it.profilePictureUrl)
                 }
             }
         }
+    }
+
+    private fun validateMobileNumber(mobile: String): Boolean {
+        val error = MobileValidator.getErrorMessage(mobile)
+        binding.contactNumber.error = error
+        binding.submitButton.isEnabled = error == null
+        return error == null
+    }
+
+    private fun submitMobileNumber() {
+        val mobile = binding.contactNumber.text.toString().trim()
+
+        if (mobile.isEmpty()) {
+            Snackbar.make(binding.root, "Please enter mobile number", Snackbar.LENGTH_SHORT).show()
+            return
+        }
+
+        if (!validateMobileNumber(mobile)) {
+            return
+        }
+
+        viewModel.updateMobile(mobile)
     }
 
     private fun loadProfilePicture(url: String) {
@@ -131,16 +168,16 @@ class ProfileFragment : Fragment() {
                 .placeholder(R.drawable.ic_user)
                 .error(R.drawable.ic_user)
                 .circleCrop()
+                .timeout(10000)
                 .into(binding.profileImage)
         } catch (e: Exception) {
-            // Handle error
+            // Handle error silently
         }
     }
 
-    private fun showKeyboard() {
-        binding.contactNumber.requestFocus()
+    private fun hideKeyboard() {
         val imm = context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-        imm?.showSoftInput(binding.contactNumber, InputMethodManager.SHOW_IMPLICIT)
+        imm?.hideSoftInputFromWindow(binding.contactNumber.windowToken, 0)
     }
 
     override fun onDestroyView() {

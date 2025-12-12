@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mobile_navigation"
-    app:startDestination="@+id/viewPagerFragment"> <!-- Start with onboarding -->
+    app:startDestination="@+id/viewPagerFragment">
 
     <!-- Onboarding Flow -->
     <fragment
@@ -11,8 +11,6 @@
         android:name="com.example.skoolswap.ui.onboarding.ViewPagerFragment"
         android:label="Onboarding"
         tools:layout="@layout/fragment_view_pager">
-
-        <!-- ADD ACTION to go to login after onboarding -->
         <action
             android:id="@+id/action_viewPagerFragment_to_loginFragment"
             app:destination="@id/loginFragment"
@@ -26,8 +24,6 @@
         android:name="com.example.skoolswap.ui.login.LoginFragment"
         android:label="Login"
         tools:layout="@layout/fragment_login">
-
-        <!-- ADD ACTION to go to home after login -->
         <action
             android:id="@+id/action_loginFragment_to_nav_home"
             app:destination="@id/nav_home"
@@ -53,5 +49,12 @@
         android:name="com.example.skoolswap.ui.slideshow.SlideshowFragment"
         android:label="@string/menu_slideshow"
         tools:layout="@layout/fragment_slideshow" />
+
+    <!-- ADD THIS: Profile Fragment -->
+    <fragment
+        android:id="@+id/nav_profile"
+        android:name="com.example.skoolswap.ui.profile.ProfileFragment"
+        android:label="Profile"
+        tools:layout="@layout/fragment_profile" />
 
 </navigation>

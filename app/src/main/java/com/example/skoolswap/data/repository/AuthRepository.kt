@@ -19,6 +19,7 @@ import com.example.skoolswap.data.remote.models.response.SignInResponse
 import com.example.skoolswap.data.remote.network.NetworkUtils
 import com.example.skoolswap.domain.model.User
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
+import com.example.skoolswap.utils.extensions.MobileValidator
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
@@ -36,8 +37,8 @@ import retrofit2.Response
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
-import androidx.core.content.edit
 import com.example.skoolswap.data.local.datastore.AppPreferences
+
 
 @Singleton
 class AuthRepository @Inject constructor(
@@ -97,16 +98,11 @@ class AuthRepository @Inject constructor(
             _loading.value = true
             _error.value = null
             logNetworkStatus()
-            // 1. Get Google ID token
+
             val googleIdToken = getGoogleIdToken(activity)
-
-            // 2. Authenticate with Firebase
             val firebaseUser = authenticateWithFirebase(googleIdToken)
-
-            // Update Firebase flow
             _currentUser.value = firebaseUser
 
-            // 3. Send to backend API
             val signInRequest = SignInRequest(
                 email = firebaseUser.email ?: "",
                 name = firebaseUser.displayName ?: "User",
@@ -171,6 +167,111 @@ class AuthRepository @Inject constructor(
         }
     }
 
+    override suspend fun updateMobile(mobile: String): Result<Boolean> {
+        return try {
+            _loading.value = true
+            _error.value = null
+
+            // Validate mobile number
+            val errorMessage = MobileValidator.getErrorMessage(mobile)
+            if (errorMessage != null) {
+                _error.value = errorMessage
+                return Result.failure(Exception(errorMessage))
+            }
+
+            val token = _authToken.value
+            if (token == null) {
+                _error.value = "Not authenticated"
+                return Result.failure(Exception("Not authenticated"))
+            }
+
+            // Format mobile for backend
+            val formattedMobile = MobileValidator.formatToInternational(mobile)
+            val request = UpdateMobileRequest(mobile = formattedMobile)
+            val response = userApiService.updateMobile("Bearer $token", request)
+
+            if (response.isSuccessful) {
+                val updateResponse = response.body()
+
+                // Update local cache immediately to prevent UI flashing
+                val currentUser = _serverUser.value
+                if (currentUser != null) {
+                    val updatedUser = currentUser.copy(mobile = formattedMobile)
+                    _serverUser.value = updatedUser
+                    userDao.insertUser(updatedUser.toEntity())
+                    Log.i(TAG, "Mobile updated locally")
+                }
+
+                // Optionally refresh from server if needed
+                if (updateResponse?.user != null) {
+                    // Update with server response (contains full user data)
+                    val updatedUser = updateResponse.user.toDomain(token)
+                    _serverUser.value = updatedUser
+                    userDao.insertUser(updatedUser.toEntity())
+                    Log.i(TAG, "Mobile updated with server response")
+                }
+
+                Result.success(true)
+            } else {
+                val errorMsg = "Failed to update mobile: ${response.code()}"
+                _error.value = errorMsg
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            _error.value = "Update mobile failed: ${e.localizedMessage}"
+            Log.e(TAG, "Update mobile failed", e)
+            Result.failure(e)
+        } finally {
+            _loading.value = false
+        }
+    }
+    override suspend fun refreshUserProfile(): Result<User?> {
+        return try {
+            _loading.value = true
+
+            val token = _authToken.value
+            if (token == null) {
+                _loading.value = false
+                return Result.failure(Exception("Not authenticated"))
+            }
+
+            val response = userApiService.getProfile("Bearer $token")
+
+            if (response.isSuccessful) {
+                val profileResponse = response.body()
+                if (profileResponse != null) {
+                    val updatedUser = User(
+                        id = profileResponse.user.id,
+                        name = profileResponse.user.name,
+                        email = profileResponse.user.email,
+                        mobile = profileResponse.user.mobile ?: profileResponse.profile?.mobile,
+                        username = profileResponse.user.username,
+                        profilePictureUrl = profileResponse.user.profilePictureUrl,
+                        authMode = profileResponse.user.authMode,
+                        role = profileResponse.user.role,
+                        token = token,
+                        createdAt = profileResponse.user.createdAt,
+                        updatedAt = profileResponse.user.updatedAt
+                    )
+
+                    // Update local cache
+                    _serverUser.value = updatedUser
+                    userDao.insertUser(updatedUser.toEntity())
+
+                    Result.success(updatedUser)
+                } else {
+                    Result.failure(Exception("Empty profile response"))
+                }
+            } else {
+                Result.failure(Exception("Failed to get profile: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        } finally {
+            // IMPORTANT: Always set loading to false
+            _loading.value = false
+        }
+    }
     override suspend fun signOut() {
         try {
             firebaseAuth.signOut()
@@ -213,29 +314,24 @@ class AuthRepository @Inject constructor(
             .build()
 
         return try {
-            // Always use Activity - works on all API levels
             val response = credentialManager.getCredential(activity, request)
             parseGoogleIdToken(response)
         } catch (e: GetCredentialException) {
             handleCredentialException(e)
         }
     }
+
     private fun handleCredentialException(e: GetCredentialException): Nothing {
         Log.e(TAG, "Credential exception: ${e.javaClass.simpleName} - ${e.message}")
 
         when (e) {
             is androidx.credentials.exceptions.NoCredentialException -> {
-                // Check network stability first
                 if (!isNetworkAvailable()) {
                     throw IllegalStateException(ErrorConstants.Auth.NO_INTERNET)
                 }
-
-                // Check if network is stable (not flaky)
                 if (!NetworkUtils.isNetworkStable(context)) {
                     throw IllegalStateException(ErrorConstants.Auth.UNSTABLE_CONNECTION)
                 }
-
-                // If network is available and stable, then it's truly no Google accounts
                 throw IllegalStateException(ErrorConstants.Auth.NO_GOOGLE_ACCOUNTS)
             }
             is androidx.credentials.exceptions.GetCredentialCancellationException -> {
@@ -269,9 +365,11 @@ class AuthRepository @Inject constructor(
     private fun generateNonce(): String {
         return UUID.randomUUID().toString()
     }
+
     private fun isNetworkAvailable(): Boolean {
         return NetworkUtils.isNetworkAvailable(context)
     }
+
     private fun logNetworkStatus() {
         if (isNetworkAvailable()) {
             val networkType = NetworkUtils.getNetworkType(context)
@@ -281,43 +379,6 @@ class AuthRepository @Inject constructor(
             Log.d(TAG, "Network stability: ${if (isStable) "Stable" else "Unstable"}")
         } else {
             Log.w(TAG, "Network is NOT available")
-        }
-    }
-    override suspend fun updateMobile(mobile: String): Result<Boolean> {
-        return try {
-            val token = _authToken.value ?: return Result.failure(Exception("Not authenticated"))
-
-            val request = UpdateMobileRequest(mobile = mobile)
-            val response = userApiService.updateMobile("Bearer $token", request)
-
-            if (response.isSuccessful) {
-                val updateResponse = response.body()
-                if (updateResponse?.cacheUpdated == true) {
-                    Log.d(TAG, "Mobile updated and Redis cache refreshed")
-                }
-
-                // Update local user cache if user data is returned
-                updateResponse?.user?.let { userResponse ->
-                    val currentUser = _serverUser.value
-                    if (currentUser != null) {
-                        val updatedUser = currentUser.copy(mobile = mobile)
-                        _serverUser.value = updatedUser
-
-                        // Update database
-                        userDao.insertUser(updatedUser.toEntity())
-                    }
-                }
-
-                Result.success(true)
-            } else {
-                val errorMsg = "Failed to update mobile: ${response.code()}"
-                _error.value = errorMsg
-                Result.failure(Exception(errorMsg))
-            }
-        } catch (e: Exception) {
-            _error.value = "Update mobile failed: ${e.localizedMessage}"
-            Log.e(TAG, "Update mobile failed", e)
-            Result.failure(e)
         }
     }
 }

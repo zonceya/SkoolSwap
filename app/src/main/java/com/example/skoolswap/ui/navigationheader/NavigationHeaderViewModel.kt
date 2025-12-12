@@ -2,54 +2,43 @@ package com.example.skoolswap.ui.navigationheader
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.skoolswap.data.repository.AuthRepository
+import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class NavigationHeaderViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepositoryInterface
 ) : ViewModel() {
 
-    // Get user data from serverUser flow
-    val userName: StateFlow<String?> = authRepository.getServerUser()
-        .map { user -> user?.name }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null
-        )
+    private val _userState = MutableStateFlow<UserState>(UserState.Loading)
+    val userState: StateFlow<UserState> = _userState.asStateFlow()
 
-    val userProfileImage: StateFlow<String?> = authRepository.getServerUser()
-        .map { user -> user?.profilePictureUrl }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null
-        )
+    init {
+        refresh()
+    }
 
-    val userEmail: StateFlow<String?> = authRepository.getServerUser()
-        .map { user -> user?.email }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null
-        )
-
-    val isLoggedIn: StateFlow<Boolean> = authRepository.getServerUser()
-        .map { user -> user != null }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = false
-        )
-
-    // Simple method to refresh
     fun refresh() {
-        authRepository.checkCurrentUser()
+        viewModelScope.launch {
+            _userState.value = UserState.Loading
+            try {
+                val result = authRepository.refreshUserProfile()
+                result.onSuccess { user ->
+                    _userState.value = UserState.Success(
+                        name = user?.name,
+                        email = user?.email,
+                        profileImageUrl = user?.profilePictureUrl
+                    )
+                }.onFailure { throwable ->
+                    _userState.value = UserState.Error("Failed to load profile")
+                }
+            } catch (e: Exception) {
+                _userState.value = UserState.Error("Error: ${e.message}")
+            }
+        }
     }
 }
