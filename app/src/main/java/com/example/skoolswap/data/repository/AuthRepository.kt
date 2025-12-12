@@ -35,6 +35,8 @@ import retrofit2.Response
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import androidx.core.content.edit
+import com.example.skoolswap.data.local.datastore.AppPreferences
 
 @Singleton
 class AuthRepository @Inject constructor(
@@ -42,7 +44,8 @@ class AuthRepository @Inject constructor(
     private val userApiService: UserApiService,
     private val database: SkoolSwapDatabase,
     private val credentialManager: CredentialManager,
-    private val firebaseAuth: FirebaseAuth
+    private val firebaseAuth: FirebaseAuth,
+    private val appPreferences: AppPreferences
 ) : AuthRepositoryInterface {
 
     private companion object {
@@ -137,7 +140,10 @@ class AuthRepository @Inject constructor(
             if (signInResponse?.success == true) {
                 val domainUser = signInResponse.user.toDomain(signInResponse.token)
                 cacheUser(domainUser, firebaseUser)
+                appPreferences.setLoggedIn(true)
+                appPreferences.setFirstTimeLogin(false)
                 Result.success(domainUser)
+
             } else {
                 val errorMsg = signInResponse?.message ?: "Backend sign-in failed"
                 _error.value = errorMsg
@@ -169,6 +175,7 @@ class AuthRepository @Inject constructor(
             firebaseAuth.signOut()
             clearUserData()
             userDao.clearAllUsers()
+            appPreferences.setLoggedIn(false)
             Log.i(TAG, "User signed out successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error during sign out", e)
@@ -240,17 +247,6 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    // Optional: Check for Google accounts offline
-    private fun checkForGoogleAccountsOffline(): Boolean {
-        return try {
-            // This is a basic check - won't work without network for Google accounts
-            // but can check for previously cached accounts
-            val sharedPrefs = context.getSharedPreferences("auth_prefs", android.content.Context.MODE_PRIVATE)
-            sharedPrefs.getBoolean("has_google_accounts", false)
-        } catch (e: Exception) {
-            false
-        }
-    }
     private fun parseGoogleIdToken(response: GetCredentialResponse): String {
         val credential = response.credential
         return when (credential) {
