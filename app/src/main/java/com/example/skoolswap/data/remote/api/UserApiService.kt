@@ -2,11 +2,13 @@ package com.example.skoolswap.data.remote.api
 
 import com.example.skoolswap.data.remote.models.request.SignInRequest
 import com.example.skoolswap.data.remote.models.request.UpdateMobileRequest
+import com.example.skoolswap.data.remote.models.response.DeleteProfileResponse
 import com.example.skoolswap.data.remote.models.response.ProfileResponse
 import com.example.skoolswap.data.remote.models.response.SignInResponse
 import com.example.skoolswap.data.remote.models.response.UpdateMobileResponse
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
@@ -28,4 +30,8 @@ interface UserApiService {
     suspend fun getProfile(
         @Header("Authorization") authToken: String
     ): Response<ProfileResponse>
+    @DELETE("api/v1/users/disable")
+    suspend fun deleteProfile(
+        @Header("Authorization") authToken: String
+    ): Response<DeleteProfileResponse>
 }

@@ -37,6 +37,7 @@ import retrofit2.Response
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.example.skoolswap.data.remote.models.response.DeleteProfileResponse
 import com.example.skoolswap.data.local.datastore.AppPreferences
 
 
@@ -274,13 +275,23 @@ class AuthRepository @Inject constructor(
     }
     override suspend fun signOut() {
         try {
+            // Firebase sign out
             firebaseAuth.signOut()
+
+            // Clear all local data
             clearUserData()
+
+            // Clear database
             userDao.clearAllUsers()
+
+            // Clear preferences
             appPreferences.setLoggedIn(false)
-            Log.i(TAG, "User signed out successfully")
+            appPreferences.clearUserData()
+
+            Log.i(TAG, "User signed out successfully after deletion")
         } catch (e: Exception) {
-            Log.e(TAG, "Error during sign out", e)
+            Log.e(TAG, "Error during sign out after deletion", e)
+            // Even if there's an error, we should continue with deletion
         }
     }
 
@@ -288,7 +299,11 @@ class AuthRepository @Inject constructor(
         _currentUser.value = null
         _serverUser.value = null
         _authToken.value = null
+        _loading.value = false
+        _error.value = null
     }
+
+
 
     override fun clearError() {
         _error.value = null
@@ -379,6 +394,67 @@ class AuthRepository @Inject constructor(
             Log.d(TAG, "Network stability: ${if (isStable) "Stable" else "Unstable"}")
         } else {
             Log.w(TAG, "Network is NOT available")
+        }
+    }
+
+    override suspend fun deleteProfile(): Result<Boolean> {
+        return try {
+            _loading.value = true
+            _error.value = null
+
+            val token = _authToken.value
+            if (token == null) {
+                _error.value = "Not authenticated"
+                return Result.failure(Exception("Not authenticated"))
+            }
+
+            Log.d(TAG, "Calling delete profile API...")
+            val response = userApiService.deleteProfile("Bearer $token")
+
+            Log.d(TAG, "Delete profile response code: ${response.code()}")
+
+            if (response.isSuccessful) {
+                val deleteResponse: DeleteProfileResponse? = response.body()
+
+                if (deleteResponse != null) {
+                    Log.i(TAG, "Profile disabled successfully: ${deleteResponse.message}")
+
+                    // Clear all user data and sign out
+                    signOut()
+
+                    Result.success(true)
+                } else {
+                    Log.e(TAG, "Delete profile response body is null")
+                    _error.value = "Server returned empty response"
+                    Result.failure(Exception("Server returned empty response"))
+                }
+            } else {
+                // Try to parse the error response
+                val errorMessage = try {
+                    val errorBody = response.errorBody()?.string()
+                    if (!errorBody.isNullOrEmpty()) {
+                        // Try to parse as DeleteProfileResponse
+                        val gson = com.google.gson.Gson()
+                        val errorResponse = gson.fromJson(errorBody, DeleteProfileResponse::class.java)
+                        errorResponse.message ?: "Delete failed with code: ${response.code()}"
+                    } else {
+                        "Delete failed with code: ${response.code()}"
+                    }
+                } catch (e: Exception) {
+                    "Delete failed with code: ${response.code()}"
+                }
+
+                Log.e(TAG, "Delete profile failed: $errorMessage")
+                _error.value = errorMessage
+                Result.failure(Exception(errorMessage))
+            }
+        } catch (e: Exception) {
+            val errorMsg = "Delete profile failed: ${e.message}"
+            Log.e(TAG, errorMsg, e)
+            _error.value = errorMsg
+            Result.failure(e)
+        } finally {
+            _loading.value = false
         }
     }
 }
