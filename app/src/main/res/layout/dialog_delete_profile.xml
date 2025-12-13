@@ -1,46 +1,79 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/deleteAccountDialogRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:padding="24dp"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:background="@android:color/transparent">
 
+    <!-- Warning icon -->
+    <ImageView
+        android:id="@+id/iconWarning"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="center_horizontal"
+        android:contentDescription="@string/cd_warning"
+        app:tint="@color/black"
+        app:srcCompat="@drawable/ic_warning" />
+
+    <!-- Title -->
     <TextView
-        android:id="@+id/warningTitle"
+        android:id="@+id/titleDeleteAccount"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Warning"
-        android:textSize="18sp"
+        android:layout_marginTop="16dp"
+        android:text="@string/title_delete_account"
+        android:textAppearance="?attr/textAppearanceHeadline6"
         android:textStyle="bold"
-        android:textColor="@color/red"
-        android:gravity="center"
-        android:layout_marginBottom="16dp" />
+        android:gravity="center" />
 
+    <!-- Message -->
     <TextView
-        android:id="@+id/warningMessage"
+        android:id="@+id/messageDeleteAccount"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Deleting your account is permanent and cannot be undone. All your data will be permanently lost."
-        android:textSize="14sp"
-        android:lineSpacingExtra="4dp"
-        android:layout_marginBottom="24dp" />
+        android:layout_marginTop="8dp"
+        android:text="@string/msg_delete_account"
+        android:textAppearance="?attr/textAppearanceBody2"
+        android:gravity="center"
+        android:lineSpacingExtra="4dp" />
 
-    <com.google.android.material.card.MaterialCardView
+    <!-- Buttons row - CENTERED with equal weights -->
+    <LinearLayout
+        android:id="@+id/actionsRow"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardBackgroundColor="@color/red_light"
-        app:cardCornerRadius="8dp"
-        android:layout_marginBottom="16dp">
+        android:layout_marginTop="24dp"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:weightSum="2">
 
-        <TextView
-            android:layout_width="match_parent"
+        <!-- Keep account (secondary) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnKeep"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="@string/to_reactivate_your_account_after_deletion_you_ll_need_to_contact_our_support_team"
-            android:textSize="12sp"
-            android:padding="12dp"
-            android:textColor="@color/red_dark" />
+            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
+            android:text="@string/btn_keep_account"
+            app:backgroundTint="@android:color/transparent"
+            app:strokeColor="@color/black"
+            android:textColor="@color/black" />
 
-    </com.google.android.material.card.MaterialCardView>
+        <!-- Delete account (destructive) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnDelete"
+            style="@style/Widget.MaterialComponents.Button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="@string/btn_delete_account"
+            app:backgroundTint="@color/black"
+            android:textColor="@android:color/white" />
+    </LinearLayout>
 
 </LinearLayout>

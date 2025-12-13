@@ -52,4 +52,9 @@
     <string name="name">Name</string>
     <string name="profileUsername">Username</string>
     <string name="to_reactivate_your_account_after_deletion_you_ll_need_to_contact_our_support_team">⚠️ To reactivate your account after deletion, you\'ll need to contact our support team.</string>
+    <string name="cd_warning">Warning</string>
+    <string name="title_delete_account">Delete Account</string>
+    <string name="msg_delete_account">You\'re going to delete your account. Are you sure?</string>
+    <string name="btn_keep_account">No, Keep it.</string>
+    <string name="btn_delete_account">Yes, Delete It!</string>
 </resources>

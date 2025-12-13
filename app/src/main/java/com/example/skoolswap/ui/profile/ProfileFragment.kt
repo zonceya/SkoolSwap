@@ -18,6 +18,7 @@ import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentProfileBinding
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.utils.extensions.MobileValidator
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
@@ -45,6 +46,7 @@ class ProfileFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        hideFab()
         setupUI()
         setupObservers()
         loadUserData()
@@ -121,7 +123,11 @@ class ProfileFragment : Fragment() {
             }
         }
     }
-
+    private  fun hideFab() {
+    val fab = activity?.findViewById<FloatingActionButton>(R.id.fab)
+    // Hide the FAB
+    fab?.visibility = View.GONE
+}
     private fun loadUserData() {
         viewLifecycleOwner.lifecycleScope.launch {
             authRepository.getServerUser().collect { user ->
