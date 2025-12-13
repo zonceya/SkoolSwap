@@ -20,15 +20,17 @@ import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
 import androidx.navigation.ui.setupActionBarWithNavController
-import androidx.navigation.ui.setupWithNavController
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.AppConstants
 import com.example.skoolswap.databinding.ActivityMainBinding
 import com.example.skoolswap.ui.navigationheader.NavigationHeaderViewModel
+import com.example.skoolswap.ui.navigationheader.UserState
 import com.google.android.material.navigation.NavigationView
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -54,8 +56,7 @@ class MainActivity : AppCompatActivity() {
 
         setupNavigationDrawer()
         setupNavigationHeader()
-        setupNavigationListener() // Combined method
-        checkInitialNavigation()
+        setupNavigationListener()
         observeNavigation()
         observeAuthState()
     }
@@ -77,27 +78,41 @@ class MainActivity : AppCompatActivity() {
         val userEmailTextView = headerView.findViewById<TextView>(R.id.userEmailTextView)
         val profileImageView = headerView.findViewById<ImageView>(R.id.profileImageView)
 
+        // Observe navigation header view model
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                combine(
-                    navHeaderViewModel.userName,
-                    navHeaderViewModel.userEmail,
-                    navHeaderViewModel.userProfileImage
-                ) { name, email, imageUrl ->
-                    Triple(name, email, imageUrl)
-                }.collect { (name, email, imageUrl) ->
-                    usernameTextView.text = name ?: "Welcome"
-                    userEmailTextView.text = email ?: "Sign in to continue"
+                navHeaderViewModel.userState.collectLatest { userState ->
+                    when (userState) {
+                        is UserState.Loading -> {
+                            usernameTextView.text = "Loading..."
+                            userEmailTextView.text = ""
+                            profileImageView.setImageResource(R.drawable.ic_user)
+                        }
+                        is UserState.Success -> {
+                            usernameTextView.text = userState.name ?: "Welcome"
+                            userEmailTextView.text = userState.email ?: "Sign in to continue"
 
-                    if (!imageUrl.isNullOrEmpty()) {
-                        Glide.with(this@MainActivity)
-                            .load(imageUrl)
-                            .circleCrop()
-                            .placeholder(R.drawable.ic_user)
-                            .error(R.drawable.ic_user)
-                            .into(profileImageView)
-                    } else {
-                        profileImageView.setImageResource(R.drawable.ic_user)
+                            if (!userState.profileImageUrl.isNullOrEmpty()) {
+                                Glide.with(this@MainActivity)
+                                    .load(userState.profileImageUrl)
+                                    .circleCrop()
+                                    .placeholder(R.drawable.ic_user)
+                                    .error(R.drawable.ic_user)
+                                    .into(profileImageView)
+                            } else {
+                                profileImageView.setImageResource(R.drawable.ic_user)
+                            }
+                        }
+                        is UserState.Error -> {
+                            usernameTextView.text = "Error"
+                            userEmailTextView.text = "Tap to retry"
+                            profileImageView.setImageResource(R.drawable.ic_user)
+
+                            // Make header clickable for retry
+                            headerView.setOnClickListener {
+                                navHeaderViewModel.refresh()
+                            }
+                        }
                     }
                 }
             }
@@ -107,10 +122,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupNavigationListener() {
         val navView: NavigationView = binding.navView
 
-        // Setup navigation with NavController
-        navView.setupWithNavController(navController)
-
-        // Add custom navigation item selection handling
+        // Setup navigation item selection
         navView.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.nav_logout -> {
@@ -119,9 +131,10 @@ class MainActivity : AppCompatActivity() {
                 }
                 else -> {
                     try {
-                        // Navigate using NavController
-                        navController.navigate(menuItem.itemId)
-                        // Close drawer
+                        // Check if we're already on this destination
+                        if (navController.currentDestination?.id != menuItem.itemId) {
+                            navController.navigate(menuItem.itemId)
+                        }
                         binding.drawerLayout.closeDrawer(GravityCompat.START)
                         true
                     } catch (e: Exception) {
@@ -132,7 +145,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Add destination changed listener for UI changes
+        // Setup destination changed listener
         navController.addOnDestinationChangedListener { _, destination, _ ->
             when (destination.id) {
                 R.id.viewPagerFragment, R.id.loginFragment -> {
@@ -193,6 +206,8 @@ class MainActivity : AppCompatActivity() {
     private fun observeAuthState() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                // Refresh profile only once when resumed
+                delay(AppConstants.TIMEOUT) // Add delay to prevent multiple rapid refreshes
                 navHeaderViewModel.refresh()
             }
         }
@@ -203,6 +218,7 @@ class MainActivity : AppCompatActivity() {
         // Check if user is already logged in
         viewModel.checkAuthState()
     }
+
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main, menu)
         return true
@@ -239,12 +255,6 @@ class MainActivity : AppCompatActivity() {
                 if (navController.currentDestination?.id != R.id.loginFragment)
                     navController.navigate(R.id.loginFragment)
             }
-        }
-    }
-
-    private fun checkInitialNavigation() {
-        viewModel.navigationDestination.observe(this) { destination ->
-            navigateToDestination(destination)
         }
     }
 }

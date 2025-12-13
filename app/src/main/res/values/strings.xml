@@ -38,4 +38,11 @@
     <string name="default_web_client_id" translatable="false">63644777044-5ttve1jvt4nr35s31b2gp2b48ev2tp3h.apps.googleusercontent.com</string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="delete_profile">Delete Profile</string>
+    <string name="deleting_your_account_is_permanent_and_cannot_be_undone_all_your_data_will_be_permanently_lost">Deleting your account is permanent and cannot be undone. All your data will be permanently lost.</string>
+    <string name="submit">Submit</string>
+    <string name="contact_number">Contact Number</string>
+    <string name="zama_onceya">Zama Onceya</string>
+    <string name="name">Name</string>
+    <string name="profileUsername">Username</string>
 </resources>

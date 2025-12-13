@@ -3,7 +3,7 @@ package com.example.skoolswap.common.constants
 object AppConstants {
     const val BASE_URL = "https://api.sekeni.xyz/"
     const val API_TIMEOUT = 30L
-
+    const val TIMEOUT = 1000L
     // Database Constants
     const val DATABASE_NAME = "skoolswap_database"
     const val DATABASE_VERSION = 1
