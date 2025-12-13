@@ -12,6 +12,7 @@ import android.view.inputmethod.InputMethodManager
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentProfileBinding
@@ -75,6 +76,9 @@ class ProfileFragment : Fragment() {
         // ADD THIS: Setup submit button click listener
         binding.submitButton.setOnClickListener {
             submitMobileNumber()
+        }
+        binding.deleteButton.setOnClickListener {
+            showDeleteConfirmationDialog()
         }
     }
 
@@ -174,7 +178,52 @@ class ProfileFragment : Fragment() {
             // Handle error silently
         }
     }
+    private fun showDeleteConfirmationDialog() {
+        val dialog = DeleteProfileDialog().apply {
+            onConfirm = {
+                // User confirmed deletion
+                deleteProfile()
+            }
+            onCancel = {
+                // User cancelled
+                Snackbar.make(binding.root, "Account deletion cancelled", Snackbar.LENGTH_SHORT).show()
+            }
+        }
 
+        dialog.show(parentFragmentManager, "delete_profile_dialog")
+    }
+    private fun deleteProfile() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.isLoading.collectLatest { isLoading ->
+                if (isLoading) {
+                    binding.profileProgressLayout.visibility = View.VISIBLE
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            val result = authRepository.deleteProfile()
+
+            if (result.isSuccess) {
+                Snackbar.make(
+                    binding.root,
+                    "Account deleted successfully. You have been signed out.",
+                    Snackbar.LENGTH_LONG
+                ).show()
+
+                // Navigate to login screen
+                findNavController().navigate(R.id.loginFragment)
+            } else {
+                Snackbar.make(
+                    binding.root,
+                    "Failed to delete account: ${result.exceptionOrNull()?.message}",
+                    Snackbar.LENGTH_LONG
+                ).show()
+            }
+
+            binding.profileProgressLayout.visibility = View.GONE
+        }
+    }
     private fun hideKeyboard() {
         val imm = context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         imm?.hideSoftInputFromWindow(binding.contactNumber.windowToken, 0)

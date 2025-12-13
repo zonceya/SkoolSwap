@@ -9,4 +9,7 @@
     <color name="white">#FFFFFFFF</color>
     <color name="lightgray">#E0E0E0</color>
     <color name="red">#FF0000</color>
+    <!-- res/values/colors.xml -->
+    <color name="red_light">#FFEBEE</color>
+    <color name="red_dark">#C62828</color>
 </resources>

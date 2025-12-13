@@ -14,7 +14,7 @@ object ErrorConstants {
         // Sign-in errors
         const val SIGN_IN_FAILED = "Sign-in failed: %s"
         const val BACKEND_SIGN_IN_FAILED = "Backend sign-in failed"
-
+        const val UNAUTHORIZED = "Unauthorized: Invalid credentials or session expired"
         // Network-related auth errors
         const val NO_INTERNET = "No internet connection. Please check your network and try again."
         const val UNSTABLE_CONNECTION = "Unstable internet connection. Please check your network stability."

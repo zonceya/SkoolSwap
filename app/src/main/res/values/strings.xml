@@ -36,7 +36,13 @@
     <string name="login_failed">"Login failed"</string>
     <string name="sign_in_with_google">Continue with Google</string>
     <string name="default_web_client_id" translatable="false">63644777044-5ttve1jvt4nr35s31b2gp2b48ev2tp3h.apps.googleusercontent.com</string>
-    <!-- TODO: Remove or change this placeholder text -->
+    <string name="delete_account_success">Account deleted successfully</string>
+    <string name="delete_account_failed">Failed to delete account</string>
+    <string name="delete_account_already_deactivated">Account is already deactivated</string>
+    <string name="delete_account_unauthorized">Session expired. Please sign in again</string>
+    <string name="delete_account_not_found">User not found or already deleted</string>
+    <string name="delete_account_invalid_request">Invalid request to delete account</string>
+    <string name="delete_account_server_error">Server error while deleting account</string>
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="delete_profile">Delete Profile</string>
     <string name="deleting_your_account_is_permanent_and_cannot_be_undone_all_your_data_will_be_permanently_lost">Deleting your account is permanent and cannot be undone. All your data will be permanently lost.</string>
@@ -45,4 +51,5 @@
     <string name="zama_onceya">Zama Onceya</string>
     <string name="name">Name</string>
     <string name="profileUsername">Username</string>
+    <string name="to_reactivate_your_account_after_deletion_you_ll_need_to_contact_our_support_team">⚠️ To reactivate your account after deletion, you\'ll need to contact our support team.</string>
 </resources>

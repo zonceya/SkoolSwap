@@ -21,6 +21,7 @@ import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
 import androidx.navigation.ui.setupActionBarWithNavController
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.example.skoolswap.R
 import com.example.skoolswap.common.constants.AppConstants
 import com.example.skoolswap.databinding.ActivityMainBinding
@@ -98,6 +99,8 @@ class MainActivity : AppCompatActivity() {
                                     .circleCrop()
                                     .placeholder(R.drawable.ic_user)
                                     .error(R.drawable.ic_user)
+                                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                                    .skipMemoryCache(false)
                                     .into(profileImageView)
                             } else {
                                 profileImageView.setImageResource(R.drawable.ic_user)
