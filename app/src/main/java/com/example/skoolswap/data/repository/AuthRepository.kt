@@ -15,7 +15,7 @@ import com.example.skoolswap.data.mapper.toEntity
 import com.example.skoolswap.data.remote.api.UserApiService
 import com.example.skoolswap.data.remote.models.request.SignInRequest
 import com.example.skoolswap.data.remote.models.request.UpdateMobileRequest
-import com.example.skoolswap.data.remote.models.response.SignInResponse
+import com.example.skoolswap.data.remote.models.response.user.SignInResponse
 import com.example.skoolswap.data.remote.network.NetworkUtils
 import com.example.skoolswap.domain.model.User
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
@@ -37,7 +37,7 @@ import retrofit2.Response
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
-import com.example.skoolswap.data.remote.models.response.DeleteProfileResponse
+import com.example.skoolswap.data.remote.models.response.profile.DeleteProfileResponse
 import com.example.skoolswap.data.local.datastore.AppPreferences
 
 

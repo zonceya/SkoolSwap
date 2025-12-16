@@ -1,4 +1,4 @@
-package com.example.skoolswap.data.remote.models.response
+package com.example.skoolswap.data.remote.models.response.user
 
 import com.google.gson.annotations.SerializedName
 

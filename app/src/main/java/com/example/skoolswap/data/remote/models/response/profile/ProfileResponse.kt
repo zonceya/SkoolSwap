@@ -1,5 +1,6 @@
-package com.example.skoolswap.data.remote.models.response
+package com.example.skoolswap.data.remote.models.response.profile
 
+import com.example.skoolswap.data.remote.models.response.user.UserResponse
 import com.google.gson.annotations.SerializedName
 
 // For GET /api/v1/users/profile

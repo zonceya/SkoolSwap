@@ -1,8 +1,8 @@
 package com.example.skoolswap.data.mapper
 
 import com.example.skoolswap.data.local.database.entities.UserEntity
-import com.example.skoolswap.data.remote.models.response.SignInResponse
-import com.example.skoolswap.data.remote.models.response.UserResponse
+import com.example.skoolswap.data.remote.models.response.user.SignInResponse
+import com.example.skoolswap.data.remote.models.response.user.UserResponse
 import com.example.skoolswap.domain.model.User
 
 fun UserResponse.toDomain(token: String): User {

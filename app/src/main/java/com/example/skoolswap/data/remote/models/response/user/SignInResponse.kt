@@ -1,6 +1,5 @@
-package com.example.skoolswap.data.remote.models.response
+package com.example.skoolswap.data.remote.models.response.user
 
-import com.example.skoolswap.domain.model.User
 import com.google.gson.annotations.SerializedName
 
 data class SignInResponse(

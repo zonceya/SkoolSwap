@@ -2,10 +2,10 @@ package com.example.skoolswap.data.remote.api
 
 import com.example.skoolswap.data.remote.models.request.SignInRequest
 import com.example.skoolswap.data.remote.models.request.UpdateMobileRequest
-import com.example.skoolswap.data.remote.models.response.DeleteProfileResponse
-import com.example.skoolswap.data.remote.models.response.ProfileResponse
-import com.example.skoolswap.data.remote.models.response.SignInResponse
-import com.example.skoolswap.data.remote.models.response.UpdateMobileResponse
+import com.example.skoolswap.data.remote.models.response.profile.DeleteProfileResponse
+import com.example.skoolswap.data.remote.models.response.profile.ProfileResponse
+import com.example.skoolswap.data.remote.models.response.user.SignInResponse
+import com.example.skoolswap.data.remote.models.response.user.UpdateMobileResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE

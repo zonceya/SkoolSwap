@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Empty stars -->
+    <item android:id="@android:id/background">
+        <bitmap
+            android:src="@drawable/ic_star_outline"
+            android:gravity="fill" />
+    </item>
+
+    <!-- Partial stars (for 0.5, 1.5, 2.5, etc.) -->
+    <item android:id="@android:id/secondaryProgress">
+        <bitmap
+            android:src="@drawable/ic_star_filled"
+            android:gravity="fill" />
+    </item>
+
+    <!-- Filled stars -->
+    <item android:id="@android:id/progress">
+        <bitmap
+            android:src="@drawable/ic_star_filled"
+            android:gravity="fill" />
+    </item>
+</layer-list>

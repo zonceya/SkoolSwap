@@ -65,7 +65,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupNavigationDrawer() {
         val drawerLayout: DrawerLayout = binding.drawerLayout
         appBarConfiguration = AppBarConfiguration(
-            setOf(R.id.nav_home, R.id.nav_gallery, R.id.nav_slideshow),
+            setOf(R.id.nav_home, R.id.nav_shop, R.id.nav_gallery, R.id.nav_slideshow),
             drawerLayout
         )
         setupActionBarWithNavController(navController, appBarConfiguration)
