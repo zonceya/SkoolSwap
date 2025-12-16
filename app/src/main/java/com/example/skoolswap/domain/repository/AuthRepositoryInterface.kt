@@ -16,9 +16,8 @@ interface AuthRepositoryInterface {
     fun checkCurrentUser()
 
     // For server user - renamed to avoid conflict
-    fun getServerUser(): Flow<User?>
-    fun getAuthToken(): Flow<String?>
-
+    fun getServerUser(): StateFlow<User?>
+    fun getAuthToken(): StateFlow<String?>
     // For Firebase compatibility - properties
     val currentUser: StateFlow<FirebaseUser?>
     val loading: StateFlow<Boolean>

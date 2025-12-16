@@ -1,6 +1,6 @@
 package com.example.skoolswap.data.mapper
 
-import com.example.skoolswap.data.remote.models.response.ProfileResponse
+import com.example.skoolswap.data.remote.models.response.profile.ProfileResponse
 import com.example.skoolswap.domain.model.User
 
 fun ProfileResponse.toDomain(token: String): User {

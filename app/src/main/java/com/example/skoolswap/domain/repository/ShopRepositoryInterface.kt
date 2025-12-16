@@ -1,0 +1,21 @@
+package com.example.skoolswap.domain.repository
+
+import com.example.skoolswap.domain.model.Shop
+import kotlinx.coroutines.flow.StateFlow
+
+interface ShopRepositoryInterface {
+    // Flow for current user's shop
+    val currentShop: StateFlow<Shop?>
+
+    // Get current user's shop
+    suspend fun getMyShop(): Result<Shop>
+
+    // Update shop display name
+    suspend fun updateShopDisplayName(displayName: String): Result<Shop>
+
+    // Get public shop by ID
+    suspend fun getPublicShop(shopId: Long): Result<Shop>
+
+    // Clear shop data (on logout)
+    suspend fun clearShopData()
+}
