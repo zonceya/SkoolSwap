@@ -9,40 +9,64 @@
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
         tools:context=".ProfileFragment">
 
+        <!-- Profile Container -->
         <RelativeLayout
             android:id="@+id/profileLayout"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginTop="30dp"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginTop="40dp"
             android:layout_marginBottom="30dp"
-            android:gravity="center_horizontal">
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
 
-            <ImageView
-                android:id="@+id/profileImage"
-                android:layout_width="100dp"
-                android:layout_height="100dp"
-                android:layout_marginTop="60dp"
-                android:layout_marginStart="150dp"
-                android:layout_marginEnd="150dp"
-                android:scaleType="centerCrop"
-                android:contentDescription="user_profile_picture"
-                android:src="@drawable/ic_user" />
+            <!-- Profile Image with Circular Background -->
+            <RelativeLayout
+                android:id="@+id/profileImageContainer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="20dp"
+                android:background="@drawable/circle_background"
+                android:padding="8dp">
 
+                <ImageView
+                    android:id="@+id/profileImage"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:scaleType="centerCrop"
+                    android:contentDescription="user_profile_picture"
+                    android:src="@drawable/ic_user" />
+            </RelativeLayout>
+
+            <!-- Change Photo Button -->
+            <TextView
+                android:id="@+id/changePhotoText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/profileImageContainer"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="8dp"
+                android:text="Change Photo"
+                android:textColor="@color/black"
+                android:textSize="14sp" />
+
+            <!-- Name Field -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/userNameTextInputLayout"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_below="@id/profileImage"
-                android:layout_marginTop="30dp"
-                android:layout_marginBottom="10dp"
-                android:layout_marginEnd="35dp"
-                android:layout_marginStart="35dp"
-                app:boxCornerRadiusBottomEnd="12dp"
+                android:layout_below="@id/changePhotoText"
+                android:layout_marginTop="32dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginStart="8dp"
                 android:hint="@string/name"
+                app:boxCornerRadiusBottomEnd="12dp"
                 app:boxCornerRadiusBottomStart="12dp"
                 app:boxCornerRadiusTopEnd="12dp"
                 app:boxCornerRadiusTopStart="12dp"
@@ -50,7 +74,6 @@
                 app:errorIconTint="@color/red"
                 app:errorTextColor="@color/red">
 
-                <!-- CHANGE TO TextInputEditText -->
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/profile_name"
                     android:layout_width="match_parent"
@@ -63,16 +86,17 @@
                     android:textColor="@color/black" />
             </com.google.android.material.textfield.TextInputLayout>
 
+            <!-- Contact Number Field -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/emailTextInputLayout"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_below="@id/userNameTextInputLayout"
-                android:layout_marginBottom="20dp"
+                android:layout_marginTop="16dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginStart="8dp"
                 android:hint="@string/contact_number"
-                android:layout_marginEnd="35dp"
-                android:layout_marginStart="35dp"
                 app:boxCornerRadiusBottomEnd="12dp"
                 app:boxCornerRadiusBottomStart="12dp"
                 app:boxCornerRadiusTopEnd="12dp"
@@ -81,102 +105,86 @@
                 app:errorIconTint="@color/red"
                 app:errorTextColor="@color/red">
 
-                <!-- CHANGE TO TextInputEditText -->
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/contactNumber"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:drawableEnd="@drawable/ic_edit"
                     android:inputType="phone"
                     android:maxLength="10"
-                    android:drawableEnd="@drawable/ic_edit"
                     android:textColor="@color/black" />
             </com.google.android.material.textfield.TextInputLayout>
 
+            <!-- Submit Button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/submitButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="20dp"
-                android:layout_marginStart="20dp"
                 android:layout_below="@id/emailTextInputLayout"
-                android:layout_marginTop="20dp"
-                android:textStyle="bold"
-                android:textColor="@color/white"
+                android:layout_marginTop="32dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginStart="8dp"
                 android:background="@drawable/ic_rounded"
-                app:backgroundTint="@null"
-                android:text="@string/submit" />
+                android:text="@string/submit"
+                android:textColor="@color/white"
+                android:textStyle="bold"
+                app:backgroundTint="@null" />
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/DeleteButton"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
+            <!-- Delete Profile Warning -->
+            <TextView
+                android:id="@+id/deleteWarningTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_below="@id/submitButton"
-                android:layout_marginTop="30dp"
-                android:layout_marginBottom="10dp"
-                android:layout_marginEnd="35dp"
-                android:layout_marginStart="35dp"
-                app:boxCornerRadiusBottomEnd="12dp"
-                app:boxCornerRadiusBottomStart="12dp"
-                app:boxCornerRadiusTopEnd="12dp"
-                app:boxCornerRadiusTopStart="12dp"
-                app:boxStrokeErrorColor="@color/red"
-                app:errorIconTint="@color/red"
-                app:errorTextColor="@color/red">
+                android:layout_marginTop="48dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:text="Delete Profile"
+                android:textColor="@color/black"
+                android:textSize="18sp"
+                android:textStyle="bold" />
 
-                <TextView
-                    android:id="@+id/deleteProfile"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:clickable="false"
-                    android:cursorVisible="false"
-                    android:fontFamily="sans-serif-medium"
-                    android:focusable="false"
-                    android:inputType="none"
-                    android:text="Delete Profile"
-                    android:textSize="20sp"
-                    android:textStyle="italic"
-                    android:textColor="@color/black" />
-                <TextView
-                    android:id="@+id/deleteTextProfile"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:clickable="false"
-                    android:layout_marginTop="5dp"
-                    android:cursorVisible="false"
-                    android:focusable="false"
-                    android:inputType="none"
-                    android:text="@string/deleting_your_account_is_permanent_and_cannot_be_undone_all_your_data_will_be_permanently_lost"
-                    android:textSize="17sp"
-                    android:textStyle="italic"
-                    android:textColor="@color/black" />
+            <TextView
+                android:id="@+id/deleteWarningText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/deleteWarningTitle"
+                android:layout_marginTop="8dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:text="@string/deleting_your_account_is_permanent_and_cannot_be_undone_all_your_data_will_be_permanently_lost"
+                android:textColor="@color/lightgray"
+                android:textSize="14sp"
+                android:lineSpacingExtra="4dp" />
 
-            </com.google.android.material.textfield.TextInputLayout>
-
+            <!-- Delete Button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/deleteButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_below="@id/DeleteButton"
-                android:layout_marginTop="20dp"
-                android:layout_marginEnd="20dp"
+                android:layout_below="@id/deleteWarningText"
+                android:layout_marginTop="24dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginStart="8dp"
                 android:background="@drawable/ic_rounded"
-                app:backgroundTint="@null"
-                android:layout_marginStart="20dp"
-                android:textStyle="bold"
-                android:textColor="@color/white"
                 android:text="@string/delete_profile"
-                app:cornerRadius="8dp" />
-
+                android:textColor="@color/white"
+                android:textStyle="bold"
+                app:backgroundTint="@null" />
         </RelativeLayout>
 
+        <!-- Loading Indicator -->
         <LinearLayout
             android:id="@+id/profileProgressLayout"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="center"
             android:orientation="vertical"
-            android:visibility="gone">
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
 
             <com.google.android.material.progressindicator.CircularProgressIndicator
                 android:layout_width="wrap_content"
