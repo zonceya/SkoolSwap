@@ -1,16 +1,23 @@
+// di/AppModule.kt
 package com.example.skoolswap.di
 
 import android.content.Context
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.credentials.CredentialManager
 import com.example.skoolswap.data.local.database.SkoolSwapDatabase
+import com.example.skoolswap.data.local.database.dao.ItemTypeDao
 import com.example.skoolswap.data.local.database.dao.ShopDao
 import com.example.skoolswap.data.local.datastore.AppPreferences
+import com.example.skoolswap.data.remote.api.ItemApiService
 import com.example.skoolswap.data.remote.api.RetrofitClient
 import com.example.skoolswap.data.remote.api.ShopApiService
 import com.example.skoolswap.data.remote.api.UserApiService
 import com.example.skoolswap.data.repository.AuthRepository
+import com.example.skoolswap.data.repository.ItemRepository
 import com.example.skoolswap.data.repository.ShopRepository
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
+import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.domain.repository.ShopRepositoryInterface
 import com.google.firebase.auth.FirebaseAuth
 import dagger.Module
@@ -44,8 +51,23 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideItemApiService(): ItemApiService {
+        return RetrofitClient.instance.create(ItemApiService::class.java)
+    }
+
+    // DAOs - Keep only non-item DAOs here
+    @Provides
+    @Singleton
     fun provideShopDao(database: SkoolSwapDatabase): ShopDao {
         return database.shopDao()
+    }
+
+    // ✅ REMOVED: provideItemDao() - it's in ItemModule.kt
+
+    @Provides
+    @Singleton
+    fun provideItemTypeDao(database: SkoolSwapDatabase): ItemTypeDao {
+        return database.itemTypeDao()
     }
 
     @Provides
@@ -66,6 +88,8 @@ object AppModule {
         return AppPreferences(context)
     }
 
+    // REPOSITORIES
+    @RequiresApi(Build.VERSION_CODES.O)
     @Provides
     @Singleton
     fun provideShopRepository(
@@ -73,11 +97,25 @@ object AppModule {
         shopDao: ShopDao,
         authRepository: AuthRepositoryInterface
     ): ShopRepositoryInterface {
-        // Cast AuthRepositoryInterface to AuthRepository since ShopRepository expects concrete type
         return ShopRepository(
             shopApiService = shopApiService,
             shopDao = shopDao,
             authRepository = authRepository as AuthRepository
+        )
+    }
+
+    @Provides
+    @Singleton
+    fun provideItemRepository(
+        itemApiService: ItemApiService,
+        // ItemDao will be injected from ItemModule.kt
+        itemDao: com.example.skoolswap.data.local.database.dao.ItemDao,
+        authRepository: AuthRepositoryInterface
+    ): ItemRepositoryInterface {
+        return ItemRepository(
+            itemApiService = itemApiService,
+            itemDao = itemDao,
+            authRepository = authRepository
         )
     }
 }

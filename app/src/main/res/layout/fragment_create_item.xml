@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    android:scrollbars="vertical"
+    android:fadeScrollbars="true"
+    android:scrollbarSize="4dp"
+    android:scrollbarStyle="outsideOverlay">
+
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <!-- Images Section -->
+        <TextView
+            android:id="@+id/images_heading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Images"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:paddingBottom="8dp"/>
+
+        <TextView
+            android:id="@+id/images_subheading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Add up to 3 images"
+            android:textColor="@android:color/darker_gray"
+            android:paddingBottom="8dp"/>
+
+        <LinearLayout
+            android:id="@+id/image_placeholders"
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingBottom="16dp">
+
+            <LinearLayout
+                android:orientation="vertical"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="12dp"
+                android:gravity="center">
+
+                <ImageView
+                    android:id="@+id/cover_photo"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:src="@drawable/ic_create"
+                    android:background="@android:color/darker_gray"
+                    android:contentDescription="Cover Photo"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Cover Photo"
+                    android:textSize="12sp"
+                    android:paddingTop="4dp"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:orientation="vertical"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="12dp"
+                android:gravity="center">
+
+                <ImageView
+                    android:id="@+id/different_angle"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:src="@drawable/ic_create"
+                    android:background="@android:color/darker_gray"
+                    android:contentDescription="Different Angle"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Different Angle"
+                    android:textSize="12sp"
+                    android:paddingTop="4dp"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:orientation="vertical"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center">
+
+                <ImageView
+                    android:id="@+id/label_photo"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:src="@drawable/ic_create"
+                    android:background="@android:color/darker_gray"
+                    android:contentDescription="Label"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Label"
+                    android:textSize="12sp"
+                    android:paddingTop="4dp"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ITEM NAME FIELD (ADDED) -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Item Name"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <EditText
+            android:id="@+id/item_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Enter item name"
+            android:paddingBottom="8dp"/>
+
+        <!-- Category Selection -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Main Category"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <Spinner
+            android:id="@+id/main_category_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Subcategory"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <Spinner
+            android:id="@+id/subcategory_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"/>
+        <!-- Add this AFTER Subcategory and BEFORE Description -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Item Type"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <Spinner
+            android:id="@+id/item_type_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"/>
+        <!-- Description -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Description"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <EditText
+            android:id="@+id/description"
+            android:layout_width="match_parent"
+            android:layout_height="100dp"
+            android:hint="Share your item's story"
+            android:inputType="textMultiLine"
+            android:gravity="top"
+            android:paddingBottom="8dp"/>
+
+        <!-- Condition -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Condition"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <Spinner
+            android:id="@+id/condition_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"/>
+
+        <!-- Size -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Size"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <Spinner
+            android:id="@+id/size_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"/>
+
+        <!-- Brand -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Brand"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <Spinner
+            android:id="@+id/brand_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"/>
+
+        <!-- Color -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Color"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <Spinner
+            android:id="@+id/colour_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"/>
+
+        <!-- Material -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Material"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <Spinner
+            android:id="@+id/material_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"/>
+
+        <!-- Quantity -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Quantity"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <Spinner
+            android:id="@+id/quantity_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"/>
+
+        <!-- Province -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Province"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <Spinner
+            android:id="@+id/province_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"/>
+
+        <!-- City/Location (ADDED) -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="City/Town"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <Spinner
+            android:id="@+id/location_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"/>
+
+        <!-- Gender (ADDED) -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Gender"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <Spinner
+            android:id="@+id/gender_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"/>
+
+        <!-- School (ADDED) -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="School"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <Spinner
+            android:id="@+id/school_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="8dp"/>
+
+        <!-- Delivery -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Delivery"
+            android:textStyle="bold"
+            android:paddingTop="16dp"/>
+
+        <TextView
+            android:id="@+id/delivery_method"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Hand Delivery / House"
+            android:textColor="@android:color/black"
+            android:padding="8dp"/>
+
+        <TextView
+            android:id="@+id/delivery_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="We're working to secure a delivery partner — coming soon!"
+            android:textColor="@android:color/darker_gray"
+            android:paddingBottom="16dp"/>
+
+        <!-- Price -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Price"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <EditText
+            android:id="@+id/price"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Item price"
+            android:inputType="numberDecimal"
+            android:paddingBottom="8dp"/>
+
+        <TextView
+            android:id="@+id/price_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="This is the amount you will receive. Selling is free."
+            android:textColor="@android:color/darker_gray"
+            android:paddingBottom="16dp"/>
+
+        <!-- Progress Bar (ADDED) -->
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone"
+            android:paddingBottom="16dp"/>
+
+        <!-- Action Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/submitButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Create Item"
+            android:textStyle="bold"
+            android:textColor="@color/white"
+            app:backgroundTint="@color/black"
+            android:gravity="center"
+        android:textAlignment="center"
+        android:paddingVertical="16dp"
+        android:paddingHorizontal="8dp"/>
+
+    </LinearLayout>
+</ScrollView>

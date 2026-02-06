@@ -1,0 +1,42 @@
+package com.example.skoolswap.data.local.database.dao
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
+import com.example.skoolswap.data.local.database.entities.ItemEntity
+
+@Dao
+interface ItemDao {
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertItem(item: ItemEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertItems(items: List<ItemEntity>)
+
+    @Query("SELECT * FROM items WHERE shopId = :shopId AND deleted = 0")
+    suspend fun getItemsByShopId(shopId: Long): List<ItemEntity>
+
+    @Query("SELECT * FROM items WHERE id = :itemId")
+    suspend fun getItemById(itemId: String): ItemEntity?
+
+    @Query("SELECT * FROM items WHERE status = 'active' AND deleted = 0 ORDER BY createdAt DESC LIMIT :limit")
+    suspend fun getActiveItems(limit: Int = 50): List<ItemEntity>
+
+    @Update
+    suspend fun updateItem(item: ItemEntity)
+
+    @Query("UPDATE items SET status = :status WHERE id = :itemId")
+    suspend fun updateItemStatus(itemId: String, status: String)
+
+    @Query("UPDATE items SET deleted = 1 WHERE id = :itemId")
+    suspend fun softDeleteItem(itemId: String)
+
+    @Query("UPDATE items SET imageCount = :count WHERE id = :itemId")
+    suspend fun updateImageCount(itemId: String, count: Int)
+
+    @Query("DELETE FROM items")
+    suspend fun clearAllItems()
+}

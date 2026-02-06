@@ -63,7 +63,7 @@ android {
     }
     buildFeatures {
       viewBinding = true
-    //  dataBinding = true
+      dataBinding = true
     }
 }
 
@@ -104,7 +104,7 @@ dependencies {
     implementation(libs.room.ktx)
     kapt(libs.room.compiler)
     implementation(libs.kotlinx.datetime)
-
+    implementation(libs.play.services.cast.framework)
 
     // Dependency Injection
     implementation(libs.hilt.android)

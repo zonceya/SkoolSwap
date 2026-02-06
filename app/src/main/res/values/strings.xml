@@ -57,4 +57,112 @@
     <string name="msg_delete_account">You\'re going to delete your account. Are you sure?</string>
     <string name="btn_keep_account">No, Keep it.</string>
     <string name="btn_delete_account">Yes, Delete It!</string>
+    <string name="loading">Loading...</string>
+
+    <!-- Categories -->
+    <string-array name="main_categories">
+        <item>Women</item>
+        <item>Men</item>
+        <item>Kids</item>
+        <item>Beauty</item>
+        <item>Home</item>
+        <item>Sports &amp; Leisure</item>
+        <item>Technology</item>
+        <item>Books &amp; Magazines</item>
+        <item>Pets</item>
+        <item>Other</item>
+    </string-array>
+
+    <string-array name="men_subcategories">
+        <item>Tops for men</item>
+        <item>Bottoms for men</item>
+        <item>Coats &amp; Jackets for men</item>
+        <item>Shoes for men</item>
+        <item>Activewear for men</item>
+        <item>Accessories for men</item>
+        <item>Underwear &amp; Nightwear</item>
+        <item>Swimwear for men</item>
+    </string-array>
+
+    <string-array name="women_subcategories">
+        <item>Tops for women</item>
+        <item>Dresses</item>
+        <item>Bottoms for women</item>
+        <item>Coats &amp; Jackets for women</item>
+        <item>Shoes for women</item>
+        <item>Activewear for women</item>
+        <item>Accessories for women</item>
+        <item>Underwear &amp; Nightwear</item>
+        <item>Swimwear for women</item>
+    </string-array>
+
+    <string-array name="kids_subcategories">
+        <item>Tops for kids</item>
+        <item>Bottoms for kids</item>
+        <item>Coats &amp; Jackets for kids</item>
+        <item>Shoes for kids</item>
+        <item>Activewear for kids</item>
+        <item>Accessories for kids</item>
+        <item>Schoolwear</item>
+        <item>Swimwear for kids</item>
+    </string-array>
+
+    <!-- Filters -->
+    <string-array name="conditions">
+        <item>New</item>
+        <item>Used - Like New</item>
+        <item>Used - Good</item>
+        <item>Used - Fair</item>
+    </string-array>
+
+    <string-array name="sizes">
+        <item>XS</item>
+        <item>S</item>
+        <item>M</item>
+        <item>L</item>
+        <item>XL</item>
+    </string-array>
+
+    <string-array name="brands">
+        <item>Brand A</item>
+        <item>Brand B</item>
+        <item>Brand C</item>
+        <item>Brand D</item>
+    </string-array>
+
+    <string-array name="colours">
+        <item>Red</item>
+        <item>Blue</item>
+        <item>Green</item>
+        <item>Black</item>
+        <item>White</item>
+    </string-array>
+
+    <string-array name="materials">
+        <item>Cotton</item>
+        <item>Leather</item>
+        <item>Polyester</item>
+        <item>Denim</item>
+        <item>Wool</item>
+    </string-array>
+
+    <string-array name="quantities">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+    </string-array>
+
+    <string-array name="provinces">
+        <item>Western Cape</item>
+        <item>Eastern Cape</item>
+        <item>Northern Cape</item>
+        <item>KwaZulu-Natal</item>
+        <item>Free State</item>
+        <item>Gauteng</item>
+        <item>Limpopo</item>
+        <item>Mpumalanga</item>
+        <item>North West</item>
+    </string-array>
 </resources>

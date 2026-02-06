@@ -15,7 +15,7 @@
             android:id="@+id/action_viewPagerFragment_to_loginFragment"
             app:destination="@id/loginFragment"
             app:popUpTo="@id/viewPagerFragment"
-            app:popUpToInclusive="true" />
+            app:popUpToInclusive="false" />
     </fragment>
 
     <!-- Login Flow -->
@@ -60,13 +60,14 @@
         android:id="@+id/nav_profile"
         android:name="com.example.skoolswap.ui.profile.ProfileFragment"
         android:label="Profile"
-        tools:layout="@layout/fragment_profile"/>
+        tools:layout="@layout/fragment_profile">
     <!-- Add action to navigate back to home -->
     <action
         android:id="@+id/action_profile_to_home"
         app:destination="@id/nav_home"
         app:popUpTo="@id/nav_home"
-        app:popUpToInclusive="true" />
+        app:popUpToInclusive="false" />
+    </fragment>
     <!-- Shop Fragment -->
     <fragment
         android:id="@+id/nav_shop"
@@ -78,7 +79,18 @@
             android:id="@+id/action_shop_to_home"
             app:destination="@id/nav_home"
             app:popUpTo="@id/nav_home"
+            app:popUpToInclusive="false" />
+    </fragment>
+    <fragment
+        android:id="@+id/createItemFragment"
+        android:name="com.example.skoolswap.ui.item.CreateItemFragment"
+        android:label="Create Item"
+        tools:layout="@layout/fragment_create_item">
+
+        <action
+            android:id="@+id/action_createItemFragment_to_mainFragment"
+            app:destination="@id/nav_home"
+            app:popUpTo="@id/nav_home"
             app:popUpToInclusive="true" />
     </fragment>
-
 </navigation>
