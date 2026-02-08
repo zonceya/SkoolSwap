@@ -51,7 +51,6 @@
                 android:layout_below="@id/profileImageContainer"
                 android:layout_centerHorizontal="true"
                 android:layout_marginTop="8dp"
-                android:text="Change Photo"
                 android:textColor="@color/black"
                 android:textSize="14sp" />
 

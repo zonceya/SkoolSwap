@@ -1,9 +1,12 @@
 package com.example.skoolswap.ui.navigationheader
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.skoolswap.domain.model.User
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,25 +22,69 @@ class NavigationHeaderViewModel @Inject constructor(
     val userState: StateFlow<UserState> = _userState.asStateFlow()
 
     init {
-        refresh()
+        // Start observing user changes immediately
+        observeUserChanges()
+    }
+
+    private fun observeUserChanges() {
+        viewModelScope.launch {
+            // Observe the server user flow from repository
+            authRepository.getServerUser().collect { user ->
+                if (user != null) {
+                    // We have a user! Show their data
+                    _userState.value = UserState.Success(
+                        name = user.name,
+                        email = user.email,
+                        profileImageUrl = user.profilePictureUrl.takeIf { !it.isNullOrEmpty() }
+                    )
+
+                    // Also refresh from API in background for latest data
+                    refreshFromApiInBackground()
+                } else {
+                    // No user - show welcome state
+                    _userState.value = UserState.Success(
+                        name = "Welcome",
+                        email = "Sign in to continue",
+                        profileImageUrl = null
+                    )
+                }
+            }
+        }
     }
 
     fun refresh() {
         viewModelScope.launch {
             _userState.value = UserState.Loading
             try {
+                // Force refresh from API
                 val result = authRepository.refreshUserProfile()
+
                 result.onSuccess { user ->
-                    _userState.value = UserState.Success(
-                        name = user?.name,
-                        email = user?.email,
-                        profileImageUrl = user?.profilePictureUrl
-                    )
+                    if (user != null) {
+                        _userState.value = UserState.Success(
+                            name = user.name,
+                            email = user.email,
+                            profileImageUrl = user.profilePictureUrl.takeIf { !it.isNullOrEmpty() }
+                        )
+                    } else {
+                        _userState.value = UserState.Error("No user data")
+                    }
                 }.onFailure { throwable ->
-                    _userState.value = UserState.Error("Failed to load profile")
+                    _userState.value = UserState.Error("Failed: ${throwable.message}")
                 }
             } catch (e: Exception) {
                 _userState.value = UserState.Error("Error: ${e.message}")
+            }
+        }
+    }
+
+    private fun refreshFromApiInBackground() {
+        viewModelScope.launch {
+            try {
+                authRepository.refreshUserProfile()
+                // Don't update UI here - let the serverUser flow handle it
+            } catch (e: Exception) {
+                // Ignore background errors
             }
         }
     }

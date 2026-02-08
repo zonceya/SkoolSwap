@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.Menu
 import android.view.View
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -74,10 +75,14 @@ class MainActivity : AppCompatActivity() {
     private fun setupNavigationHeader() {
         val navView: NavigationView = binding.navView
         val headerView = navView.getHeaderView(0)
+        val loadingOverlay = binding.loadingOverlay
 
         val usernameTextView = headerView.findViewById<TextView>(R.id.usernameTextView)
         val userEmailTextView = headerView.findViewById<TextView>(R.id.userEmailTextView)
         val profileImageView = headerView.findViewById<ImageView>(R.id.profileImageView)
+
+        // Show loading overlay initially
+        loadingOverlay.visibility = View.VISIBLE
 
         // Observe navigation header view model
         lifecycleScope.launch {
@@ -85,11 +90,14 @@ class MainActivity : AppCompatActivity() {
                 navHeaderViewModel.userState.collectLatest { userState ->
                     when (userState) {
                         is UserState.Loading -> {
-                            usernameTextView.text = getString(R.string.loading)
+                            loadingOverlay.visibility = View.VISIBLE
+                            usernameTextView.text = "Loading..."
                             userEmailTextView.text = ""
                             profileImageView.setImageResource(R.drawable.ic_user)
                         }
                         is UserState.Success -> {
+                            loadingOverlay.visibility = View.GONE
+
                             usernameTextView.text = userState.name ?: "Welcome"
                             userEmailTextView.text = userState.email ?: "Sign in to continue"
 
@@ -99,20 +107,22 @@ class MainActivity : AppCompatActivity() {
                                     .circleCrop()
                                     .placeholder(R.drawable.ic_user)
                                     .error(R.drawable.ic_user)
-                                    .diskCacheStrategy(DiskCacheStrategy.ALL)
-                                    .skipMemoryCache(false)
+                                    .diskCacheStrategy(DiskCacheStrategy.NONE) // Force fresh load
+                                    .skipMemoryCache(true)
                                     .into(profileImageView)
                             } else {
                                 profileImageView.setImageResource(R.drawable.ic_user)
                             }
                         }
                         is UserState.Error -> {
+                            loadingOverlay.visibility = View.GONE
+
                             usernameTextView.text = "Error"
-                            userEmailTextView.text = "Tap to retry"
+                            userEmailTextView.text = userState.message
                             profileImageView.setImageResource(R.drawable.ic_user)
 
-                            // Make header clickable for retry
                             headerView.setOnClickListener {
+                                loadingOverlay.visibility = View.VISIBLE
                                 navHeaderViewModel.refresh()
                             }
                         }
@@ -120,6 +130,8 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
+        // NO NEED to call loadProfile() - ViewModel observes automatically
     }
 
     private fun setupNavigationListener() {
