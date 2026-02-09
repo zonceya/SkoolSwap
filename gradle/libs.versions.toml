@@ -28,6 +28,7 @@ retrofit = "3.0.0"
 okhttp = "5.3.2"
 firebaseAppdistributionGradle = "5.2.0"
 kotlinx-datetime = "0.4.1"
+playServicesCastFramework = "22.2.0"
 
 
 [libraries]
@@ -68,6 +69,7 @@ credentials = { module = "androidx.credentials:credentials", version.ref = "cred
 credentials-play-services = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
 firebase-appdistribution-gradle = { group = "com.google.firebase", name = "firebase-appdistribution-gradle", version.ref = "firebaseAppdistributionGradle" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
+play-services-cast-framework = { group = "com.google.android.gms", name = "play-services-cast-framework", version.ref = "playServicesCastFramework" }
 
 
 

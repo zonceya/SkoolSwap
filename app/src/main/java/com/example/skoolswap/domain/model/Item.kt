@@ -1,0 +1,38 @@
+package com.example.skoolswap.domain.model
+
+data class Item(
+    val id: String,
+    val shopId: Long,
+    val name: String,
+    val description: String,
+    val price: Double,
+    val quantity: Int,
+    val status: String,
+    val itemTypeId: Int? = null,
+    val brandId: Int? = null,
+    val sizeId: Int? = null,
+    val schoolId: Int? = null,
+    val itemConditionId: Int? = null,
+    val locationId: Int? = null,
+    val provinceId: Int? = null,
+    val genderId: Int? = null,
+    val meta: ItemMeta? = null,
+    val label: String? = null,
+    val reserved: Int = 0,
+    val createdAt: String,
+    val shop: Shop? = null,
+    val images: List<ItemImage> = emptyList()
+)
+
+data class ItemMeta(
+    val color: String?,
+    val size: String?
+)
+
+data class ItemImage(
+    val id: Long,
+    val url: String,
+    val filename: String? = null,
+    val contentType: String? = null,
+    val createdAt: String? = null
+)

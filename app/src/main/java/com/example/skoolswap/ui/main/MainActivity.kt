@@ -1,11 +1,12 @@
 package com.example.skoolswap.ui.main
 
-import android.app.ProgressDialog
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
 import android.view.View
+import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
@@ -33,7 +34,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import javax.inject.Inject
+
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -74,10 +75,14 @@ class MainActivity : AppCompatActivity() {
     private fun setupNavigationHeader() {
         val navView: NavigationView = binding.navView
         val headerView = navView.getHeaderView(0)
+        val loadingOverlay = binding.loadingOverlay
 
         val usernameTextView = headerView.findViewById<TextView>(R.id.usernameTextView)
         val userEmailTextView = headerView.findViewById<TextView>(R.id.userEmailTextView)
         val profileImageView = headerView.findViewById<ImageView>(R.id.profileImageView)
+
+        // Show loading overlay initially
+        loadingOverlay.visibility = View.VISIBLE
 
         // Observe navigation header view model
         lifecycleScope.launch {
@@ -85,11 +90,14 @@ class MainActivity : AppCompatActivity() {
                 navHeaderViewModel.userState.collectLatest { userState ->
                     when (userState) {
                         is UserState.Loading -> {
+                            loadingOverlay.visibility = View.VISIBLE
                             usernameTextView.text = "Loading..."
                             userEmailTextView.text = ""
                             profileImageView.setImageResource(R.drawable.ic_user)
                         }
                         is UserState.Success -> {
+                            loadingOverlay.visibility = View.GONE
+
                             usernameTextView.text = userState.name ?: "Welcome"
                             userEmailTextView.text = userState.email ?: "Sign in to continue"
 
@@ -99,20 +107,22 @@ class MainActivity : AppCompatActivity() {
                                     .circleCrop()
                                     .placeholder(R.drawable.ic_user)
                                     .error(R.drawable.ic_user)
-                                    .diskCacheStrategy(DiskCacheStrategy.ALL)
-                                    .skipMemoryCache(false)
+                                    .diskCacheStrategy(DiskCacheStrategy.NONE) // Force fresh load
+                                    .skipMemoryCache(true)
                                     .into(profileImageView)
                             } else {
                                 profileImageView.setImageResource(R.drawable.ic_user)
                             }
                         }
                         is UserState.Error -> {
+                            loadingOverlay.visibility = View.GONE
+
                             usernameTextView.text = "Error"
-                            userEmailTextView.text = "Tap to retry"
+                            userEmailTextView.text = userState.message
                             profileImageView.setImageResource(R.drawable.ic_user)
 
-                            // Make header clickable for retry
                             headerView.setOnClickListener {
+                                loadingOverlay.visibility = View.VISIBLE
                                 navHeaderViewModel.refresh()
                             }
                         }
@@ -120,10 +130,15 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
+        // NO NEED to call loadProfile() - ViewModel observes automatically
     }
 
     private fun setupNavigationListener() {
         val navView: NavigationView = binding.navView
+        binding.appBarMain.fab.setOnClickListener {
+            navController.navigate(R.id.createItemFragment)
+        }
 
         // Setup navigation item selection
         navView.setNavigationItemSelectedListener { menuItem ->
@@ -177,21 +192,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun performLogout() {
+        // Close the drawer (optional if you're using a navigation drawer)
         binding.drawerLayout.closeDrawer(GravityCompat.START)
 
-        lifecycleScope.launch {
-            // Show loading
-            val progressDialog = ProgressDialog(this@MainActivity).apply {
-                setMessage("Logging out...")
-                setCancelable(false)
-                show()
-            }
+        // Get the ProgressBar and show it
+        val progressBar = findViewById<ProgressBar>(R.id.progressBar)
+        progressBar.visibility = View.VISIBLE  // Show ProgressBar
 
+        lifecycleScope.launch {
             try {
-                // Sign out using viewModel
+                // Sign out using ViewModel
                 viewModel.logout()
 
-                // Navigate to login
+                // Navigate to login screen
                 navController.navigate(R.id.loginFragment) {
                     popUpTo(R.id.nav_home) { inclusive = true }
                 }
@@ -199,19 +212,22 @@ class MainActivity : AppCompatActivity() {
                 // Show success message
                 Snackbar.make(binding.root, "Logged out successfully", Snackbar.LENGTH_SHORT).show()
             } catch (e: Exception) {
+                // Handle logout failure
                 Snackbar.make(binding.root, "Logout failed: ${e.message}", Snackbar.LENGTH_LONG).show()
             } finally {
-                progressDialog.dismiss()
+                // Hide ProgressBar after operation is complete
+                progressBar.visibility = View.GONE  // Hide ProgressBar
             }
         }
     }
 
+
     private fun observeAuthState() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                // Refresh profile only once when resumed
-                delay(AppConstants.TIMEOUT) // Add delay to prevent multiple rapid refreshes
-                navHeaderViewModel.refresh()
+                // This triggers profile refresh when activity resumes
+                delay(AppConstants.TIMEOUT)
+               // navHeaderViewModel.refresh() // ← This calls the profile API
             }
         }
     }
