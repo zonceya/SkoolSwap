@@ -52,7 +52,7 @@
                     android:id="@+id/cover_photo"
                     android:layout_width="80dp"
                     android:layout_height="80dp"
-                    android:src="@drawable/ic_create"
+                    android:src="@drawable/ic_create_item_placeholder"
                     android:background="@android:color/darker_gray"
                     android:contentDescription="Cover Photo"/>
 
@@ -75,7 +75,7 @@
                     android:id="@+id/different_angle"
                     android:layout_width="80dp"
                     android:layout_height="80dp"
-                    android:src="@drawable/ic_create"
+                    android:src="@drawable/ic_create_item_placeholder"
                     android:background="@android:color/darker_gray"
                     android:contentDescription="Different Angle"/>
 
@@ -97,7 +97,7 @@
                     android:id="@+id/label_photo"
                     android:layout_width="80dp"
                     android:layout_height="80dp"
-                    android:src="@drawable/ic_create"
+                    android:src="@drawable/ic_create_item_placeholder"
                     android:background="@android:color/darker_gray"
                     android:contentDescription="Label"/>
 
