@@ -711,9 +711,9 @@ class CreateItemFragment : Fragment() {
         binding.imagesSubheading.text = "${uris.size}/3 images selected"
 
         // Clear all images first
-        binding.coverPhoto.setImageResource(R.drawable.ic_create)
-        binding.differentAngle.setImageResource(R.drawable.ic_create)
-        binding.labelPhoto.setImageResource(R.drawable.ic_create)
+        binding.coverPhoto.setImageResource(R.drawable.ic_create_item_placeholder)
+        binding.differentAngle.setImageResource(R.drawable.ic_create_item_placeholder)
+        binding.labelPhoto.setImageResource(R.drawable.ic_create_item_placeholder)
 
         // Load images into ImageViews using Glide
         lifecycleScope.launch {
@@ -731,8 +731,8 @@ class CreateItemFragment : Fragment() {
         try {
             Glide.with(requireContext())
                 .load(uri)
-                .placeholder(R.drawable.ic_create)
-                .error(R.drawable.ic_create)
+                .placeholder(R.drawable.ic_create_item_placeholder)
+                .error(R.drawable.ic_create_item_placeholder)
                 .centerCrop()
                 .into(imageView)
         } catch (e: Exception) {
@@ -797,9 +797,9 @@ class CreateItemFragment : Fragment() {
         viewModel.clearImages()
 
         // Clear image previews
-        binding.coverPhoto.setImageResource(R.drawable.ic_create)
-        binding.differentAngle.setImageResource(R.drawable.ic_create)
-        binding.labelPhoto.setImageResource(R.drawable.ic_create)
+        binding.coverPhoto.setImageResource(R.drawable.ic_create_item_placeholder)
+        binding.differentAngle.setImageResource(R.drawable.ic_create_item_placeholder)
+        binding.labelPhoto.setImageResource(R.drawable.ic_create_item_placeholder)
 
         updateImagePreview(emptyList())
 
