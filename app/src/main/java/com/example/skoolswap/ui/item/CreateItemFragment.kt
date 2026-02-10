@@ -797,9 +797,9 @@ class CreateItemFragment : Fragment() {
         viewModel.clearImages()
 
         // Clear image previews
-        binding.coverPhoto.setImageResource(R.drawable.ic_create_item_placeholder)
-        binding.differentAngle.setImageResource(R.drawable.ic_create_item_placeholder)
-        binding.labelPhoto.setImageResource(R.drawable.ic_create_item_placeholder)
+        binding.coverPhoto.setImageResource(R.drawable.ic_create_item_placeholder  )
+        binding.differentAngle.setImageResource(R.drawable.ic_create_item_placeholder  )
+        binding.labelPhoto.setImageResource(R.drawable.ic_create_item_placeholder  )
 
         updateImagePreview(emptyList())
 
