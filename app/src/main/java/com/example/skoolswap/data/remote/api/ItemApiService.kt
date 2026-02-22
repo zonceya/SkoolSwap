@@ -2,7 +2,6 @@ package com.example.skoolswap.data.remote.api
 
 import com.example.skoolswap.data.remote.models.request.CreateItemRequest
 import com.example.skoolswap.data.remote.models.response.item.*
-import com.example.skoolswap.data.remote.models.response.shop.PublicShopResponse
 import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.*
@@ -39,17 +38,15 @@ interface ItemApiService {
     @GET("api/v1/items")
     suspend fun getItems(
         @Query("sort") sort: String? = null,
-        @Query("limit") limit: Int? = null
+        @Query("limit") limit: Int? = null,
+        @Query("main_category_id") mainCategoryId: Int? = null,
+        @Query("sub_category_id") subCategoryId: Int? = null,
+        @Query("province_id") provinceId: Int? = null,
+        @Query("town_id") townId: Int? = null
     ): Response<List<CreateItemResponse>>
 
     @GET("api/v1/shops/{shop_id}/items")
     suspend fun getShopItems(
         @Path("shop_id") shopId: Long
     ): Response<List<CreateItemResponse>>
-
-   @GET("api/v1/item_types")
-    suspend fun getItemTypes(
-        @Header("Authorization") authToken: String? = null
-    ): Response<ItemTypesResponse>
-
 }

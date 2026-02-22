@@ -1,10 +1,9 @@
-// di/RepositoryModule.kt
 package com.example.skoolswap.di
 
 import com.example.skoolswap.data.repository.AuthRepository
-import com.example.skoolswap.data.repository.ItemTypeRepository
+import com.example.skoolswap.data.repository.ReferenceDataRepository
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
-import com.example.skoolswap.domain.repository.ItemTypeRepositoryInterface
+import com.example.skoolswap.domain.repository.ReferenceDataRepositoryInterface
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -19,7 +18,8 @@ interface RepositoryModule {
     @Singleton
     fun bindAuthRepository(authRepository: AuthRepository): AuthRepositoryInterface
 
+    // ✅ REPLACED ItemTypeRepository with ReferenceDataRepository
     @Binds
     @Singleton
-    fun bindItemTypeRepository(impl: ItemTypeRepository): ItemTypeRepositoryInterface
+    fun bindReferenceDataRepository(impl: ReferenceDataRepository): ReferenceDataRepositoryInterface
 }

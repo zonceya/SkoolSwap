@@ -13,12 +13,24 @@ import java.io.File
 
 @Database(
     entities = [
-        UserEntity::class,
-        ShopEntity::class,
-        ItemEntity::class,
-        ItemTypeEntity::class
+        com.example.skoolswap.data.local.database.entities.UserEntity::class,
+        com.example.skoolswap.data.local.database.entities.ShopEntity::class,
+        com.example.skoolswap.data.local.database.entities.ItemEntity::class,
+        com.example.skoolswap.data.local.database.entities.ItemTypeEntity::class,
+        com.example.skoolswap.data.local.database.entities.MainCategoryEntity::class,
+        com.example.skoolswap.data.local.database.entities.SubCategoryEntity::class,  // Fully qualified
+        com.example.skoolswap.data.local.database.entities.ColorEntity::class,
+        com.example.skoolswap.data.local.database.entities.SizeEntity::class,
+        com.example.skoolswap.data.local.database.entities.BrandEntity::class,
+        com.example.skoolswap.data.local.database.entities.ConditionEntity::class,
+        com.example.skoolswap.data.local.database.entities.ProvinceEntity::class,
+        com.example.skoolswap.data.local.database.entities.TownEntity::class,
+        com.example.skoolswap.data.local.database.entities.SchoolEntity::class,
+        com.example.skoolswap.data.local.database.entities.GenderEntity::class,
+        com.example.skoolswap.data.local.database.entities.TagEntity::class,
+        com.example.skoolswap.data.local.database.entities.LocationEntity::class
     ],
-    version = 6,  // Make sure this is correct
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -27,6 +39,18 @@ abstract class SkoolSwapDatabase : RoomDatabase() {
     abstract fun shopDao(): ShopDao
     abstract fun itemDao(): ItemDao
     abstract fun itemTypeDao(): ItemTypeDao
+    abstract fun mainCategoryDao(): MainCategoryDao
+    abstract fun subCategoryDao(): SubCategoryDao
+    abstract fun colorDao(): ColorDao
+    abstract fun sizeDao(): SizeDao
+    abstract fun brandDao(): BrandDao
+    abstract fun conditionDao(): ConditionDao
+    abstract fun provinceDao(): ProvinceDao
+    abstract fun townDao(): TownDao
+    abstract fun schoolDao(): SchoolDao
+    abstract fun genderDao(): GenderDao
+    abstract fun tagDao(): TagDao
+    abstract fun locationDao(): LocationDao
 
     companion object {
         @Volatile

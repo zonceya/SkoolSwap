@@ -6,12 +6,23 @@
     <color name="teal_200">#FF03DAC5</color>
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
     <color name="lightgray">#E0E0E0</color>
+    <color name="gray_light">#CCCCCC</color>
     <color name="red">#FF0000</color>
-    <!-- res/values/colors.xml -->
     <color name="red_light">#FFEBEE</color>
     <color name="red_dark">#C62828</color>
     <color name="gold">#FFD700</color>
-    <color name="gray_light">#CCCCCC</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="blue">#0000FF</color>
+    <color name="blue_light">#E3F2FD</color>
+    <color name="blue_dark">#000080</color>
+    <color name="green">#00FF00</color>
+    <color name="green_light">#E8F5E9</color>
+    <color name="green_dark">#006400</color>
+    <color name="yellow">#FFFF00</color>
+    <color name="orange">#FFA500</color>
+    <color name="brown">#A52A2A</color>
+    <color name="brown_light">#D2B48C</color>
+    <color name="purple">#800080</color>
+    <color name="pink">#FFC0CB</color>
 </resources>
