@@ -9,7 +9,6 @@
     android:scrollbarSize="4dp"
     android:scrollbarStyle="outsideOverlay">
 
-
     <LinearLayout
         android:orientation="vertical"
         android:layout_width="match_parent"
@@ -29,7 +28,7 @@
             android:id="@+id/images_subheading"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Add up to 3 images"
+            android:text="0/3 images selected"
             android:textColor="@android:color/darker_gray"
             android:paddingBottom="8dp"/>
 
@@ -41,12 +40,11 @@
             android:gravity="center"
             android:paddingBottom="16dp">
 
-            <LinearLayout
-                android:orientation="vertical"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="12dp"
-                android:gravity="center">
+            <!-- Cover Photo with delete button -->
+            <FrameLayout
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_marginEnd="12dp">
 
                 <ImageView
                     android:id="@+id/cover_photo"
@@ -54,22 +52,37 @@
                     android:layout_height="80dp"
                     android:src="@drawable/ic_create_item_placeholder"
                     android:background="@android:color/darker_gray"
-                    android:contentDescription="Cover Photo"/>
+                    android:contentDescription="Cover Photo"
+                    android:scaleType="centerCrop"/>
+
+                <ImageView
+                    android:id="@+id/delete_cover"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_close"
+                    android:background="@drawable/circle_background"
+                    android:layout_gravity="top|end"
+                    android:visibility="gone"
+                    android:padding="4dp"
+                    android:contentDescription="Delete"/>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Cover Photo"
+                    android:text="Cover"
                     android:textSize="12sp"
-                    android:paddingTop="4dp"/>
-            </LinearLayout>
+                    android:layout_gravity="bottom|center_horizontal"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:background="#80000000"
+                    android:textColor="@android:color/white"/>
+            </FrameLayout>
 
-            <LinearLayout
-                android:orientation="vertical"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="12dp"
-                android:gravity="center">
+            <!-- Angle 2 with delete button -->
+            <FrameLayout
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_marginEnd="12dp">
 
                 <ImageView
                     android:id="@+id/different_angle"
@@ -77,21 +90,36 @@
                     android:layout_height="80dp"
                     android:src="@drawable/ic_create_item_placeholder"
                     android:background="@android:color/darker_gray"
-                    android:contentDescription="Different Angle"/>
+                    android:contentDescription="Different Angle"
+                    android:scaleType="centerCrop"/>
+
+                <ImageView
+                    android:id="@+id/delete_angle2"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_close"
+                    android:background="@drawable/circle_background"
+                    android:layout_gravity="top|end"
+                    android:visibility="gone"
+                    android:padding="4dp"
+                    android:contentDescription="Delete"/>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Different Angle"
+                    android:text="Angle 2"
                     android:textSize="12sp"
-                    android:paddingTop="4dp"/>
-            </LinearLayout>
+                    android:layout_gravity="bottom|center_horizontal"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:background="#80000000"
+                    android:textColor="@android:color/white"/>
+            </FrameLayout>
 
-            <LinearLayout
-                android:orientation="vertical"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:gravity="center">
+            <!-- Angle 3 with delete button -->
+            <FrameLayout
+                android:layout_width="80dp"
+                android:layout_height="80dp">
 
                 <ImageView
                     android:id="@+id/label_photo"
@@ -99,19 +127,36 @@
                     android:layout_height="80dp"
                     android:src="@drawable/ic_create_item_placeholder"
                     android:background="@android:color/darker_gray"
-                    android:contentDescription="Label"/>
+                    android:contentDescription="Label"
+                    android:scaleType="centerCrop"/>
+
+                <ImageView
+                    android:id="@+id/delete_angle3"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_close"
+                    android:background="@drawable/circle_background"
+                    android:layout_gravity="top|end"
+                    android:visibility="gone"
+                    android:padding="4dp"
+                    android:contentDescription="Delete"/>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Label"
+                    android:text="Angle 3"
                     android:textSize="12sp"
-                    android:paddingTop="4dp"/>
-            </LinearLayout>
+                    android:layout_gravity="bottom|center_horizontal"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="4dp"
+                    android:background="#80000000"
+                    android:textColor="@android:color/white"/>
+            </FrameLayout>
         </LinearLayout>
 
-        <!-- ITEM NAME FIELD (ADDED) -->
+        <!-- Item Name -->
         <TextView
+            android:id="@+id/item_name_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Item Name"
@@ -125,8 +170,9 @@
             android:hint="Enter item name"
             android:paddingBottom="8dp"/>
 
-        <!-- Category Selection -->
+        <!-- Main Category -->
         <TextView
+            android:id="@+id/main_category_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Main Category"
@@ -139,33 +185,38 @@
             android:layout_height="wrap_content"
             android:paddingBottom="8dp"/>
 
+        <!-- Sub Category -->
         <TextView
+            android:id="@+id/sub_category_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Subcategory"
+            android:text="Sub Category"
             android:textStyle="bold"
             android:paddingTop="8dp"/>
-
-        <Spinner
-            android:id="@+id/subcategory_spinner"
+        <!-- Add this next to your subcategory spinner -->
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="8dp"/>
-        <!-- Add this AFTER Subcategory and BEFORE Description -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Item Type"
-            android:textStyle="bold"
-            android:paddingTop="8dp"/>
+            android:paddingBottom="8dp">
 
-        <Spinner
-            android:id="@+id/item_type_spinner"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingBottom="8dp"/>
+            <Spinner
+                android:id="@+id/sub_category_spinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="visible"/>
+
+            <ProgressBar
+                android:id="@+id/subcategory_loading"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:visibility="gone"/>
+
+        </FrameLayout>
+
         <!-- Description -->
         <TextView
+            android:id="@+id/description_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Description"
@@ -176,13 +227,14 @@
             android:id="@+id/description"
             android:layout_width="match_parent"
             android:layout_height="100dp"
-            android:hint="Share your item's story"
+            android:hint="Describe your item"
             android:inputType="textMultiLine"
             android:gravity="top"
             android:paddingBottom="8dp"/>
 
         <!-- Condition -->
         <TextView
+            android:id="@+id/condition_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Condition"
@@ -197,6 +249,7 @@
 
         <!-- Size -->
         <TextView
+            android:id="@+id/size_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Size"
@@ -211,6 +264,7 @@
 
         <!-- Brand -->
         <TextView
+            android:id="@+id/brand_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Brand"
@@ -225,34 +279,35 @@
 
         <!-- Color -->
         <TextView
+            android:id="@+id/color_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Color"
             android:textStyle="bold"
             android:paddingTop="8dp"/>
 
-        <Spinner
-            android:id="@+id/colour_spinner"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="8dp"/>
+            android:paddingBottom="8dp">
 
-        <!-- Material -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Material"
-            android:textStyle="bold"
-            android:paddingTop="8dp"/>
+            <Spinner
+                android:id="@+id/color_spinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"/>
 
-        <Spinner
-            android:id="@+id/material_spinner"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingBottom="8dp"/>
+            <ProgressBar
+                android:id="@+id/color_loading"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:visibility="gone"/>
+
+        </FrameLayout>
 
         <!-- Quantity -->
         <TextView
+            android:id="@+id/quantity_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Quantity"
@@ -267,6 +322,7 @@
 
         <!-- Province -->
         <TextView
+            android:id="@+id/province_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Province"
@@ -279,22 +335,24 @@
             android:layout_height="wrap_content"
             android:paddingBottom="8dp"/>
 
-        <!-- City/Location (ADDED) -->
+        <!-- Town/City -->
         <TextView
+            android:id="@+id/town_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="City/Town"
+            android:text="Town/City"
             android:textStyle="bold"
             android:paddingTop="8dp"/>
 
         <Spinner
-            android:id="@+id/location_spinner"
+            android:id="@+id/town_spinner"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingBottom="8dp"/>
 
-        <!-- Gender (ADDED) -->
+        <!-- Gender -->
         <TextView
+            android:id="@+id/gender_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Gender"
@@ -307,8 +365,9 @@
             android:layout_height="wrap_content"
             android:paddingBottom="8dp"/>
 
-        <!-- School (ADDED) -->
+        <!-- School -->
         <TextView
+            android:id="@+id/school_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="School"
@@ -321,35 +380,38 @@
             android:layout_height="wrap_content"
             android:paddingBottom="8dp"/>
 
-        <!-- Delivery -->
+        <!-- Tags Section -->
         <TextView
+            android:id="@+id/tags_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Delivery"
+            android:text="Tags"
             android:textStyle="bold"
-            android:paddingTop="16dp"/>
+            android:paddingTop="8dp"/>
 
-        <TextView
-            android:id="@+id/delivery_method"
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/tags_recycler_view"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Hand Delivery / House"
-            android:textColor="@android:color/black"
-            android:padding="8dp"/>
+            android:paddingBottom="8dp"
+            android:visibility="gone"/>
 
+        <!-- Selected Tags Display -->
         <TextView
-            android:id="@+id/delivery_note"
+            android:id="@+id/selected_tags_display"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="We're working to secure a delivery partner — coming soon!"
+            android:text="No tags selected"
             android:textColor="@android:color/darker_gray"
-            android:paddingBottom="16dp"/>
+            android:paddingBottom="8dp"
+            android:visibility="gone"/>
 
         <!-- Price -->
         <TextView
+            android:id="@+id/price_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Price"
+            android:text="Price (R)"
             android:textStyle="bold"
             android:paddingTop="8dp"/>
 
@@ -357,19 +419,11 @@
             android:id="@+id/price"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Item price"
+            android:hint="0.00"
             android:inputType="numberDecimal"
             android:paddingBottom="8dp"/>
 
-        <TextView
-            android:id="@+id/price_note"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="This is the amount you will receive. Selling is free."
-            android:textColor="@android:color/darker_gray"
-            android:paddingBottom="16dp"/>
-
-        <!-- Progress Bar (ADDED) -->
+        <!-- Progress Bar -->
         <ProgressBar
             android:id="@+id/progressBar"
             android:layout_width="wrap_content"
@@ -378,7 +432,7 @@
             android:visibility="gone"
             android:paddingBottom="16dp"/>
 
-        <!-- Action Button -->
+        <!-- Submit Button -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/submitButton"
             android:layout_width="match_parent"
@@ -388,9 +442,7 @@
             android:textColor="@color/white"
             app:backgroundTint="@color/black"
             android:gravity="center"
-        android:textAlignment="center"
-        android:paddingVertical="16dp"
-        android:paddingHorizontal="8dp"/>
+            android:paddingVertical="16dp"/>
 
     </LinearLayout>
 </ScrollView>

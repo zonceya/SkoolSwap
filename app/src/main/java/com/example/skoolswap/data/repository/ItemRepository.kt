@@ -9,7 +9,6 @@ import com.example.skoolswap.data.mapper.toEntity
 import com.example.skoolswap.data.remote.api.ItemApiService
 import com.example.skoolswap.data.remote.models.request.CreateItemRequest
 import com.example.skoolswap.data.remote.models.request.ItemData
-import com.example.skoolswap.data.remote.models.request.ItemMeta
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.ItemImage
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
@@ -40,22 +39,22 @@ class ItemRepository @Inject constructor(
     private val _currentItems = MutableStateFlow<List<Item>>(emptyList())
     override val currentItems: StateFlow<List<Item>> = _currentItems.asStateFlow()
 
-    // ============ CREATE ITEM WITHOUT IMAGES ============
+    // ============ CREATE ITEM WITHOUT IMAGES (NEW VERSION) ============
     override suspend fun createItemSimple(
         name: String,
         description: String,
-        itemTypeId: Int,
-        brandId: Int,
+        mainCategoryId: Int,
+        subCategoryId: Int,
+        brandId: Int?,
         price: Double,
         quantity: Int,
-        itemConditionId: Int,
-        provinceId: Int,
-        locationId: Int,
-        genderId: Int,
-        schoolId: Int,
-        sizeId: Int,
-        color: String?,
-        sizeMeta: String?,
+        itemConditionId: Int?,
+        provinceId: Int?,
+        locationId: Int?,
+        genderId: Int?,
+        schoolId: Int?,
+        sizeId: Int?,
+        colorId: Int?,
         tagIds: List<Int>?
     ): Result<Item> {
         return try {
@@ -70,7 +69,8 @@ class ItemRepository @Inject constructor(
                 item = ItemData(
                     name = name,
                     description = description,
-                    itemTypeId = itemTypeId,
+                    mainCategoryId = mainCategoryId,
+                    subCategoryId = subCategoryId,
                     brandId = brandId,
                     price = price,
                     quantity = quantity,
@@ -80,11 +80,9 @@ class ItemRepository @Inject constructor(
                     genderId = genderId,
                     schoolId = schoolId,
                     sizeId = sizeId,
+                    colorId = colorId,
                     label = "popular",
                     status = "active",
-                    meta = if (color != null || sizeMeta != null) {
-                        ItemMeta(color = color, size = sizeMeta)
-                    } else null,
                     tagIds = tagIds
                 )
             )
@@ -119,23 +117,23 @@ class ItemRepository @Inject constructor(
         }
     }
 
-    // ============ CREATE ITEM WITH IMAGES ============
+    // ============ CREATE ITEM WITH IMAGES (NEW VERSION) ============
     override suspend fun createItemWithImages(
         context: Context,
         name: String,
         description: String,
-        itemTypeId: Int,
-        brandId: Int,
+        mainCategoryId: Int,
+        subCategoryId: Int,
+        brandId: Int?,
         price: Double,
         quantity: Int,
-        itemConditionId: Int,
-        provinceId: Int,
-        locationId: Int,
-        genderId: Int,
-        schoolId: Int,
-        sizeId: Int,
-        color: String?,
-        sizeMeta: String?,
+        itemConditionId: Int?,
+        provinceId: Int?,
+        locationId: Int?,
+        genderId: Int?,
+        schoolId: Int?,
+        sizeId: Int?,
+        colorId: Int?,
         tagIds: List<Int>?,
         imageUris: List<Uri>
     ): Result<Item> {
@@ -156,7 +154,8 @@ class ItemRepository @Inject constructor(
                 item = ItemData(
                     name = name,
                     description = description,
-                    itemTypeId = itemTypeId,
+                    mainCategoryId = mainCategoryId,
+                    subCategoryId = subCategoryId,
                     brandId = brandId,
                     price = price,
                     quantity = quantity,
@@ -166,11 +165,9 @@ class ItemRepository @Inject constructor(
                     genderId = genderId,
                     schoolId = schoolId,
                     sizeId = sizeId,
+                    colorId = colorId,
                     label = "popular",
                     status = "active",
-                    meta = if (color != null || sizeMeta != null) {
-                        ItemMeta(color = color, size = sizeMeta)
-                    } else null,
                     tagIds = tagIds
                 )
             )
@@ -200,7 +197,6 @@ class ItemRepository @Inject constructor(
 
             if (imageUris.isNotEmpty()) {
                 Log.d(TAG, "Uploading ${imageUris.size} images")
-                // Convert URIs to Multipart parts
                 val imageParts = ImageMultipartHelper.createImageParts(context, imageUris)
 
                 if (imageParts.isNotEmpty()) {
@@ -247,13 +243,11 @@ class ItemRepository @Inject constructor(
                 return Result.failure(Exception("Not authenticated"))
             }
 
-            // Convert URIs to Multipart parts
             val imageParts = ImageMultipartHelper.createImageParts(context, imageUris)
             if (imageParts.isEmpty()) {
                 return Result.failure(Exception("No valid images provided"))
             }
 
-            // Upload images
             val response = itemApiService.addItemImages("Bearer $token", itemId, imageParts)
 
             if (!response.isSuccessful) {
@@ -316,14 +310,12 @@ class ItemRepository @Inject constructor(
     // ============ GET SINGLE ITEM ============
     override suspend fun getItem(itemId: String): Result<Item> {
         return try {
-            // Try cache first
             val cachedItem = itemDao.getItemById(itemId)
             if (cachedItem != null) {
                 Log.d(TAG, "Returning cached item: $itemId")
                 return Result.success(cachedItem.toDomain())
             }
 
-            // Fetch from API
             val response = itemApiService.getItem(null, itemId)
 
             if (!response.isSuccessful) {
@@ -348,14 +340,12 @@ class ItemRepository @Inject constructor(
     // ============ GET ACTIVE ITEMS ============
     override suspend fun getActiveItems(limit: Int): Result<List<Item>> {
         return try {
-            // Try cache first
             val cachedItems = itemDao.getActiveItems(limit)
             if (cachedItems.isNotEmpty()) {
                 Log.d(TAG, "Returning ${cachedItems.size} cached active items")
                 return Result.success(cachedItems.map { it.toDomain() })
             }
 
-            // Fetch from API
             val response = itemApiService.getItems(limit = limit)
 
             if (!response.isSuccessful) {
@@ -435,36 +425,4 @@ class ItemRepository @Inject constructor(
             Result.failure(e)
         }
     }
-}
-
-// ============ EXTENSION FUNCTIONS ============
-
-private fun com.example.skoolswap.data.remote.models.response.item.ItemImageDto.toDomain(): ItemImage {
-    return ItemImage(
-        id = id,
-        url = url,
-        filename = filename,
-        contentType = contentType,
-        createdAt = createdAt
-    )
-}
-
-private fun com.example.skoolswap.data.remote.models.response.item.CreateItemResponse.toDomain(): Item {
-    return Item(
-        id = item?.id ?: UUID.randomUUID().toString(),
-        shopId = item?.shopId ?: 0L,
-        name = item?.name ?: "",
-        description = item?.description ?: "",
-        price = item?.price?.toDoubleOrNull() ?: 0.0,
-        quantity = item?.quantity ?: 0,
-        status = item?.status ?: "active",
-        meta = if (item?.meta != null) {
-            com.example.skoolswap.domain.model.ItemMeta(
-                color = item.meta.color,
-                size = item.meta.size
-            )
-        } else null,
-        createdAt = item?.createdAt ?: "",
-        images = images.map { it.toDomain() }
-    )
 }

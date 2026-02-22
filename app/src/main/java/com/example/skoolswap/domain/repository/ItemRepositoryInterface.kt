@@ -11,42 +11,42 @@ interface ItemRepositoryInterface {
     val recentlyCreatedItem: StateFlow<Item?>
     val currentItems: StateFlow<List<Item>>
 
-    // Create item without images
+    // Create item without images - UPDATED parameter names
     suspend fun createItemSimple(
         name: String,
         description: String,
-        itemTypeId: Int,
-        brandId: Int,
+        mainCategoryId: Int,
+        subCategoryId: Int,
+        brandId: Int?,
         price: Double,
         quantity: Int,
-        itemConditionId: Int,
-        provinceId: Int,
-        locationId: Int,
-        genderId: Int,
-        schoolId: Int,
-        sizeId: Int,
-        color: String? = null,
-        sizeMeta: String? = null,
+        itemConditionId: Int?,
+        provinceId: Int?,
+        locationId: Int?,
+        genderId: Int?,
+        schoolId: Int?,
+        sizeId: Int?,
+        colorId: Int?,
         tagIds: List<Int>? = null
     ): Result<Item>
 
-    // Create item with images
+    // Create item with images - UPDATED parameter names
     suspend fun createItemWithImages(
         context: Context,
         name: String,
         description: String,
-        itemTypeId: Int,
-        brandId: Int,
+        mainCategoryId: Int,
+        subCategoryId: Int,
+        brandId: Int?,
         price: Double,
         quantity: Int,
-        itemConditionId: Int,
-        provinceId: Int,
-        locationId: Int,
-        genderId: Int,
-        schoolId: Int,
-        sizeId: Int,
-        color: String? = null,
-        sizeMeta: String? = null,
+        itemConditionId: Int?,
+        provinceId: Int?,
+        locationId: Int?,
+        genderId: Int?,
+        schoolId: Int?,
+        sizeId: Int?,
+        colorId: Int?,
         tagIds: List<Int>? = null,
         imageUris: List<Uri> = emptyList()
     ): Result<Item>

@@ -133,7 +133,11 @@ class MainActivity : AppCompatActivity() {
 
         // NO NEED to call loadProfile() - ViewModel observes automatically
     }
-
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        // Save current destination
+        outState.putInt("currentDestinationId", navController.currentDestination?.id ?: R.id.nav_home)
+    }
     private fun setupNavigationListener() {
         val navView: NavigationView = binding.navView
         binding.appBarMain.fab.setOnClickListener {
@@ -190,7 +194,14 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Cancel", null)
             .show()
     }
-
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        // Restore destination if needed
+        val destinationId = savedInstanceState.getInt("currentDestinationId", R.id.nav_home)
+        if (navController.currentDestination?.id != destinationId) {
+            navController.navigate(destinationId)
+        }
+    }
     private fun performLogout() {
         // Close the drawer (optional if you're using a navigation drawer)
         binding.drawerLayout.closeDrawer(GravityCompat.START)
@@ -259,7 +270,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
     private fun navigateToDestination(destination: NavigationDestination) {
         when (destination) {
             NavigationDestination.ONBOARDING -> {

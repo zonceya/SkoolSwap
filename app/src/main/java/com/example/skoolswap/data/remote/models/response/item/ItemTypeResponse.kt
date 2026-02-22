@@ -30,5 +30,3 @@ data class ItemTypesResponse(
     val itemTypes: List<ItemTypeDto>?
 )
 
-// Option 2: Use generic response
-typealias ItemTypesApiResponse = ApiResponse<List<ItemTypeDto>>

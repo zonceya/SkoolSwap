@@ -1,7 +1,6 @@
 package com.example.skoolswap.data.remote.models.request
 
 import com.google.gson.annotations.SerializedName
-import okhttp3.MultipartBody
 
 data class CreateItemRequest(
     @SerializedName("item")
@@ -15,11 +14,16 @@ data class ItemData(
     @SerializedName("description")
     val description: String,
 
-    @SerializedName("item_type_id")
-    val itemTypeId: Int,
+    // ✅ CHANGED: from item_type_id to main_category_id
+    @SerializedName("main_category_id")
+    val mainCategoryId: Int,
+
+    // ✅ NEW: sub_category_id
+    @SerializedName("sub_category_id")
+    val subCategoryId: Int,
 
     @SerializedName("brand_id")
-    val brandId: Int,
+    val brandId: Int? = null,
 
     @SerializedName("price")
     val price: Double,
@@ -28,22 +32,26 @@ data class ItemData(
     val quantity: Int,
 
     @SerializedName("item_condition_id")
-    val itemConditionId: Int,
+    val itemConditionId: Int? = null,
 
     @SerializedName("province_id")
-    val provinceId: Int,
+    val provinceId: Int? = null,
 
     @SerializedName("location_id")
-    val locationId: Int,
+    val locationId: Int? = null,
 
     @SerializedName("gender_id")
-    val genderId: Int,
+    val genderId: Int? = null,
 
     @SerializedName("school_id")
-    val schoolId: Int,
+    val schoolId: Int? = null,
 
     @SerializedName("size_id")
-    val sizeId: Int,
+    val sizeId: Int? = null,
+
+    // ✅ CHANGED: color is now color_id
+    @SerializedName("color_id")
+    val colorId: Int? = null,
 
     @SerializedName("label")
     val label: String? = "popular",
@@ -51,22 +59,8 @@ data class ItemData(
     @SerializedName("status")
     val status: String = "active",
 
-    @SerializedName("meta")
-    val meta: ItemMeta? = null,
+    // ❌ REMOVED: meta object - not needed anymore
 
     @SerializedName("tag_ids")
     val tagIds: List<Int>? = emptyList()
-)
-
-data class ItemMeta(
-    @SerializedName("color")
-    val color: String? = null,
-
-    @SerializedName("size")
-    val size: String? = null
-)
-
-// Separate request for image upload
-data class ItemImageUploadRequest(
-    val images: List<MultipartBody.Part> = emptyList()
 )
