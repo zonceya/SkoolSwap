@@ -82,7 +82,8 @@
                     android:focusable="false"
                     android:inputType="none"
                     android:text="@string/zama_onceya"
-                    android:textColor="@color/black" />
+                    android:textColor="?attr/colorOnSurface"
+                    android:textColorHint="?attr/android:textColorSecondary" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Contact Number Field -->
@@ -111,7 +112,8 @@
                     android:drawableEnd="@drawable/ic_edit"
                     android:inputType="phone"
                     android:maxLength="10"
-                    android:textColor="@color/black" />
+                    android:textColor="?attr/colorOnSurface"
+                    android:textColorHint="?attr/android:textColorSecondary" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Submit Button -->
@@ -123,11 +125,10 @@
                 android:layout_marginTop="32dp"
                 android:layout_marginEnd="8dp"
                 android:layout_marginStart="8dp"
-                android:background="@drawable/ic_rounded"
                 android:text="@string/submit"
                 android:textColor="@color/white"
                 android:textStyle="bold"
-                app:backgroundTint="@null" />
+                style="@style/Widget.SkoolSwap.Button" />
 
             <!-- Delete Profile Warning -->
             <TextView
@@ -152,7 +153,7 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="@string/deleting_your_account_is_permanent_and_cannot_be_undone_all_your_data_will_be_permanently_lost"
-                android:textColor="@color/lightgray"
+                android:textColor="@color/gray_light"
                 android:textSize="14sp"
                 android:lineSpacingExtra="4dp" />
 
@@ -165,11 +166,10 @@
                 android:layout_marginTop="24dp"
                 android:layout_marginEnd="8dp"
                 android:layout_marginStart="8dp"
-                android:background="@drawable/ic_rounded"
                 android:text="@string/delete_profile"
                 android:textColor="@color/white"
                 android:textStyle="bold"
-                app:backgroundTint="@null" />
+                style="@style/Widget.SkoolSwap.Button" />
         </RelativeLayout>
 
         <!-- Loading Indicator -->

@@ -1,3 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+
+    <style name="Theme.SkoolSwap" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary brand color - Still white in dark mode -->
+        <item name="colorPrimary">@color/white</item>
+        <item name="colorPrimaryVariant">@color/gray_medium</item>
+        <item name="colorOnPrimary">@color/black</item>
+
+        <!-- Secondary brand color -->
+        <item name="colorSecondary">@color/purple_200</item>
+        <item name="colorSecondaryVariant">@color/purple_700</item>
+        <item name="colorOnSecondary">@color/black</item>
+
+        <!-- Surface and Background - Dark mode -->
+        <item name="android:windowBackground">@color/dark_background</item>
+        <item name="colorSurface">@color/dark_background</item>
+        <item name="colorOnSurface">@color/white</item>
+
+        <!-- Status bar color - Dark mode -->
+        <item name="android:statusBarColor">@color/dark_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+
+        <!-- Navigation bar -->
+        <item name="android:navigationBarColor">@color/dark_background</item>
+        <item name="android:windowLightNavigationBar">false</item>
+
+        <!-- Text colors - Light text on dark background -->
+        <item name="android:textColorPrimary">@color/white</item>
+        <item name="android:textColorSecondary">@color/gray_light</item>
+
+        <!-- Remove elevation -->
+        <item name="android:elevation">0dp</item>
+        <item name="android:windowContentOverlay">@null</item>
+
+        <!-- Button colors - Adjust for dark mode -->
+        <item name="materialButtonStyle">@style/Widget.SkoolSwap.Button.Dark</item>
+    </style>
 </resources>
