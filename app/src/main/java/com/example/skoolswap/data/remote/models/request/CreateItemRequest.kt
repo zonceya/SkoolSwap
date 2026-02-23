@@ -59,8 +59,6 @@ data class ItemData(
     @SerializedName("status")
     val status: String = "active",
 
-    // ❌ REMOVED: meta object - not needed anymore
-
     @SerializedName("tag_ids")
     val tagIds: List<Int>? = emptyList()
 )

@@ -2,7 +2,9 @@ package com.example.skoolswap.ui.shop
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.Shop
+import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.domain.repository.ShopRepositoryInterface
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,7 +14,8 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 @HiltViewModel
 class ShopViewModel @Inject constructor(
-    private val shopRepository: ShopRepositoryInterface
+    private val shopRepository: ShopRepositoryInterface,
+    private val itemRepository: ItemRepositoryInterface
 ) : ViewModel() {
 
     // Current shop from repository
@@ -30,13 +33,18 @@ class ShopViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+
     // Update success state
     private val _updateSuccess = MutableStateFlow(false)
     val updateSuccess: StateFlow<Boolean> = _updateSuccess.asStateFlow()
-
+    private val _isLoadingItems = MutableStateFlow(false)
+    val isLoadingItems: StateFlow<Boolean> = _isLoadingItems.asStateFlow()
+    private val _shopItems = MutableStateFlow<List<Item>>(emptyList())
+    val shopItems: StateFlow<List<Item>> = _shopItems.asStateFlow()
     init {
         // Load shop data when ViewModel is created
         loadMyShop(showLoading = false)
+        loadMyShopItems()
     }
 
     // MODIFIED: Added showLoading parameter
@@ -57,7 +65,18 @@ class ShopViewModel @Inject constructor(
             }
         }
     }
-
+    fun loadMyShopItems() {
+        viewModelScope.launch {
+            _isLoadingItems.value = true
+            val result = itemRepository.getMyShopItems() // You'll need to add this to ItemRepository
+            result.onSuccess { items ->
+                _shopItems.value = items
+            }.onFailure { error ->
+                _error.value = "Failed to load items: ${error.message}"
+            }
+            _isLoadingItems.value = false
+        }
+    }
     // FIXED: Clear loading states properly
     suspend fun updateShopDisplayName(displayName: String): Result<Unit> {
         return try {

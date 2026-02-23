@@ -1,5 +1,6 @@
 package com.example.skoolswap.domain.repository
 
+import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.Shop
 import kotlinx.coroutines.flow.StateFlow
 
@@ -9,7 +10,8 @@ interface ShopRepositoryInterface {
 
     // Get current user's shop
     suspend fun getMyShop(): Result<Shop>
-
+    val shopItems: StateFlow<List<Item>>
+    suspend fun getMyShopItems(): Result<List<Item>>
     // Update shop display name
     suspend fun updateShopDisplayName(displayName: String): Result<Shop>
 

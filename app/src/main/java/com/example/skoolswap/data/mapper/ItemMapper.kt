@@ -2,12 +2,16 @@ package com.example.skoolswap.data.mapper
 
 import com.example.skoolswap.data.local.database.entities.ItemEntity
 import com.example.skoolswap.data.remote.models.response.item.*
+import com.example.skoolswap.data.remote.models.response.shop.PublicShopItemDto
+import com.example.skoolswap.data.remote.models.response.shop.PublicShopItemImageDto
+import com.example.skoolswap.data.remote.models.response.shop.ShopItemDto
+import com.example.skoolswap.data.remote.models.response.shop.ShopItemImageDto
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.ItemImage
 import com.example.skoolswap.domain.model.ItemMeta
 import com.example.skoolswap.domain.model.Shop
 
-// DTO to Domain
+// ============ ITEM DTO TO DOMAIN ============
 fun ItemDto.toDomain(): Item {
     return Item(
         id = id,
@@ -24,6 +28,7 @@ fun ItemDto.toDomain(): Item {
     )
 }
 
+// ============ ITEM IMAGE DTO TO DOMAIN ============
 fun ItemImageDto.toDomain(): ItemImage {
     return ItemImage(
         id = id,
@@ -34,6 +39,26 @@ fun ItemImageDto.toDomain(): ItemImage {
     )
 }
 
+// ============ SHOP ITEM IMAGE DTO TO DOMAIN ============
+fun ShopItemImageDto.toDomain(): ItemImage {
+    return ItemImage(
+        id = id,
+        url = url,
+        filename = filename,
+        contentType = contentType,
+        createdAt = createdAt
+    )
+}
+
+// ============ PUBLIC SHOP ITEM IMAGE DTO TO DOMAIN ============
+fun PublicShopItemImageDto.toDomain(): ItemImage {
+    return ItemImage(
+        id = id,
+        url = url
+    )
+}
+
+// ============ ITEM META DTO TO DOMAIN ============
 fun ItemMetaDto.toDomain(): ItemMeta {
     return ItemMeta(
         color = color,
@@ -41,20 +66,21 @@ fun ItemMetaDto.toDomain(): ItemMeta {
     )
 }
 
+// ============ ITEM SHOP DTO TO DOMAIN ============
 fun ItemShopDto.toDomain(): Shop {
     return Shop(
         id = id,
         name = name,
-        displayName = "", // Not available in item response
-        userId = 0L, // Not available in item response
-        sellerName = "", // Not available in item response
-        profilePictureUrl = "", // Not available in item response
-        createdAt = "", // Not available in item response
-        itemsCount = 0 // Not available in item response
+        displayName = "",
+        userId = 0L,
+        sellerName = "",
+        profilePictureUrl = "",
+        createdAt = "",
+        itemsCount = 0
     )
 }
 
-// Response to Domain
+// ============ CREATE ITEM RESPONSE TO DOMAIN ============
 fun CreateItemResponse.toDomain(): Item {
     return Item(
         id = item?.id ?: "",
@@ -71,7 +97,89 @@ fun CreateItemResponse.toDomain(): Item {
     )
 }
 
-// Domain to Entity
+// ============ PUBLIC SHOP ITEM DTO TO DOMAIN ============
+fun PublicShopItemDto.toDomain(shopId: Long): Item {
+    return Item(
+        id = id,
+        shopId = shopId,
+        name = name,
+        description = "",
+        price = price,
+        quantity = 1,
+        status = "active",
+        createdAt = "",
+        // ✅ FIXED: Explicitly handle PublicShopItemImageDto
+        images = images?.map { imageDto ->
+            when (imageDto) {
+                is PublicShopItemImageDto -> imageDto.toDomain()
+                else -> {
+                    // Fallback for any other type
+                    ItemImage(
+                        id = (imageDto as? Map<*, *>)?.get("id") as? Long ?: 0L,
+                        url = (imageDto as? Map<*, *>)?.get("url") as? String ?: "",
+                        filename = null,
+                        contentType = null,
+                        createdAt = null
+                    )
+                }
+            }
+        } ?: emptyList(),
+        brandId = null,
+        sizeId = null,
+        schoolId = null,
+        itemConditionId = null,
+        locationId = null,
+        provinceId = null,
+        genderId = null,
+        label = null,
+        reserved = 0,
+        meta = null,
+        shop = null
+    )
+}
+
+// ============ SHOP ITEM DTO TO DOMAIN ============
+fun ShopItemDto.toDomain(shopId: Long): Item {
+    return Item(
+        id = id,
+        shopId = shopId,
+        name = name,
+        description = description,
+        price = price,
+        quantity = quantity,
+        status = status,
+        createdAt = createdAt,
+        // ✅ FIXED: Explicitly handle ShopItemImageDto
+        images = images.map { imageDto ->
+            when (imageDto) {
+                is ShopItemImageDto -> imageDto.toDomain()
+                else -> {
+                    // Fallback for any other type
+                    ItemImage(
+                        id = (imageDto as? Map<*, *>)?.get("id") as? Long ?: 0L,
+                        url = (imageDto as? Map<*, *>)?.get("url") as? String ?: "",
+                        filename = null,
+                        contentType = null,
+                        createdAt = null
+                    )
+                }
+            }
+        },
+        brandId = null,
+        sizeId = null,
+        schoolId = null,
+        itemConditionId = null,
+        locationId = null,
+        provinceId = null,
+        genderId = null,
+        label = null,
+        reserved = quantity - availableQuantity,
+        meta = null,
+        shop = null
+    )
+}
+
+// ============ DOMAIN TO ENTITY ============
 fun Item.toEntity(): ItemEntity {
     return ItemEntity(
         id = id,
@@ -81,24 +189,24 @@ fun Item.toEntity(): ItemEntity {
         price = price,
         quantity = quantity,
         status = status,
-        itemTypeId = null, // Not stored in DTO
-        brandId = null, // Not stored in DTO
-        sizeId = null, // Not stored in DTO
-        schoolId = null, // Not stored in DTO
-        itemConditionId = null, // Not stored in DTO
-        locationId = null, // Not stored in DTO
-        provinceId = null, // Not stored in DTO
-        genderId = null, // Not stored in DTO
+        itemTypeId = null,
+        brandId = null,
+        sizeId = null,
+        schoolId = null,
+        itemConditionId = null,
+        locationId = null,
+        provinceId = null,
+        genderId = null,
         metaColor = meta?.color,
         metaSize = meta?.size,
-        label = null, // Not stored in DTO
-        reserved = 0, // Not stored in DTO
+        label = null,
+        reserved = 0,
         createdAt = createdAt,
         imageCount = images.size
     )
 }
 
-// Entity to Domain
+// ============ ENTITY TO DOMAIN ============
 fun ItemEntity.toDomain(): Item {
     return Item(
         id = id,
@@ -112,7 +220,7 @@ fun ItemEntity.toDomain(): Item {
             ItemMeta(color = metaColor, size = metaSize)
         } else null,
         createdAt = createdAt,
-        shop = null, // Not stored in entity
-        images = emptyList() // Not stored in entity
+        shop = null,
+        images = emptyList()
     )
 }
