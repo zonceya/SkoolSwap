@@ -73,12 +73,14 @@ object AppModule {
     fun provideShopRepository(
         shopApiService: ShopApiService,
         shopDao: ShopDao,
-        authRepository: AuthRepositoryInterface
+        authRepository: AuthRepositoryInterface,
+        itemRepository: ItemRepositoryInterface  // ✅ Add this parameter
     ): ShopRepositoryInterface {
         return ShopRepository(
             shopApiService = shopApiService,
             shopDao = shopDao,
-            authRepository = authRepository as AuthRepository
+            authRepository = authRepository as AuthRepository,
+            itemRepository = itemRepository  // ✅ Pass it here
         )
     }
 

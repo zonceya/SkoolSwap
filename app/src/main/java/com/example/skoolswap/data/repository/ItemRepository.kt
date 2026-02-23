@@ -9,6 +9,8 @@ import com.example.skoolswap.data.mapper.toEntity
 import com.example.skoolswap.data.remote.api.ItemApiService
 import com.example.skoolswap.data.remote.models.request.CreateItemRequest
 import com.example.skoolswap.data.remote.models.request.ItemData
+import com.example.skoolswap.data.remote.models.response.shop.PublicShopItemDto
+import com.example.skoolswap.data.remote.models.response.shop.ShopItemDto
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.ItemImage
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
@@ -364,23 +366,104 @@ class ItemRepository @Inject constructor(
         }
     }
 
+    // In your repository
+    override suspend fun getMyShopItems(): Result<List<Item>> {
+        return try {
+            val token = authRepository.getAuthToken().value
+            if (token == null) {
+                return Result.failure(Exception("Not authenticated"))
+            }
+
+            val response = itemApiService.getMyShopItems("Bearer $token")
+
+            if (!response.isSuccessful) {
+                return Result.failure(Exception("Server error: ${response.code()}"))
+            }
+
+            val responseBody = response.body()
+            if (responseBody?.success != true) {
+                return Result.failure(Exception("Failed to load items"))
+            }
+
+            // ✅ Get shopId from the response
+            val shopId = responseBody.shop?.id ?: 0L
+
+            // ✅ Pass shopId to toDomain()
+            val items: List<Item> = when (val itemsList = responseBody.items) {
+                is List<*> -> {
+                    itemsList.mapNotNull { item ->
+                        when (item) {
+                            is ShopItemDto -> item.toDomain(shopId)  // ✅ Pass shopId here!
+                            else -> {
+                                Log.w(TAG, "Unexpected item type: ${item?.javaClass?.simpleName}")
+                                null
+                            }
+                        }
+                    }
+                }
+                else -> emptyList()
+            }
+
+            _currentItems.value = items
+
+            // Cache items
+            try {
+                val entities = items.map { it.toEntity() }
+                itemDao.insertItems(entities)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to cache items", e)
+            }
+
+            Log.i(TAG, "Fetched ${items.size} shop items")
+            Result.success(items)
+        } catch (e: Exception) {
+            Log.e(TAG, "Get my shop items failed", e)
+            Result.failure(e)
+        }
+    }
     // ============ GET SHOP ITEMS ============
     override suspend fun getShopItems(shopId: Long): Result<List<Item>> {
         return try {
+            // Try cache first
             val cachedItems = itemDao.getItemsByShopId(shopId)
             if (cachedItems.isNotEmpty()) {
                 Log.d(TAG, "Returning ${cachedItems.size} cached items for shop $shopId")
                 return Result.success(cachedItems.map { it.toDomain() })
             }
 
+            // Make API call
             val response = itemApiService.getShopItems(shopId)
 
             if (!response.isSuccessful) {
+                Log.e(TAG, "Server error: ${response.code()}")
                 return Result.failure(Exception("Server error: ${response.code()}"))
             }
 
-            val items = response.body()?.mapNotNull { it.toDomain() } ?: emptyList()
-            itemDao.insertItems(items.map { it.toEntity() })
+            val responseBody = response.body()
+            if (responseBody == null) {
+                Log.w(TAG, "Response body is null for shop $shopId")
+                return Result.success(emptyList())
+            }
+
+            if (!responseBody.success) {
+                Log.e(TAG, "API returned success=false for shop $shopId")
+                return Result.failure(Exception("Failed to load items"))
+            }
+
+            // ✅ FIXED: Explicitly tell the compiler which mapper to use
+            val items: List<Item> = responseBody.items
+                ?.map { publicShopItemDto ->
+                    publicShopItemDto.toDomain(shopId)  // Now it knows the type
+                } ?: emptyList()
+
+            // Cache items
+            try {
+                val entities = items.map { it.toEntity() }
+                itemDao.insertItems(entities)
+                Log.d(TAG, "Cached ${entities.size} items for shop $shopId")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to cache items", e)
+            }
 
             Log.i(TAG, "Fetched ${items.size} items for shop $shopId from API")
             Result.success(items)
@@ -390,7 +473,6 @@ class ItemRepository @Inject constructor(
         }
     }
 
-    // ============ CLEAR CACHED ITEMS ============
     override suspend fun clearItems() {
         try {
             itemDao.clearAllItems()

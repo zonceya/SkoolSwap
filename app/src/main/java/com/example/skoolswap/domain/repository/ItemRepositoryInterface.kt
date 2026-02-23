@@ -66,13 +66,11 @@ interface ItemRepositoryInterface {
 
     // Get single item
     suspend fun getItem(itemId: String): Result<Item>
-
+    suspend fun getMyShopItems(): Result<List<Item>>
     // Get active items
     suspend fun getActiveItems(limit: Int = 50): Result<List<Item>>
-
     // Get shop items
     suspend fun getShopItems(shopId: Long): Result<List<Item>>
-
     // Clear cached items
     suspend fun clearItems()
 }
