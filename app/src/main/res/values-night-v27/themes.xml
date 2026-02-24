@@ -36,4 +36,82 @@
         <!-- Button colors - Adjust for dark mode -->
         <item name="materialButtonStyle">@style/Widget.SkoolSwap.Button.Dark</item>
     </style>
+
+    <style name="Theme.SkoolSwap" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary brand color - BLACK for surfaces -->
+        <item name="colorPrimary">@color/black</item>
+        <item name="colorPrimaryVariant">@color/dark_gray</item>
+        <item name="colorOnPrimary">@color/white</item>
+
+        <!-- Secondary - WHITE for accents -->
+        <item name="colorSecondary">@color/white</item>
+        <item name="colorSecondaryVariant">@color/light_gray</item>
+        <item name="colorOnSecondary">@color/black</item>
+
+        <!-- Surface and Background - Dark -->
+        <item name="android:windowBackground">@color/black</item>
+        <item name="colorSurface">@color/black</item>
+        <item name="colorOnSurface">@color/white</item>
+
+        <!-- Status bar - Dark mode -->
+        <item name="android:statusBarColor">@color/black</item>
+        <item name="android:windowLightStatusBar">false</item>
+
+        <!-- Navigation bar -->
+        <item name="android:navigationBarColor">@color/black</item>
+        <item name="android:windowLightNavigationBar">false</item>
+
+        <!-- Text colors - White on dark -->
+        <item name="android:textColorPrimary">@color/white</item>
+        <item name="android:textColorSecondary">@color/light_gray</item>
+
+        <!-- Remove elevation -->
+        <item name="android:elevation">0dp</item>
+        <item name="android:windowContentOverlay">@null</item>
+
+        <!-- Button styles - Dark mode -->
+        <item name="materialButtonStyle">@style/Widget.SkoolSwap.Button.Dark</item>
+
+        <!-- FAB style - Dark mode -->
+        <item name="floatingActionButtonStyle">@style/Widget.SkoolSwap.FAB.Dark</item>
+    </style>
+
+    <style name="Theme.SkoolSwap" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary brand color - BLACK for surfaces -->
+        <item name="colorPrimary">@color/black</item>
+        <item name="colorPrimaryVariant">@color/dark_gray</item>
+        <item name="colorOnPrimary">@color/white</item>
+
+        <!-- Secondary - WHITE for accents -->
+        <item name="colorSecondary">@color/white</item>
+        <item name="colorSecondaryVariant">@color/light_gray</item>
+        <item name="colorOnSecondary">@color/black</item>
+
+        <!-- Surface and Background - Dark -->
+        <item name="android:windowBackground">@color/black</item>
+        <item name="colorSurface">@color/black</item>
+        <item name="colorOnSurface">@color/white</item>
+
+        <!-- Status bar - Dark mode -->
+        <item name="android:statusBarColor">@color/black</item>
+        <item name="android:windowLightStatusBar">false</item>
+
+        <!-- Navigation bar -->
+        <item name="android:navigationBarColor">@color/black</item>
+        <item name="android:windowLightNavigationBar">false</item>
+
+        <!-- Text colors - White on dark -->
+        <item name="android:textColorPrimary">@color/white</item>
+        <item name="android:textColorSecondary">@color/light_gray</item>
+
+        <!-- Remove elevation -->
+        <item name="android:elevation">0dp</item>
+        <item name="android:windowContentOverlay">@null</item>
+
+        <!-- Button styles - Dark mode -->
+        <item name="materialButtonStyle">@style/Widget.SkoolSwap.Button.Dark</item>
+
+        <!-- FAB style - Dark mode -->
+        <item name="floatingActionButtonStyle">@style/Widget.SkoolSwap.FAB.Dark</item>
+    </style>
 </resources>
