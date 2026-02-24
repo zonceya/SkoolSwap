@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:tools="http://schemas.android.com/apk/res/android">
+<resources xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Dark theme - Black and White -->
+    <!-- Dark theme for main app -->
     <style name="Theme.SkoolSwap" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- Primary brand color - BLACK for surfaces -->
         <item name="colorPrimary">@color/black</item>
@@ -18,15 +18,15 @@
         <item name="colorSurface">@color/black</item>
         <item name="colorOnSurface">@color/white</item>
 
-        <!-- Status bar - Dark mode -->
+        <!-- Status bar -->
         <item name="android:statusBarColor">@color/black</item>
         <item name="android:windowLightStatusBar">false</item>
 
         <!-- Navigation bar -->
         <item name="android:navigationBarColor">@color/black</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">false</item>
 
-        <!-- Text colors - White on dark -->
+        <!-- Text colors -->
         <item name="android:textColorPrimary">@color/white</item>
         <item name="android:textColorSecondary">@color/light_gray</item>
 
@@ -40,6 +40,9 @@
         <!-- FAB style - Dark mode -->
         <item name="floatingActionButtonStyle">@style/Widget.SkoolSwap.FAB.Dark</item>
     </style>
+
+    <!-- Login theme for dark mode -->
+    <style name="Theme.SkoolSwap.Login" parent="Theme.SkoolSwap" />
 
     <!-- NoActionBar variant -->
     <style name="Theme.SkoolSwap.NoActionBar">
@@ -73,7 +76,7 @@
     <!-- PopupOverlay for dark mode -->
     <style name="Theme.SkoolSwap.PopupOverlay" parent="ThemeOverlay.MaterialComponents.Dark" />
 
-    <!-- GoldRatingBar - Same as light mode -->
+    <!-- GoldRatingBar -->
     <style name="GoldRatingBar" parent="Widget.AppCompat.RatingBar.Small">
         <item name="android:minHeight">20dp</item>
         <item name="android:maxHeight">20dp</item>

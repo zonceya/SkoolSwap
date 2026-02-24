@@ -5,7 +5,15 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:padding="16dp">
-
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        app:navigationIcon="?attr/homeAsUpIndicator"
+        app:navigationContentDescription="navigate_up"
+        app:title="Shop"
+        app:titleTextColor="?attr/colorOnPrimary" />
     <!-- Store Header -->
     <LinearLayout
         android:id="@+id/storeHeader"

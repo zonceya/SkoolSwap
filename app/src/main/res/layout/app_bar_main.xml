@@ -34,8 +34,8 @@
         android:layout_marginEnd="@dimen/fab_margin"
         android:layout_marginBottom="16dp"
         app:maxImageSize="56dp"
-        android:backgroundTint="@color/purple_500"
-        app:tint="@color/white"
+        android:backgroundTint="@color/white"
+        style="?attr/floatingActionButtonStyle"
         app:srcCompat="@drawable/ic_plus_fab"
         android:visibility="visible" />
 

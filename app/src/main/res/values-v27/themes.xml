@@ -1,117 +1,83 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <!-- Dark theme for API 27+ with windowLightNavigationBar support -->
     <style name="Theme.SkoolSwap" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <!-- Primary brand color - WHITE -->
-        <item name="colorPrimary">@color/white</item>
-        <item name="colorPrimaryVariant">@color/light_gray</item>
-        <item name="colorOnPrimary">@color/black</item>
+        <!-- Primary brand color - BLACK for surfaces -->
+        <item name="colorPrimary">@color/black</item>
+        <item name="colorPrimaryVariant">@color/dark_gray</item>
+        <item name="colorOnPrimary">@color/white</item>
 
-        <!-- Secondary brand color -->
-        <item name="colorSecondary">@color/purple_500</item>
-        <item name="colorSecondaryVariant">@color/purple_700</item>
-        <item name="colorOnSecondary">@color/white</item>
+        <!-- Secondary - WHITE for accents -->
+        <item name="colorSecondary">@color/white</item>
+        <item name="colorSecondaryVariant">@color/light_gray</item>
+        <item name="colorOnSecondary">@color/black</item>
 
-        <!-- Surface and Background -->
-        <item name="android:windowBackground">@color/white</item>
-        <item name="colorSurface">@color/white</item>
-        <item name="colorOnSurface">@color/black</item>
+        <!-- Surface and Background - Dark -->
+        <item name="android:windowBackground">@color/black</item>
+        <item name="colorSurface">@color/black</item>
+        <item name="colorOnSurface">@color/white</item>
 
-        <!-- Status bar color -->
-        <item name="android:statusBarColor">@color/white</item>
-        <item name="android:windowLightStatusBar">true</item>
+        <!-- Status bar - Dark mode -->
+        <item name="android:statusBarColor">@color/black</item>
+        <item name="android:windowLightStatusBar">false</item>
 
-        <!-- Navigation bar -->
-        <item name="android:navigationBarColor">@color/white</item>
-        <item name="android:windowLightNavigationBar">true</item>
+        <!-- Navigation bar - with light navigation bar support (API 27+) -->
+        <item name="android:navigationBarColor">@color/black</item>
+        <item name="android:windowLightNavigationBar">false</item>
 
-        <!-- Text colors -->
-        <item name="android:textColorPrimary">@color/black</item>
-        <item name="android:textColorSecondary">@color/dark_gray</item>
+        <!-- Text colors - White on dark -->
+        <item name="android:textColorPrimary">@color/white</item>
+        <item name="android:textColorSecondary">@color/light_gray</item>
 
         <!-- Remove elevation -->
         <item name="android:elevation">0dp</item>
         <item name="android:windowContentOverlay">@null</item>
 
-        <!-- Button colors -->
-        <item name="materialButtonStyle">@style/Widget.SkoolSwap.Button</item>
+        <!-- Button styles - Dark mode -->
+        <item name="materialButtonStyle">@style/Widget.SkoolSwap.Button.Dark</item>
+
+        <!-- FAB style - Dark mode -->
+        <item name="floatingActionButtonStyle">@style/Widget.SkoolSwap.FAB.Dark</item>
     </style>
 
-    <style name="Theme.SkoolSwap" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <!-- Primary brand color - WHITE for surfaces -->
-        <item name="colorPrimary">@color/white</item>
-        <item name="colorPrimaryVariant">@color/light_gray</item>
-        <item name="colorOnPrimary">@color/black</item>
-
-        <!-- Secondary - BLACK for accents -->
-        <item name="colorSecondary">@color/black</item>
-        <item name="colorSecondaryVariant">@color/dark_gray</item>
-        <item name="colorOnSecondary">@color/white</item>
-
-        <!-- Surface and Background -->
-        <item name="android:windowBackground">@color/white</item>
-        <item name="colorSurface">@color/white</item>
-        <item name="colorOnSurface">@color/black</item>
-
-        <!-- Status bar - Light mode -->
-        <item name="android:statusBarColor">@color/white</item>
-        <item name="android:windowLightStatusBar">true</item>
-
-        <!-- Navigation bar -->
-        <item name="android:navigationBarColor">@color/white</item>
-        <item name="android:windowLightNavigationBar">true</item>
-
-        <!-- Text colors -->
-        <item name="android:textColorPrimary">@color/black</item>
-        <item name="android:textColorSecondary">@color/dark_gray</item>
-
-        <!-- Remove elevation -->
-        <item name="android:elevation">0dp</item>
-        <item name="android:windowContentOverlay">@null</item>
-
-        <!-- Button styles -->
-        <item name="materialButtonStyle">@style/Widget.SkoolSwap.Button.Light</item>
-
-        <!-- FAB style -->
-        <item name="floatingActionButtonStyle">@style/Widget.SkoolSwap.FAB.Light</item>
+    <!-- NoActionBar variant -->
+    <style name="Theme.SkoolSwap.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
     </style>
 
-    <style name="Theme.SkoolSwap" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <!-- Primary brand color - WHITE for surfaces -->
-        <item name="colorPrimary">@color/white</item>
-        <item name="colorPrimaryVariant">@color/light_gray</item>
-        <item name="colorOnPrimary">@color/black</item>
-
-        <!-- Secondary - BLACK for accents -->
-        <item name="colorSecondary">@color/black</item>
-        <item name="colorSecondaryVariant">@color/dark_gray</item>
-        <item name="colorOnSecondary">@color/white</item>
-
-        <!-- Surface and Background -->
-        <item name="android:windowBackground">@color/white</item>
-        <item name="colorSurface">@color/white</item>
-        <item name="colorOnSurface">@color/black</item>
-
-        <!-- Status bar - Light mode -->
-        <item name="android:statusBarColor">@color/white</item>
-        <item name="android:windowLightStatusBar">true</item>
-
-        <!-- Navigation bar -->
-        <item name="android:navigationBarColor">@color/white</item>
-        <item name="android:windowLightNavigationBar">true</item>
-
-        <!-- Text colors -->
-        <item name="android:textColorPrimary">@color/black</item>
-        <item name="android:textColorSecondary">@color/dark_gray</item>
-
-        <!-- Remove elevation -->
-        <item name="android:elevation">0dp</item>
-        <item name="android:windowContentOverlay">@null</item>
-
-        <!-- Button styles -->
-        <item name="materialButtonStyle">@style/Widget.SkoolSwap.Button.Light</item>
-
-        <!-- FAB style -->
-        <item name="floatingActionButtonStyle">@style/Widget.SkoolSwap.FAB.Light</item>
+    <!-- Dark mode button - White background, black text -->
+    <style name="Widget.SkoolSwap.Button.Dark" parent="Widget.MaterialComponents.Button">
+        <item name="backgroundTint">@color/white</item>
+        <item name="android:textColor">@color/black</item>
+        <item name="cornerRadius">12dp</item>
+        <item name="android:textStyle">bold</item>
     </style>
+
+    <!-- Dark mode FAB - White background, black icon -->
+    <style name="Widget.SkoolSwap.FAB.Dark" parent="Widget.MaterialComponents.FloatingActionButton">
+        <item name="backgroundTint">@color/white</item>
+        <item name="tint">@color/black</item>
+        <item name="rippleColor">@color/medium_gray</item>
+    </style>
+
+    <!-- AppBarOverlay for dark mode toolbar -->
+    <style name="Theme.SkoolSwap.AppBarOverlay" parent="ThemeOverlay.MaterialComponents.Dark">
+        <item name="android:textColorPrimary">@color/white</item>
+        <item name="android:textColorSecondary">@color/light_gray</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="actionMenuTextColor">@color/white</item>
+    </style>
+
+    <!-- PopupOverlay for dark mode -->
+    <style name="Theme.SkoolSwap.PopupOverlay" parent="ThemeOverlay.MaterialComponents.Dark" />
+
+    <!-- GoldRatingBar -->
+    <style name="GoldRatingBar" parent="Widget.AppCompat.RatingBar.Small">
+        <item name="android:minHeight">20dp</item>
+        <item name="android:maxHeight">20dp</item>
+        <item name="android:progressDrawable">@drawable/rating_bar_gold</item>
+    </style>
+
 </resources>

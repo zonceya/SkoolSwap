@@ -12,12 +12,12 @@ object ColorUtils {
             "black" -> R.color.black
             "white" -> R.color.white
             "gold" -> R.color.gold
-            "gray", "grey" -> R.color.gray_light
+            "gray", "grey" -> R.color.light_gray
             "yellow" -> R.color.gold  // Use gold for yellow
             "navy" -> R.color.blue_dark  // You'd need to add blue_dark
             "maroon" -> R.color.red_dark
             "brown" -> R.color.brown  // You'd need to add brown
-            else -> R.color.gray_light  // Default fallback
+            else -> R.color.light_gray  // Default fallback
         }
     }
 

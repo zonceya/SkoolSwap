@@ -14,12 +14,13 @@
         android:layout_height="wrap_content"
         android:visibility="gone"
         android:indeterminate="true"
+        android:indeterminateTint="@color/white"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
 
-    <!-- Facebook Login Button -->
+    <!-- Video Background -->
     <VideoView
         android:id="@+id/videoView"
         android:layout_width="match_parent"
@@ -29,6 +30,8 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- Logo -->
     <TextView
         android:id="@+id/login_logo"
         android:layout_width="152dp"
@@ -38,6 +41,8 @@
         android:textSize="30sp"
         android:textStyle="bold|italic"
         android:gravity="center"
+        android:shadowColor="@color/black"
+        android:shadowRadius="2"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.498"
@@ -45,9 +50,7 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="0.232" />
 
-
     <!-- Google Sign-In Button -->
-
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="60dp"
@@ -69,6 +72,7 @@
             android:orientation="horizontal"
             android:background="@drawable/ic_google_rounded"
             android:gravity="start|center_vertical">
+
             <ImageView
                 android:layout_width="30dp"
                 android:layout_height="30dp"
@@ -84,8 +88,9 @@
                 android:paddingStart="50dp"
                 android:paddingEnd="20dp"
                 android:text="@string/sign_in_with_google"
-                android:textColor="@color/black"
+                android:textColor="@color/white"
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
+
 </androidx.constraintlayout.widget.ConstraintLayout>
