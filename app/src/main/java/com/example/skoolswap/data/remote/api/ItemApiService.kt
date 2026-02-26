@@ -1,6 +1,7 @@
 package com.example.skoolswap.data.remote.api
 
 import com.example.skoolswap.data.remote.models.request.CreateItemRequest
+import com.example.skoolswap.data.remote.models.request.UpdateItemRequest
 import com.example.skoolswap.data.remote.models.response.item.*
 import com.example.skoolswap.data.remote.models.response.shop.PublicShopItemsResponse
 import com.example.skoolswap.data.remote.models.response.shop.ShopItemsResponse
@@ -15,7 +16,12 @@ interface ItemApiService {
         @Header("Authorization") authHeader: String,
         @Body request: CreateItemRequest
     ): Response<CreateItemResponse>
-
+    @PUT("api/v1/items/{item_id}/updateItem")
+    suspend fun updateItem(
+        @Header("Authorization") authHeader: String,
+        @Path("item_id") itemId: String,
+        @Body request: UpdateItemRequest
+    ): Response<UpdateItemResponse>
     @Multipart
     @POST("api/v1/items/{item_id}/images")
     suspend fun addItemImages(
@@ -54,4 +60,22 @@ interface ItemApiService {
     suspend fun getShopItems(
         @Path("shop_id") shopId: Long
     ): Response<PublicShopItemsResponse>
+    @GET("api/v1/items/{item_id}/viewShopItem")
+    suspend fun getShopItemForEdit(
+        @Header("Authorization") authHeader: String,
+        @Path("item_id") itemId: String
+    ): Response<ViewShopItemResponse>
+    // NEW: Delete item (soft delete)
+    @DELETE("api/v1/items/{item_id}/deleteItem")
+    suspend fun deleteItem(
+        @Header("Authorization") authHeader: String,
+        @Path("item_id") itemId: String
+    ): Response<DeleteItemResponse>
+
+    // NEW: Mark item as sold
+    @PATCH("api/v1/items/{item_id}/mark_as_sold")
+    suspend fun markItemAsSold(
+        @Header("Authorization") authHeader: String,
+        @Path("item_id") itemId: String
+    ): Response<MarkAsSoldResponse>
 }

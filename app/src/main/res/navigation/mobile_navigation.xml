@@ -37,7 +37,6 @@
         android:name="com.example.skoolswap.ui.home.HomeFragment"
         android:label="@string/menu_home"
         tools:layout="@layout/fragment_home">
-        <!-- Add action to navigate to shop -->
         <action
             android:id="@+id/action_home_to_shop"
             app:destination="@id/nav_shop" />
@@ -61,19 +60,25 @@
         android:name="com.example.skoolswap.ui.profile.ProfileFragment"
         android:label="Profile"
         tools:layout="@layout/fragment_profile">
-    <!-- Add action to navigate back to home -->
-    <action
-        android:id="@+id/action_profile_to_home"
-        app:destination="@id/nav_home"
-        app:popUpTo="@id/nav_home"
-        app:popUpToInclusive="false" />
+        <action
+            android:id="@+id/action_profile_to_home"
+            app:destination="@id/nav_home"
+            app:popUpTo="@id/nav_home"
+            app:popUpToInclusive="false" />
     </fragment>
+
     <!-- Shop Fragment -->
     <fragment
         android:id="@+id/nav_shop"
         android:name="com.example.skoolswap.ui.shop.ShopFragment"
         android:label="My Shop"
         tools:layout="@layout/fragment_shop">
+
+        <!-- Add action to navigate to edit item -->
+        <action
+            android:id="@+id/action_shop_to_editItem"
+            app:destination="@id/editItemFragment" />
+
         <!-- Add action to navigate back to home -->
         <action
             android:id="@+id/action_shop_to_home"
@@ -81,16 +86,29 @@
             app:popUpTo="@id/nav_home"
             app:popUpToInclusive="false" />
     </fragment>
+
+    <!-- Create Item Fragment -->
     <fragment
         android:id="@+id/createItemFragment"
         android:name="com.example.skoolswap.ui.item.CreateItemFragment"
         android:label="Create Item"
         tools:layout="@layout/fragment_create_item">
-
         <action
             android:id="@+id/action_createItemFragment_to_mainFragment"
             app:destination="@id/nav_home"
             app:popUpTo="@id/nav_home"
             app:popUpToInclusive="true" />
     </fragment>
+
+    <!-- Edit Item Fragment -->
+    <fragment
+        android:id="@+id/editItemFragment"
+        android:name="com.example.skoolswap.ui.item.edititem.EditItemFragment"
+        android:label="Edit Item"
+        tools:layout="@layout/fragment_edit_item">
+        <argument
+            android:name="itemId"
+            app:argType="string" />
+    </fragment>
+
 </navigation>

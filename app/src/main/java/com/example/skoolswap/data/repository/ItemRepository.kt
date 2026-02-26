@@ -9,10 +9,16 @@ import com.example.skoolswap.data.mapper.toEntity
 import com.example.skoolswap.data.remote.api.ItemApiService
 import com.example.skoolswap.data.remote.models.request.CreateItemRequest
 import com.example.skoolswap.data.remote.models.request.ItemData
+import com.example.skoolswap.data.remote.models.request.UpdateItemData
+import com.example.skoolswap.data.remote.models.request.UpdateItemRequest
+import com.example.skoolswap.data.remote.models.response.item.UpdateItemDto
+import com.example.skoolswap.data.remote.models.response.item.ViewShopItemDto
 import com.example.skoolswap.data.remote.models.response.shop.PublicShopItemDto
 import com.example.skoolswap.data.remote.models.response.shop.ShopItemDto
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.ItemImage
+import com.example.skoolswap.domain.model.ItemMeta
+import com.example.skoolswap.domain.model.Shop
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.utils.ImageMultipartHelper
@@ -308,7 +314,92 @@ class ItemRepository @Inject constructor(
             Result.failure(e)
         }
     }
+    override suspend fun getShopItemForEdit(itemId: String): Result<Item> {
+        return try {
+            val token = authRepository.getAuthToken().value
+            if (token == null) {
+                return Result.failure(Exception("Not authenticated"))
+            }
 
+            Log.d(TAG, "🔍 Fetching item for edit: $itemId")
+            val response = itemApiService.getShopItemForEdit("Bearer $token", itemId)
+
+            if (!response.isSuccessful) {
+                val errorMsg = "Failed to load item: ${response.code()}"
+                Log.e(TAG, errorMsg)
+                return Result.failure(Exception(errorMsg))
+            }
+
+            val responseBody = response.body()
+            if (responseBody?.success != true || responseBody.item == null) {
+                val errorMsg = responseBody?.message ?: "Failed to load item"
+                Log.e(TAG, errorMsg)
+                return Result.failure(Exception(errorMsg))
+            }
+
+            // Convert the response to your domain Item model
+            val item = mapViewShopItemToDomain(responseBody.item)
+
+            Log.d(TAG, "✅ Item loaded: ${item.name} with ${item.images.size} images")
+
+            // Cache in database
+            itemDao.insertItem(item.toEntity())
+
+            Result.success(item)
+        } catch (e: Exception) {
+            Log.e(TAG, "Get item for edit failed", e)
+            Result.failure(e)
+        }
+    }
+
+    // Helper mapping function
+    private fun mapViewShopItemToDomain(dto: ViewShopItemDto): Item {
+        return Item(
+            id = dto.id,
+            shopId = dto.shopId,
+            name = dto.name,
+            description = dto.description,
+            price = dto.price?.toDoubleOrNull() ?: 0.0,
+            quantity = dto.totalQuantity,
+            status = dto.status,
+            mainCategoryId = dto.mainCategoryId,
+            subCategoryId = dto.subCategoryId,
+            brandId = dto.brandId,
+            sizeId = null, // You might need to map these from variants
+            schoolId = dto.schoolId,
+            itemConditionId = dto.itemConditionId,
+            locationId = dto.locationId,
+            provinceId = dto.provinceId,
+            genderId = dto.genderId,
+            colorId = null, // You might need to map these from variants
+            label = dto.label,
+            reserved = dto.totalReserved,
+            createdAt = dto.createdAt,
+            images = dto.images?.map { imageDto ->
+                ItemImage(
+                    id = imageDto.id,
+                    url = imageDto.url,
+                    filename = imageDto.filename,
+                    contentType = imageDto.contentType,
+                    createdAt = imageDto.createdAt
+                )
+            } ?: emptyList(),
+            shop = dto.shop?.let {
+                Shop(
+                    id = it.id,
+                    name = it.name,
+                    displayName = "",
+                    userId = 0L,
+                    sellerName = "",
+                    profilePictureUrl = "",
+                    createdAt = "",
+                    itemsCount = 0
+                )
+            },
+            meta = null,
+            itemTypeId = null
+        )
+    }
     // ============ GET SINGLE ITEM ============
     override suspend fun getItem(itemId: String): Result<Item> {
         return try {
@@ -495,16 +586,326 @@ class ItemRepository @Inject constructor(
             Result.failure(e)
         }
     }
+// Add to ItemRepository.kt - inside the ItemRepository class
 
-    // ============ SOFT DELETE ITEM ============
-    suspend fun softDeleteItem(itemId: String): Result<Unit> {
+    // ============ UPDATE ITEM WITHOUT IMAGES ============
+    // ============ UPDATE ITEM WITHOUT IMAGES ============
+    override suspend fun updateItemSimple(
+        itemId: String,
+        name: String?,
+        description: String?,
+        mainCategoryId: Int?,
+        subCategoryId: Int?,
+        brandId: Int?,
+        price: Double?,
+        quantity: Int?,
+        itemConditionId: Int?,
+        provinceId: Int?,
+        locationId: Int?,
+        genderId: Int?,
+        schoolId: Int?,
+        sizeId: Int?,
+        colorId: Int?,
+        tagIds: List<Int>?,
+        status: String?
+    ): Result<Item> {
         return try {
-            itemDao.softDeleteItem(itemId)
-            Log.i(TAG, "Soft deleted item $itemId")
-            Result.success(Unit)
+            // 1. Get auth token
+            val token = authRepository.getAuthToken().value
+            if (token == null) {
+                return Result.failure(Exception("Not authenticated"))
+            }
+
+            // 2. Prepare update data
+            val updateData = UpdateItemData(
+                name = name,
+                description = description,
+                price = price,
+                quantity = quantity,
+                mainCategoryId = mainCategoryId,
+                subCategoryId = subCategoryId,
+                brandId = brandId,
+                sizeId = sizeId,
+                colorId = colorId,
+                itemConditionId = itemConditionId,
+                provinceId = provinceId,
+                locationId = locationId,
+                genderId = genderId,
+                schoolId = schoolId,
+                label = null,
+                status = status,
+                tagIds = tagIds
+            )
+
+            val request = UpdateItemRequest(item = updateData)
+
+            // 3. Make API call
+            Log.d(TAG, "Updating item $itemId")
+            val response = itemApiService.updateItem("Bearer $token", itemId, request)
+
+            if (!response.isSuccessful) {
+                val errorMsg = "Failed to update item: ${response.errorBody()?.string()}"
+                Log.e(TAG, errorMsg)
+                return Result.failure(Exception(errorMsg))
+            }
+
+            val responseBody = response.body()
+            if (responseBody?.success != true) {
+                val errorMsg = responseBody?.message ?: "Failed to update item"
+                Log.e(TAG, errorMsg)
+                return Result.failure(Exception(errorMsg))
+            }
+
+            // 4. Convert response to domain model
+            val updatedItem = responseBody.item?.let { mapUpdateDtoToItem(it) }
+                ?: return Result.failure(Exception("No item data in response"))
+
+            // 🔥 IMPORTANT: Update in database IMMEDIATELY
+            itemDao.insertItem(updatedItem.toEntity())
+            Log.d(TAG, "✅ Updated item ${updatedItem.id} in local database with price: ${updatedItem.price}")
+
+            // 5. Update current items list if needed
+            val currentList = _currentItems.value.toMutableList()
+            val index = currentList.indexOfFirst { it.id == updatedItem.id }
+            if (index >= 0) {
+                currentList[index] = updatedItem
+                _currentItems.value = currentList
+                Log.d(TAG, "✅ Updated item in currentItems StateFlow")
+            }
+
+            Log.i(TAG, "Item updated successfully: ${updatedItem.name}")
+            Result.success(updatedItem)
+
         } catch (e: Exception) {
-            Log.e(TAG, "Soft delete item failed", e)
+            Log.e(TAG, "Update item failed", e)
             Result.failure(e)
         }
     }
+
+    // ============ UPDATE ITEM WITH IMAGE OPERATIONS ============
+    override suspend fun updateItemWithImages(
+        context: Context,
+        itemId: String,
+        name: String?,
+        description: String?,
+        mainCategoryId: Int?,
+        subCategoryId: Int?,
+        brandId: Int?,
+        price: Double?,
+        quantity: Int?,
+        itemConditionId: Int?,
+        provinceId: Int?,
+        locationId: Int?,
+        genderId: Int?,
+        schoolId: Int?,
+        sizeId: Int?,
+        colorId: Int?,
+        tagIds: List<Int>?,
+        status: String?,
+        addImageUris: List<Uri>,
+        removeImageIds: List<Long>,
+        replaceAllImages: List<Uri>?
+    ): Result<Item> {
+        return try {
+            // 1. First update the item details
+            val updateResult = updateItemSimple(
+                itemId = itemId,
+                name = name,
+                description = description,
+                mainCategoryId = mainCategoryId,
+                subCategoryId = subCategoryId,
+                brandId = brandId,
+                price = price,
+                quantity = quantity,
+                itemConditionId = itemConditionId,
+                provinceId = provinceId,
+                locationId = locationId,
+                genderId = genderId,
+                schoolId = schoolId,
+                sizeId = sizeId,
+                colorId = colorId,
+                tagIds = tagIds,
+                status = status
+            )
+
+            if (updateResult.isFailure) {
+                return updateResult
+            }
+
+            var updatedItem = updateResult.getOrNull() ?: return Result.failure(Exception("Update failed"))
+
+            // 2. Handle image replacement (complete replace)
+            if (replaceAllImages != null) {
+                // First remove all existing images
+                val token = authRepository.getAuthToken().value ?: return Result.failure(Exception("Not authenticated"))
+
+                // Get current images
+                val currentItem = getItem(itemId).getOrNull()
+                currentItem?.images?.forEach { image ->
+                    try {
+                        removeItemImage(itemId, image.id)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to remove image ${image.id}", e)
+                    }
+                }
+
+                // Add new images
+                if (replaceAllImages.isNotEmpty()) {
+                    val imageParts = ImageMultipartHelper.createImageParts(context, replaceAllImages)
+                    if (imageParts.isNotEmpty()) {
+                        val imagesResponse = itemApiService.addItemImages("Bearer $token", itemId, imageParts)
+                        if (imagesResponse.isSuccessful && imagesResponse.body()?.success == true) {
+                            val images = imagesResponse.body()?.images ?: emptyList()
+                            updatedItem = updatedItem.copy(images = images.map { it.toDomain() })
+                        }
+                    }
+                }
+            } else {
+                // Handle individual image operations
+                val token = authRepository.getAuthToken().value ?: return Result.failure(Exception("Not authenticated"))
+
+                // Remove specified images
+                if (removeImageIds.isNotEmpty()) {
+                    removeImageIds.forEach { imageId ->
+                        try {
+                            removeItemImage(itemId, imageId)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to remove image $imageId", e)
+                        }
+                    }
+                }
+
+                // Add new images
+                if (addImageUris.isNotEmpty()) {
+                    val imageParts = ImageMultipartHelper.createImageParts(context, addImageUris)
+                    if (imageParts.isNotEmpty()) {
+                        val imagesResponse = itemApiService.addItemImages("Bearer $token", itemId, imageParts)
+                        if (imagesResponse.isSuccessful && imagesResponse.body()?.success == true) {
+                            val newImages = imagesResponse.body()?.images ?: emptyList()
+                            val allImages = updatedItem.images + newImages.map { it.toDomain() }
+                            updatedItem = updatedItem.copy(images = allImages)
+                        }
+                    }
+                }
+            }
+
+            // 3. Get fresh copy of item
+            val finalItem = getItem(itemId).getOrElse { updatedItem }
+
+            // 4. Update in database
+            itemDao.insertItem(finalItem.toEntity())
+
+            Result.success(finalItem)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Update item with images failed", e)
+            Result.failure(e)
+        }
+    }
+
+    // ============ DELETE ITEM (SOFT DELETE) ============
+    override suspend fun deleteItem(itemId: String): Result<Unit> {
+        return try {
+            val token = authRepository.getAuthToken().value
+            if (token == null) {
+                return Result.failure(Exception("Not authenticated"))
+            }
+
+            val response = itemApiService.deleteItem("Bearer $token", itemId)
+
+            if (!response.isSuccessful) {
+                val errorMsg = "Failed to delete item: ${response.errorBody()?.string()}"
+                Log.e(TAG, errorMsg)
+                return Result.failure(Exception(errorMsg))
+            }
+
+            val responseBody = response.body()
+            if (responseBody?.success != true) {
+                val errorMsg = responseBody?.message ?: "Failed to delete item"
+                Log.e(TAG, errorMsg)
+                return Result.failure(Exception(errorMsg))
+            }
+
+            // Remove from database (soft delete by updating status or actually remove)
+            itemDao.softDeleteItem(itemId)
+
+            // Update current items list
+            val currentList = _currentItems.value.toMutableList()
+            currentList.removeAll { it.id == itemId }
+            _currentItems.value = currentList
+
+            Log.i(TAG, "Item deleted successfully: $itemId")
+            Result.success(Unit)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Delete item failed", e)
+            Result.failure(e)
+        }
+    }
+
+    // ============ MARK ITEM AS SOLD ============
+    override suspend fun markItemAsSold(itemId: String): Result<Item> {
+        return try {
+            val token = authRepository.getAuthToken().value
+            if (token == null) {
+                return Result.failure(Exception("Not authenticated"))
+            }
+
+            val response = itemApiService.markItemAsSold("Bearer $token", itemId)
+
+            if (!response.isSuccessful) {
+                val errorMsg = "Failed to mark item as sold: ${response.errorBody()?.string()}"
+                Log.e(TAG, errorMsg)
+                return Result.failure(Exception(errorMsg))
+            }
+
+            val responseBody = response.body()
+            if (responseBody?.success != true) {
+                val errorMsg = responseBody?.message ?: "Failed to mark item as sold"
+                Log.e(TAG, errorMsg)
+                return Result.failure(Exception(errorMsg))
+            }
+
+            // Get updated item
+            val updatedItem = getItem(itemId).getOrElse {
+                return Result.failure(Exception("Failed to get updated item"))
+            }
+
+            Log.i(TAG, "Item marked as sold: $itemId")
+            Result.success(updatedItem)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Mark as sold failed", e)
+            Result.failure(e)
+        }
+    }
+
+    // Helper function to map UpdateItemDto to Item
+    private fun mapUpdateDtoToItem(dto: UpdateItemDto): Item {
+        return Item(
+            id = dto.id,
+            shopId = 0L, // This might need to be fetched separately
+            name = dto.name,
+            description = dto.description,
+            price = dto.price.toDoubleOrNull() ?: 0.0,
+            quantity = dto.quantity,
+            status = dto.status,
+            createdAt = dto.createdAt,
+            images = dto.images?.map { it.toDomain() } ?: emptyList(),
+            brandId = dto.brandId,
+            sizeId = dto.sizeId,
+            schoolId = dto.schoolId,
+            itemConditionId = dto.conditionId,
+            locationId = dto.townId,
+            provinceId = dto.provinceId,
+            genderId = dto.genderId,
+            label = null,
+            reserved = dto.quantity - dto.availableQuantity,
+            meta = if (dto.colorName != null || dto.sizeName != null) {
+                ItemMeta(color = dto.colorName, size = dto.sizeName)
+            } else null,
+            shop = null
+        )
+    }
+
 }
