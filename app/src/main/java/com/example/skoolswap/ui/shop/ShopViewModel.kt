@@ -42,9 +42,14 @@ class ShopViewModel @Inject constructor(
     private val _shopItems = MutableStateFlow<List<Item>>(emptyList())
     val shopItems: StateFlow<List<Item>> = _shopItems.asStateFlow()
     init {
-        // Load shop data when ViewModel is created
-        loadMyShop(showLoading = false)
-        loadMyShopItems()
+        viewModelScope.launch {
+            itemRepository.currentItems.collect { items ->
+                // This will update whenever repository's currentItems changes
+                if (items.isNotEmpty()) {
+                    _shopItems.value = items
+                }
+            }
+        }
     }
 
     // MODIFIED: Added showLoading parameter

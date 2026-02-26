@@ -68,7 +68,6 @@ interface ReferenceDataRepositoryInterface {
     // ============ BULK OPERATIONS ============
     suspend fun refreshAllReferenceData(): Result<Unit>
 
-    // 👇 ADD THIS NEW METHOD
     suspend fun refreshAllReferenceDataBulk(): Result<Unit>
 
     suspend fun clearAllCache()

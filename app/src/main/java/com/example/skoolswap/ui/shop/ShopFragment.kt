@@ -13,6 +13,7 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -22,6 +23,7 @@ import com.example.skoolswap.databinding.FragmentShopBinding
 import com.example.skoolswap.databinding.ItemProductBinding
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -48,7 +50,20 @@ class ShopFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        findNavController().currentBackStackEntry?.savedStateHandle?.let { handle ->
+            handle.getLiveData<Boolean>("item_updated").observe(viewLifecycleOwner) { updated ->
+                if (updated == true) {
+                    handle.remove<Boolean>("item_updated")
 
+                    lifecycleScope.launch {
+                        Log.d("ShopFragment", "🔄 Item updated, waiting 500ms before refresh")
+                        delay(500)
+                        viewModel.loadMyShopItems()
+                        Toast.makeText(requireContext(), "Item updated!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
         // Set initial rating
         binding.storeRating.rating = 2.5f
 
@@ -64,11 +79,23 @@ class ShopFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         // Refresh data when coming back to fragment
-        viewModel.refresh()
+        //viewModel.refresh()
+        lifecycleScope.launch {
+            delay(500) // 500ms delay
+            viewModel.loadMyShopItems()
+            Log.d("ShopFragment", "🔄 Refreshing shop items after delay")
+        }
     }
 
     private fun setupRecyclerView() {
-        productAdapter = ProductAdapter()
+        // Initialize adapter with click listener
+        productAdapter = ProductAdapter { itemId ->
+            // Navigate to edit screen with the item ID using bundle
+            val bundle = Bundle().apply {
+                putString("itemId", itemId)
+            }
+            findNavController().navigate(R.id.editItemFragment, bundle)
+        }
 
         binding.productRecyclerView.apply {
             adapter = productAdapter
@@ -84,8 +111,7 @@ class ShopFragment : Fragment() {
     private fun showSampleProducts() {
         // Only show samples if there are no real items
         if (productAdapter.itemCount == 0) {
-            // Keep your existing sample products
-            productAdapter.submitList(sampleProducts)
+            productAdapter.submitList(sampleItems)
         }
     }
 
@@ -110,7 +136,7 @@ class ShopFragment : Fragment() {
                 } else if (!isLoading && viewModel.currentShop.value == null) {
                     // If loading finished but no shop data, show default
                     binding.storeName.text = "My Shop"
-                    binding.storeStats.text = "0 items • 0 sold • 0 followers"
+                    binding.storeStats.text = "0 items • 0 sold • 0 current"
                 }
             }
         }
@@ -126,15 +152,8 @@ class ShopFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launchWhenStarted {
             viewModel.shopItems.collectLatest { items ->
                 if (items.isNotEmpty()) {
-                    // Convert your Item domain model to Product for display
-                    val products = items.map { item ->
-                        Product(
-                            name = item.name,
-                            price = "R${item.price}", // Format price
-                            imageUrl = item.images.firstOrNull()?.url ?: "" // Use first image
-                        )
-                    }
-                    productAdapter.submitList(products)
+                    // Pass the domain items directly - they contain IDs!
+                    productAdapter.submitList(items)  // Now passing List<Item>, not List<Product>
                 } else {
                     // Show empty state or keep sample data
                     if (viewModel.isLoadingItems.value) {
@@ -272,9 +291,7 @@ class ShopFragment : Fragment() {
     private fun updateShopUI(shop: com.example.skoolswap.domain.model.Shop) {
         binding.apply {
             // Shop name - show display name if available, otherwise default name
-            val displayName = if (shop.displayName.isNotEmpty()) {
-                shop.displayName
-            } else {
+            val displayName = shop.displayName.ifEmpty {
                 shop.name
             }
 

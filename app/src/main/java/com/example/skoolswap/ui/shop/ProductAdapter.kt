@@ -7,20 +7,15 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemProductBinding
+import com.example.skoolswap.domain.model.Item  // Import domain model
 
-// Data class for products
-data class Product(
-    val name: String,
-    val price: String,
-    val imageUrl: String
-)
+class ProductAdapter(
+    private val onItemClick: (String) -> Unit
+) : RecyclerView.Adapter<ProductAdapter.ProductViewHolder>() {
 
-// Product Adapter
-class ProductAdapter : RecyclerView.Adapter<ProductAdapter.ProductViewHolder>() {
+    private val items = mutableListOf<Item>()  // Use domain Item
 
-    private val items = mutableListOf<Product>()
-
-    fun submitList(newItems: List<Product>) {
+    fun submitList(newItems: List<Item>) {
         items.clear()
         items.addAll(newItems)
         notifyDataSetChanged()
@@ -50,14 +45,16 @@ class ProductAdapter : RecyclerView.Adapter<ProductAdapter.ProductViewHolder>() 
         private val binding: ItemProductBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(product: Product) {
+        fun bind(item: Item) {  // Now accepts domain Item
             binding.apply {
-                productName.text = product.name
-                productPrice.text = product.price
+                productName.text = item.name
+                productPrice.text = "R${item.price}"  // Format price
 
-                // Load image from URL using Glide
+                // Get first image URL or empty string
+                val imageUrl = item.images.firstOrNull()?.url ?: ""
+
                 Glide.with(itemView.context)
-                    .load(product.imageUrl)
+                    .load(imageUrl)
                     .thumbnail(0.25f)
                     .placeholder(R.drawable.ic_launcher_foreground)
                     .error(R.drawable.ic_launcher_foreground)
@@ -65,11 +62,7 @@ class ProductAdapter : RecyclerView.Adapter<ProductAdapter.ProductViewHolder>() 
                     .into(productImage)
 
                 root.setOnClickListener {
-                    Toast.makeText(
-                        root.context,
-                        "Clicked: ${product.name} - ${product.price}",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    onItemClick(item.id)  // Pass item ID for editing
                 }
             }
         }
