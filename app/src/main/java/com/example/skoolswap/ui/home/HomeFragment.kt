@@ -33,10 +33,10 @@ class HomeFragment : Fragment() {
 
         // Hide the FAB
         fab?.visibility = View.VISIBLE
-        val textView: TextView = binding.textHome
+      /*  val textView: TextView = binding.textHome
         homeViewModel.text.observe(viewLifecycleOwner) {
             textView.text = it
-        }
+        }*/
         return root
     }
 
