@@ -29,6 +29,7 @@ okhttp = "5.3.2"
 firebaseAppdistributionGradle = "5.2.0"
 kotlinx-datetime = "0.4.1"
 playServicesCastFramework = "22.2.0"
+viewpager2 = "1.0.0"
 
 
 [libraries]
@@ -70,6 +71,8 @@ credentials-play-services = { module = "androidx.credentials:credentials-play-se
 firebase-appdistribution-gradle = { group = "com.google.firebase", name = "firebase-appdistribution-gradle", version.ref = "firebaseAppdistributionGradle" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 play-services-cast-framework = { group = "com.google.android.gms", name = "play-services-cast-framework", version.ref = "playServicesCastFramework" }
+androidx-viewpager2 = { module = "androidx.viewpager2:viewpager2", version.ref = "viewpager2" }
+
 
 
 
