@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Selected tab - black block background -->
+    <item android:drawable="@color/black" android:state_selected="true" />
+    <!-- Unselected tab - white background -->
+    <item android:drawable="@android:color/white" />
+</selector>
