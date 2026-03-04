@@ -6,42 +6,38 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.viewpager2.widget.ViewPager2
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentHomeBinding
+import com.example.skoolswap.domain.model.BannerItem
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.tabs.TabLayout
-
-// Simple data class for banner items
-data class BannerItem(
-    val imageUrl: String,
-    val title: String? = null
-)
 
 class HomeFragment : Fragment() {
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
 
-    // Your banner items with titles
+    private lateinit var bannerAdapter: BannerAdapter
+    private lateinit var autoScrollHelper: BannerAutoScrollHelper
+
     private val bannerItems = listOf(
         BannerItem(
-            imageUrl = "https://cdn.skoolswap.co.za/banners/home_1.png",
-            title = "Pre Sold School Items"
+            imageUrl = "https://cdn.skoolswap.co.za/banners/home_1.jpg",
+            title = null
         ),
         BannerItem(
             imageUrl = "https://cdn.skoolswap.co.za/banners/home_2.jpg",
-            title = null  // No text
+            title = null
         ),
         BannerItem(
             imageUrl = "https://cdn.skoolswap.co.za/banners/home_3.jpg",
             title = null
         )
     )
-
-    private lateinit var bannerAdapter: BannerAdapter
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -53,46 +49,71 @@ class HomeFragment : Fragment() {
         val fab = activity?.findViewById<FloatingActionButton>(R.id.fab)
         fab?.visibility = View.VISIBLE
 
-        // Setup banner slider
+        setupCustomTabs()
         setupBannerSlider()
         setupIndicatorDots()
-       // setupTabLayout()
 
         return binding.root
     }
-    // In your HomeFragment.kt, inside setupTabLayout()
+    private fun selectTab(selectedTab: TextView) {
+        val tabs = listOf(
+            binding.tabHome,
+            binding.tabShops,
+            binding.tabSchools,
+            binding.tabSales
+        )
 
-
-    /*private fun setupTabLayout() {
-        binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
-            override fun onTabSelected(tab: TabLayout.Tab?) {
-                // Get the text view from tab and set appearance
-                val textView = tab?.view?.findViewById<TextView>(androidx.appcompat.R.id.textView)
-                textView?.setTextAppearance(requireContext(), R.style.CustomTabTextSelected)
-
-                when (tab?.position) {
-                    0 -> Log.d("HomeFragment", "Home selected")
-                    1 -> Log.d("HomeFragment", "Shops selected")
-                    2 -> Log.d("HomeFragment", "Schools selected")
-                    3 -> Log.d("HomeFragment", "Sales selected")
-                }
+        tabs.forEach { tab ->
+            if (tab == selectedTab) {
+                // Selected tab - Black background, White text, Bold
+                tab.setBackgroundResource(R.drawable.tablayout_selector) // You need this drawable
+                tab.setTextColor(resources.getColor(android.R.color.white, null))
+                tab.setTypeface(null, android.graphics.Typeface.BOLD)
+            } else {
+                // Unselected tab - Transparent background, Black text, Normal
+                tab.setBackgroundResource(R.drawable.tablayout_unselected) // You need this drawable
+                tab.setTextColor(resources.getColor(android.R.color.black, null))
+                tab.setTypeface(null, android.graphics.Typeface.NORMAL)
             }
+        }
 
-            override fun onTabUnselected(tab: TabLayout.Tab?) {
-                val textView = tab?.view?.findViewById<TextView>(androidx.appcompat.R.id.textView)
-                textView?.setTextAppearance(requireContext(), R.style.CustomTabText)
+        // Handle content switching
+        when (selectedTab.id) {
+            R.id.tabHome -> {
+                Log.d("HomeFragment", "Home Selected")
+                // Load home content
             }
+            R.id.tabShops -> {
+                Log.d("HomeFragment", "Shops Selected")
+            }
+            R.id.tabSchools -> {
+                Log.d("HomeFragment", "Schools Selected")
+            }
+            R.id.tabSales -> {
+                Log.d("HomeFragment", "Sales Selected")
+            }
+        }
+    }
+    // In your HomeFragment.kt
+    // ui/home/HomeFragment.kt
+    private fun setupCustomTabs() {
 
-            override fun onTabReselected(tab: TabLayout.Tab?) {
-                // Optional
+        val tabs = listOf(
+            binding.tabHome,
+            binding.tabShops,
+            binding.tabSchools,
+            binding.tabSales
+        )
+
+        tabs.forEach { tab ->
+            tab.setOnClickListener {
+                selectTab(tab)
             }
-        })
-    }*/
+        }
+    }
+
     private fun setupBannerSlider() {
         bannerAdapter = BannerAdapter(bannerItems)
-
-        // Make ViewPager visible
-        binding.bannerViewPager.visibility = View.VISIBLE
 
         binding.bannerViewPager.apply {
             adapter = bannerAdapter
@@ -106,13 +127,30 @@ class HomeFragment : Fragment() {
                 }
             })
         }
+
+        // Setup auto-scroll
+        autoScrollHelper = BannerAutoScrollHelper(binding.bannerViewPager, 8000)
+
+        // Pause on touch
+        binding.bannerViewPager.setOnTouchListener { _, event ->
+            when (event.action) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    autoScrollHelper.pauseAutoScroll()
+                    false
+                }
+                android.view.MotionEvent.ACTION_UP,
+                android.view.MotionEvent.ACTION_CANCEL -> {
+                    autoScrollHelper.resumeAutoScroll()
+                    false
+                }
+                else -> false
+            }
+        }
+
+        autoScrollHelper.startAutoScroll()
     }
 
     private fun setupIndicatorDots() {
-        // Make indicator layout visible
-        binding.indicatorDots.visibility = View.VISIBLE
-
-        // Create indicator dots based on number of banners
         binding.indicatorDots.removeAllViews()
 
         bannerItems.forEachIndexed { index, _ ->
@@ -141,8 +179,19 @@ class HomeFragment : Fragment() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        autoScrollHelper?.resumeAutoScroll()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        autoScrollHelper?.pauseAutoScroll()
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
+        autoScrollHelper?.stopAutoScroll()
         _binding = null
     }
 }
