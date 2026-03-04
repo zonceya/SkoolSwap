@@ -6,21 +6,92 @@
     android:layout_height="match_parent"
     android:background="#F7F7F7">
 
-    <!-- Banner ViewPager -->
+    <!-- TabLayout at the very top -->
+    <!-- Top Tabs Container -->
+    <LinearLayout
+        android:id="@+id/topTabs"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:background="#F7F7F7"
+        android:backgroundTint="@color/white"
+        android:weightSum="4"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Home (Selected) -->
+        <TextView
+            android:id="@+id/tabHome"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:gravity="center"
+            android:layout_weight="1"
+            android:text="Home"
+            android:textColor="@android:color/white"
+            android:textStyle="bold"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:background="@drawable/tablayout_selector"
+            android:layout_marginEnd="16dp"/>
+
+        <!-- Shops -->
+        <TextView
+            android:id="@+id/tabShops"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="Shops"
+            android:textStyle="bold"
+            android:textColor="@android:color/black"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:layout_marginEnd="16dp"/>
+
+        <!-- Schools -->
+        <TextView
+            android:id="@+id/tabSchools"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:gravity="center"
+            android:layout_weight="1"
+            android:textStyle="bold"
+            android:text="Schools"
+            android:textColor="@android:color/black"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:layout_marginEnd="16dp"/>
+
+        <!-- Sales -->
+        <TextView
+            android:id="@+id/tabSales"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textStyle="bold"
+            android:text="Sales"
+            android:textColor="@android:color/black"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"/>
+    </LinearLayout>
+    <!-- Rest of your layout remains the same -->
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/bannerViewPager"
         android:layout_width="match_parent"
-        android:layout_height="262dp"
-        android:layout_marginTop="0dp"
+        android:layout_height="300dp"
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
+        android:layout_marginTop="0dp"
         android:clipToPadding="false"
         android:visibility="visible"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topTabs"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Indicator Dots - INSIDE the banner area at bottom -->
+    <!-- Indicator Dots -->
     <LinearLayout
         android:id="@+id/indicatorDots"
         android:layout_width="wrap_content"
@@ -33,7 +104,7 @@
         app:layout_constraintStart_toStartOf="@id/bannerViewPager"
         app:layout_constraintEnd_toEndOf="@id/bannerViewPager" />
 
-    <!-- RecyclerView for remaining content -->
+    <!-- RecyclerView -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/homeRecycler"
         android:layout_width="0dp"
