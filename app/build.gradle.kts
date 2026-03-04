@@ -94,6 +94,7 @@ dependencies {
     // Image Loading
     implementation(libs.glide)
     implementation(libs.androidx.viewpager2)
+    implementation(libs.media3.exoplayer)
 
     // Networking
     implementation(libs.retrofit)
@@ -103,6 +104,7 @@ dependencies {
     // Database
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.androidx.media3.ui)
     kapt(libs.room.compiler)
     implementation(libs.kotlinx.datetime)
     implementation(libs.play.services.cast.framework)

@@ -1,5 +1,7 @@
+// ui/login/LoginFragment.kt
 package com.example.skoolswap.ui.login
 
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -14,6 +16,7 @@ import com.example.skoolswap.common.constants.ErrorConstants
 import com.example.skoolswap.databinding.FragmentLoginBinding
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -35,8 +38,30 @@ class LoginFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        setupVideoBackground()
         setupUI()
         setupObservers()
+    }
+
+    private fun setupVideoBackground() {
+        try {
+            // Create URI for local video from raw folder
+            val videoUri = Uri.parse("android.resource://${requireContext().packageName}/${R.raw.login_background}")
+
+            // Set the video URI
+            binding.videoPlayer.setVideoUri(videoUri)
+
+            // Small delay to ensure view is attached, then prepare
+            viewLifecycleOwner.lifecycleScope.launch {
+                delay(100)
+                binding.videoPlayer.prepare()
+            }
+
+            Log.d("LoginFragment", "Video background initialized successfully with URI: $videoUri")
+        } catch (e: Exception) {
+            Log.e("LoginFragment", "Error setting up video background", e)
+            // Fallback: show a solid color background or keep as is
+        }
     }
 
     private fun setupUI() {
@@ -60,6 +85,7 @@ class LoginFragment : Fragment() {
                 binding.loadingIndicator.visibility =
                     if (isLoading) View.VISIBLE else View.GONE
                 binding.signInButton.isEnabled = !isLoading
+                binding.signInButton.alpha = if (isLoading) 0.5f else 1.0f
             }
         }
 
@@ -136,13 +162,19 @@ class LoginFragment : Fragment() {
         findNavController().navigate(R.id.nav_home)
     }
 
+    override fun onResume() {
+        super.onResume()
+        binding.videoPlayer.onResume()
+        viewModel.clearError()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        binding.videoPlayer.onPause()
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
-    }
-
-    override fun onResume() {
-        super.onResume()
-        viewModel.clearError()
     }
 }
