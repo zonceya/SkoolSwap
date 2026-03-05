@@ -8,7 +8,7 @@ import java.lang.ref.WeakReference
 
 class BannerAutoScrollHelper(
     viewPager: ViewPager2,
-    private val interval: Long = 3000 // 3 seconds
+    private val interval: Long = 8000 // 3 seconds
 ) {
     private val weakViewPager = WeakReference(viewPager)
     private val handler = Handler(Looper.getMainLooper())
