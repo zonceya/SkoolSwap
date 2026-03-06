@@ -48,7 +48,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        Log.e("MainActivity", "🔥 onCreate at ${System.currentTimeMillis()}")
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -259,11 +259,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun observeNavigation() {
+        Log.e("MainActivity", "👀 observeNavigation called at ${System.currentTimeMillis()}")
         viewModel.navigationDestination.observe(this) { destination ->
-            navigateToDestination(destination)
+            Log.e("MainActivity", "📡 navigationDestination observed: $destination at ${System.currentTimeMillis()}")
+
+            // 🔥 Only navigate if destination is not null
+            if (destination != null) {
+                navigateToDestination(destination)
+            } else {
+                Log.e("MainActivity", "⏭️ Null destination - no navigation (user needs to complete profile)")
+            }
         }
 
         viewModel.forceNavigation.observe(this) { destination ->
+            Log.e("MainActivity", "📡 forceNavigation observed: $destination at ${System.currentTimeMillis()}")
             destination?.let {
                 navigateToDestination(it)
                 viewModel.clearForceNavigation()
@@ -271,19 +280,44 @@ class MainActivity : AppCompatActivity() {
         }
     }
     private fun navigateToDestination(destination: NavigationDestination) {
+        val currentDestId = navController.currentDestination?.id
+        val currentDestName = navController.currentDestination?.displayName
+
+        Log.e("MainActivity", "🎯 navigateToDestination: $destination, current: $currentDestName")
+
+        // BLOCK ALL navigation when ProfileFragment is visible
+        if (currentDestId == R.id.nav_profile) {
+            Log.e("MainActivity", "🛑 BLOCKING navigation to $destination - ProfileFragment is active")
+            return
+        }
+
+        // Also block if we're already at the destination
         when (destination) {
             NavigationDestination.ONBOARDING -> {
-                if (navController.currentDestination?.id != R.id.viewPagerFragment)
+                if (currentDestId != R.id.viewPagerFragment) {
                     navController.navigate(R.id.viewPagerFragment)
+                }
             }
             NavigationDestination.HOME -> {
-                if (navController.currentDestination?.id != R.id.nav_home)
+                if (currentDestId != R.id.nav_home) {
                     navController.navigate(R.id.nav_home)
+                }
             }
             NavigationDestination.LOGIN -> {
-                if (navController.currentDestination?.id != R.id.loginFragment)
+                if (currentDestId != R.id.loginFragment) {
                     navController.navigate(R.id.loginFragment)
+                }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Log.e("MainActivity", "🔥 onResume at ${System.currentTimeMillis()}")
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Log.e("MainActivity", "🔥 onPause at ${System.currentTimeMillis()}")
     }
 }

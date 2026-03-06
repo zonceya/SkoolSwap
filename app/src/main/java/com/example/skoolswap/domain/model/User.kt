@@ -11,5 +11,9 @@ data class User(
     val role: String,
     val token: String,
     val createdAt: String,
-    val updatedAt: String
+    val updatedAt: String,
+    // Add these school fields
+    val schoolId: Int? = null,
+    val schoolName: String? = null,
+    val schoolMapped: Boolean = false
 )

@@ -12,6 +12,7 @@ interface AuthRepositoryInterface {
     suspend fun updateMobile(mobile: String): Result<Boolean>
     suspend fun refreshUserProfile(): Result<User?>
     suspend fun deleteProfile(): Result<Boolean>
+    suspend fun assignSchool(schoolId: Int): Result<Unit>
     fun clearError()
     fun checkCurrentUser()
 

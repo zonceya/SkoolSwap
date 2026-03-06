@@ -137,11 +137,19 @@ class AuthRepository @Inject constructor(
             val signInResponse = response.body()
             if (signInResponse?.success == true) {
                 val domainUser = signInResponse.user.toDomain(signInResponse.token)
+
+                // 🔥 STEP 1: Set token FIRST before anything else
+                _authToken.value = signInResponse.token
+                appPreferences.setAuthToken(signInResponse.token)
+
+                // 🔥 STEP 2: Then cache user
                 cacheUser(domainUser, firebaseUser)
+
+                // 🔥 STEP 3: Then set app state
                 appPreferences.setLoggedIn(true)
                 appPreferences.setFirstTimeLogin(false)
-                Result.success(domainUser)
 
+                Result.success(domainUser)
             } else {
                 val errorMsg = signInResponse?.message ?: "Backend sign-in failed"
                 _error.value = errorMsg
@@ -457,4 +465,51 @@ class AuthRepository @Inject constructor(
             _loading.value = false
         }
     }
+
+    override suspend fun assignSchool(schoolId: Int): Result<Unit> {
+        return try {
+            _loading.value = true
+
+            val token = _authToken.value
+            if (token == null) {
+                return Result.failure(Exception("Not authenticated"))
+            }
+
+            // Simple request with just school_id
+            val request = mapOf("school_id" to schoolId)
+            val response = userApiService.assignSchool("Bearer $token", request)
+
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body?.success == true) {
+                    // Update local user
+                    val currentUser = _serverUser.value
+                    if (currentUser != null) {
+                        val updatedUser = currentUser.copy(
+                            schoolMapped = true,
+                            schoolId = schoolId,
+                            schoolName = body.school_name
+                        )
+                        _serverUser.value = updatedUser
+                        userDao.insertUser(updatedUser.toEntity())
+
+                        // Save to preferences
+                        appPreferences.setSchoolMapped(true)
+                        appPreferences.setSchoolInfo(schoolId, body.school_name ?: "")
+                    }
+
+                    Result.success(Unit)
+                } else {
+                    Result.failure(Exception(body?.message ?: "Failed to assign school"))
+                }
+            } else {
+                Result.failure(Exception("Server error: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        } finally {
+            _loading.value = false
+        }
+    }
+
 }

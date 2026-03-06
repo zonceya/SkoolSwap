@@ -28,20 +28,16 @@ class NavigationHeaderViewModel @Inject constructor(
 
     private fun observeUserChanges() {
         viewModelScope.launch {
-            // Observe the server user flow from repository
             authRepository.getServerUser().collect { user ->
                 if (user != null) {
-                    // We have a user! Show their data
                     _userState.value = UserState.Success(
                         name = user.name,
                         email = user.email,
                         profileImageUrl = user.profilePictureUrl.takeIf { !it.isNullOrEmpty() }
                     )
-
-                    // Also refresh from API in background for latest data
-                    refreshFromApiInBackground()
+                    // 🔥 REMOVE THIS LINE - it's causing the infinite loop!
+                    // refreshFromApiInBackground()
                 } else {
-                    // No user - show welcome state
                     _userState.value = UserState.Success(
                         name = "Welcome",
                         email = "Sign in to continue",
@@ -78,14 +74,4 @@ class NavigationHeaderViewModel @Inject constructor(
         }
     }
 
-    private fun refreshFromApiInBackground() {
-        viewModelScope.launch {
-            try {
-                authRepository.refreshUserProfile()
-                // Don't update UI here - let the serverUser flow handle it
-            } catch (e: Exception) {
-                // Ignore background errors
-            }
-        }
-    }
-}
+  }

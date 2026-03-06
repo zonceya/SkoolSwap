@@ -15,7 +15,7 @@
             android:id="@+id/action_viewPagerFragment_to_loginFragment"
             app:destination="@id/loginFragment"
             app:popUpTo="@id/viewPagerFragment"
-            app:popUpToInclusive="false" />
+            app:popUpToInclusive="true" />
     </fragment>
 
     <!-- Login Flow -->
@@ -24,9 +24,18 @@
         android:name="com.example.skoolswap.ui.login.LoginFragment"
         android:label="Login"
         tools:layout="@layout/fragment_login">
+
+        <!-- Action to Home (existing) -->
         <action
             android:id="@+id/action_loginFragment_to_nav_home"
             app:destination="@id/nav_home"
+            app:popUpTo="@id/loginFragment"
+            app:popUpToInclusive="true" />
+
+        <!-- NEW: Action to Profile for first-time users who need to complete profile -->
+        <action
+            android:id="@+id/action_loginFragment_to_profileFragment"
+            app:destination="@id/nav_profile"
             app:popUpTo="@id/loginFragment"
             app:popUpToInclusive="true" />
     </fragment>

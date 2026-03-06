@@ -17,7 +17,10 @@ fun UserResponse.toDomain(token: String): User {
         role = role,
         token = token,
         createdAt = createdAt,
-        updatedAt = updatedAt
+        updatedAt = updatedAt,
+        schoolMapped = schoolMapped ?: false,
+        schoolId = schoolId,
+        schoolName = schoolName
     )
 }
 
@@ -49,7 +52,10 @@ fun UserEntity.toDomain(): User {
         role = role,
         token = token,
         createdAt = createdAt,
-        updatedAt = updatedAt
+        updatedAt = updatedAt,
+        schoolMapped = false,
+        schoolId = null,
+        schoolName = null
     )
 }
 fun SignInResponse.toDomain(): User {

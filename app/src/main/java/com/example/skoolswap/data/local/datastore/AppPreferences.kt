@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -28,7 +29,12 @@ class AppPreferences @Inject constructor(
         val LOGGED_IN = booleanPreferencesKey("logged_in")
         val FIRST_TIME_LOGIN = booleanPreferencesKey("first_time_login")
 
-        // String preferences (add these for user data)
+        // ADD THESE SCHOOL-RELATED PREFERENCES
+        val SCHOOL_MAPPED = booleanPreferencesKey("school_mapped")
+        val SCHOOL_ID = intPreferencesKey("school_id")
+        val SCHOOL_NAME = stringPreferencesKey("school_name")
+
+        // String preferences for user data
         val USER_ID = stringPreferencesKey("user_id")
         val USER_NAME = stringPreferencesKey("user_name")
         val USER_EMAIL = stringPreferencesKey("user_email")
@@ -36,6 +42,7 @@ class AppPreferences @Inject constructor(
         val AUTH_TOKEN = stringPreferencesKey("auth_token")
     }
 
+    // Existing preferences
     val isOnboardingFinished: Flow<Boolean> = context.dataStore.data
         .map { it[ONBOARDING_FINISHED] ?: false }
 
@@ -45,7 +52,17 @@ class AppPreferences @Inject constructor(
     val isFirstTimeLogin: Flow<Boolean> = context.dataStore.data
         .map { it[FIRST_TIME_LOGIN] ?: true }
 
-    // Getters for user data
+    // ADD THESE SCHOOL-RELATED FLOWS
+    val schoolMapped: Flow<Boolean> = context.dataStore.data
+        .map { it[SCHOOL_MAPPED] ?: false }
+
+    val schoolId: Flow<Int?> = context.dataStore.data
+        .map { it[SCHOOL_ID] }
+
+    val schoolName: Flow<String?> = context.dataStore.data
+        .map { it[SCHOOL_NAME] }
+
+    // User data getters
     val userId: Flow<String?> = context.dataStore.data
         .map { it[USER_ID] }
 
@@ -61,6 +78,7 @@ class AppPreferences @Inject constructor(
     val authToken: Flow<String?> = context.dataStore.data
         .map { it[AUTH_TOKEN] }
 
+    // Existing setters
     suspend fun setOnboardingFinished(finished: Boolean = true) {
         context.dataStore.edit { preferences ->
             preferences[ONBOARDING_FINISHED] = finished
@@ -83,10 +101,30 @@ class AppPreferences @Inject constructor(
         }
     }
 
-    // Methods to save user data
+    // ADD THESE SCHOOL-RELATED SETTERS
+    suspend fun setSchoolMapped(mapped: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[SCHOOL_MAPPED] = mapped
+        }
+    }
+
+    suspend fun setSchoolInfo(id: Int, name: String) {
+        context.dataStore.edit { preferences ->
+            preferences[SCHOOL_ID] = id
+            preferences[SCHOOL_NAME] = name
+        }
+    }
+
+    // User data setters
     suspend fun setUserId(id: String) {
         context.dataStore.edit { preferences ->
             preferences[USER_ID] = id
+        }
+    }
+
+    suspend fun setUserId(id: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[USER_ID] = id.toString()
         }
     }
 
@@ -114,6 +152,11 @@ class AppPreferences @Inject constructor(
         }
     }
 
+    // ADD THIS HELPER TO CHECK SCHOOL STATUS
+    suspend fun hasSchoolMapped(): Boolean {
+        return context.dataStore.data.map { it[SCHOOL_MAPPED] ?: false }.first()
+    }
+
     // Clear all user data (for logout/delete)
     suspend fun clearUserData() {
         context.dataStore.edit { preferences ->
@@ -124,6 +167,9 @@ class AppPreferences @Inject constructor(
             preferences.remove(USER_EMAIL)
             preferences.remove(USER_PROFILE_IMAGE)
             preferences.remove(AUTH_TOKEN)
+            preferences.remove(SCHOOL_MAPPED)
+            preferences.remove(SCHOOL_ID)
+            preferences.remove(SCHOOL_NAME)
         }
     }
 

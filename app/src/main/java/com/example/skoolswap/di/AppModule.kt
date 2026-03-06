@@ -10,12 +10,15 @@ import com.example.skoolswap.data.local.database.dao.ItemDao
 import com.example.skoolswap.data.local.database.dao.ShopDao
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.remote.api.ItemApiService
+import com.example.skoolswap.data.remote.api.ProvinceApiService  // ADD THIS IMPORT
 import com.example.skoolswap.data.remote.api.ReferenceDataApiService
 import com.example.skoolswap.data.remote.api.RetrofitClient
+import com.example.skoolswap.data.remote.api.SchoolApiService  // ADD THIS IMPORT
 import com.example.skoolswap.data.remote.api.ShopApiService
 import com.example.skoolswap.data.remote.api.UserApiService
 import com.example.skoolswap.data.repository.AuthRepository
 import com.example.skoolswap.data.repository.ItemRepository
+import com.example.skoolswap.data.repository.SchoolRepository  // ADD THIS IMPORT
 import com.example.skoolswap.data.repository.ShopRepository
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
@@ -51,6 +54,15 @@ object AppModule {
     @Singleton
     fun provideItemApiService(): ItemApiService = RetrofitClient.instance.create(ItemApiService::class.java)
 
+    // 🔥 ADD THESE NEW API SERVICES
+    @Provides
+    @Singleton
+    fun provideProvinceApiService(): ProvinceApiService = RetrofitClient.instance.create(ProvinceApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideSchoolApiService(): SchoolApiService = RetrofitClient.instance.create(SchoolApiService::class.java)
+
     // Other dependencies
     @Provides
     @Singleton
@@ -66,7 +78,21 @@ object AppModule {
     fun provideAppPreferences(@ApplicationContext context: Context): AppPreferences =
         AppPreferences(context)
 
-    // Repositories
+    // 🔥 ADD SCHOOL REPOSITORY PROVIDER
+    @Provides
+    @Singleton
+    fun provideSchoolRepository(
+        schoolApiService: SchoolApiService,
+        provinceApiService: ProvinceApiService,
+        appPreferences: AppPreferences
+    ): SchoolRepository {
+        return SchoolRepository(
+            schoolApiService = schoolApiService,
+            provinceApiService = provinceApiService,
+            appPreferences = appPreferences
+        )
+    }
+
     @RequiresApi(Build.VERSION_CODES.O)
     @Provides
     @Singleton
@@ -74,13 +100,13 @@ object AppModule {
         shopApiService: ShopApiService,
         shopDao: ShopDao,
         authRepository: AuthRepositoryInterface,
-        itemRepository: ItemRepositoryInterface  // ✅ Add this parameter
+        itemRepository: ItemRepositoryInterface
     ): ShopRepositoryInterface {
         return ShopRepository(
             shopApiService = shopApiService,
             shopDao = shopDao,
             authRepository = authRepository as AuthRepository,
-            itemRepository = itemRepository  // ✅ Pass it here
+            itemRepository = itemRepository
         )
     }
 
@@ -97,10 +123,10 @@ object AppModule {
             authRepository = authRepository
         )
     }
+
     @Provides
     @Singleton
     fun provideReferenceDataApiService(): ReferenceDataApiService {
         return RetrofitClient.instance.create(ReferenceDataApiService::class.java)
     }
-
 }
