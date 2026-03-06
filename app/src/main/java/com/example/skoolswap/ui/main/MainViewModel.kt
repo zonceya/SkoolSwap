@@ -33,7 +33,9 @@ class MainViewModel @Inject constructor(
         when {
             !onboardingFinished -> NavigationDestination.ONBOARDING
             user == null -> NavigationDestination.LOGIN
-            else -> NavigationDestination.HOME
+            user.schoolMapped -> NavigationDestination.HOME
+            // 🔥 User exists but no school mapped - return null to prevent auto-navigation
+            else -> null
         }
     }.asLiveData()
 

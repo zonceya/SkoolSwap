@@ -51,6 +51,8 @@
                 android:layout_below="@id/profileImageContainer"
                 android:layout_centerHorizontal="true"
                 android:layout_marginTop="8dp"
+                android:text="change_photo"
+                android:visibility="gone"
                 android:textColor="@color/black"
                 android:textSize="14sp" />
 
@@ -81,13 +83,12 @@
                     android:cursorVisible="false"
                     android:focusable="false"
                     android:inputType="none"
-                    android:text="@string/zama_onceya"
                     android:textColor="@color/black" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Contact Number Field -->
             <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/emailTextInputLayout"
+                android:id="@+id/mobileTextInputLayout"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -114,16 +115,123 @@
                     android:textColor="@color/black" />
             </com.google.android.material.textfield.TextInputLayout>
 
+            <!-- Province Dropdown -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/provinceTextInputLayout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/mobileTextInputLayout"
+                android:layout_marginTop="16dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginStart="8dp"
+                android:hint="@string/select_province"
+
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp"
+                app:endIconMode="dropdown_menu"
+                app:startIconDrawable="@drawable/ic_location"
+                app:startIconTint="@color/black">
+
+                <AutoCompleteTextView
+                    android:paddingEnd="45dp"
+                    android:paddingStart="45dp"
+                    android:id="@+id/provinceSpinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="none"
+                    android:textColor="@color/black" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- School Search -->
+            <!-- School Search - FIXED -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/schoolSearchLayout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/provinceTextInputLayout"
+                android:layout_marginTop="16dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginStart="8dp"
+                android:hint="@string/search_school"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp"
+                app:endIconMode="clear_text"
+                app:startIconDrawable="@drawable/ic_search"
+                app:startIconTint="@color/black"
+                app:endIconTint="@color/black"
+                app:placeholderText="@string/select_province_first"
+                app:placeholderTextColor="@color/darker_grey_light">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/schoolSearch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:enabled="false"
+                    android:inputType="text"
+                    android:textColor="@color/black"
+                    android:textColorHint="@color/darker_grey_light"
+                    android:paddingEnd="8dp"
+                    android:paddingStart="8dp" />
+            </com.google.android.material.textfield.TextInputLayout>
+            <!-- Selected School Display -->
+            <TextView
+                android:id="@+id/selectedSchoolText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/schoolSearchLayout"
+                android:layout_marginTop="8dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:text="@string/no_school_selected"
+                android:textColor="@color/lightgray"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+            <!-- Search Results -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/schoolResultsRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/selectedSchoolText"
+                android:layout_marginTop="8dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:maxHeight="200dp"
+                android:visibility="gone"
+                android:background="@drawable/rounded_background"
+                android:elevation="4dp" />
+
+            <!-- No Results Message -->
+            <TextView
+                android:id="@+id/noResultsText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/selectedSchoolText"
+                android:layout_marginTop="16dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:text="@string/no_schools_found"
+                android:textAlignment="center"
+                android:textColor="@color/lightgray"
+                android:visibility="gone" />
+
             <!-- Submit Button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/submitButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_below="@id/emailTextInputLayout"
+                android:layout_below="@id/schoolResultsRecyclerView"
                 android:layout_marginTop="32dp"
                 android:layout_marginEnd="8dp"
                 android:layout_marginStart="8dp"
                 android:background="@drawable/ic_rounded"
+                android:enabled="false"
                 android:text="@string/submit"
                 android:textColor="@color/white"
                 android:textStyle="bold"
@@ -141,7 +249,8 @@
                 android:text="Delete Profile"
                 android:textColor="@color/black"
                 android:textSize="18sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:visibility="visible" />
 
             <TextView
                 android:id="@+id/deleteWarningText"
@@ -152,9 +261,10 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="@string/deleting_your_account_is_permanent_and_cannot_be_undone_all_your_data_will_be_permanently_lost"
-                android:textColor="@color/lightgray"
+                android:textColor="@color/darker_grey_light"
                 android:textSize="14sp"
-                android:lineSpacingExtra="4dp" />
+                android:lineSpacingExtra="4dp"
+                android:visibility="visible" />
 
             <!-- Delete Button -->
             <com.google.android.material.button.MaterialButton
@@ -169,7 +279,9 @@
                 android:text="@string/delete_profile"
                 android:textColor="@color/white"
                 android:textStyle="bold"
+                android:visibility="visible"
                 app:backgroundTint="@null" />
+
         </RelativeLayout>
 
         <!-- Loading Indicator -->
