@@ -12,6 +12,8 @@ import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
+import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -39,7 +41,7 @@ class ProfileFragment : Fragment() {
 
     @Inject
     lateinit var authRepository: AuthRepositoryInterface
-
+    private var isSettingTextProgrammatically = false
     private lateinit var schoolAdapter: SchoolAdapter
     private var searchDebounceJob: kotlinx.coroutines.Job? = null
 
@@ -105,17 +107,28 @@ class ProfileFragment : Fragment() {
             mutableListOf<String>()
         )
 
-        (binding.provinceSpinner as? AutoCompleteTextView)?.setAdapter(provinceAdapter)
+        (binding.provinceSpinner as? AutoCompleteTextView)?.apply {
+            setAdapter(provinceAdapter)
+            threshold = 1  // Show dropdown after 1 character
+        }
 
         binding.provinceSpinner.setOnItemClickListener { _, _, position, _ ->
             val province = viewModel.provinces.value[position]
             viewModel.selectProvince(province)
 
-            // Enable school search
+            // Immediately show selected province
+            binding.provinceSpinner.setText(province.name, false)
+
+            // Clear any existing school when province changes
+            binding.selectedSchoolText.visibility = View.GONE
+            binding.schoolSearch.text?.clear()
+
+            // Clear error when province is selected
+            binding.provinceTextInputLayout.error = null
+
             binding.schoolSearch.isEnabled = true
             binding.schoolSearchLayout.hint = "Search schools in ${province.name}"
             binding.schoolSearchLayout.placeholderText = "Type at least 2 characters"
-            binding.schoolSearch.text?.clear()
         }
     }
 
@@ -124,13 +137,22 @@ class ProfileFragment : Fragment() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
+                // Don't search if we're setting text programmatically
+                if (isSettingTextProgrammatically) {
+                    isSettingTextProgrammatically = false
+                    return
+                }
+
+                // Clear error when user starts typing
+                binding.schoolSearchLayout.error = null
+
                 searchDebounceJob?.cancel()
 
                 val query = s?.toString()?.trim() ?: ""
 
                 if (query.length >= 2) {
                     searchDebounceJob = lifecycleScope.launch {
-                        delay(500) // Debounce
+                        delay(500)
                         viewModel.searchSchools(query)
                     }
                 } else {
@@ -146,44 +168,72 @@ class ProfileFragment : Fragment() {
         }
     }
 
-    private fun setupSchoolResults() {
-        schoolAdapter = SchoolAdapter { school ->
-            viewModel.selectSchool(school)
-            binding.selectedSchoolText.text = "Selected: ${school.name}"
-            binding.selectedSchoolText.visibility = View.VISIBLE
-            binding.schoolResultsRecyclerView.visibility = View.GONE
-            binding.schoolSearch.text?.clear()
-            hideKeyboard()
-        }
-
-        binding.schoolResultsRecyclerView.apply {
-            layoutManager = LinearLayoutManager(requireContext())
-            adapter = schoolAdapter
-        }
-    }
-
     private fun setupObservers() {
-        // Provinces
+        // ========== PROVINCE OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.provinces.collectLatest { provinces ->
+                Log.d("ProfileFragment", "📋 Provinces loaded: ${provinces.size}")
+
+                // Create and set adapter
                 val provinceNames = provinces.map { it.name }
-                (binding.provinceSpinner as? AutoCompleteTextView)?.setAdapter(
-                    ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, provinceNames)
+                val adapter = ArrayAdapter(
+                    requireContext(),
+                    android.R.layout.simple_dropdown_item_1line,
+                    provinceNames
                 )
+
+                (binding.provinceSpinner as? AutoCompleteTextView)?.apply {
+                    setAdapter(adapter)
+                    Log.d("ProfileFragment", "✅ Adapter set with ${provinces.size} items")
+
+                    // Try to set province from ViewModel first
+                    var provinceSet = false
+
+                    viewModel.selectedProvince.value?.let { province ->
+                        Log.d("ProfileFragment", "🔄 Setting spinner to selected province: ${province.name}")
+                        setText(province.name, false)
+                        provinceSet = true
+                    }
+
+                    // If no selected province but we have a school with provinceId, try to find it
+                    if (!provinceSet) {
+                        viewModel.selectedSchool.value?.let { school ->
+                            if (school.provinceId != null) {
+                                val matchingProvince = provinces.find { it.id == school.provinceId }
+                                matchingProvince?.let {
+                                    Log.d("ProfileFragment", "🔄 Setting spinner from school provinceId: ${it.name}")
+                                    setText(it.name, false)
+
+                                    // Also update the ViewModel so it's saved for next time
+                                    viewModel.selectProvince(it)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
-
-        // Selected Province
+        // ========== SELECTED PROVINCE OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.selectedProvince.collectLatest { province ->
                 province?.let {
+                    Log.d("ProfileFragment", "📍 Selected province changed to: ${it.name}")
+
+                    // Force the spinner to show the province name
+                    binding.provinceSpinner.setText(it.name, false)
+
+                    // Enable school search
                     binding.schoolSearch.isEnabled = true
                     binding.schoolSearchLayout.hint = "Search schools in ${it.name}"
+                    binding.schoolSearchLayout.placeholderText = "Type at least 2 characters"
+
+                    // Clear any province error
+                    binding.provinceTextInputLayout.error = null
                 }
             }
         }
 
-        // School Search Results
+        // ========== SCHOOL SEARCH RESULTS OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.schools.collectLatest { schools ->
                 if (schools.isNotEmpty()) {
@@ -199,20 +249,48 @@ class ProfileFragment : Fragment() {
             }
         }
 
-        // Selected School
+        // ========== SELECTED SCHOOL OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.selectedSchool.collectLatest { school ->
-                binding.submitButton.isEnabled = school != null
                 if (school != null) {
+                    // Show in the selected text view
                     binding.selectedSchoolText.text = "Selected: ${school.name}"
                     binding.selectedSchoolText.visibility = View.VISIBLE
+                    binding.selectedSchoolText.setTextColor(ContextCompat.getColor(requireContext(), R.color.green))
+
+                    // Set text programmatically without triggering search
+                    isSettingTextProgrammatically = true
+                    binding.schoolSearch.setText(school.name)
+
+                    // Clear any search results when school is selected
+                    binding.schoolResultsRecyclerView.visibility = View.GONE
+
+                    // Enable submit button
+                    binding.submitButton.isEnabled = true
+                    binding.submitButton.alpha = 1.0f
+
+                    // Clear any school error
+                    binding.schoolSearchLayout.error = null
+
+                    Log.d("ProfileFragment", "🏫 Selected school: ${school.name}")
+
+                    // If provinces are already loaded, try to set the province
+                    if (viewModel.provinces.value.isNotEmpty() && school.provinceId != null) {
+                        val matchingProvince = viewModel.provinces.value.find { it.id == school.provinceId }
+                        matchingProvince?.let {
+                            Log.d("ProfileFragment", "🔄 Setting province from school: ${it.name}")
+                            viewModel.selectProvince(it)
+                        }
+                    }
                 } else {
                     binding.selectedSchoolText.visibility = View.GONE
+                    binding.schoolSearch.text?.clear()
+                    binding.submitButton.isEnabled = false
+                    binding.submitButton.alpha = 0.5f
                 }
             }
         }
-
-        // Search Active State
+        // ========== SEARCH ACTIVE STATE OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.isSearchActive.collectLatest { isActive ->
                 if (isActive) {
@@ -221,7 +299,7 @@ class ProfileFragment : Fragment() {
             }
         }
 
-        // Loading States
+        // ========== LOADING STATE OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.isLoading.collectLatest { isLoading ->
                 binding.profileProgressLayout.visibility = if (isLoading) View.VISIBLE else View.GONE
@@ -229,13 +307,14 @@ class ProfileFragment : Fragment() {
             }
         }
 
+        // ========== SEARCHING INDICATOR OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.isSearching.collectLatest { isSearching ->
-                // Show searching indicator if needed
+                // Optional: Show a progress bar in search field
             }
         }
 
-        // Error Handling
+        // ========== ERROR HANDLING OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.error.collectLatest { error ->
                 error?.let {
@@ -245,7 +324,7 @@ class ProfileFragment : Fragment() {
             }
         }
 
-        // Mobile Update Success
+        // ========== MOBILE UPDATE SUCCESS OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.updateSuccess.collectLatest { success ->
                 if (success) {
@@ -255,13 +334,62 @@ class ProfileFragment : Fragment() {
             }
         }
 
-        // Profile Complete - Navigate to Home
+        // ========== HAS EXISTING SCHOOL OBSERVER (SHOWS DELETE SECTION) ==========
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.hasExistingSchool.collectLatest { hasExisting ->
+                Log.d("ProfileFragment", "🔥 hasExistingSchool: $hasExisting")
+                if (hasExisting) {
+                    binding.submitButton.text = "Update Profile"
+                    binding.deleteWarningTitle.visibility = View.VISIBLE
+                    binding.deleteWarningText.visibility = View.VISIBLE
+                    binding.deleteButton.visibility = View.VISIBLE
+                } else {
+                    binding.submitButton.text = "Submit"
+                    binding.deleteWarningTitle.visibility = View.GONE
+                    binding.deleteWarningText.visibility = View.GONE
+                    binding.deleteButton.visibility = View.GONE
+                }
+            }
+        }
+
+        // ========== PROFILE COMPLETE OBSERVER (NAVIGATE TO HOME) ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.profileComplete.collectLatest { isComplete ->
                 if (isComplete) {
-                    Snackbar.make(binding.root, "Profile completed! Welcome to SkoolSwap!", Snackbar.LENGTH_LONG).show()
+                    binding.profileProgressLayout.visibility = View.GONE
+                    val message = if (viewModel.hasExistingSchool.value) {
+                        "School updated successfully!"
+                    } else {
+                        "Profile completed! Welcome to SkoolSwap!"
+                    }
+                    Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+
+                    // Navigate to home
+                    findNavController().navigate(R.id.nav_home)
                     viewModel.resetNavigation()
-                  //  findNavController().navigate(R.id.nav_home)
+                }
+            }
+        }
+
+        // ========== LOADING STATE FOR FIRST LOAD ==========
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.isLoading.collectLatest { isLoading ->
+                if (isLoading) {
+                    // Show loading only for first load
+                    if (!viewModel.hasExistingSchool.value && viewModel.selectedSchool.value == null) {
+                        binding.profileProgressLayout.visibility = View.VISIBLE
+                    }
+                } else {
+                    binding.profileProgressLayout.visibility = View.GONE
+                }
+            }
+        }
+
+        // ========== CURRENT SCHOOL MAPPING OBSERVER (DEBUGGING) ==========
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.currentSchoolMapping.collectLatest { mapping ->
+                mapping?.let {
+                    Log.d("ProfileFragment", "📋 Current mapping: ${it.schoolName} (${it.mappingId})")
                 }
             }
         }
@@ -305,8 +433,6 @@ class ProfileFragment : Fragment() {
             viewModel.updateMobile(mobile)
         }
 
-        // Complete profile with school selection
-        viewModel.completeProfile()
     }
 
     private fun loadProfilePicture(url: String?) {
@@ -365,6 +491,52 @@ class ProfileFragment : Fragment() {
         val imm = context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         imm?.hideSoftInputFromWindow(binding.contactNumber.windowToken, 0)
     }
+    private fun validateAndSubmit() {
+        val mobile = binding.contactNumber.text.toString().trim()
+
+        // Check if school search field is filled but no school selected
+        val searchText = binding.schoolSearch.text.toString().trim()
+        if (searchText.isNotEmpty() && viewModel.selectedSchool.value == null) {
+            Toast.makeText(
+                requireContext(),
+                "Please select a school from the search results",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        // Validate mobile if provided (but don't auto-update)
+        if (mobile.isNotEmpty()) {
+            if (!validateMobileNumber(mobile)) {
+                binding.contactNumber.requestFocus()
+                return
+            }
+            // We'll update mobile after school is saved
+        }
+
+        // Check if school is selected
+        if (viewModel.selectedSchool.value == null) {
+            Toast.makeText(
+                requireContext(),
+                "Please select a school",
+                Toast.LENGTH_LONG
+            ).show()
+            binding.schoolSearch.requestFocus()
+            return
+        }
+
+        // Show loading
+        binding.profileProgressLayout.visibility = View.VISIBLE
+
+        // Update mobile if provided
+        if (mobile.isNotEmpty()) {
+            viewModel.updateMobile(mobile)
+        }
+
+        // Submit school selection
+        viewModel.submitSchoolSelection()
+    }
+
 
     override fun onDestroyView() {
         super.onDestroyView()
@@ -375,7 +547,31 @@ class ProfileFragment : Fragment() {
         super.onResume()
         Log.e("ProfileFragment", "🔥 ProfileFragment onResume")
     }
+    private fun setupSchoolResults() {
+        schoolAdapter = SchoolAdapter { school ->
+            // Just select the school, don't save yet
+            viewModel.selectSchool(school)
+            binding.selectedSchoolText.text = "Selected: ${school.name}"
+            binding.selectedSchoolText.visibility = View.VISIBLE
+            binding.selectedSchoolText.setTextColor(ContextCompat.getColor(requireContext(), R.color.green))
+            binding.schoolResultsRecyclerView.visibility = View.GONE
+            binding.schoolSearch.text?.clear()
+            hideKeyboard()
 
+            // Enable submit button
+            binding.submitButton.isEnabled = true
+
+            // Clear any search field errors
+            binding.schoolSearchLayout.error = null
+
+            Log.d("ProfileFragment", "✅ School selected: ${school.name}")
+        }
+
+        binding.schoolResultsRecyclerView.apply {
+            layoutManager = LinearLayoutManager(requireContext())
+            adapter = schoolAdapter
+        }
+    }
     override fun onPause() {
         super.onPause()
         Log.e("ProfileFragment", "🔥 ProfileFragment onPause - navigating away?")

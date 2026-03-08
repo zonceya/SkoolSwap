@@ -13,6 +13,11 @@ interface ProvinceDao {
     @Query("SELECT * FROM provinces ORDER BY name")
     fun getAll(): Flow<List<ProvinceEntity>>
 
+    @Query("SELECT COUNT(*) FROM provinces")
+    suspend fun getCount(): Int
+    @Query("SELECT * FROM provinces ORDER BY name")
+    suspend fun getAllSync(): List<ProvinceEntity>
+
     @Query("SELECT * FROM provinces WHERE id = :id")
     suspend fun getById(id: Int): ProvinceEntity?
 

@@ -28,7 +28,8 @@ import java.io.File
         com.example.skoolswap.data.local.database.entities.SchoolEntity::class,
         com.example.skoolswap.data.local.database.entities.GenderEntity::class,
         com.example.skoolswap.data.local.database.entities.TagEntity::class,
-        com.example.skoolswap.data.local.database.entities.LocationEntity::class
+        com.example.skoolswap.data.local.database.entities.LocationEntity::class,
+        com.example.skoolswap.data.local.database.entities.UserSchoolEntity::class
     ],
     version = 7,
     exportSchema = false
@@ -51,6 +52,7 @@ abstract class SkoolSwapDatabase : RoomDatabase() {
     abstract fun genderDao(): GenderDao
     abstract fun tagDao(): TagDao
     abstract fun locationDao(): LocationDao
+    abstract fun userSchoolDao(): UserSchoolDao
 
     companion object {
         @Volatile

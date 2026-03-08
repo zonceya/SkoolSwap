@@ -7,22 +7,29 @@ import androidx.annotation.RequiresApi
 import androidx.credentials.CredentialManager
 import com.example.skoolswap.data.local.database.SkoolSwapDatabase
 import com.example.skoolswap.data.local.database.dao.ItemDao
+import com.example.skoolswap.data.local.database.dao.ProvinceDao
+import com.example.skoolswap.data.local.database.dao.SchoolDao
 import com.example.skoolswap.data.local.database.dao.ShopDao
+import com.example.skoolswap.data.local.database.dao.UserDao
+import com.example.skoolswap.data.local.database.dao.UserSchoolDao
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.remote.api.ItemApiService
-import com.example.skoolswap.data.remote.api.ProvinceApiService  // ADD THIS IMPORT
+import com.example.skoolswap.data.remote.api.ProvinceApiService
 import com.example.skoolswap.data.remote.api.ReferenceDataApiService
 import com.example.skoolswap.data.remote.api.RetrofitClient
-import com.example.skoolswap.data.remote.api.SchoolApiService  // ADD THIS IMPORT
+import com.example.skoolswap.data.remote.api.SchoolApiService
 import com.example.skoolswap.data.remote.api.ShopApiService
 import com.example.skoolswap.data.remote.api.UserApiService
+import com.example.skoolswap.data.remote.api.UserSchoolApiService
 import com.example.skoolswap.data.repository.AuthRepository
 import com.example.skoolswap.data.repository.ItemRepository
-import com.example.skoolswap.data.repository.SchoolRepository  // ADD THIS IMPORT
+import com.example.skoolswap.data.repository.SchoolRepository
 import com.example.skoolswap.data.repository.ShopRepository
+import com.example.skoolswap.data.repository.UserSchoolRepository
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.domain.repository.ShopRepositoryInterface
+import com.example.skoolswap.domain.repository.UserSchoolRepositoryInterface
 import com.google.firebase.auth.FirebaseAuth
 import dagger.Module
 import dagger.Provides
@@ -41,7 +48,36 @@ object AppModule {
         return SkoolSwapDatabase.getInstance(context)
     }
 
-    // API Services
+    // ========== DAO PROVIDERS (User/School/Shop related) ==========
+    @Provides
+    @Singleton
+    fun provideUserDao(database: SkoolSwapDatabase): UserDao {
+        return database.userDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSchoolDao(database: SkoolSwapDatabase): SchoolDao {
+        return database.schoolDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideUserSchoolDao(database: SkoolSwapDatabase): UserSchoolDao {
+        return database.userSchoolDao()
+    }
+    @Provides
+    @Singleton
+    fun provideProvinceDao(database: SkoolSwapDatabase): ProvinceDao {  // ADD THIS
+        return database.provinceDao()
+    }
+    @Provides
+    @Singleton
+    fun provideShopDao(database: SkoolSwapDatabase): ShopDao {
+        return database.shopDao()
+    }
+
+    // ========== API SERVICES ==========
     @Provides
     @Singleton
     fun provideUserApiService(): UserApiService = RetrofitClient.instance.create(UserApiService::class.java)
@@ -54,7 +90,6 @@ object AppModule {
     @Singleton
     fun provideItemApiService(): ItemApiService = RetrofitClient.instance.create(ItemApiService::class.java)
 
-    // 🔥 ADD THESE NEW API SERVICES
     @Provides
     @Singleton
     fun provideProvinceApiService(): ProvinceApiService = RetrofitClient.instance.create(ProvinceApiService::class.java)
@@ -63,7 +98,17 @@ object AppModule {
     @Singleton
     fun provideSchoolApiService(): SchoolApiService = RetrofitClient.instance.create(SchoolApiService::class.java)
 
-    // Other dependencies
+    @Provides
+    @Singleton
+    fun provideUserSchoolApiService(): UserSchoolApiService = RetrofitClient.instance.create(UserSchoolApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideReferenceDataApiService(): ReferenceDataApiService {
+        return RetrofitClient.instance.create(ReferenceDataApiService::class.java)
+    }
+
+    // ========== OTHER DEPENDENCIES ==========
     @Provides
     @Singleton
     fun provideCredentialManager(@ApplicationContext context: Context): CredentialManager =
@@ -78,17 +123,37 @@ object AppModule {
     fun provideAppPreferences(@ApplicationContext context: Context): AppPreferences =
         AppPreferences(context)
 
-    // 🔥 ADD SCHOOL REPOSITORY PROVIDER
+    // ========== REPOSITORY PROVIDERS ==========
     @Provides
     @Singleton
     fun provideSchoolRepository(
         schoolApiService: SchoolApiService,
         provinceApiService: ProvinceApiService,
+        provinceDao : ProvinceDao,
         appPreferences: AppPreferences
     ): SchoolRepository {
         return SchoolRepository(
             schoolApiService = schoolApiService,
             provinceApiService = provinceApiService,
+            appPreferences = appPreferences,
+            provinceDao = provinceDao
+        )
+    }
+
+    @Provides
+    @Singleton
+    fun provideUserSchoolRepository(
+        userSchoolApiService: UserSchoolApiService,
+        userSchoolDao: UserSchoolDao,
+        schoolDao: SchoolDao,
+        provinceDao: ProvinceDao,
+        appPreferences: AppPreferences
+    ): UserSchoolRepository {
+        return UserSchoolRepository(
+            userSchoolApiService = userSchoolApiService,
+            userSchoolDao = userSchoolDao,
+            schoolDao = schoolDao,
+            provinceDao = provinceDao,
             appPreferences = appPreferences
         )
     }
@@ -114,7 +179,7 @@ object AppModule {
     @Singleton
     fun provideItemRepository(
         itemApiService: ItemApiService,
-        itemDao: ItemDao,
+        itemDao: ItemDao,  // This comes from ItemModule
         authRepository: AuthRepositoryInterface
     ): ItemRepositoryInterface {
         return ItemRepository(
@@ -122,11 +187,5 @@ object AppModule {
             itemDao = itemDao,
             authRepository = authRepository
         )
-    }
-
-    @Provides
-    @Singleton
-    fun provideReferenceDataApiService(): ReferenceDataApiService {
-        return RetrofitClient.instance.create(ReferenceDataApiService::class.java)
     }
 }

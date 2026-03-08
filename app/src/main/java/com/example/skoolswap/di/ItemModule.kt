@@ -1,4 +1,4 @@
-// di/ItemModule.kt
+// di/ItemModule.kt - REMOVE ProvinceDao
 package com.example.skoolswap.di
 
 import com.example.skoolswap.data.local.database.SkoolSwapDatabase
@@ -10,9 +10,6 @@ import com.example.skoolswap.data.local.database.dao.ItemDao
 import com.example.skoolswap.data.local.database.dao.ItemTypeDao
 import com.example.skoolswap.data.local.database.dao.LocationDao
 import com.example.skoolswap.data.local.database.dao.MainCategoryDao
-import com.example.skoolswap.data.local.database.dao.ProvinceDao
-import com.example.skoolswap.data.local.database.dao.SchoolDao
-import com.example.skoolswap.data.local.database.dao.ShopDao
 import com.example.skoolswap.data.local.database.dao.SizeDao
 import com.example.skoolswap.data.local.database.dao.SubCategoryDao
 import com.example.skoolswap.data.local.database.dao.TagDao
@@ -57,17 +54,14 @@ object ItemModule {
     @Singleton
     fun provideConditionDao(database: SkoolSwapDatabase): ConditionDao = database.conditionDao()
 
-    @Provides
-    @Singleton
-    fun provideProvinceDao(database: SkoolSwapDatabase): ProvinceDao = database.provinceDao()
+    // REMOVE THIS - ProvinceDao is now in AppModule
+    // @Provides
+    // @Singleton
+    // fun provideProvinceDao(database: SkoolSwapDatabase): ProvinceDao = database.provinceDao()
 
     @Provides
     @Singleton
     fun provideTownDao(database: SkoolSwapDatabase): TownDao = database.townDao()
-
-    @Provides
-    @Singleton
-    fun provideSchoolDao(database: SkoolSwapDatabase): SchoolDao = database.schoolDao()
 
     @Provides
     @Singleton
@@ -80,10 +74,6 @@ object ItemModule {
     @Provides
     @Singleton
     fun provideLocationDao(database: SkoolSwapDatabase): LocationDao = database.locationDao()
-
-    @Provides
-    @Singleton
-    fun provideShopDao(database: SkoolSwapDatabase): ShopDao = database.shopDao()
 
     @Provides
     @Singleton

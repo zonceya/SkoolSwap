@@ -3,7 +3,7 @@ package com.example.skoolswap.domain.model
 data class School(
     val id: Int,
     val name: String,
-    val provinceId: Int,
+    val provinceId: Int?,
     val provinceName: String?,
     val locationId: Int?,
     val schoolType: String?

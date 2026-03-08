@@ -35,9 +35,5 @@ interface UserApiService {
     suspend fun deleteProfile(
         @Header("Authorization") authToken: String
     ): Response<DeleteProfileResponse>
-    @POST("api/v1/users/assign_school")
-    suspend fun assignSchool(
-        @Header("Authorization") authToken: String,
-        @Body request: Map<String, Int>  // Simple map with school_id
-    ): Response<AssignSchoolResponse>
+
 }
