@@ -10,6 +10,8 @@ import androidx.credentials.exceptions.GetCredentialException
 import com.example.skoolswap.R
 import com.example.skoolswap.common.constants.ErrorConstants
 import com.example.skoolswap.data.local.database.SkoolSwapDatabase
+import com.example.skoolswap.data.local.database.dao.UserSchoolDao
+import com.example.skoolswap.data.local.database.entities.UserSchoolEntity
 import com.example.skoolswap.data.mapper.toDomain
 import com.example.skoolswap.data.mapper.toEntity
 import com.example.skoolswap.data.remote.api.UserApiService
@@ -39,15 +41,20 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import com.example.skoolswap.data.remote.models.response.profile.DeleteProfileResponse
 import com.example.skoolswap.data.local.datastore.AppPreferences
+import com.example.skoolswap.data.remote.api.SchoolApiService
+import com.example.skoolswap.data.remote.api.UserSchoolApiService
+import com.example.skoolswap.domain.model.SchoolMapping
 
 
 @Singleton
 class AuthRepository @Inject constructor(
     @ApplicationContext private val context: android.content.Context,
     private val userApiService: UserApiService,
+    private val userSchoolApiService: UserSchoolApiService,
     private val database: SkoolSwapDatabase,
     private val credentialManager: CredentialManager,
     private val firebaseAuth: FirebaseAuth,
+    private val userSchoolDao: UserSchoolDao,
     private val appPreferences: AppPreferences
 ) : AuthRepositoryInterface {
 
@@ -56,6 +63,7 @@ class AuthRepository @Inject constructor(
     }
 
     private val userDao = database.userDao()
+
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
 
     // Firebase user flow (property)
@@ -162,6 +170,7 @@ class AuthRepository @Inject constructor(
         }
     }
 
+    // In AuthRepository.kt - update cacheUser method
     private suspend fun cacheUser(user: User, firebaseUser: com.google.firebase.auth.FirebaseUser) {
         try {
             val userEntity = user.toEntity()
@@ -170,9 +179,65 @@ class AuthRepository @Inject constructor(
             _serverUser.value = user
             _authToken.value = user.token
 
+            // If user has school, cache it immediately
+
+            if (user.schoolMapped && user.schoolId != null) {
+                val userId = user.id
+                val existing = userSchoolDao.getCurrentForUserSync(userId)
+                if (existing == null){
+                    val tempEntity = UserSchoolEntity(
+                        id = "temp_${userId}", // Temporary ID
+                        userId = userId,
+                        schoolId = user.schoolId,
+                        schoolName = user.schoolName ?: "",
+                        mappedAt = null,
+                        updatedAt = null
+                    )
+                    userSchoolDao.insert(tempEntity)
+                    Log.i(TAG, "✅ Cached school in database: ${user.schoolName}")
+
+                    // Trigger background refresh to get real mapping_id
+                    CoroutineScope(Dispatchers.IO).launch {
+                        refreshSchoolMapping(userId)
+                    }
+                }
+
+                // You'll need userSchoolDao here - inject it in AuthRepository
+                // userSchoolDao.insert(tempEntity)
+                Log.i(TAG, "Cached school from sign-in: ${user.schoolName}")
+            }
+
             Log.i(TAG, "User data cached successfully: ${user.name}")
         } catch (e: Exception) {
             Log.e(TAG, "Error caching user data", e)
+        }
+    }
+    private suspend fun refreshSchoolMapping(userId: Int) {
+        try {
+            val token = _authToken.value ?: return
+            val response = userSchoolApiService.getCurrentSchool("Bearer $token")
+
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body?.school_mapped == true && body.school != null) {
+                    val school = body.school
+
+                    // Update with real data
+                    val entity = UserSchoolEntity(
+                        id = school.mapping_id,
+                        userId = userId,
+                        schoolId = school.id,
+                        schoolName = school.name,
+                        mappedAt = school.mapped_at,
+                        updatedAt = school.updated_at
+                    )
+                    userSchoolDao.insert(entity)
+
+                    Log.i(TAG, "🔄 Refreshed school mapping: ${school.mapping_id}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Background refresh failed", e)
         }
     }
 
@@ -460,52 +525,6 @@ class AuthRepository @Inject constructor(
             val errorMsg = "Delete profile failed: ${e.message}"
             Log.e(TAG, errorMsg, e)
             _error.value = errorMsg
-            Result.failure(e)
-        } finally {
-            _loading.value = false
-        }
-    }
-
-    override suspend fun assignSchool(schoolId: Int): Result<Unit> {
-        return try {
-            _loading.value = true
-
-            val token = _authToken.value
-            if (token == null) {
-                return Result.failure(Exception("Not authenticated"))
-            }
-
-            // Simple request with just school_id
-            val request = mapOf("school_id" to schoolId)
-            val response = userApiService.assignSchool("Bearer $token", request)
-
-            if (response.isSuccessful) {
-                val body = response.body()
-                if (body?.success == true) {
-                    // Update local user
-                    val currentUser = _serverUser.value
-                    if (currentUser != null) {
-                        val updatedUser = currentUser.copy(
-                            schoolMapped = true,
-                            schoolId = schoolId,
-                            schoolName = body.school_name
-                        )
-                        _serverUser.value = updatedUser
-                        userDao.insertUser(updatedUser.toEntity())
-
-                        // Save to preferences
-                        appPreferences.setSchoolMapped(true)
-                        appPreferences.setSchoolInfo(schoolId, body.school_name ?: "")
-                    }
-
-                    Result.success(Unit)
-                } else {
-                    Result.failure(Exception(body?.message ?: "Failed to assign school"))
-                }
-            } else {
-                Result.failure(Exception("Server error: ${response.code()}"))
-            }
-        } catch (e: Exception) {
             Result.failure(e)
         } finally {
             _loading.value = false

@@ -29,10 +29,11 @@ class AppPreferences @Inject constructor(
         val LOGGED_IN = booleanPreferencesKey("logged_in")
         val FIRST_TIME_LOGIN = booleanPreferencesKey("first_time_login")
 
-        // ADD THESE SCHOOL-RELATED PREFERENCES
+        // School-related preferences
         val SCHOOL_MAPPED = booleanPreferencesKey("school_mapped")
         val SCHOOL_ID = intPreferencesKey("school_id")
         val SCHOOL_NAME = stringPreferencesKey("school_name")
+        val SCHOOL_MAPPING_ID = stringPreferencesKey("school_mapping_id")  // ← ADD THIS
 
         // String preferences for user data
         val USER_ID = stringPreferencesKey("user_id")
@@ -52,7 +53,7 @@ class AppPreferences @Inject constructor(
     val isFirstTimeLogin: Flow<Boolean> = context.dataStore.data
         .map { it[FIRST_TIME_LOGIN] ?: true }
 
-    // ADD THESE SCHOOL-RELATED FLOWS
+    // School-related flows
     val schoolMapped: Flow<Boolean> = context.dataStore.data
         .map { it[SCHOOL_MAPPED] ?: false }
 
@@ -61,6 +62,9 @@ class AppPreferences @Inject constructor(
 
     val schoolName: Flow<String?> = context.dataStore.data
         .map { it[SCHOOL_NAME] }
+
+    val schoolMappingId: Flow<String?> = context.dataStore.data  // ← ADD THIS
+        .map { it[SCHOOL_MAPPING_ID] }
 
     // User data getters
     val userId: Flow<String?> = context.dataStore.data
@@ -101,7 +105,7 @@ class AppPreferences @Inject constructor(
         }
     }
 
-    // ADD THESE SCHOOL-RELATED SETTERS
+    // School-related setters
     suspend fun setSchoolMapped(mapped: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[SCHOOL_MAPPED] = mapped
@@ -112,6 +116,12 @@ class AppPreferences @Inject constructor(
         context.dataStore.edit { preferences ->
             preferences[SCHOOL_ID] = id
             preferences[SCHOOL_NAME] = name
+        }
+    }
+
+    suspend fun setSchoolMappingId(mappingId: String) {  // ← ADD THIS
+        context.dataStore.edit { preferences ->
+            preferences[SCHOOL_MAPPING_ID] = mappingId
         }
     }
 
@@ -152,9 +162,19 @@ class AppPreferences @Inject constructor(
         }
     }
 
-    // ADD THIS HELPER TO CHECK SCHOOL STATUS
+    // Helper to check school status
     suspend fun hasSchoolMapped(): Boolean {
         return context.dataStore.data.map { it[SCHOOL_MAPPED] ?: false }.first()
+    }
+
+    // Get user ID as Int
+    suspend fun getUserId(): Int? {
+        return context.dataStore.data.map { it[USER_ID]?.toIntOrNull() }.first()
+    }
+
+    // Get school mapping ID
+    suspend fun getSchoolMappingId(): String? {  // ← ADD THIS
+        return context.dataStore.data.map { it[SCHOOL_MAPPING_ID] }.first()
     }
 
     // Clear all user data (for logout/delete)
@@ -170,6 +190,7 @@ class AppPreferences @Inject constructor(
             preferences.remove(SCHOOL_MAPPED)
             preferences.remove(SCHOOL_ID)
             preferences.remove(SCHOOL_NAME)
+            preferences.remove(SCHOOL_MAPPING_ID)  // ← ADD THIS
         }
     }
 
