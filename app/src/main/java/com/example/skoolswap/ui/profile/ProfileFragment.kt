@@ -114,7 +114,7 @@ class ProfileFragment : Fragment() {
 
         binding.provinceSpinner.setOnItemClickListener { _, _, position, _ ->
             val province = viewModel.provinces.value[position]
-            viewModel.selectProvince(province)
+            viewModel.selectProvince(province, shouldClearSchool = true)
 
             // Immediately show selected province
             binding.provinceSpinner.setText(province.name, false)
@@ -143,6 +143,13 @@ class ProfileFragment : Fragment() {
                     return
                 }
 
+                // If user is typing and there was a selected school, clear the selection
+                if (viewModel.selectedSchool.value != null) {
+                    Log.d("ProfileFragment", "User typing - clearing school selection")
+                    viewModel.clearSchoolSelection()
+                    binding.selectedSchoolText.visibility = View.GONE
+                }
+
                 // Clear error when user starts typing
                 binding.schoolSearchLayout.error = null
 
@@ -150,7 +157,7 @@ class ProfileFragment : Fragment() {
 
                 val query = s?.toString()?.trim() ?: ""
 
-                if (query.length >= 2) {
+                if (query.length >= 2 && viewModel.selectedProvince.value != null) {
                     searchDebounceJob = lifecycleScope.launch {
                         delay(500)
                         viewModel.searchSchools(query)
@@ -160,12 +167,6 @@ class ProfileFragment : Fragment() {
                 }
             }
         })
-
-        binding.schoolSearch.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus && viewModel.selectedProvince.value != null) {
-                viewModel.clearSearch()
-            }
-        }
     }
 
     private fun setupObservers() {
@@ -258,16 +259,12 @@ class ProfileFragment : Fragment() {
                     binding.selectedSchoolText.visibility = View.VISIBLE
                     binding.selectedSchoolText.setTextColor(ContextCompat.getColor(requireContext(), R.color.green))
 
-                    // Set text programmatically without triggering search
+                    // Set text in search box so user can see and edit/delete
                     isSettingTextProgrammatically = true
                     binding.schoolSearch.setText(school.name)
 
                     // Clear any search results when school is selected
                     binding.schoolResultsRecyclerView.visibility = View.GONE
-
-                    // Enable submit button
-                    binding.submitButton.isEnabled = true
-                    binding.submitButton.alpha = 1.0f
 
                     // Clear any school error
                     binding.schoolSearchLayout.error = null
@@ -284,9 +281,9 @@ class ProfileFragment : Fragment() {
                     }
                 } else {
                     binding.selectedSchoolText.visibility = View.GONE
-                    binding.schoolSearch.text?.clear()
-                    binding.submitButton.isEnabled = false
-                    binding.submitButton.alpha = 0.5f
+                    // Don't clear the search text when school is deselected
+                    // This allows user to type a new search
+                    // binding.schoolSearch.text?.clear()
                 }
             }
         }
@@ -303,7 +300,8 @@ class ProfileFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.isLoading.collectLatest { isLoading ->
                 binding.profileProgressLayout.visibility = if (isLoading) View.VISIBLE else View.GONE
-                binding.submitButton.isEnabled = !isLoading && viewModel.selectedSchool.value != null
+                // REMOVE THIS LINE - Don't disable button based on loading
+                // binding.submitButton.isEnabled = !isLoading && viewModel.selectedSchool.value != null
             }
         }
 
@@ -425,14 +423,119 @@ class ProfileFragment : Fragment() {
     private fun completeProfile() {
         val mobile = binding.contactNumber.text.toString().trim()
 
-        // Update mobile if provided
-        if (mobile.isNotEmpty()) {
-            if (!validateMobileNumber(mobile)) {
+        // Log current state for debugging
+        Log.d("ProfileFragment", "=== SUBMIT CLICKED ===")
+        Log.d("ProfileFragment", "Selected province: ${viewModel.selectedProvince.value?.name}")
+        Log.d("ProfileFragment", "Selected school: ${viewModel.selectedSchool.value?.name}")
+        Log.d("ProfileFragment", "Search text: ${binding.schoolSearch.text}")
+
+        // SIMPLIFIED VALIDATION
+
+        // 1. Check if province is selected
+        if (viewModel.selectedProvince.value == null) {
+            showValidationError("Please select a province first", binding.provinceTextInputLayout)
+            return
+        }
+
+        // 2. Check if a school is selected in the ViewModel
+        if (viewModel.selectedSchool.value == null) {
+            // Check if there's text in search but no selection
+            val searchText = binding.schoolSearch.text.toString().trim()
+
+            if (searchText.isNotEmpty()) {
+                Toast.makeText(
+                    requireContext(),
+                    "Please click on a school from the search results",
+                    Toast.LENGTH_LONG
+                ).show()
+
+                // Show search results again
+                if (schoolAdapter.currentList.isNotEmpty()) {
+                    binding.schoolResultsRecyclerView.visibility = View.VISIBLE
+                }
+
+                binding.schoolSearchLayout.startAnimation(
+                    android.view.animation.AnimationUtils.loadAnimation(
+                        requireContext(),
+                        R.anim.shake
+                    )
+                )
+                binding.schoolSearchLayout.error = "Select a school from the list"
+            } else {
+                Toast.makeText(
+                    requireContext(),
+                    "Please search and select a school",
+                    Toast.LENGTH_LONG
+                ).show()
+
+                binding.schoolSearchLayout.startAnimation(
+                    android.view.animation.AnimationUtils.loadAnimation(
+                        requireContext(),
+                        R.anim.shake
+                    )
+                )
+                binding.schoolSearchLayout.error = "Search for a school"
+            }
+            binding.schoolSearch.requestFocus()
+            return
+        }
+
+        // 3. Optional: Verify the selected school belongs to the selected province
+        val selectedSchool = viewModel.selectedSchool.value!!
+        val selectedProvince = viewModel.selectedProvince.value!!
+
+        if (selectedSchool.provinceId != selectedProvince.id) {
+            Log.e("ProfileFragment", "⚠️ School province mismatch! School province ID: ${selectedSchool.provinceId}, Selected province ID: ${selectedProvince.id}")
+
+            // Try to fix by finding correct province
+            val correctProvince = viewModel.provinces.value.find { it.id == selectedSchool.provinceId }
+            if (correctProvince != null) {
+                Log.d("ProfileFragment", "🔄 Fixing province mismatch - setting to: ${correctProvince.name}")
+                viewModel.selectProvince(correctProvince)
+            } else {
+                Toast.makeText(
+                    requireContext(),
+                    "Error: School doesn't match selected province",
+                    Toast.LENGTH_LONG
+                ).show()
                 return
             }
+        }
+
+        // 4. Validate mobile if provided
+        if (mobile.isNotEmpty() && !validateMobileNumber(mobile)) {
+            binding.mobileTextInputLayout.startAnimation(
+                android.view.animation.AnimationUtils.loadAnimation(
+                    requireContext(),
+                    R.anim.shake
+                )
+            )
+            binding.contactNumber.requestFocus()
+            return
+        }
+
+        // ALL GOOD - Proceed
+        Log.d("ProfileFragment", "✅ All validation passed. Submitting school: ${selectedSchool.name}")
+        binding.profileProgressLayout.visibility = View.VISIBLE
+
+        if (mobile.isNotEmpty() && validateMobileNumber(mobile)) {
             viewModel.updateMobile(mobile)
         }
 
+        viewModel.submitSchoolSelection()
+    }
+
+    // Helper function for validation errors
+    private fun showValidationError(message: String, inputLayout: com.google.android.material.textfield.TextInputLayout) {
+        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+        inputLayout.startAnimation(
+            android.view.animation.AnimationUtils.loadAnimation(
+                requireContext(),
+                R.anim.shake
+            )
+        )
+        inputLayout.error = message
+        inputLayout.requestFocus()
     }
 
     private fun loadProfilePicture(url: String?) {
@@ -549,22 +652,42 @@ class ProfileFragment : Fragment() {
     }
     private fun setupSchoolResults() {
         schoolAdapter = SchoolAdapter { school ->
-            // Just select the school, don't save yet
+            Log.d("ProfileFragment", "🔍 School clicked: ${school.name}, ID: ${school.id}, Province: ${school.provinceName}")
+
+            // First, verify the school object is valid
+            if (school.id <= 0) {
+                Log.e("ProfileFragment", "❌ Invalid school ID!")
+                return@SchoolAdapter
+            }
+
+            // Clear any pending operations
+            searchDebounceJob?.cancel()
+
+            // Set the school in ViewModel
             viewModel.selectSchool(school)
+
+            // IMMEDIATELY check if it was set
+            val checkSelection = viewModel.selectedSchool.value
+            Log.d("ProfileFragment", "✅ Immediate check - selected school in VM: ${checkSelection?.name}")
+
+            // Update UI
             binding.selectedSchoolText.text = "Selected: ${school.name}"
             binding.selectedSchoolText.visibility = View.VISIBLE
             binding.selectedSchoolText.setTextColor(ContextCompat.getColor(requireContext(), R.color.green))
             binding.schoolResultsRecyclerView.visibility = View.GONE
-            binding.schoolSearch.text?.clear()
+
+            // Set text in search field
+            isSettingTextProgrammatically = true
+            binding.schoolSearch.setText(school.name)
+
             hideKeyboard()
-
-            // Enable submit button
-            binding.submitButton.isEnabled = true
-
-            // Clear any search field errors
             binding.schoolSearchLayout.error = null
 
-            Log.d("ProfileFragment", "✅ School selected: ${school.name}")
+            // Check again after a tiny delay to see if something clears it
+            binding.root.postDelayed({
+                val finalCheck = viewModel.selectedSchool.value
+                Log.d("ProfileFragment", "⏱️ Delayed check (100ms) - selected school in VM: ${finalCheck?.name}")
+            }, 100)
         }
 
         binding.schoolResultsRecyclerView.apply {
