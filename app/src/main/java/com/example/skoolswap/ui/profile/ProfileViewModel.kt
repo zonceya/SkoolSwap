@@ -87,8 +87,11 @@ class ProfileViewModel @Inject constructor(
             _isLoading.value = false
         }
     }
+    fun clearSchoolSelection() {
+        Log.d("ProfileViewModel", "⚠️⚠️⚠️ clearSchoolSelection() called! Previous school: ${_selectedSchool.value?.name}")
+        _selectedSchool.value = null
+    }
 
-    // In ProfileViewModel.kt - update checkExistingSchoolMapping()
     fun checkExistingSchoolMapping() {
         viewModelScope.launch {
             Log.d("ProfileViewModel", "🔍 Checking existing school mapping")
@@ -136,13 +139,23 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    fun selectProvince(province: Province) {
+    fun selectProvince(province: Province, shouldClearSchool: Boolean = false) {
+        Log.d("ProfileViewModel", "📍 selectProvince called with: ${province.name}, shouldClearSchool: $shouldClearSchool")
+
         _selectedProvince.value = province
-        _selectedSchool.value = null
-        _schools.value = emptyList()
+
+        // Only clear school if explicitly told to (default true for user selection)
+        if (shouldClearSchool) {
+            Log.d("ProfileViewModel", "🗑️ Clearing school because shouldClearSchool=true")
+            _selectedSchool.value = null
+            _schools.value = emptyList()
+        } else {
+            Log.d("ProfileViewModel", "🔒 Keeping school because shouldClearSchool=false")
+            // Don't clear schools if we're just syncing province from school
+        }
+
         _isSearchActive.value = true
     }
-
     fun searchSchools(query: String) {
         val province = _selectedProvince.value ?: return
 
@@ -168,14 +181,23 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
+    // In ProfileViewModel.kt
     fun selectSchool(school: School) {
+        Log.d("ProfileViewModel", "📝 selectSchool called with: ${school.name} (ID: ${school.id})")
+
+        // Set the school FIRST
         _selectedSchool.value = school
+
+        // Verify it was set
+        Log.d("ProfileViewModel", "✅ After setting school: ${_selectedSchool.value?.name}")
+
         _isSearchActive.value = false
         _schools.value = emptyList()
-        // REMOVE the auto-save call
-        // saveSchoolSelection()  // ← REMOVE THIS LINE
 
-        // Just update UI state
+        // 🚨🚨🚨 REMOVE THE PROVINCE AUTO-SETTING COMPLETELY 🚨🚨🚨
+        // Let the user select province manually or keep the existing one
+
+        Log.d("ProfileViewModel", "✅ Final check - school is: ${_selectedSchool.value?.name}")
         Log.d("ProfileViewModel", "✅ School selected: ${school.name} (waiting for submit)")
     }
     fun submitSchoolSelection() {
