@@ -4,13 +4,16 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
-    <include layout="@layout/item_section_header"/>
+    <include layout="@layout/item_section_header"
+        android:id="@+id/header" />
 
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/categoriesRecycler"
+        android:id="@+id/recommendedRecycler"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="170dp"
         android:layout_marginTop="10dp"
-        android:nestedScrollingEnabled="false"/>
+        android:orientation="horizontal"
+        android:clipToPadding="false"
+        android:paddingEnd="8dp"/>
 
 </LinearLayout>

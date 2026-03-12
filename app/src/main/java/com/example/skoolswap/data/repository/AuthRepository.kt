@@ -41,9 +41,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import com.example.skoolswap.data.remote.models.response.profile.DeleteProfileResponse
 import com.example.skoolswap.data.local.datastore.AppPreferences
-import com.example.skoolswap.data.remote.api.SchoolApiService
 import com.example.skoolswap.data.remote.api.UserSchoolApiService
-import com.example.skoolswap.domain.model.SchoolMapping
 
 
 @Singleton

@@ -12,6 +12,7 @@
     <color name="red_light">#FFEBEE</color>
     <color name="red_dark">#C62828</color>
     <color name="gold">#FFD700</color>
+    <color name="shimmer_background">#E0E0E0</color>
     <color name="white">#FFFFFFFF</color>
     <color name="blue">#0000FF</color>
     <color name="blue_light">#E3F2FD</color>

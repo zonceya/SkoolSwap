@@ -15,6 +15,7 @@ import com.example.skoolswap.data.local.database.dao.UserSchoolDao
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.remote.api.ItemApiService
 import com.example.skoolswap.data.remote.api.ProvinceApiService
+import com.example.skoolswap.data.remote.api.RecommendationsApiService
 import com.example.skoolswap.data.remote.api.ReferenceDataApiService
 import com.example.skoolswap.data.remote.api.RetrofitClient
 import com.example.skoolswap.data.remote.api.SchoolApiService
@@ -22,11 +23,13 @@ import com.example.skoolswap.data.remote.api.ShopApiService
 import com.example.skoolswap.data.remote.api.UserApiService
 import com.example.skoolswap.data.remote.api.UserSchoolApiService
 import com.example.skoolswap.data.repository.AuthRepository
+import com.example.skoolswap.data.repository.HomeRepository
 import com.example.skoolswap.data.repository.ItemRepository
 import com.example.skoolswap.data.repository.SchoolRepository
 import com.example.skoolswap.data.repository.ShopRepository
 import com.example.skoolswap.data.repository.UserSchoolRepository
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
+import com.example.skoolswap.domain.repository.HomeRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.domain.repository.ShopRepositoryInterface
 import com.example.skoolswap.domain.repository.UserSchoolRepositoryInterface
@@ -36,6 +39,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import retrofit2.Retrofit
 import javax.inject.Singleton
 
 @Module
@@ -122,7 +126,13 @@ object AppModule {
     @Singleton
     fun provideAppPreferences(@ApplicationContext context: Context): AppPreferences =
         AppPreferences(context)
+// Add to AppModule.kt inside the API SERVICES section
 
+    @Provides
+    @Singleton
+    fun provideRecommendationsApiService(retrofit: Retrofit): RecommendationsApiService {
+        return retrofit.create(RecommendationsApiService::class.java)
+    }
     // ========== REPOSITORY PROVIDERS ==========
     @Provides
     @Singleton
@@ -185,6 +195,19 @@ object AppModule {
         return ItemRepository(
             itemApiService = itemApiService,
             itemDao = itemDao,
+            authRepository = authRepository
+        )
+    }
+
+    // In AppModule.kt, update the provideHomeRepository method:
+    @Provides
+    @Singleton
+    fun provideHomeRepository(
+        recommendationsApiService: RecommendationsApiService,
+        authRepository: AuthRepositoryInterface
+    ): HomeRepositoryInterface {
+        return HomeRepository(
+            recommendationsApiService = recommendationsApiService,
             authRepository = authRepository
         )
     }

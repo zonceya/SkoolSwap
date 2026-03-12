@@ -8,6 +8,7 @@
     <TextView
         android:id="@+id/sectionTitle"
         android:text="Recommended"
+        android:textColor="@color/black"
         android:textStyle="bold"
         android:textSize="18sp"
         android:layout_weight="1"
@@ -15,9 +16,10 @@
         android:layout_height="wrap_content"/>
 
     <TextView
+        android:id="@+id/viewAll"
         android:text="Show all"
         android:textSize="14sp"
-        android:textColor="#888"
+        android:textColor="@color/black"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
 
