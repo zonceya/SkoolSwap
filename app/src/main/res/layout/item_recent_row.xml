@@ -4,14 +4,15 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
-    <include layout="@layout/item_section_header"/>
+    <include
+        layout="@layout/item_section_header"
+        android:id="@+id/header" />
 
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recommendedRecycler"
+        android:id="@+id/recentRecycler"
         android:layout_width="match_parent"
         android:layout_height="170dp"
         android:layout_marginTop="10dp"
-        android:orientation="horizontal"
         android:clipToPadding="false"
         android:paddingEnd="8dp"/>
 

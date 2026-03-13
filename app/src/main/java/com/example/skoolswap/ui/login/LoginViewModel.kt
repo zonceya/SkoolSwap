@@ -99,7 +99,7 @@ class LoginViewModel @Inject constructor(
         appPreferences.setUserId(user.id.toString())
         appPreferences.setUserName(user.name)
         appPreferences.setUserEmail(user.email)
-        appPreferences.setUserProfileImage(user.profilePictureUrl)
+        appPreferences.setUserProfileImage(user.profilePictureUrl ?: "")
 
         if (user.schoolMapped) {
             appPreferences.setSchoolMapped(true)

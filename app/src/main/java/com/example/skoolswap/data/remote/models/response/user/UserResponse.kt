@@ -9,7 +9,7 @@ data class UserResponse(
     val mobile: String?,
     val username: String?,
     @SerializedName("profile_picture_url")
-    val profilePictureUrl: String,
+    val profilePictureUrl: String?,  
     @SerializedName("auth_mode")
     val authMode: String,
     val role: String,
@@ -17,7 +17,6 @@ data class UserResponse(
     val createdAt: String,
     @SerializedName("updated_at")
     val updatedAt: String,
-    // 🔥 ADD THESE THREE FIELDS
     @SerializedName("school_mapped")
     val schoolMapped: Boolean? = false,
     @SerializedName("school_id")

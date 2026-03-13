@@ -190,7 +190,7 @@ class AppPreferences @Inject constructor(
             preferences.remove(SCHOOL_MAPPED)
             preferences.remove(SCHOOL_ID)
             preferences.remove(SCHOOL_NAME)
-            preferences.remove(SCHOOL_MAPPING_ID)  // ← ADD THIS
+            preferences.remove(SCHOOL_MAPPING_ID)
         }
     }
 

@@ -10,7 +10,7 @@ data class UserEntity(
     val email: String,
     val mobile: String?,
     val username: String?,
-    val profilePictureUrl: String,
+    val profilePictureUrl: String?,
     val authMode: String,
     val role: String,
     val token: String,

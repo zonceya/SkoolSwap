@@ -94,6 +94,7 @@ dependencies {
     // Image Loading
     implementation(libs.glide)
     implementation(libs.androidx.viewpager2)
+    implementation(libs.facebook.shimmer)
 
     // Networking
     implementation(libs.retrofit)

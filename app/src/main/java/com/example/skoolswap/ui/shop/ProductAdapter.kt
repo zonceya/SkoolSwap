@@ -53,13 +53,18 @@ class ProductAdapter(
                 // Get first image URL or empty string
                 val imageUrl = item.images.firstOrNull()?.url ?: ""
 
-                Glide.with(itemView.context)
-                    .load(imageUrl)
-                    .thumbnail(0.25f)
-                    .placeholder(R.drawable.ic_launcher_foreground)
-                    .error(R.drawable.ic_launcher_foreground)
-                    .centerCrop()
-                    .into(productImage)
+                // In HorizontalItemsAdapter.kt
+                if (!item.images.isNullOrEmpty()) {
+                    Glide.with(binding.root.context)
+                        .load(item.images.first().url)
+                        .placeholder(R.drawable.ic_create_item_placeholder)
+                        .error(R.drawable.ic_create_item_placeholder)
+                        .centerCrop()
+                        .into(binding.productImage)
+                } else {
+                    // Always use placeholder when no images
+                    binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
+                }
 
                 root.setOnClickListener {
                     onItemClick(item.id)  // Pass item ID for editing
