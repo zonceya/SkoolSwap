@@ -12,6 +12,15 @@ import com.example.skoolswap.data.remote.models.response.home.SportSectionDto
 import com.example.skoolswap.data.remote.models.response.home.UniformRecommendationResponse
 import com.example.skoolswap.data.remote.models.response.home.UniformSectionDto
 import com.example.skoolswap.domain.model.*
+import com.example.skoolswap.domain.model.homefeed.EssentialsSections
+import com.example.skoolswap.domain.model.homefeed.HomeFeed
+import com.example.skoolswap.domain.model.homefeed.RecentFeed
+import com.example.skoolswap.domain.model.homefeed.RecentSection
+import com.example.skoolswap.domain.model.homefeed.Section
+import com.example.skoolswap.domain.model.homefeed.SportFeed
+import com.example.skoolswap.domain.model.homefeed.SportSection
+import com.example.skoolswap.domain.model.homefeed.UniformFeed
+import com.example.skoolswap.domain.model.homefeed.UniformSection
 
 // ============ HOME RESPONSE TO DOMAIN ============
 fun HomeRecommendationResponse.toDomain(): HomeFeed {

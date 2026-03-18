@@ -3,10 +3,10 @@ package com.example.skoolswap.data.repository
 import android.util.Log
 import com.example.skoolswap.data.mapper.toDomain
 import com.example.skoolswap.data.remote.api.RecommendationsApiService
-import com.example.skoolswap.domain.model.HomeFeed
-import com.example.skoolswap.domain.model.RecentFeed
-import com.example.skoolswap.domain.model.SportFeed
-import com.example.skoolswap.domain.model.UniformFeed
+import com.example.skoolswap.domain.model.homefeed.HomeFeed
+import com.example.skoolswap.domain.model.homefeed.RecentFeed
+import com.example.skoolswap.domain.model.homefeed.SportFeed
+import com.example.skoolswap.domain.model.homefeed.UniformFeed
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.domain.repository.HomeRepositoryInterface
 import com.example.skoolswap.utils.Result

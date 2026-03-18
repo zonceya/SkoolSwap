@@ -5,7 +5,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.skoolswap.databinding.ItemRecentRowBinding
 import com.example.skoolswap.domain.model.Item
-import com.example.skoolswap.domain.model.Section
+import com.example.skoolswap.domain.model.homefeed.Section
 import com.example.skoolswap.ui.home.adapter.RecentItemsAdapter
 
 class RecentViewHolder(

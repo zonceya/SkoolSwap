@@ -5,7 +5,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.example.skoolswap.databinding.*
 import com.example.skoolswap.domain.model.Item
-import com.example.skoolswap.domain.model.Section
+import com.example.skoolswap.domain.model.homefeed.Section
 import com.example.skoolswap.ui.home.viewholders.*
 
 class HomeFeedAdapter(

@@ -2,7 +2,7 @@ package com.example.skoolswap.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.skoolswap.domain.model.HomeFeed
+import com.example.skoolswap.domain.model.homefeed.HomeFeed
 import com.example.skoolswap.domain.repository.HomeRepositoryInterface
 import com.example.skoolswap.domain.repository.UserSchoolRepositoryInterface
 import com.example.skoolswap.utils.Result

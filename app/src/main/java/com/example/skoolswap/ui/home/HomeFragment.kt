@@ -1,5 +1,6 @@
 package com.example.skoolswap.ui.home
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -9,6 +10,7 @@ import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentHomeBinding
@@ -20,6 +22,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import androidx.viewpager2.widget.ViewPager2
+
 
 @AndroidEntryPoint
 class HomeFragment : Fragment() {
@@ -66,9 +69,18 @@ class HomeFragment : Fragment() {
             onViewAllClick = { sectionType ->
                 // Navigate to full category view
                 when (sectionType) {
-                    "recommended" -> navigateToRecommendedAll()
-                    "trending" -> navigateToTrendingAll()
-                    "recent" -> navigateToRecentAll()
+                    "recommended" -> {
+                        navigateToProducts("recommended", "Recommended For You")
+                    }
+                    "essentials" -> {
+                        navigateToProducts("essentials", "School Essentials")
+                    }
+                    "trending" -> {
+                        navigateToProducts("trending", "Trending")
+                    }
+                    "recent" -> {
+                        navigateToProducts("recent", "Recently Added")
+                    }
                 }
             }
         )
@@ -78,7 +90,19 @@ class HomeFragment : Fragment() {
             adapter = homeAdapter
         }
     }
+    // In HomeFragment's onViewAllClick
+    private fun navigateToProducts(sectionType: String, title: String, period: String? = null) {
+        val bundle = Bundle().apply {
+            putString("SECTION_TYPE", sectionType)
+            putString("SECTION_TITLE", title)
+            period?.let { putString("PERIOD", it) }
+        }
 
+        findNavController().navigate(
+            R.id.action_homeFragment_to_productsFragment,
+            bundle
+        )
+    }
     private fun setupCustomTabs() {
         val tabs = listOf(
             binding.tabHome,
@@ -223,16 +247,17 @@ class HomeFragment : Fragment() {
     }
 
     private fun navigateToUniformTab() {
-        // Navigate to UniformFragment
+        navigateToProducts("uniform", "Uniforms", null)  // You'll need to add "uniform" to ViewModel
     }
 
     private fun navigateToSportTab() {
-        // Navigate to SportFragment
+        navigateToProducts("sport", "Sports", null)  // You'll need to add "sport" to ViewModel
+    }
+    private fun navigateToRecentTab() {
+        // Navigate to ProductsFragment with "recent" type and default period "today"
+        navigateToProducts("recent", "Recently Added", "all")
     }
 
-    private fun navigateToRecentTab() {
-        // Navigate to RecentFragment
-    }
 
     private fun navigateToRecommendedAll() {
         // Navigate to full recommended list
