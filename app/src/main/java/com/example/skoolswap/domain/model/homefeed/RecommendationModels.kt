@@ -1,5 +1,7 @@
 // domain/model/RecommendationModels.kt
-package com.example.skoolswap.domain.model
+package com.example.skoolswap.domain.model.homefeed
+
+import com.example.skoolswap.domain.model.Item
 
 // ============ HOME FEED ============
 data class HomeFeed(

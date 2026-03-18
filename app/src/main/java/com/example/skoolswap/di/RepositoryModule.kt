@@ -1,9 +1,11 @@
 package com.example.skoolswap.di
 
 import com.example.skoolswap.data.repository.AuthRepository
+import com.example.skoolswap.data.repository.ProductsRepository
 import com.example.skoolswap.data.repository.ReferenceDataRepository
 import com.example.skoolswap.data.repository.UserSchoolRepository
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
+import com.example.skoolswap.domain.repository.ProductsRepositoryInterface
 import com.example.skoolswap.domain.repository.ReferenceDataRepositoryInterface
 import com.example.skoolswap.domain.repository.UserSchoolRepositoryInterface
 import dagger.Binds
@@ -27,4 +29,9 @@ interface RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindUserSchoolRepository(impl: UserSchoolRepository): UserSchoolRepositoryInterface
+    @Binds
+    @Singleton
+    abstract fun bindProductsRepository(
+        productsRepository: ProductsRepository
+    ): ProductsRepositoryInterface
 }

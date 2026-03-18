@@ -6,7 +6,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemRecommendedRowBinding
 import com.example.skoolswap.domain.model.Item
-import com.example.skoolswap.domain.model.Section
+import com.example.skoolswap.domain.model.homefeed.Section
 import com.example.skoolswap.ui.home.adapter.HorizontalItemsAdapter
 
 class RecommendedViewHolder(

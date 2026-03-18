@@ -1,9 +1,9 @@
 package com.example.skoolswap.domain.repository
 
-import com.example.skoolswap.domain.model.HomeFeed
-import com.example.skoolswap.domain.model.RecentFeed
-import com.example.skoolswap.domain.model.SportFeed
-import com.example.skoolswap.domain.model.UniformFeed
+import com.example.skoolswap.domain.model.homefeed.HomeFeed
+import com.example.skoolswap.domain.model.homefeed.RecentFeed
+import com.example.skoolswap.domain.model.homefeed.SportFeed
+import com.example.skoolswap.domain.model.homefeed.UniformFeed
 import com.example.skoolswap.utils.Result
 import kotlinx.coroutines.flow.StateFlow
 
