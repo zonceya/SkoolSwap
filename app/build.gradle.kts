@@ -81,6 +81,7 @@ dependencies {
     implementation(libs.androidx.datastore.core)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.annotation)
+    implementation(libs.timber)
 
     // Firebase
     implementation(platform(libs.firebase.bom))
