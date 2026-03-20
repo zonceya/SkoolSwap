@@ -35,7 +35,6 @@ class NavigationHeaderViewModel @Inject constructor(
                         email = user.email,
                         profileImageUrl = user.profilePictureUrl.takeIf { !it.isNullOrEmpty() }
                     )
-                    // 🔥 REMOVE THIS LINE - it's causing the infinite loop!
                     // refreshFromApiInBackground()
                 } else {
                     _userState.value = UserState.Success(

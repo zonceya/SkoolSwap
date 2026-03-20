@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -6,6 +7,47 @@
     android:layout_height="match_parent"
     android:background="@android:color/transparent"
     tools:context=".ui.login.LoginFragment">
+
+    <!-- Video Background -->
+    <VideoView
+        android:id="@+id/videoView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- Semi-transparent overlay to improve text readability -->
+    <View
+        android:id="@+id/overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/black"
+        android:alpha="0.3"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- Logo -->
+    <TextView
+        android:id="@+id/login_logo"
+        android:layout_width="152dp"
+        android:layout_height="61dp"
+        android:text="SkoolSwap"
+        android:textColor="@color/white"
+        android:textSize="30sp"
+        android:visibility="gone"
+        android:textStyle="bold|italic"
+        android:gravity="center"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.498"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.232" />
 
     <!-- Loading Indicator -->
     <ProgressBar
@@ -19,35 +61,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
 
-    <!-- Facebook Login Button -->
-    <VideoView
-        android:id="@+id/videoView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:scaleType="centerCrop"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
-    <TextView
-        android:id="@+id/login_logo"
-        android:layout_width="152dp"
-        android:layout_height="61dp"
-        android:text="SkoolSwap"
-        android:textColor="@color/white"
-        android:textSize="30sp"
-        android:textStyle="bold|italic"
-        android:gravity="center"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.498"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.232" />
-
-
     <!-- Google Sign-In Button -->
-
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="60dp"
@@ -61,7 +75,6 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="0.502">
 
-        <!-- Icon for Google -->
         <LinearLayout
             android:id="@+id/sign_in_button"
             android:layout_width="320dp"
@@ -69,6 +82,7 @@
             android:orientation="horizontal"
             android:background="@drawable/ic_google_rounded"
             android:gravity="start|center_vertical">
+
             <ImageView
                 android:layout_width="30dp"
                 android:layout_height="30dp"
@@ -88,4 +102,5 @@
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
+
 </androidx.constraintlayout.widget.ConstraintLayout>
