@@ -1,5 +1,6 @@
 package com.example.skoolswap.data.repository
 
+import android.util.Log
 import com.example.skoolswap.data.mapper.toDomain
 import com.example.skoolswap.data.remote.api.RecommendationsApiService
 import com.example.skoolswap.domain.model.PaginatedResponse
@@ -27,6 +28,12 @@ class ProductsRepository @Inject constructor(
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body?.success == true) {
+                    // 🔍 DEBUG: Log first item's image
+                    body.items.firstOrNull()?.let { firstItem ->
+                        Log.d("ProductsDebug", "📸 First item image URL: ${firstItem.image}")
+                        Log.d("ProductsDebug", "📸 Item name: ${firstItem.name}")
+                    }
+
                     Result.Success(PaginatedResponse(
                         items = body.items.map { it.toDomain() },
                         pagination = body.pagination
