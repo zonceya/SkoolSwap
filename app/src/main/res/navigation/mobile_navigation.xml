@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mobile_navigation"
-    app:startDestination="@+id/viewPagerFragment">
+    app:startDestination="@id/loginFragment">
 
     <!-- Onboarding Flow -->
     <fragment
@@ -14,8 +14,8 @@
         <action
             android:id="@+id/action_viewPagerFragment_to_loginFragment"
             app:destination="@id/loginFragment"
-            app:popUpTo="@id/viewPagerFragment"
-            app:popUpToInclusive="true" />
+            app:popUpTo="@id/loginFragment"
+            app:popUpToInclusive="false" />
     </fragment>
 
     <!-- Login Flow -->
@@ -24,6 +24,13 @@
         android:name="com.example.skoolswap.ui.login.LoginFragment"
         android:label="Login"
         tools:layout="@layout/fragment_login">
+
+        <!-- Action to Onboarding - REQUIRED -->
+        <action
+            android:id="@+id/action_loginFragment_to_onboarding"
+            app:destination="@id/viewPagerFragment"
+            app:popUpTo="@id/loginFragment"
+            app:popUpToInclusive="false" />
 
         <!-- Action to Home -->
         <action
@@ -143,11 +150,7 @@
             app:argType="string" />
     </fragment>
 
-    <!-- ========================================= -->
-    <!-- NEW FRAGMENTS - CORRECT PACKAGE PATHS     -->
-    <!-- ========================================= -->
-
-    <!-- Products Fragment (for View All) - CORRECTED PATH -->
+    <!-- Products Fragment (for View All) -->
     <fragment
         android:id="@+id/productsFragment"
         android:name="com.example.skoolswap.ui.products.ProductsFragment"
@@ -173,7 +176,7 @@
             app:destination="@id/filterOptionsFragment" />
     </fragment>
 
-    <!-- Filter Options Fragment - CORRECTED PATH -->
+    <!-- Filter Options Fragment -->
     <fragment
         android:id="@+id/filterOptionsFragment"
         android:name="com.example.skoolswap.ui.products.FilterOptionsFragment"
@@ -189,32 +192,28 @@
             app:argType="string[]" />
     </fragment>
 
-    <!-- ========================================= -->
-    <!-- FRAGMENTS TO CREATE LATER                 -->
-    <!-- ========================================= -->
-
-    <!-- Uniform Fragment (for Uniform tab) - CREATE LATER -->
+    <!-- Uniform Fragment -->
     <fragment
         android:id="@+id/uniformFragment"
         android:name="com.example.skoolswap.ui.uniform.UniformFragment"
         android:label="Uniforms"
         tools:layout="@layout/fragment_uniform" />
 
-    <!-- Sport Fragment (for Sport tab) - CREATE LATER -->
+    <!-- Sport Fragment -->
     <fragment
         android:id="@+id/sportFragment"
         android:name="com.example.skoolswap.ui.sport.SportFragment"
         android:label="Sports"
         tools:layout="@layout/fragment_sport" />
 
-    <!-- Recent Fragment (for Recent tab) - CREATE LATER -->
+    <!-- Recent Fragment -->
     <fragment
         android:id="@+id/recentFragment"
         android:name="com.example.skoolswap.ui.recent.RecentFragment"
         android:label="Recent"
         tools:layout="@layout/fragment_recent" />
 
-    <!-- Item Detail Fragment - CREATE LATER -->
+    <!-- Item Detail Fragment -->
     <fragment
         android:id="@+id/itemDetailFragment"
         android:name="com.example.skoolswap.ui.detail.ItemDetailFragment"

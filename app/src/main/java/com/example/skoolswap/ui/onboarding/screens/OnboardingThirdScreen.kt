@@ -6,14 +6,20 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import com.example.skoolswap.R
-import com.example.skoolswap.ui.main.MainViewModel
+import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class OnboardingThirdScreen : Fragment() {
 
-    private val mainViewModel: MainViewModel by activityViewModels()
+    @Inject
+    lateinit var appPreferences: AppPreferences
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -27,8 +33,15 @@ class OnboardingThirdScreen : Fragment() {
         fab?.visibility = View.GONE
 
         finishButton.setOnClickListener {
-            // Tell MainViewModel to finish onboarding
-            mainViewModel.finishOnboarding()
+            lifecycleScope.launch {
+                // Save onboarding completion
+                appPreferences.setOnboardingFinished(true)
+
+                // Navigate back to login
+                findNavController().navigate(
+                    R.id.action_viewPagerFragment_to_loginFragment
+                )
+            }
         }
 
         return view

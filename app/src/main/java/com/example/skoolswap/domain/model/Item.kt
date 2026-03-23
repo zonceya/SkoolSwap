@@ -24,6 +24,7 @@ data class Item(
     val reserved: Int = 0,
     val createdAt: String,
     val shop: Shop? = null,
+    val image: String? = null,
     val images: List<ItemImage> = emptyList()
 )
 

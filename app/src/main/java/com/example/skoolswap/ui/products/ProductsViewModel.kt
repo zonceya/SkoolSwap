@@ -1,5 +1,6 @@
 package com.example.skoolswap.ui.products
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.skoolswap.data.repository.ProductsRepository
@@ -65,6 +66,7 @@ class ProductsViewModel @Inject constructor(
                 is Result.Success -> {
                     if (page == 1) {
                         _products.value = result.data.items
+                        Log.d("ProductsDebug", "📦 Item: ${result.data.items}, Image: ${result.data.items.toString()}")
                     } else {
                         _products.value = _products.value + result.data.items
                     }
