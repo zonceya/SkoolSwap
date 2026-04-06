@@ -5,68 +5,48 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- REMOVE THIS SECTION - IT'S THE WRONG DYNAMICFILTERCONTAINER -->
-    <!--
-    <LinearLayout
-        android:id="@+id/dynamicFilterContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:visibility="gone" />
-    -->
-
     <!-- Main Content -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Top bar -->
+        <!-- Top bar with back, centered sort/filter, search -->
         <LinearLayout
             android:id="@+id/topBar"
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:padding="12dp">
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
 
+            <!-- Back Button -->
             <ImageView
                 android:id="@+id/backBtn"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
-                android:src="@drawable/ic_back"/>
+                android:src="@drawable/ic_back"
+                android:contentDescription="Back"/>
 
-            <TextView
-                android:id="@+id/sectionTitle"
+            <!-- Spacer to push center content -->
+            <View
                 android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="All Items"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:layout_marginStart="12dp"/>
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
 
-            <ImageView
-                android:id="@+id/searchBtn"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_search"/>
-
-        </LinearLayout>
-
-        <!-- Sort / Filter Bar -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:background="#F3F3F3"
-            android:orientation="horizontal">
-
+            <!-- Sort / Filter Pill (Centered) -->
             <LinearLayout
-                android:id="@+id/sortBtn"
-                android:layout_width="0dp"
-                android:layout_weight="1"
+                android:id="@+id/sortFilterPill"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:orientation="horizontal"
                 android:gravity="center"
-                android:layout_height="match_parent">
+                android:background="@drawable/bg_sort_filter_pill"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:clickable="true"
+                android:focusable="true">
 
                 <TextView
                     android:id="@+id/sortText"
@@ -74,30 +54,40 @@
                     android:textStyle="bold"
                     android:textSize="14sp"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"/>
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/black"/>
 
-            </LinearLayout>
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="match_parent"
-                android:background="#DDDDDD"/>
-
-            <LinearLayout
-                android:id="@+id/filterBtn"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:layout_height="match_parent">
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="20dp"
+                    android:background="#DDDDDD"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginEnd="12dp"/>
 
                 <TextView
+                    android:id="@+id/filterText"
                     android:text="FILTER"
                     android:textStyle="bold"
                     android:textSize="14sp"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"/>
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/black"/>
 
             </LinearLayout>
+
+            <!-- Spacer to push search to right -->
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"/>
+
+            <!-- Search Button -->
+            <ImageView
+                android:id="@+id/searchBtn"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_search"
+                android:contentDescription="Search"/>
 
         </LinearLayout>
 
@@ -106,7 +96,8 @@
             android:id="@+id/productsRecycler"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="12dp"/>
+            android:padding="12dp"
+            android:clipToPadding="false"/>
 
     </LinearLayout>
 
@@ -128,7 +119,7 @@
             android:textStyle="bold"
             android:layout_marginBottom="16dp"/>
 
-        <!-- Dynamic Filter Container (Category, Condition, etc.) -->
+        <!-- Dynamic Filter Container -->
         <LinearLayout
             android:id="@+id/dynamicFilterContainer"
             android:layout_width="match_parent"
@@ -136,7 +127,7 @@
             android:orientation="vertical"
             android:visibility="visible"/>
 
-        <!-- Price Range Section (IN THE DRAWER, NOT DIALOG) -->
+        <!-- Price Range Section -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="48dp"

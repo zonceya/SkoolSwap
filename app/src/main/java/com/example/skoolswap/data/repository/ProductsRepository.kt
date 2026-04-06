@@ -1,3 +1,4 @@
+// data/repository/ProductsRepository.kt (FIXED)
 package com.example.skoolswap.data.repository
 
 import android.util.Log
@@ -16,24 +17,33 @@ class ProductsRepository @Inject constructor(
     private val userSchoolRepository: UserSchoolRepository
 ) : ProductsRepositoryInterface {
 
-    override suspend fun getRecommendedAll(page: Int, perPage: Int): Result<PaginatedResponse<Item>> {
+    override suspend fun getRecommendedAll(
+        page: Int,
+        perPage: Int,
+        categoryId: Int?,
+        conditionId: Int?,
+        minPrice: Float?,
+        maxPrice: Float?
+    ): Result<PaginatedResponse<Item>> {
         return try {
             val schoolId = getCurrentSchoolId()
             if (schoolId == null) {
                 return Result.Error(Exception("No school selected"))
             }
 
-            val response = api.getRecommendedAll(schoolId, page, perPage)
+            val response = api.getRecommendedAll(
+                schoolId = schoolId,
+                page = page,
+                perPage = perPage,
+                categoryId = categoryId,
+                conditionId = conditionId,
+                minPrice = minPrice,
+                maxPrice = maxPrice
+            )
 
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body?.success == true) {
-                    // 🔍 DEBUG: Log first item's image
-                    body.items.firstOrNull()?.let { firstItem ->
-                        Log.d("ProductsDebug", "📸 First item image URL: ${firstItem.image}")
-                        Log.d("ProductsDebug", "📸 Item name: ${firstItem.name}")
-                    }
-
                     Result.Success(PaginatedResponse(
                         items = body.items.map { it.toDomain() },
                         pagination = body.pagination
@@ -52,7 +62,10 @@ class ProductsRepository @Inject constructor(
     override suspend fun getEssentialsAll(
         page: Int,
         category: String?,
-        perPage: Int
+        perPage: Int,
+        conditionId: Int?,
+        minPrice: Float?,
+        maxPrice: Float?
     ): Result<PaginatedResponse<Item>> {
         return try {
             val schoolId = getCurrentSchoolId()
@@ -60,7 +73,15 @@ class ProductsRepository @Inject constructor(
                 return Result.Error(Exception("No school selected"))
             }
 
-            val response = api.getEssentialsAll(schoolId, category, page, perPage)
+            val response = api.getEssentialsAll(
+                schoolId = schoolId,
+                category = category,
+                page = page,
+                perPage = perPage,
+                conditionId = conditionId,
+                minPrice = minPrice,
+                maxPrice = maxPrice
+            )
 
             if (response.isSuccessful) {
                 val body = response.body()
@@ -83,12 +104,25 @@ class ProductsRepository @Inject constructor(
     override suspend fun getTrendingAll(
         period: String,
         page: Int,
-        perPage: Int
+        perPage: Int,
+        categoryId: Int?,
+        conditionId: Int?,
+        minPrice: Float?,
+        maxPrice: Float?
     ): Result<PaginatedResponse<Item>> {
         return try {
             val schoolId = getCurrentSchoolId() ?: return Result.Error(Exception("No school selected"))
 
-            val response = api.getTrendingAll(schoolId, period, page, perPage)
+            val response = api.getTrendingAll(
+                schoolId = schoolId,
+                period = period,
+                page = page,
+                perPage = perPage,
+                categoryId = categoryId,
+                conditionId = conditionId,
+                minPrice = minPrice,
+                maxPrice = maxPrice
+            )
 
             if (response.isSuccessful) {
                 val body = response.body()
@@ -111,7 +145,11 @@ class ProductsRepository @Inject constructor(
     override suspend fun getRecentAll(
         period: String,
         page: Int,
-        perPage: Int
+        perPage: Int,
+        categoryId: Int?,
+        conditionId: Int?,
+        minPrice: Float?,
+        maxPrice: Float?
     ): Result<PaginatedResponse<Item>> {
         return try {
             val schoolId = getCurrentSchoolId()
@@ -119,7 +157,16 @@ class ProductsRepository @Inject constructor(
                 return Result.Error(Exception("No school selected"))
             }
 
-            val response = api.getRecentAll(schoolId, period, page, perPage)
+            val response = api.getRecentAll(
+                schoolId = schoolId,
+                period = period,
+                page = page,
+                perPage = perPage,
+                categoryId = categoryId,
+                conditionId = conditionId,
+                minPrice = minPrice,
+                maxPrice = maxPrice
+            )
 
             if (response.isSuccessful) {
                 val body = response.body()

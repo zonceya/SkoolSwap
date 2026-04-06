@@ -10,9 +10,10 @@ import com.example.skoolswap.domain.model.Item
 
 class RecentItemsAdapter(
     private val items: List<Item>,
-    private val onItemClick: (Item) -> Unit
+    private val onItemClick: (Item) -> Unit,
+    private val maxItems: Int = 4
 ) : RecyclerView.Adapter<RecentItemsAdapter.ViewHolder>() {
-
+    private val displayItems = items.take(maxItems)
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ItemHomeRecentItemBinding.inflate(
             LayoutInflater.from(parent.context), parent, false
@@ -21,11 +22,10 @@ class RecentItemsAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(items[position])
+        holder.bind(displayItems[position])
     }
 
-    override fun getItemCount() = items.size
-
+    override fun getItemCount() = displayItems.size
     inner class ViewHolder(
         private val binding: ItemHomeRecentItemBinding
     ) : RecyclerView.ViewHolder(binding.root) {
@@ -34,7 +34,7 @@ class RecentItemsAdapter(
             binding.root.setOnClickListener {
                 val position = adapterPosition
                 if (position != RecyclerView.NO_POSITION) {
-                    onItemClick(items[position])
+                    onItemClick(displayItems[position])
                 }
             }
         }

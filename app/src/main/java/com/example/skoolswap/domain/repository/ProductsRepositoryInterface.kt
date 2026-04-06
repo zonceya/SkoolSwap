@@ -8,25 +8,40 @@ interface ProductsRepositoryInterface {
 
     suspend fun getRecommendedAll(
         page: Int,
-        perPage: Int = 20
+        perPage: Int = 20,
+        categoryId: Int? = null,
+        conditionId: Int? = null,
+        minPrice: Float? = null,
+        maxPrice: Float? = null
     ): Result<PaginatedResponse<Item>>
 
     suspend fun getEssentialsAll(
         page: Int,
         category: String? = null,
-        perPage: Int = 20
+        perPage: Int = 20,
+        conditionId: Int? = null,
+        minPrice: Float? = null,
+        maxPrice: Float? = null
     ): Result<PaginatedResponse<Item>>
 
     suspend fun getTrendingAll(
         period: String,
         page: Int,
-        perPage: Int = 20
+        perPage: Int = 20,
+        categoryId: Int? = null,
+        conditionId: Int? = null,
+        minPrice: Float? = null,
+        maxPrice: Float? = null
     ): Result<PaginatedResponse<Item>>
 
     suspend fun getRecentAll(
         period: String,
         page: Int,
-        perPage: Int = 20
+        perPage: Int = 20,
+        categoryId: Int? = null,
+        conditionId: Int? = null,
+        minPrice: Float? = null,
+        maxPrice: Float? = null
     ): Result<PaginatedResponse<Item>>
 
     suspend fun trackClick(
