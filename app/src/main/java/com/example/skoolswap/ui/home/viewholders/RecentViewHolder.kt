@@ -10,25 +10,18 @@ import com.example.skoolswap.ui.home.adapter.RecentItemsAdapter
 
 class RecentViewHolder(
     private val binding: ItemRecentRowBinding,
-    private val onItemClick: (Item, String) -> Unit,
-    private val onViewAllClick: (String) -> Unit
+    private val onItemClick: (Item, String) -> Unit
 ) : RecyclerView.ViewHolder(binding.root) {
 
     fun bind(section: Section.Recent) {
         binding.header.sectionTitle.text = section.title
 
-        // Set up View All click
-        binding.header.viewAll.setOnClickListener {
-            onViewAllClick(section.type)
-        }
-
-        // Only show first 4 items
+        // Create adapter that drops the second parameter for the click
         val adapter = RecentItemsAdapter(
             items = section.items,
             onItemClick = { item ->
-                onItemClick(item, section.type)
-            },
-            maxItems = 4  // Show only 4 items
+                onItemClick(item, section.type)  // Pass both item and section type
+            }
         )
 
         binding.recentRecycler.apply {

@@ -1,4 +1,3 @@
-// ui/home/HomeViewModel.kt
 package com.example.skoolswap.ui.home
 
 import androidx.lifecycle.ViewModel
@@ -10,7 +9,7 @@ import com.example.skoolswap.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -20,8 +19,9 @@ class HomeViewModel @Inject constructor(
     private val userSchoolRepository: UserSchoolRepositoryInterface
 ) : ViewModel() {
 
+    // Observe home feed from repository
     private val _homeFeed = MutableStateFlow<HomeFeed?>(null)
-    val homeFeed: StateFlow<HomeFeed?> = _homeFeed.asStateFlow()
+    val homeFeed: StateFlow<HomeFeed?> = _homeFeed
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
@@ -29,19 +29,16 @@ class HomeViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
-    // Cache to preserve data across navigation
-    private var cachedHomeFeed: HomeFeed? = null
-
-    fun loadHomeFeed(forceRefresh: Boolean = false) {
-        // If we have cached data and not forcing refresh, use it immediately
-        if (!forceRefresh && cachedHomeFeed != null) {
-            _homeFeed.value = cachedHomeFeed
-            return
+    init {
+        // Collect home feed from repository
+        viewModelScope.launch {
+            homeRepository.homeFeed.collectLatest { feed ->
+                _homeFeed.value = feed
+            }
         }
+    }
 
-        // If already loading, don't start another request
-        if (_isLoading.value) return
-
+    fun loadHomeFeed() {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
@@ -50,7 +47,7 @@ class HomeViewModel @Inject constructor(
                 is Result.Success -> {
                     val mapping = result.data
                     if (mapping != null) {
-                        loadFeedWithSchoolId(mapping.schoolId, forceRefresh)
+                        loadFeedWithSchoolId(mapping.schoolId)
                     } else {
                         _error.value = "Please select a school first"
                         _isLoading.value = false
@@ -64,11 +61,10 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private suspend fun loadFeedWithSchoolId(schoolId: Int, forceRefresh: Boolean) {
+    private suspend fun loadFeedWithSchoolId(schoolId: Int) {
         when (val result = homeRepository.getHomeFeed(schoolId)) {
             is Result.Success -> {
-                cachedHomeFeed = result.data
-                _homeFeed.value = result.data
+                // Feed is automatically updated via StateFlow
                 _error.value = null
             }
             is Result.Error -> {
@@ -78,12 +74,7 @@ class HomeViewModel @Inject constructor(
         _isLoading.value = false
     }
 
-    fun refreshHomeFeed() {
-        loadHomeFeed(forceRefresh = true)
-    }
-
     fun clearHomeData() {
-        cachedHomeFeed = null
         viewModelScope.launch {
             homeRepository.clearHomeData()
         }
