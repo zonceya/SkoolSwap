@@ -5,16 +5,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- REMOVE THIS SECTION - IT'S THE WRONG DYNAMICFILTERCONTAINER -->
-    <!--
-    <LinearLayout
-        android:id="@+id/dynamicFilterContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:visibility="gone" />
-    -->
-
     <!-- Main Content -->
     <LinearLayout
         android:layout_width="match_parent"
@@ -110,7 +100,7 @@
 
     </LinearLayout>
 
-    <!-- Filter Drawer -->
+    <!-- Filter Drawer (Main - slides from right) -->
     <LinearLayout
         android:id="@+id/filterDrawer"
         android:layout_width="320dp"
@@ -120,7 +110,9 @@
         android:orientation="vertical"
         android:padding="16dp">
 
+        <!-- Header that shows "Filter" -->
         <TextView
+            android:id="@+id/filterHeaderTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Filter"
@@ -128,7 +120,35 @@
             android:textStyle="bold"
             android:layout_marginBottom="16dp"/>
 
-        <!-- Dynamic Filter Container (Category, Condition, etc.) -->
+        <!-- Header that shows back button and title (hidden initially) -->
+        <LinearLayout
+            android:id="@+id/optionsHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            android:layout_marginBottom="16dp">
+
+            <ImageView
+                android:id="@+id/backToMain"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_back"
+                app:tint="#000000" />
+
+            <TextView
+                android:id="@+id/optionsTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Product Type"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_marginStart="16dp"/>
+
+        </LinearLayout>
+
+        <!-- Dynamic Filter Container (Category, Condition, Product Type, Brand) -->
         <LinearLayout
             android:id="@+id/dynamicFilterContainer"
             android:layout_width="match_parent"
@@ -136,7 +156,16 @@
             android:orientation="vertical"
             android:visibility="visible"/>
 
-        <!-- Price Range Section (IN THE DRAWER, NOT DIALOG) -->
+        <!-- Options Container (hidden initially, shown when filter is clicked) -->
+        <LinearLayout
+            android:id="@+id/optionsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:padding="8dp"/>
+
+        <!-- Price Range Section -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="48dp"

@@ -213,6 +213,9 @@
         android:label="Uniforms"
         tools:layout="@layout/fragment_uniform">
 
+        <action
+            android:id="@+id/action_uniformFragment_to_productsFragment"
+            app:destination="@id/productsFragment" />
         <argument
             android:name="CATEGORY_ID"
             app:argType="integer"

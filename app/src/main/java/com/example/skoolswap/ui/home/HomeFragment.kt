@@ -256,7 +256,7 @@ class HomeFragment : Fragment() {
     }
 
     private fun navigateToUniformTab() {
-        navigateToProducts("uniform", "Uniforms", null, 1)
+        findNavController().navigate(R.id.action_homeFragment_to_uniformFragment)
     }
 
     private fun navigateToSportTab() {
