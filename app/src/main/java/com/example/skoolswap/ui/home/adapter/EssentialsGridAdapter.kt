@@ -2,18 +2,18 @@ package com.example.skoolswap.ui.home.adapter
 
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemHomeCategoryBinding
-import com.example.skoolswap.ui.home.viewholders.EssentialsCategoryItem
+import com.example.skoolswap.domain.model.Item
 
 private const val TAG = "EssentialsGridAdapter"
 
 class EssentialsGridAdapter(
-    private val items: List<EssentialsCategoryItem>,
-    private val onCategoryClick: (EssentialsCategoryItem) -> Unit
+    private val items: List<Pair<Item, String>>,
+    private val onItemClick: (Item, String) -> Unit
 ) : RecyclerView.Adapter<EssentialsGridAdapter.ViewHolder>() {
 
     init {
@@ -29,7 +29,8 @@ class EssentialsGridAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(items[position])
+        val (item, categoryType) = items[position]
+        holder.bind(item, categoryType)
     }
 
     override fun getItemCount() = items.size
@@ -38,48 +39,29 @@ class EssentialsGridAdapter(
         private val binding: ItemHomeCategoryBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(categoryItem: EssentialsCategoryItem) {
+        fun bind(item: Item, categoryType: String) {
             // Set category name
-            binding.categoryName.text = categoryItem.displayName
-
-            // Determine which image to use
-            // Priority: actual item image > default image > local placeholder
-            val actualImageUrl = categoryItem.item.images.firstOrNull()?.url
-            val imageUrl = if (!actualImageUrl.isNullOrEmpty()) {
-                actualImageUrl
-            } else {
-                categoryItem.defaultImageUrl
+            val displayName = when (categoryType) {
+                "uniforms" -> "Uniforms"
+                "sports" -> "Sports"
+                "stationery" -> "Stationery"
+                "accessories" -> "Accessories"
+                else -> categoryType.replaceFirstChar { it.uppercase() }
             }
+            binding.categoryName.text = displayName
 
-            if (!imageUrl.isNullOrEmpty()) {
-                // Load image from URL (either actual item or default)
-                Glide.with(binding.root.context)
-                    .load(imageUrl)
-                    .placeholder(getPlaceholderForCategory(categoryItem.categoryType))
-                    .error(getPlaceholderForCategory(categoryItem.categoryType))
-                    .centerCrop()
-                    .into(binding.categoryIcon)
-                Log.d(TAG, "Loaded image for ${categoryItem.displayName}: $imageUrl")
-            } else {
-                // Fallback to local drawable placeholder
-                val iconResId = getPlaceholderForCategory(categoryItem.categoryType)
-                binding.categoryIcon.setImageResource(iconResId)
-                Log.d(TAG, "Using placeholder for ${categoryItem.displayName}")
-            }
-
-            // Handle click
-            binding.root.setOnClickListener {
-                onCategoryClick(categoryItem)
-            }
-        }
-
-        private fun getPlaceholderForCategory(categoryType: String): Int {
-            return when (categoryType) {
+            // Set category icon
+            val iconResId = when (categoryType) {
                 "uniforms" -> R.drawable.ic_uniform_placeholder
                 "sports" -> R.drawable.ic_sports_placeholder
                 "stationery" -> R.drawable.ic_stationery_placeholder
                 "accessories" -> R.drawable.ic_accessories_placeholder
                 else -> R.drawable.ic_create_item_placeholder
+            }
+            binding.categoryIcon.setImageResource(iconResId)
+
+            binding.root.setOnClickListener {
+                onItemClick(item, categoryType)
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.example.skoolswap.ui.home
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -11,7 +12,6 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.viewpager2.widget.ViewPager2
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentHomeBinding
 import com.example.skoolswap.domain.model.BannerItem
@@ -21,6 +21,8 @@ import com.example.skoolswap.ui.home.adapter.HomeFeedAdapter
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import androidx.viewpager2.widget.ViewPager2
+
 
 @AndroidEntryPoint
 class HomeFragment : Fragment() {
@@ -55,32 +57,29 @@ class HomeFragment : Fragment() {
         setupRecyclerView()
         observeViewModel()
 
-        // Only load home feed if we don't have cached data
-        if (viewModel.homeFeed.value == null) {
-            viewModel.loadHomeFeed()
-        }
-
         return binding.root
     }
 
     private fun setupRecyclerView() {
         homeAdapter = HomeFeedAdapter(
             onItemClick = { item, source ->
+                // Navigate to item detail
                 navigateToItemDetail(item.id, source)
             },
             onViewAllClick = { sectionType ->
+                // Navigate to full category view
                 when (sectionType) {
                     "recommended" -> {
-                        navigateToProducts("recommended", "Recommended For You", null, null)
+                        navigateToProducts("recommended", "Recommended For You")
                     }
                     "essentials" -> {
-                        navigateToProducts("essentials", "School Essentials", null, null)
+                        navigateToProducts("essentials", "School Essentials")
                     }
                     "trending" -> {
-                        navigateToProducts("trending", "Trending", "today", null)
+                        navigateToProducts("trending", "Trending")
                     }
                     "recent" -> {
-                        navigateToProducts("recent", "Recently Added", "all", null)
+                        navigateToProducts("recent", "Recently Added")
                     }
                 }
             }
@@ -91,20 +90,12 @@ class HomeFragment : Fragment() {
             adapter = homeAdapter
         }
     }
-
-    private fun navigateToProducts(
-        sectionType: String,
-        title: String,
-        period: String? = null,
-        categoryId: Int? = null
-    ) {
+    // In HomeFragment's onViewAllClick
+    private fun navigateToProducts(sectionType: String, title: String, period: String? = null) {
         val bundle = Bundle().apply {
             putString("SECTION_TYPE", sectionType)
             putString("SECTION_TITLE", title)
             period?.let { putString("PERIOD", it) }
-            if (categoryId != null) {
-                putInt("CATEGORY_ID", categoryId)
-            }
         }
 
         findNavController().navigate(
@@ -112,7 +103,6 @@ class HomeFragment : Fragment() {
             bundle
         )
     }
-
     private fun setupCustomTabs() {
         val tabs = listOf(
             binding.tabHome,
@@ -127,6 +117,7 @@ class HomeFragment : Fragment() {
             }
         }
 
+        // Select HOME tab by default
         selectTab(binding.tabHome)
     }
 
@@ -150,21 +141,21 @@ class HomeFragment : Fragment() {
             }
         }
 
+        // Load content based on selected tab
         when (selectedTab.id) {
             R.id.tabHome -> {
-                // Only reload if we're not already on Home or if data is empty
-                // This prevents unnecessary reloads when coming back from navigation
-                if (viewModel.homeFeed.value == null) {
-                    viewModel.loadHomeFeed()
-                }
+                viewModel.loadHomeFeed()
             }
             R.id.tabUniform -> {
+                // Navigate to Uniform fragment or show filter
                 navigateToUniformTab()
             }
             R.id.tabSport -> {
+                // Navigate to Sport fragment
                 navigateToSportTab()
             }
             R.id.tabRecent -> {
+                // Navigate to Recent fragment
                 navigateToRecentTab()
             }
         }
@@ -256,14 +247,27 @@ class HomeFragment : Fragment() {
     }
 
     private fun navigateToUniformTab() {
-        navigateToProducts("uniform", "Uniforms", null, 1)
+        navigateToProducts("uniform", "Uniforms", null)  // You'll need to add "uniform" to ViewModel
     }
 
     private fun navigateToSportTab() {
-        navigateToProducts("sport", "Sports", null, 2)
+        navigateToProducts("sport", "Sports", null)  // You'll need to add "sport" to ViewModel
+    }
+    private fun navigateToRecentTab() {
+        // Navigate to ProductsFragment with "recent" type and default period "today"
+        navigateToProducts("recent", "Recently Added", "all")
     }
 
-    private fun navigateToRecentTab() {
-        navigateToProducts("recent", "Recently Added", "all", null)
+
+    private fun navigateToRecommendedAll() {
+        // Navigate to full recommended list
+    }
+
+    private fun navigateToTrendingAll() {
+        // Navigate to full trending list
+    }
+
+    private fun navigateToRecentAll() {
+        // Navigate to full recent list
     }
 }

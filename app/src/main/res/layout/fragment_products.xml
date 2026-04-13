@@ -5,16 +5,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- REMOVE THIS SECTION - IT'S THE WRONG DYNAMICFILTERCONTAINER -->
-    <!--
-    <LinearLayout
-        android:id="@+id/dynamicFilterContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:visibility="gone" />
-    -->
-
     <!-- Main Content -->
     <LinearLayout
         android:layout_width="match_parent"
@@ -125,27 +115,83 @@
             android:layout_height="wrap_content"
             android:text="Filter"
             android:textSize="20sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="16dp"/>
+            android:textStyle="bold"/>
 
-        <!-- Dynamic Filter Container (Category, Condition, etc.) -->
-        <LinearLayout
-            android:id="@+id/dynamicFilterContainer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="visible"/>
-
-        <!-- Price Range Section (IN THE DRAWER, NOT DIALOG) -->
+        <!-- Filter Categories -->
         <TextView
+            android:id="@+id/filterCategory"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Category"
+            android:gravity="center_vertical"
+            android:textSize="16sp"
+            android:paddingStart="8dp"
+            android:background="?selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"/>
+
+        <TextView
+            android:id="@+id/filterSchool"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="School"
+            android:gravity="center_vertical"
+            android:textSize="16sp"
+            android:paddingStart="8dp"
+            android:background="?selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"/>
+
+        <TextView
+            android:id="@+id/filterCondition"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Condition"
+            android:gravity="center_vertical"
+            android:textSize="16sp"
+            android:paddingStart="8dp"
+            android:background="?selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"/>
+
+        <TextView
+            android:id="@+id/filterColour"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Colour"
+            android:gravity="center_vertical"
+            android:textSize="16sp"
+            android:paddingStart="8dp"
+            android:background="?selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"/>
+
+        <TextView
+            android:id="@+id/filterBrand"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Brand"
+            android:gravity="center_vertical"
+            android:textSize="16sp"
+            android:paddingStart="8dp"
+            android:background="?selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"/>
+
+        <!-- Add this after the brand filter -->
+        <TextView
+            android:id="@+id/filterPriceRange"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:text="Price Range"
+            android:gravity="center_vertical"
             android:textSize="16sp"
-            android:textStyle="bold"
             android:paddingStart="8dp"
-            android:layout_marginTop="16dp"/>
+            android:background="?selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"/>
 
+        <!-- Selected price display (optional) -->
         <TextView
             android:id="@+id/selectedPriceRange"
             android:layout_width="match_parent"
@@ -154,26 +200,15 @@
             android:textSize="14sp"
             android:textColor="@color/lightgray"
             android:paddingStart="8dp"
-            android:paddingBottom="8dp"/>
-
-        <!-- Price Slider -->
-        <com.google.android.material.slider.RangeSlider
-            android:id="@+id/priceSlider"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="16dp"
-            android:valueFrom="0"
-            android:valueTo="1000"
-            app:thumbColor="@color/black"
-            app:trackColorActive="@color/black"
-            app:trackColorInactive="#E0E0E0"/>
+            android:paddingBottom="8dp"
+            android:visibility="gone"/>
 
         <Space
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"/>
 
+        <!-- Bottom Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="56dp"

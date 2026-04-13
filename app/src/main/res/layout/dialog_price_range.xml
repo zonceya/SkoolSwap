@@ -7,14 +7,16 @@
     android:padding="20dp"
     android:background="@android:color/white">
 
+    <!-- Title -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Price Range"
-        android:textSize="20sp"
+        android:text="Price"
+        android:textSize="24sp"
         android:textStyle="bold"
         android:layout_marginBottom="20dp"/>
 
+    <!-- Price Range Display -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -22,6 +24,7 @@
         android:gravity="center_vertical"
         android:layout_marginBottom="20dp">
 
+        <!-- Min Price Box -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="60dp"
@@ -46,6 +49,7 @@
                 android:textStyle="bold"/>
         </LinearLayout>
 
+        <!-- Separator -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -53,6 +57,7 @@
             android:textSize="24sp"
             android:layout_marginHorizontal="16dp"/>
 
+        <!-- Max Price Box -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="60dp"
@@ -78,6 +83,7 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- Range Slider -->
     <com.google.android.material.slider.RangeSlider
         android:id="@+id/rangeSlider"
         android:layout_width="match_parent"
@@ -89,6 +95,7 @@
         app:trackColorActive="@color/black"
         app:trackColorInactive="#E0E0E0"/>
 
+    <!-- Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
