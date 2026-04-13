@@ -11,13 +11,14 @@ import android.widget.TextView
 import androidx.core.view.GravityCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.GridLayoutManager
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentProductsBinding
 import com.example.skoolswap.domain.model.FilterConfig
-import com.example.skoolswap.domain.model.FilterGroup
 import com.example.skoolswap.domain.model.FilterOption
 import com.example.skoolswap.ui.products.adapter.ProductsAdapter
 import dagger.hilt.android.AndroidEntryPoint
@@ -56,19 +57,11 @@ class ProductsFragment : Fragment() {
         setupRecyclerView()
         setupSortFilterBar()
         setupDrawer()
-        setupOptionsDrawer()
+        setupBackButton()
         observeViewModel()
+        observeFilterConfig()
 
         viewModel.loadProducts(sectionType, period, categoryId)
-
-        // Observe filter config to rebuild drawer
-        lifecycleScope.launch {
-            viewModel.filterConfig.collect { filterConfig ->
-                if (filterConfig != null) {
-                    rebuildFilterDrawer(filterConfig)
-                }
-            }
-        }
     }
 
     private fun setupToolbar(title: String) {
@@ -135,39 +128,58 @@ class ProductsFragment : Fragment() {
     }
 
     private fun setupPriceSlider() {
-        lifecycleScope.launch {
-            viewModel.filterConfig.collect { filterConfig ->
-                if (filterConfig == null) return@collect
-                val priceGroup = filterConfig.filterGroups.find { it.id == "price" } ?: return@collect
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.filterConfig.collect { filterConfig ->
+                    if (filterConfig == null) return@collect
+                    val priceGroup = filterConfig.filterGroups.find { it.id == "price" } ?: return@collect
 
-                binding.priceSlider.apply {
-                    clearOnChangeListeners()
-                    valueFrom = priceGroup.min ?: 0f
-                    valueTo = priceGroup.max ?: 1000f
-                    setValues(
-                        viewModel.appliedFilters.value.minPrice ?: (priceGroup.min ?: 0f),
-                        viewModel.appliedFilters.value.maxPrice ?: (priceGroup.max ?: 1000f)
-                    )
-                    addOnChangeListener { slider, _, _ ->
-                        val values = slider.values
-                        if (values.size >= 2) {
-                            binding.selectedPriceRange.text = "R${values[0].toInt()} - R${values[1].toInt()}"
+                    // Check if binding is still valid
+                    if (_binding == null) return@collect
+
+                    binding.priceSlider.apply {
+                        clearOnChangeListeners()
+                        valueFrom = priceGroup.min ?: 0f
+                        valueTo = priceGroup.max ?: 1000f
+                        setValues(
+                            viewModel.appliedFilters.value.minPrice ?: (priceGroup.min ?: 0f),
+                            viewModel.appliedFilters.value.maxPrice ?: (priceGroup.max ?: 1000f)
+                        )
+                        addOnChangeListener { slider, _, _ ->
+                            val values = slider.values
+                            if (values.size >= 2) {
+                                binding.selectedPriceRange.text = "R${values[0].toInt()} - R${values[1].toInt()}"
+                            }
                         }
                     }
+                    updatePriceDisplay()
                 }
-                updatePriceDisplay()
             }
         }
     }
 
     private fun updatePriceDisplay() {
+        if (_binding == null) return
         val values = binding.priceSlider.values
         if (values.size >= 2) {
             binding.selectedPriceRange.text = "R${values[0].toInt()} - R${values[1].toInt()}"
         }
     }
 
+    private fun observeFilterConfig() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.filterConfig.collect { filterConfig ->
+                    if (filterConfig != null && _binding != null) {
+                        rebuildFilterDrawer(filterConfig)
+                    }
+                }
+            }
+        }
+    }
+
     private fun rebuildFilterDrawer(filterConfig: FilterConfig) {
+        if (_binding == null) return
         binding.dynamicFilterContainer.removeAllViews()
 
         // Add Category if we have a selected category
@@ -195,6 +207,7 @@ class ProductsFragment : Fragment() {
     }
 
     private fun addFilterItem(title: String, selectedValue: String?, onClick: () -> Unit) {
+        if (_binding == null) return
         val itemView = layoutInflater.inflate(R.layout.item_filter_section, binding.dynamicFilterContainer, false)
         val titleView = itemView.findViewById<TextView>(R.id.filterTitle)
         val valueView = itemView.findViewById<TextView>(R.id.filterValue)
@@ -213,12 +226,12 @@ class ProductsFragment : Fragment() {
     }
 
     private fun showOptionsDrawer(groupId: String, groupName: String, options: List<FilterOption>, filterType: String) {
-        // Hide filter header, show options header
+        if (_binding == null) return
+
+        // Switch to options view
         binding.filterHeaderTitle.visibility = View.GONE
         binding.optionsHeader.visibility = View.VISIBLE
         binding.optionsTitle.text = groupName
-
-        // Hide filter list, show options container
         binding.dynamicFilterContainer.visibility = View.GONE
         binding.optionsContainer.visibility = View.VISIBLE
 
@@ -236,25 +249,27 @@ class ProductsFragment : Fragment() {
             checkIcon.visibility = if (isSelected) View.VISIBLE else View.GONE
 
             optionView.setOnClickListener {
+                // Update filter
                 viewModel.updateFilter(groupId, option.id)
                 viewModel.applyFilters()
 
-                // Go back to main filter view
+                // Switch back to main filter view
                 binding.filterHeaderTitle.visibility = View.VISIBLE
                 binding.optionsHeader.visibility = View.GONE
                 binding.dynamicFilterContainer.visibility = View.VISIBLE
                 binding.optionsContainer.visibility = View.GONE
 
-                // Rebuild to show updated value
+                // Rebuild main drawer to show updated value
                 viewModel.filterConfig.value?.let { rebuildFilterDrawer(it) }
             }
 
             container.addView(optionView)
         }
     }
-    private fun setupOptionsDrawer() {
+
+    private fun setupBackButton() {
         binding.backToMain.setOnClickListener {
-            // Go back to main filter view
+            // Switch back to main filter view
             binding.filterHeaderTitle.visibility = View.VISIBLE
             binding.optionsHeader.visibility = View.GONE
             binding.dynamicFilterContainer.visibility = View.VISIBLE
@@ -293,15 +308,24 @@ class ProductsFragment : Fragment() {
             else -> null
         }
     }
+
     private fun observeViewModel() {
-        lifecycleScope.launch {
-            viewModel.products.collect { products ->
-                productsAdapter.submitList(products)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.products.collect { products ->
+                    if (_binding != null) {
+                        productsAdapter.submitList(products)
+                    }
+                }
             }
         }
-        lifecycleScope.launch {
-            viewModel.error.collect { error ->
-                if (error != null) Log.e(TAG, "Error: $error")
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.error.collect { error ->
+                    if (error != null && _binding != null) {
+                        Log.e(TAG, "Error: $error")
+                    }
+                }
             }
         }
     }
