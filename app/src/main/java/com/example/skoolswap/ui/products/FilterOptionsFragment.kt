@@ -20,7 +20,7 @@ class FilterOptionsFragment : Fragment() {
     private var _binding: FragmentFilterOptionsBinding? = null
     private val binding get() = _binding!!
 
-    // Shared ViewModel with ProductsFragment
+    // Shared ViewModel with ProductsFragment pushed to develope
     private val viewModel: ProductsViewModel by activityViewModels()
 
     private lateinit var filterGroup: FilterGroup
