@@ -140,14 +140,13 @@
             app:argType="string" />
     </fragment>
 
-    <!-- Products Fragment (for View All) -->
+    <!-- Products Fragment -->
     <fragment
         android:id="@+id/productsFragment"
         android:name="com.example.skoolswap.ui.products.ProductsFragment"
         android:label="Products"
         tools:layout="@layout/fragment_products">
 
-        <!-- Arguments - INTEGER CANNOT BE NULLABLE -->
         <argument
             android:name="SECTION_TYPE"
             app:argType="string"
@@ -164,46 +163,22 @@
             app:nullable="true"
             android:defaultValue="@null" />
 
-        <!-- INTEGER - cannot be nullable, use -1 as "no value" sentinel -->
         <argument
             android:name="CATEGORY_ID"
             app:argType="integer"
             android:defaultValue="-1" />
 
-        <action
-            android:id="@+id/action_productsFragment_to_filterOptionsFragment"
-            app:destination="@id/filterOptionsFragment" />
-    </fragment>
-
-    <!-- Filter Options Fragment -->
-    <!-- Filter Options Fragment -->
-    <fragment
-        android:id="@+id/filterOptionsFragment"
-        android:name="com.example.skoolswap.ui.products.FilterOptionsFragment"
-        android:label="Filter Options"
-        tools:layout="@layout/fragment_filter_options">
+        <argument
+            android:name="SPORT_TYPE_ID"
+            app:argType="integer"
+            android:defaultValue="-1" />
 
         <argument
-            android:name="FILTER_GROUP_ID"
-            app:argType="string" />
-
-        <argument
-            android:name="FILTER_TYPE"
+            android:name="GEAR_TYPE"
             app:argType="string"
             app:nullable="true"
             android:defaultValue="@null" />
 
-        <argument
-            android:name="FILTER_OPTIONS"
-            app:argType="string[]"
-            app:nullable="true"
-            android:defaultValue="@null" />
-
-        <argument
-            android:name="FILTER_OPTION_IDS"
-            app:argType="integer[]"
-            app:nullable="true"
-            android:defaultValue="@null" />
     </fragment>
 
     <!-- Uniform Fragment -->
@@ -216,10 +191,12 @@
         <action
             android:id="@+id/action_uniformFragment_to_productsFragment"
             app:destination="@id/productsFragment" />
+
         <argument
             android:name="CATEGORY_ID"
             app:argType="integer"
             android:defaultValue="1" />
+
     </fragment>
 
     <!-- Sport Fragment -->
@@ -229,23 +206,28 @@
         android:label="Sports"
         tools:layout="@layout/fragment_sport">
 
+        <action
+            android:id="@+id/action_sportFragment_to_productsFragment"
+            app:destination="@id/productsFragment" />
+
         <argument
             android:name="CATEGORY_ID"
             app:argType="integer"
             android:defaultValue="2" />
+
     </fragment>
 
     <!-- Recent Fragment -->
     <fragment
         android:id="@+id/recentFragment"
         android:name="com.example.skoolswap.ui.recent.RecentFragment"
-        android:label="Recent"
-        tools:layout="@layout/fragment_recent">
+        android:label="Recent">
 
         <argument
             android:name="PERIOD"
             app:argType="string"
             android:defaultValue="all" />
+
     </fragment>
 
     <!-- Item Detail Fragment -->
@@ -264,6 +246,7 @@
             app:argType="string"
             app:nullable="true"
             android:defaultValue="@null" />
+
     </fragment>
 
 </navigation>

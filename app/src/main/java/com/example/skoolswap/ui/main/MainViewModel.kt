@@ -9,7 +9,6 @@ import com.example.skoolswap.data.repository.AuthRepository
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -22,30 +21,37 @@ class MainViewModel @Inject constructor(
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
-    private val _forceNavigation = MutableLiveData<NavigationDestination?>(null)
-    val forceNavigation = _forceNavigation
+    private val _forceNavigation = MutableLiveData<NavigationDestination?>()
+    val forceNavigation: MutableLiveData<NavigationDestination?> = _forceNavigation
 
-    // Combine onboarding + auth state from Room database
-    val navigationDestination = combine(
-        preferences.isOnboardingFinished,
-        authRepository.getServerUser()
-    ) { onboardingFinished, user ->
-        when {
-            !onboardingFinished -> NavigationDestination.ONBOARDING
-            user == null -> NavigationDestination.LOGIN
-            user.schoolMapped -> NavigationDestination.HOME
-            // 🔥 User exists but no school mapped - return null to prevent auto-navigation
-            else -> null
-        }
-    }.asLiveData()
+    // Make this MutableLiveData so we can clear it
+    private val _navigationDestination = MutableLiveData<NavigationDestination?>()
+    val navigationDestination: MutableLiveData<NavigationDestination?> = _navigationDestination
 
-    // Check auth state on initialization
     init {
         viewModelScope.launch {
             checkAuthState()
+            observeNavigationState()
         }
     }
-     fun checkAuthState() {
+
+    private suspend fun observeNavigationState() {
+        combine(
+            preferences.isOnboardingFinished,
+            authRepository.getServerUser()
+        ) { onboardingFinished, user ->
+            when {
+                !onboardingFinished -> NavigationDestination.ONBOARDING
+                user == null -> NavigationDestination.LOGIN
+                user.schoolMapped -> NavigationDestination.HOME
+                else -> null
+            }
+        }.collect { destination ->
+            _navigationDestination.value = destination
+        }
+    }
+
+    fun checkAuthState() {
         viewModelScope.launch {
             authRepository.checkCurrentUser()
 
@@ -64,6 +70,10 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun clearNavigationDestination() {
+        _navigationDestination.value = null
+    }
+
     fun clearForceNavigation() {
         _forceNavigation.value = null
     }
@@ -78,7 +88,6 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             authRepository.signOut()
             preferences.setLoggedIn(false)
-            // Force navigation to login
             _forceNavigation.value = NavigationDestination.LOGIN
         }
     }

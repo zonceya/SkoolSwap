@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.PopupMenu
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -52,7 +53,22 @@ class ProductsFragment : Fragment() {
         val sectionTitle = arguments?.getString("SECTION_TITLE") ?: "All Items"
         val period = arguments?.getString("PERIOD")
         val categoryId = arguments?.getInt("CATEGORY_ID")
-
+        val sportTypeId = arguments?.getInt("SPORT_TYPE_ID", -1)
+        val gearType = arguments?.getString("GEAR_TYPE")
+        (requireActivity() as AppCompatActivity).supportActionBar?.hide()
+        if (sectionType == "sport") {
+            viewModel.clearSavedCategory()
+        }
+        when (sectionType) {
+            "recommended", "trending" -> {
+                binding.sortFilterBar.visibility = View.GONE  // No filter needed
+                binding.topBar.visibility = View.VISIBLE
+            }
+            else -> {
+                binding.sortFilterBar.visibility = View.VISIBLE  // Show filter for all others
+                binding.topBar.visibility = View.VISIBLE
+            }
+        }
         setupToolbar(sectionTitle)
         setupRecyclerView()
         setupSortFilterBar()
@@ -61,7 +77,7 @@ class ProductsFragment : Fragment() {
         observeViewModel()
         observeFilterConfig()
 
-        viewModel.loadProducts(sectionType, period, categoryId)
+        viewModel.loadProducts(sectionType, period, categoryId, sportTypeId, gearType)
     }
 
     private fun setupToolbar(title: String) {
@@ -332,6 +348,7 @@ class ProductsFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        (requireActivity() as AppCompatActivity).supportActionBar?.show()
         _binding = null
     }
 }

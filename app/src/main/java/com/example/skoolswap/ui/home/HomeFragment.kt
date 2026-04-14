@@ -260,7 +260,7 @@ class HomeFragment : Fragment() {
     }
 
     private fun navigateToSportTab() {
-        navigateToProducts("sport", "Sports", null, 2)
+        findNavController().navigate(R.id.action_homeFragment_to_sportFragment)
     }
 
     private fun navigateToRecentTab() {

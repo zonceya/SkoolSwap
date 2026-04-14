@@ -73,38 +73,46 @@
                     android:textColor="@android:color/black"
                     android:textStyle="bold" />
             </LinearLayout>
-
-            <!-- Banner Slider -->
-            <androidx.viewpager2.widget.ViewPager2
-                android:id="@+id/bannerViewPager"
-                android:layout_width="match_parent"
-                android:layout_height="200dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="8dp" />
-
-            <!-- Indicator Dots -->
-            <LinearLayout
-                android:id="@+id/indicatorDots"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:orientation="horizontal"
-                android:padding="8dp" />
         </LinearLayout>
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- Main Content RecyclerView -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/homeRecycler"
+    <!-- Main Content - Banner and RecyclerView together -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:paddingBottom="80dp"
-        android:clipToPadding="false"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+        android:orientation="vertical"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-    <!-- Shimmer Loading State -->
+        <!-- Banner Slider -->
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/bannerViewPager"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Indicator Dots -->
+        <LinearLayout
+            android:id="@+id/indicatorDots"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:padding="8dp" />
+
+        <!-- RecyclerView -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/homeRecycler"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:paddingBottom="80dp"
+            android:clipToPadding="false" />
+    </LinearLayout>
+
+    <!-- Shimmer, Error, Empty states remain the same -->
     <LinearLayout
         android:id="@+id/shimmerLayout"
         android:layout_width="match_parent"
@@ -115,17 +123,12 @@
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <include layout="@layout/shimmer_banner" />
-
         <include layout="@layout/shimmer_section" />
-
         <include layout="@layout/shimmer_grid" />
-
         <include layout="@layout/shimmer_section" />
-
         <include layout="@layout/shimmer_list" />
     </LinearLayout>
 
-    <!-- Error State -->
     <LinearLayout
         android:id="@+id/errorLayout"
         android:layout_width="match_parent"
@@ -158,7 +161,6 @@
             android:layout_marginTop="24dp" />
     </LinearLayout>
 
-    <!-- Empty State - No School Selected -->
     <LinearLayout
         android:id="@+id/noSchoolLayout"
         android:layout_width="match_parent"

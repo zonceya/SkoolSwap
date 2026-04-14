@@ -50,6 +50,10 @@ class ProductsViewModel @Inject constructor(
     private var currentPeriod: String? = null
     private var lastLoadedCategoryId: Int? = null
 
+    // Sport-specific filters (for pre-filtering before ProductsFragment opens)
+    private var preSelectedSportTypeId: Int? = null
+    private var preSelectedGearType: String? = null
+
     private var loadProductsJob: Job? = null
     private var loadFilterJob: Job? = null
 
@@ -70,14 +74,35 @@ class ProductsViewModel @Inject constructor(
         Log.d("ProductsViewModel", "Cleared saved category")
     }
 
-    fun loadProducts(sectionType: String, period: String? = null, navCategoryId: Int? = null) {
+    fun loadProducts(
+        sectionType: String,
+        period: String? = null,
+        navCategoryId: Int? = null,
+        preSelectedSportTypeId: Int? = null,
+        preSelectedGearType: String? = null
+    ) {
+        // Store pre-selected filters
+        this.preSelectedSportTypeId = preSelectedSportTypeId
+        this.preSelectedGearType = preSelectedGearType
+
+        // If we have pre-selected sport type, apply it as a type filter
+        if (preSelectedSportTypeId != null && preSelectedSportTypeId > 0) {
+            updateFilter("type", listOf(preSelectedSportTypeId))
+        }
+
         val incomingCategoryId = if (navCategoryId == -1) null else navCategoryId
 
-        // Priority: saved category > applied filters > last loaded > navigation argument
-        val effectiveCategoryId = savedCategoryId
-            ?: _appliedFilters.value.categoryId
-            ?: lastLoadedCategoryId
-            ?: incomingCategoryId
+        // FOR SPORT SECTION: Always use the passed category ID, don't use saved category
+        val effectiveCategoryId = if (sectionType == "sport") {
+            // For sport tab, always use the passed category ID (2)
+            incomingCategoryId ?: 2
+        } else {
+            // For other sections, use saved priority
+            savedCategoryId
+                ?: _appliedFilters.value.categoryId
+                ?: lastLoadedCategoryId
+                ?: incomingCategoryId
+        }
 
         currentSectionType = sectionType
         currentPeriod = period
@@ -85,7 +110,7 @@ class ProductsViewModel @Inject constructor(
             lastLoadedCategoryId = effectiveCategoryId
         }
 
-        Log.d("ProductsViewModel", "loadProducts → effectiveCategoryId=$effectiveCategoryId (saved=$savedCategoryId, applied=${_appliedFilters.value.categoryId}, last=$lastLoadedCategoryId, nav=$incomingCategoryId)")
+        Log.d("ProductsViewModel", "loadProducts → sectionType=$sectionType, effectiveCategoryId=$effectiveCategoryId, preSelectedSportTypeId=$preSelectedSportTypeId")
 
         loadFilterConfigIfNeeded(effectiveCategoryId)
         loadProductsInternal(effectiveCategoryId)
@@ -117,7 +142,6 @@ class ProductsViewModel @Inject constructor(
             "category" -> {
                 val categoryId = value as? Int
                 if (categoryId != null && categoryId > 0) {
-                    // Find category name
                     val categoryName = getGlobalFilterGroupById("category")
                         ?.options?.find { it.id == categoryId }?.name ?: ""
                     setSavedCategory(categoryId, categoryName)
@@ -157,6 +181,8 @@ class ProductsViewModel @Inject constructor(
     fun resetFilters() {
         _appliedFilters.value = AppliedFilters()
         lastLoadedCategoryId = null
+        preSelectedSportTypeId = null
+        preSelectedGearType = null
         clearSavedCategory()
         loadFilterConfigIfNeeded(null)
         loadProductsInternal(null)
@@ -189,7 +215,6 @@ class ProductsViewModel @Inject constructor(
     // ==================== Private Methods ====================
 
     private fun loadFilterConfigIfNeeded(categoryId: Int?) {
-        // Check if we already have the config loaded
         val currentConfig = _filterConfig.value
         if (categoryId != null && categoryId > 0 &&
             currentConfig?.categoryId == categoryId) {
@@ -235,10 +260,13 @@ class ProductsViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
 
+            val effectiveCategoryId = categoryId ?: _appliedFilters.value.categoryId
+
+            // Use the same repository methods as UNIFORM - just with different categoryId
             val result = when (currentSectionType) {
-                "recommended" -> productsRepository.getRecommendedAll(
+                "recommended", "sport" -> productsRepository.getRecommendedAll(
                     page = 1,
-                    categoryId = categoryId ?: _appliedFilters.value.categoryId,
+                    categoryId = effectiveCategoryId,
                     conditionId = _appliedFilters.value.condition,
                     minPrice = _appliedFilters.value.minPrice,
                     maxPrice = _appliedFilters.value.maxPrice
@@ -246,7 +274,7 @@ class ProductsViewModel @Inject constructor(
                 "trending" -> productsRepository.getTrendingAll(
                     period = currentPeriod ?: "today",
                     page = 1,
-                    categoryId = categoryId ?: _appliedFilters.value.categoryId,
+                    categoryId = effectiveCategoryId,
                     conditionId = _appliedFilters.value.condition,
                     minPrice = _appliedFilters.value.minPrice,
                     maxPrice = _appliedFilters.value.maxPrice
@@ -254,14 +282,14 @@ class ProductsViewModel @Inject constructor(
                 "recent" -> productsRepository.getRecentAll(
                     period = currentPeriod ?: "all",
                     page = 1,
-                    categoryId = categoryId ?: _appliedFilters.value.categoryId,
+                    categoryId = effectiveCategoryId,
                     conditionId = _appliedFilters.value.condition,
                     minPrice = _appliedFilters.value.minPrice,
                     maxPrice = _appliedFilters.value.maxPrice
                 )
                 else -> productsRepository.getRecommendedAll(
                     page = 1,
-                    categoryId = categoryId ?: _appliedFilters.value.categoryId,
+                    categoryId = effectiveCategoryId,
                     conditionId = _appliedFilters.value.condition,
                     minPrice = _appliedFilters.value.minPrice,
                     maxPrice = _appliedFilters.value.maxPrice
@@ -271,7 +299,7 @@ class ProductsViewModel @Inject constructor(
             when (result) {
                 is Result.Success -> {
                     _products.value = result.data.items
-                    Log.d("ProductsViewModel", "Loaded ${result.data.items.size} items")
+                    Log.d("ProductsViewModel", "Loaded ${result.data.items.size} items for sectionType=$currentSectionType, categoryId=$effectiveCategoryId")
                 }
                 is Result.Error -> {
                     _error.value = result.exception.message
