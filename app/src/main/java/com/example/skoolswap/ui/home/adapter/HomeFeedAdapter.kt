@@ -63,7 +63,7 @@ class HomeFeedAdapter(
                 val binding = ItemRecentRowBinding.inflate(
                     LayoutInflater.from(parent.context), parent, false
                 )
-                RecentViewHolder(binding, onItemClick, onViewAllClick)
+                RecentViewHolder(binding, onItemClick)
             }
             else -> throw IllegalArgumentException("Unknown view type: $viewType")
         }

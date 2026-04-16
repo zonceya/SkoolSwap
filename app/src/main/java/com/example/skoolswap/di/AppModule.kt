@@ -13,7 +13,6 @@ import com.example.skoolswap.data.local.database.dao.ShopDao
 import com.example.skoolswap.data.local.database.dao.UserDao
 import com.example.skoolswap.data.local.database.dao.UserSchoolDao
 import com.example.skoolswap.data.local.datastore.AppPreferences
-import com.example.skoolswap.data.remote.api.FilterApiService
 import com.example.skoolswap.data.remote.api.ItemApiService
 import com.example.skoolswap.data.remote.api.ProvinceApiService
 import com.example.skoolswap.data.remote.api.RecommendationsApiService
@@ -24,20 +23,17 @@ import com.example.skoolswap.data.remote.api.ShopApiService
 import com.example.skoolswap.data.remote.api.UserApiService
 import com.example.skoolswap.data.remote.api.UserSchoolApiService
 import com.example.skoolswap.data.repository.AuthRepository
-import com.example.skoolswap.data.repository.FilterRepository
 import com.example.skoolswap.data.repository.HomeRepository
 import com.example.skoolswap.data.repository.ItemRepository
 import com.example.skoolswap.data.repository.SchoolRepository
 import com.example.skoolswap.data.repository.ShopRepository
 import com.example.skoolswap.data.repository.UserSchoolRepository
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
-import com.example.skoolswap.domain.repository.FilterRepositoryInterface
 import com.example.skoolswap.domain.repository.HomeRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.domain.repository.ShopRepositoryInterface
 import com.example.skoolswap.domain.repository.UserSchoolRepositoryInterface
 import com.google.firebase.auth.FirebaseAuth
-import com.google.gson.Gson
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -56,7 +52,7 @@ object AppModule {
         return SkoolSwapDatabase.getInstance(context)
     }
 
-    // ========== DAO PROVIDERS ==========
+    // ========== DAO PROVIDERS (User/School/Shop related) ==========
     @Provides
     @Singleton
     fun provideUserDao(database: SkoolSwapDatabase): UserDao {
@@ -74,13 +70,11 @@ object AppModule {
     fun provideUserSchoolDao(database: SkoolSwapDatabase): UserSchoolDao {
         return database.userSchoolDao()
     }
-
     @Provides
     @Singleton
-    fun provideProvinceDao(database: SkoolSwapDatabase): ProvinceDao {
+    fun provideProvinceDao(database: SkoolSwapDatabase): ProvinceDao {  // ADD THIS
         return database.provinceDao()
     }
-
     @Provides
     @Singleton
     fun provideShopDao(database: SkoolSwapDatabase): ShopDao {
@@ -122,18 +116,6 @@ object AppModule {
         return RetrofitClient.instance.create(ReferenceDataApiService::class.java)
     }
 
-    @Provides
-    @Singleton
-    fun provideRecommendationsApiService(retrofit: Retrofit): RecommendationsApiService {
-        return retrofit.create(RecommendationsApiService::class.java)
-    }
-
-    @Provides
-    @Singleton
-    fun provideFilterApiService(retrofit: Retrofit): FilterApiService {
-        return retrofit.create(FilterApiService::class.java)
-    }
-
     // ========== OTHER DEPENDENCIES ==========
     @Provides
     @Singleton
@@ -148,16 +130,20 @@ object AppModule {
     @Singleton
     fun provideAppPreferences(@ApplicationContext context: Context): AppPreferences =
         AppPreferences(context)
+// Add to AppModule.kt inside the API SERVICES section
 
-    // REMOVED: Gson provider (already in NetworkModule)
-
+    @Provides
+    @Singleton
+    fun provideRecommendationsApiService(retrofit: Retrofit): RecommendationsApiService {
+        return retrofit.create(RecommendationsApiService::class.java)
+    }
     // ========== REPOSITORY PROVIDERS ==========
     @Provides
     @Singleton
     fun provideSchoolRepository(
         schoolApiService: SchoolApiService,
         provinceApiService: ProvinceApiService,
-        provinceDao: ProvinceDao,
+        provinceDao : ProvinceDao,
         appPreferences: AppPreferences
     ): SchoolRepository {
         return SchoolRepository(
@@ -207,7 +193,7 @@ object AppModule {
     @Singleton
     fun provideItemRepository(
         itemApiService: ItemApiService,
-        itemDao: ItemDao,
+        itemDao: ItemDao,  // This comes from ItemModule
         authRepository: AuthRepositoryInterface
     ): ItemRepositoryInterface {
         return ItemRepository(
@@ -217,6 +203,7 @@ object AppModule {
         )
     }
 
+    // In AppModule.kt, update the provideHomeRepository method:
     @Provides
     @Singleton
     fun provideHomeRepository(
@@ -226,22 +213,6 @@ object AppModule {
         return HomeRepository(
             recommendationsApiService = recommendationsApiService,
             authRepository = authRepository
-        )
-    }
-
-    @Provides
-    @Singleton
-    fun provideFilterRepository(
-        filterApiService: FilterApiService,
-        authRepository: AuthRepositoryInterface,
-        appPreferences: AppPreferences,
-        gson: Gson  // This Gson comes from NetworkModule
-    ): FilterRepositoryInterface {
-        return FilterRepository(
-            api = filterApiService,
-            authRepository = authRepository,
-            appPreferences = appPreferences
-
         )
     }
 }
