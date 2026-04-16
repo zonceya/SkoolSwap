@@ -61,6 +61,7 @@ class MainActivity : AppCompatActivity() {
         setupNavigationListener()
         observeNavigation()
         observeAuthState()
+
     }
 
     private fun setupNavigationDrawer() {
@@ -263,11 +264,12 @@ class MainActivity : AppCompatActivity() {
         viewModel.navigationDestination.observe(this) { destination ->
             Log.e("MainActivity", "📡 navigationDestination observed: $destination at ${System.currentTimeMillis()}")
 
-            // 🔥 Only navigate if destination is not null
             if (destination != null) {
                 navigateToDestination(destination)
+                // Clear the navigation destination after handling to prevent repeated navigation
+                viewModel.clearNavigationDestination()
             } else {
-                Log.e("MainActivity", "⏭️ Null destination - no navigation (user needs to complete profile)")
+                Log.e("MainActivity", "⏭️ Null destination - no navigation")
             }
         }
 
@@ -291,6 +293,14 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // BLOCK navigation when on ProductsFragment (Uniform/Sport/Recent screens)
+        if (currentDestId == R.id.productsFragment ||
+            currentDestId == R.id.uniformFragment ||
+            currentDestId == R.id.sportFragment) {
+            Log.e("MainActivity", "🛑 BLOCKED - Already on a content screen")
+            return
+        }
+
         // Also block if we're already at the destination
         when (destination) {
             NavigationDestination.ONBOARDING -> {
@@ -299,8 +309,15 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             NavigationDestination.HOME -> {
-                if (currentDestId != R.id.nav_home) {
+                // Only navigate to home if we're not already on a valid screen
+                if (currentDestId != R.id.nav_home &&
+                    currentDestId != R.id.productsFragment &&
+                    currentDestId != R.id.uniformFragment &&
+                    currentDestId != R.id.sportFragment &&
+                    currentDestId != R.id.recentFragment) {
                     navController.navigate(R.id.nav_home)
+                } else {
+                    Log.e("MainActivity", "🛑 Already on a valid screen, skipping HOME navigation")
                 }
             }
             NavigationDestination.LOGIN -> {
@@ -310,7 +327,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
     override fun onResume() {
         super.onResume()
         Log.e("MainActivity", "🔥 onResume at ${System.currentTimeMillis()}")

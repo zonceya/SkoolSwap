@@ -46,6 +46,7 @@
 
         <!-- Sort / Filter Bar -->
         <LinearLayout
+            android:id="@+id/sortFilterBar"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:background="#F3F3F3"

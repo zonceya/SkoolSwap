@@ -25,21 +25,18 @@
         android:label="Login"
         tools:layout="@layout/fragment_login">
 
-        <!-- Action to Onboarding - REQUIRED -->
         <action
             android:id="@+id/action_loginFragment_to_onboarding"
             app:destination="@id/viewPagerFragment"
             app:popUpTo="@id/loginFragment"
             app:popUpToInclusive="false" />
 
-        <!-- Action to Home -->
         <action
             android:id="@+id/action_loginFragment_to_nav_home"
             app:destination="@id/nav_home"
             app:popUpTo="@id/loginFragment"
             app:popUpToInclusive="true" />
 
-        <!-- Action to Profile for first-time users -->
         <action
             android:id="@+id/action_loginFragment_to_profileFragment"
             app:destination="@id/nav_profile"
@@ -54,27 +51,22 @@
         android:label="@string/menu_home"
         tools:layout="@layout/fragment_home">
 
-        <!-- Action to Shop -->
         <action
             android:id="@+id/action_home_to_shop"
             app:destination="@id/nav_shop" />
 
-        <!-- Action to ProductsFragment (View All) -->
         <action
             android:id="@+id/action_homeFragment_to_productsFragment"
             app:destination="@id/productsFragment" />
 
-        <!-- Action to Uniform Fragment (for Uniform tab) -->
         <action
             android:id="@+id/action_homeFragment_to_uniformFragment"
             app:destination="@id/uniformFragment" />
 
-        <!-- Action to Sport Fragment (for Sport tab) -->
         <action
             android:id="@+id/action_homeFragment_to_sportFragment"
             app:destination="@id/sportFragment" />
 
-        <!-- Action to Recent Fragment (for Recent tab) -->
         <action
             android:id="@+id/action_homeFragment_to_recentFragment"
             app:destination="@id/recentFragment" />
@@ -113,12 +105,10 @@
         android:label="My Shop"
         tools:layout="@layout/fragment_shop">
 
-        <!-- Action to edit item -->
         <action
             android:id="@+id/action_shop_to_editItem"
             app:destination="@id/editItemFragment" />
 
-        <!-- Action back to home -->
         <action
             android:id="@+id/action_shop_to_home"
             app:destination="@id/nav_home"
@@ -150,7 +140,7 @@
             app:argType="string" />
     </fragment>
 
-    <!-- Products Fragment (for View All) -->
+    <!-- Products Fragment -->
     <fragment
         android:id="@+id/productsFragment"
         android:name="com.example.skoolswap.ui.products.ProductsFragment"
@@ -159,37 +149,36 @@
 
         <argument
             android:name="SECTION_TYPE"
-            app:argType="string" />
+            app:argType="string"
+            android:defaultValue="all" />
 
         <argument
             android:name="SECTION_TITLE"
-            app:argType="string" />
+            app:argType="string"
+            android:defaultValue="All Items" />
 
         <argument
             android:name="PERIOD"
             app:argType="string"
-            app:nullable="true" />
-
-        <!-- Action to FilterOptionsFragment -->
-        <action
-            android:id="@+id/action_productsFragment_to_filterOptionsFragment"
-            app:destination="@id/filterOptionsFragment" />
-    </fragment>
-
-    <!-- Filter Options Fragment -->
-    <fragment
-        android:id="@+id/filterOptionsFragment"
-        android:name="com.example.skoolswap.ui.products.FilterOptionsFragment"
-        android:label="FilterOptions"
-        tools:layout="@layout/fragment_filter_options">
+            app:nullable="true"
+            android:defaultValue="@null" />
 
         <argument
-            android:name="FILTER_TYPE"
-            app:argType="string" />
+            android:name="CATEGORY_ID"
+            app:argType="integer"
+            android:defaultValue="-1" />
 
         <argument
-            android:name="OPTIONS"
-            app:argType="string[]" />
+            android:name="SPORT_TYPE_ID"
+            app:argType="integer"
+            android:defaultValue="-1" />
+
+        <argument
+            android:name="GEAR_TYPE"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+
     </fragment>
 
     <!-- Uniform Fragment -->
@@ -197,21 +186,49 @@
         android:id="@+id/uniformFragment"
         android:name="com.example.skoolswap.ui.uniform.UniformFragment"
         android:label="Uniforms"
-        tools:layout="@layout/fragment_uniform" />
+        tools:layout="@layout/fragment_uniform">
+
+        <action
+            android:id="@+id/action_uniformFragment_to_productsFragment"
+            app:destination="@id/productsFragment" />
+
+        <argument
+            android:name="CATEGORY_ID"
+            app:argType="integer"
+            android:defaultValue="1" />
+
+    </fragment>
 
     <!-- Sport Fragment -->
     <fragment
         android:id="@+id/sportFragment"
         android:name="com.example.skoolswap.ui.sport.SportFragment"
         android:label="Sports"
-        tools:layout="@layout/fragment_sport" />
+        tools:layout="@layout/fragment_sport">
+
+        <action
+            android:id="@+id/action_sportFragment_to_productsFragment"
+            app:destination="@id/productsFragment" />
+
+        <argument
+            android:name="CATEGORY_ID"
+            app:argType="integer"
+            android:defaultValue="2" />
+
+    </fragment>
 
     <!-- Recent Fragment -->
     <fragment
         android:id="@+id/recentFragment"
         android:name="com.example.skoolswap.ui.recent.RecentFragment"
-        android:label="Recent"
-        tools:layout="@layout/fragment_recent" />
+        android:label="Recent">
+
+        <argument
+            android:name="PERIOD"
+            app:argType="string"
+            android:defaultValue="all" />
+
+    </fragment>
 
     <!-- Item Detail Fragment -->
     <fragment
@@ -227,7 +244,9 @@
         <argument
             android:name="source"
             app:argType="string"
-            app:nullable="true" />
+            app:nullable="true"
+            android:defaultValue="@null" />
+
     </fragment>
 
 </navigation>

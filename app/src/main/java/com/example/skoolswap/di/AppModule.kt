@@ -84,15 +84,19 @@ object AppModule {
     // ========== API SERVICES ==========
     @Provides
     @Singleton
-    fun provideUserApiService(): UserApiService = RetrofitClient.instance.create(UserApiService::class.java)
-
+    fun provideUserApiService(retrofit: Retrofit): UserApiService {
+        return retrofit.create(UserApiService::class.java)
+    }
     @Provides
     @Singleton
-    fun provideShopApiService(): ShopApiService = RetrofitClient.instance.create(ShopApiService::class.java)
-
+    fun provideShopApiService(retrofit: Retrofit): ShopApiService {
+        return retrofit.create(ShopApiService::class.java)
+    }
     @Provides
     @Singleton
-    fun provideItemApiService(): ItemApiService = RetrofitClient.instance.create(ItemApiService::class.java)
+    fun provideItemApiService(retrofit: Retrofit): ItemApiService {  // ← Inject Retrofit
+        return retrofit.create(ItemApiService::class.java)
+    }
 
     @Provides
     @Singleton

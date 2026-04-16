@@ -1,5 +1,12 @@
 package com.example.skoolswap.data.remote.models.response.item
 
+import com.example.skoolswap.data.remote.models.response.reference.BrandDto
+import com.example.skoolswap.data.remote.models.response.reference.GenderDto
+import com.example.skoolswap.data.remote.models.response.reference.MainCategoryDto
+import com.example.skoolswap.data.remote.models.response.reference.ProvinceDto
+import com.example.skoolswap.data.remote.models.response.reference.SchoolDto
+import com.example.skoolswap.data.remote.models.response.reference.SubCategoryDto
+import com.example.skoolswap.data.remote.models.response.reference.TownDto
 import com.google.gson.annotations.SerializedName
 
 data class CreateItemResponse(
@@ -22,6 +29,8 @@ data class ItemDto(
 
     @SerializedName("shop_id")
     val shopId: Long,
+    @SerializedName("images")
+    val imagesRaw: Any? = null,  // ← Can be List<String> OR List<ItemImageDto>
 
     @SerializedName("name")
     val name: String,
@@ -40,14 +49,56 @@ data class ItemDto(
 
     @SerializedName("meta")
     val meta: ItemMetaDto?,
+    @SerializedName("images") val images: List<ItemImageDto>? = emptyList(),
+    @SerializedName("image")
+    val image: String?,  // ← Single image URL from home feed
+
+    @SerializedName("cover_photo")
+    val cover_photo: String?,  // ← Cover photo URL
 
     @SerializedName("shop")
     val shop: ItemShopDto?,
 
     @SerializedName("created_at")
-    val createdAt: String
-)
+    val createdAt: String,
 
+    // ===== ADD ALL THESE MISSING FIELDS =====
+    @SerializedName("brand")
+    val brand: BrandDto?,
+
+    @SerializedName("size")
+    val size: SizeDto?,
+
+    @SerializedName("color")
+    val color: ColorDto?,
+
+    @SerializedName("school")
+    val school: SchoolDto?,
+
+    @SerializedName("condition")
+    val condition: ConditionDto?,
+
+    @SerializedName("town")
+    val town: TownDto?,
+
+    @SerializedName("province")
+    val province: ProvinceDto?,
+
+    @SerializedName("gender")
+    val gender: GenderDto?,
+
+    @SerializedName("main_category")
+    val mainCategory: MainCategoryDto?,  // ← Note: main_category maps to mainCategory
+
+    @SerializedName("sub_category")
+    val subCategory: SubCategoryDto?,    // ← Note: sub_category maps to subCategory
+
+    @SerializedName("available_quantity")
+    val availableQuantity: Int?,
+
+    @SerializedName("label")
+    val label: String?
+)
 data class ItemImageDto(
     @SerializedName("id")
     val id: Long,
@@ -63,6 +114,7 @@ data class ItemImageDto(
 
     @SerializedName("created_at")
     val createdAt: String?
+
 )
 
 data class ItemMetaDto(
@@ -80,7 +132,37 @@ data class ItemShopDto(
     @SerializedName("name")
     val name: String
 )
+data class ConditionDto(
+    @SerializedName("id")
+    val id: Int,
+    @SerializedName("name")
+    val name: String
+)
+data class ColorDto(
+    @SerializedName("id")
+    val id: Int,
+    @SerializedName("name")
+    val name: String
+)
+data class MainCategoryDto(
+    @SerializedName("id")
+    val id: Int,
+    @SerializedName("name")
+    val name: String
+)
 
+data class SubCategoryDto(
+    @SerializedName("id")
+    val id: Int,
+    @SerializedName("name")
+    val name: String
+)
+data class SizeDto(
+    @SerializedName("id")
+    val id: Int,
+    @SerializedName("name")
+    val name: String
+)
 // Separate response for image operations
 data class AddImagesResponse(
     @SerializedName("success")

@@ -39,9 +39,8 @@ interface ItemApiService {
 
     @GET("api/v1/items/{item_id}")
     suspend fun getItem(
-        @Header("Authorization") authHeader: String? = null,
         @Path("item_id") itemId: String
-    ): Response<CreateItemResponse>
+    ): Response<ItemDetailResponse>
 
     @GET("api/v1/items")
     suspend fun getItems(
