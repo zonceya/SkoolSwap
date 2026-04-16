@@ -61,6 +61,7 @@ class MainActivity : AppCompatActivity() {
         setupNavigationListener()
         observeNavigation()
         observeAuthState()
+
     }
 
     private fun setupNavigationDrawer() {

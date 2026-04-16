@@ -62,7 +62,13 @@ class HomeFragment : Fragment() {
 
         return binding.root
     }
-
+    private fun navigateToItemDetail(itemId: String, source: String) {
+        val bundle = Bundle().apply {
+            putString("itemId", itemId)
+            putString("source", source)
+        }
+        findNavController().navigate(R.id.itemDetailFragment, bundle)
+    }
     private fun setupRecyclerView() {
         homeAdapter = HomeFeedAdapter(
             onItemClick = { item, source ->
@@ -249,10 +255,6 @@ class HomeFragment : Fragment() {
         super.onDestroyView()
         autoScrollHelper?.stopAutoScroll()
         _binding = null
-    }
-
-    private fun navigateToItemDetail(itemId: String, source: String) {
-        // Navigation logic
     }
 
     private fun navigateToUniformTab() {

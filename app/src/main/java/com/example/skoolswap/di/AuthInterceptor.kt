@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.Response
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,23 +23,29 @@ class AuthInterceptor @Inject constructor(
         val originalRequest = chain.request()
         val path = originalRequest.url.encodedPath
 
-        Log.d(TAG, "🔍 Intercepting: $path")
+        Timber.tag(TAG).d("🔍 Intercepting: $path")
 
         // Get token from preferences
         val token = runBlocking {
             try {
                 val tokenValue = appPreferences.authToken.first()
-                Log.d(TAG, "📦 Token from preferences: ${if (tokenValue != null) "Present (${tokenValue.take(10)}...)" else "NULL"}")
+                Timber.tag(TAG).d(
+                    "📦 Token from preferences: ${
+                        if (tokenValue != null) "Present (${
+                            tokenValue.take(10)
+                        }...)" else "NULL"
+                    }"
+                )
                 tokenValue
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Error getting auth token", e)
+                Timber.tag(TAG).e(e, "❌ Error getting auth token")
                 null
             }
         }
 
         // Build request with or without token
         val request = if (!token.isNullOrBlank()) {
-            Log.d(TAG, "✅ Adding Bearer token to: $path")
+            Timber.tag(TAG).d("✅ Adding Bearer token to: $path")
             originalRequest.newBuilder()
                 .header("Authorization", "Bearer $token")
                 .build()

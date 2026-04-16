@@ -434,15 +434,15 @@
 
         <!-- Submit Button -->
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/submitButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Create Item"
-            android:textStyle="bold"
-            android:textColor="@color/white"
-            app:backgroundTint="@color/black"
-            android:gravity="center"
-            android:paddingVertical="16dp"/>
+        android:id="@+id/submitButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Create Item"
+        android:textStyle="bold"
+        android:textColor="@color/white"
+        app:backgroundTint="@color/black"
+        android:gravity="center"
+        android:layout_margin="16dp"/>
 
     </LinearLayout>
 </ScrollView>

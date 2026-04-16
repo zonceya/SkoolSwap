@@ -17,5 +17,6 @@ class SkoolSwapApplication : Application() {
         // Initialize DataStore Preferences
         appPreferences = AppPreferences(this)
         FirebaseApp.initializeApp(this)
+
     }
 }
