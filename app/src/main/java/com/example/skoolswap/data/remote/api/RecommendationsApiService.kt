@@ -12,8 +12,6 @@ import retrofit2.http.Query
 
 interface RecommendationsApiService {
 
-    // ============ HOME SCREEN ENDPOINTS ============
-
     @GET("api/v1/recommendations/home")
     suspend fun getHomeFeed(
         @Query("school_id") schoolId: Int
@@ -43,7 +41,11 @@ interface RecommendationsApiService {
     suspend fun getRecommendedAll(
         @Query("school_id") schoolId: Int,
         @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 20
+        @Query("per_page") perPage: Int = 20,
+        @Query("category_id") categoryId: Int? = null,
+        @Query("condition_id") conditionId: Int? = null,
+        @Query("min_price") minPrice: Float? = null,
+        @Query("max_price") maxPrice: Float? = null
     ): Response<PaginatedItemsResponse>
 
     @GET("api/v1/recommendations/essentials/all")
@@ -51,7 +53,10 @@ interface RecommendationsApiService {
         @Query("school_id") schoolId: Int,
         @Query("category") category: String? = null,
         @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 20
+        @Query("per_page") perPage: Int = 20,
+        @Query("condition_id") conditionId: Int? = null,
+        @Query("min_price") minPrice: Float? = null,
+        @Query("max_price") maxPrice: Float? = null
     ): Response<PaginatedItemsResponse>
 
     @GET("api/v1/recommendations/trending/all")
@@ -59,7 +64,11 @@ interface RecommendationsApiService {
         @Query("school_id") schoolId: Int,
         @Query("period") period: String = "today",
         @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 20
+        @Query("per_page") perPage: Int = 20,
+        @Query("category_id") categoryId: Int? = null,
+        @Query("condition_id") conditionId: Int? = null,
+        @Query("min_price") minPrice: Float? = null,
+        @Query("max_price") maxPrice: Float? = null
     ): Response<PaginatedItemsResponse>
 
     @GET("api/v1/recommendations/recent/all")
@@ -67,7 +76,11 @@ interface RecommendationsApiService {
         @Query("school_id") schoolId: Int,
         @Query("period") period: String = "all",
         @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 20
+        @Query("per_page") perPage: Int = 20,
+        @Query("category_id") categoryId: Int? = null,
+        @Query("condition_id") conditionId: Int? = null,
+        @Query("min_price") minPrice: Float? = null,
+        @Query("max_price") maxPrice: Float? = null
     ): Response<PaginatedItemsResponse>
 
     // ============ TRACKING ENDPOINTS ============
