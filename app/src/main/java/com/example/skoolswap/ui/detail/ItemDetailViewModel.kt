@@ -1,5 +1,6 @@
 package com.example.skoolswap.ui.detail
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.skoolswap.data.local.database.dao.BrandDao
@@ -42,6 +43,8 @@ class ItemDetailViewModel @Inject constructor(
     val colorName: StateFlow<String?> = _colorName.asStateFlow()
     private val _brandName = MutableStateFlow<String?>(null)
     val brandName: StateFlow<String?> = _brandName.asStateFlow()
+    private val _conditionName = MutableStateFlow<String?>(null)
+    val conditionName: StateFlow<String?> = _conditionName.asStateFlow()
     fun loadItem(itemId: String, source: String) {
         viewModelScope.launch {
             _itemState.value = ItemDetailState.Loading
@@ -76,24 +79,27 @@ class ItemDetailViewModel @Inject constructor(
     }
 
     private suspend fun loadReferenceData(item: Item) {
-        // Load size name from Room
-        item.sizeId?.let { sizeId ->
-            val size = sizeDao.getById(sizeId)
-            _sizeName.value = size?.name
+        android.util.Log.d("ItemDetailVM", "Images count: ${item.images.size}")
+        item.images.forEachIndexed { index, image ->
+            android.util.Log.d("ItemDetailVM", "Image $index: ${image.url}")
         }
-        item.brandId?.let { brandId ->
-            val brand = brandDao.getById(brandId)
-            _brandName.value = brand?.name
+        Log.d("ItemDetailVM", "=== IMAGES DEBUG ===")
+        Log.d("ItemDetailVM", "Images count: ${item.images.size}")
+        item.images.forEachIndexed { index, image ->
+            Log.d("ItemDetailVM", "Image $index: ${image.url}")
         }
+        Log.d("ItemDetailVM", "==================")
+        _sizeName.value = item.sizeName
+        _colorName.value = item.colorName
+        _brandName.value = item.brandName
+        _conditionName.value = item.conditionName
+
         // Load school name from Room
         item.schoolId?.let { schoolId ->
             val school = schoolDao.getById(schoolId)
             _schoolName.value = school?.name
         }
-        item.colorId?.let { colorId ->
-            val color = colorDao.getById(colorId)  // You'll need to inject ColorDao
-            _colorName.value = color?.name
-        }
+
     }
 
     private suspend fun loadSimilarItems(currentItem: Item) {

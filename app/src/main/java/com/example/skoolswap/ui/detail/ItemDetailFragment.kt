@@ -1,6 +1,7 @@
 package com.example.skoolswap.ui.detail
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,11 +14,13 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentItemDetailBinding
+import com.example.skoolswap.domain.model.ItemImage
 import com.example.skoolswap.ui.detail.adapter.ImageSliderAdapter
 import com.example.skoolswap.ui.detail.adapter.SimilarItemsAdapter
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 @AndroidEntryPoint
 class ItemDetailFragment : Fragment() {
@@ -68,6 +71,10 @@ class ItemDetailFragment : Fragment() {
             layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
             adapter = similarItemsAdapter
         }
+        binding.imageSlider.apply {
+            offscreenPageLimit = 2          // Keep 2 pages in memory
+            setCurrentItem(0, false)        // Force start at position 0
+        }
     }
 
     private fun setupListeners() {
@@ -95,11 +102,21 @@ class ItemDetailFragment : Fragment() {
             toggleShippingSection()
         }
     }
+    private fun toggleShippingSection() {
+        val isVisible = binding.shippingExpandableContent.visibility == View.VISIBLE
 
+        if (isVisible) {
+            binding.shippingExpandableContent.visibility = View.GONE
+            binding.shippingToggle.text = "+"
+        } else {
+            binding.shippingExpandableContent.visibility = View.VISIBLE
+            binding.shippingToggle.text = "-"
+        }
+    }
     private fun observeViewModel() {
         lifecycleScope.launch {
             viewModel.itemState.collect { state ->
-                android.util.Log.d("ItemDetail", "State received: $state")
+                Timber.tag("ItemDetail").d("State received: $state")
                 when (state) {
                     is ItemDetailViewModel.ItemDetailState.Loading -> {
                         android.util.Log.d("ItemDetail", "Loading...")
@@ -128,7 +145,9 @@ class ItemDetailFragment : Fragment() {
         lifecycleScope.launch {
             viewModel.sizeName.collect { sizeName ->
                 if (!sizeName.isNullOrEmpty()) {
-                    binding.productSize.text = sizeName
+                    // Convert "Adult 8" to "UK 8"
+                    val displaySize = sizeName.replace("Adult", "UK")
+                    binding.productSize.text = "$displaySize"
                     binding.productSize.visibility = View.VISIBLE
                 } else {
                     binding.productSize.visibility = View.GONE
@@ -153,6 +172,16 @@ class ItemDetailFragment : Fragment() {
                     binding.productColor.visibility = View.VISIBLE
                 } else {
                     binding.productColor.visibility = View.GONE
+                }
+            }
+        }
+        lifecycleScope.launch {
+            viewModel.conditionName.collect { conditionName ->
+                if (!conditionName.isNullOrEmpty()) {
+                    binding.productCondition.text = "Condition: $conditionName"
+                    binding.productCondition.visibility = View.VISIBLE
+                } else {
+                    binding.productCondition.visibility = View.GONE
                 }
             }
         }
@@ -188,29 +217,39 @@ class ItemDetailFragment : Fragment() {
             binding.soldBadge.visibility = View.GONE
         }
 
-        setupImageSlider(item.images)
+        setupImageSlider(item)
     }
-    private fun setupImageSlider(images: List<com.example.skoolswap.domain.model.ItemImage>) {
-        if (images.isEmpty()) {
+    private fun setupImageSlider(item: com.example.skoolswap.domain.model.Item) {
+        val imageUrls = mutableListOf<String>()
+
+        // Cover image first
+        if (!item.coverImage.isNullOrBlank()) {
+            imageUrls.add(item.coverImage)
+        }
+
+        // Add all images from the list
+        item.images.forEach { imageItem ->
+            if (!imageItem.url.isNullOrBlank() && imageItem.url.startsWith("http")) {
+                if (!imageUrls.contains(imageItem.url)) {
+                    imageUrls.add(imageItem.url)
+                }
+            }
+        }
+
+        Timber.tag("ItemDetail").d("Final image list size: ${imageUrls.size}")
+        imageUrls.forEachIndexed { index, url ->
+            Timber.tag("ItemDetail").d("Image $index: $url")
+        }
+
+        if (imageUrls.isEmpty()) {
             binding.imageSlider.visibility = View.GONE
             return
         }
 
-        val imageAdapter = ImageSliderAdapter(images)
-        binding.imageSlider.adapter = imageAdapter
+        binding.imageSlider.visibility = View.VISIBLE
+        binding.imageSlider.adapter = ImageSliderAdapter(imageUrls)
+        binding.imageSlider.setCurrentItem(0, false)   // Start at first image
     }
-
-    private fun toggleShippingSection() {
-        val isVisible = binding.shippingExpandableContent.visibility == View.VISIBLE
-        if (isVisible) {
-            binding.shippingExpandableContent.visibility = View.GONE
-            binding.shippingToggle.text = "+"
-        } else {
-            binding.shippingExpandableContent.visibility = View.VISIBLE
-            binding.shippingToggle.text = "-"
-        }
-    }
-
     private fun shareItem() {
         val currentState = viewModel.itemState.value
         if (currentState is ItemDetailViewModel.ItemDetailState.Success) {

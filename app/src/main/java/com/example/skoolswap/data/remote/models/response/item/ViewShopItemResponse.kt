@@ -61,7 +61,11 @@ data class ViewShopItemDto(
 
     @SerializedName("sub_category_id")
     val subCategoryId: Int?,
+    @SerializedName("size")
+    val size: SizeDto?,  // ← ADD THIS
 
+    @SerializedName("color")
+    val color: ColorDto?,  // ← ADD THIS
     @SerializedName("total_quantity")
     val totalQuantity: Int,
 

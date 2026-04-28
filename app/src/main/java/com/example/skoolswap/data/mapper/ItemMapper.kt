@@ -24,7 +24,7 @@ fun ItemDto.toDomain(): Item {
         meta = meta?.toDomain(),
         createdAt = createdAt,
         shop = shop?.toDomain(),
-        images = emptyList() // Images are separate in response
+        images = emptyList()
     )
 }
 
@@ -81,17 +81,13 @@ fun ItemShopDto.toDomain(): Shop {
 }
 
 // ============ CREATE ITEM RESPONSE TO DOMAIN ============
-
-// In your mapper file - COMPLETE FIX
 fun CreateItemResponse.toDomain(): Item {
     val itemData = item
     val allImages = mutableListOf<ItemImage>()
 
     // 1. Get cover photo (primary image)
     val coverPhotoUrl = when {
-        // From Active Storage via image field
         !itemData?.image.isNullOrEmpty() -> itemData.image
-        // From database cover_photo column
         !itemData?.cover_photo.isNullOrEmpty() -> itemData.cover_photo
         else -> null
     }
@@ -99,24 +95,22 @@ fun CreateItemResponse.toDomain(): Item {
     // Add cover photo as first image if exists
     coverPhotoUrl?.let { url ->
         allImages.add(ItemImage(
-            id = 0,  // Temporary ID for CDN images
+            id = 0,
             url = url,
             filename = null,
             contentType = null,
             createdAt = null,
-            isCover = true  // Mark as cover (you may need to add this field)
+            isCover = true
         ))
     }
 
     // 2. Get additional images from images array
-    // Handle both formats: List<String> OR List<ItemImageDto>
     val additionalImages = when (val imagesRaw = itemData?.imagesRaw) {
         is List<*> -> {
             imagesRaw.mapNotNull { image ->
                 when (image) {
                     is String -> {
-                        // String URL from CDN
-                        if (image != coverPhotoUrl) {  // Avoid duplicate cover
+                        if (image != coverPhotoUrl) {
                             ItemImage(
                                 id = 0,
                                 url = image,
@@ -128,15 +122,9 @@ fun CreateItemResponse.toDomain(): Item {
                         } else null
                     }
                     is ItemImageDto -> {
-                        // Object from Active Storage
-                        ItemImage(
-                            id = image.id,
-                            url = image.url,
-                            filename = image.filename,
-                            contentType = image.contentType,
-                            createdAt = image.createdAt,
-                            isCover = false
-                        )
+                        if (image.url != coverPhotoUrl) {
+                            image.toDomain().copy(isCover = false)
+                        } else null
                     }
                     else -> null
                 }
@@ -146,8 +134,6 @@ fun CreateItemResponse.toDomain(): Item {
     }
 
     allImages.addAll(additionalImages)
-
-    // 3. Ensure we don't exceed 3 images
     val finalImages = allImages.take(3)
 
     return Item(
@@ -161,8 +147,8 @@ fun CreateItemResponse.toDomain(): Item {
         meta = itemData?.meta?.toDomain(),
         createdAt = itemData?.createdAt ?: "",
         shop = itemData?.shop?.toDomain(),
-        images = finalImages,
-        coverImage = coverPhotoUrl,  // Add this field to your Item model
+        images = finalImages,  // ← List<ItemImage>
+        coverImage = coverPhotoUrl,
         brandId = itemData?.brand?.id,
         sizeId = itemData?.size?.id,
         colorId = itemData?.color?.id,
@@ -192,19 +178,13 @@ fun PublicShopItemDto.toDomain(shopId: Long): Item {
         quantity = 1,
         status = "active",
         createdAt = "",
-        // ✅ FIXED: Explicitly handle PublicShopItemImageDto
         images = images?.map { imageDto ->
             when (imageDto) {
                 is PublicShopItemImageDto -> imageDto.toDomain()
+                is String -> ItemImage(id = 0, url = imageDto)
                 else -> {
-                    // Fallback for any other type
-                    ItemImage(
-                        id = (imageDto as? Map<*, *>)?.get("id") as? Long ?: 0L,
-                        url = (imageDto as? Map<*, *>)?.get("url") as? String ?: "",
-                        filename = null,
-                        contentType = null,
-                        createdAt = null
-                    )
+                    val url = (imageDto as? Map<*, *>)?.get("url") as? String ?: ""
+                    ItemImage(id = 0, url = url)
                 }
             }
         } ?: emptyList(),
@@ -233,19 +213,13 @@ fun ShopItemDto.toDomain(shopId: Long): Item {
         quantity = quantity,
         status = status,
         createdAt = createdAt,
-        // ✅ FIXED: Explicitly handle ShopItemImageDto
         images = images.map { imageDto ->
             when (imageDto) {
                 is ShopItemImageDto -> imageDto.toDomain()
+                is String -> ItemImage(id = 0, url = imageDto)
                 else -> {
-                    // Fallback for any other type
-                    ItemImage(
-                        id = (imageDto as? Map<*, *>)?.get("id") as? Long ?: 0L,
-                        url = (imageDto as? Map<*, *>)?.get("url") as? String ?: "",
-                        filename = null,
-                        contentType = null,
-                        createdAt = null
-                    )
+                    val url = (imageDto as? Map<*, *>)?.get("url") as? String ?: ""
+                    ItemImage(id = 0, url = url)
                 }
             }
         },

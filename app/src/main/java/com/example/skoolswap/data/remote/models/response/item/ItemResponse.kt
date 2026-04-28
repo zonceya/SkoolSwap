@@ -30,7 +30,7 @@ data class ItemDto(
     @SerializedName("shop_id")
     val shopId: Long,
     @SerializedName("images")
-    val imagesRaw: Any? = null,  // ← Can be List<String> OR List<ItemImageDto>
+    val imagesRaw: Any? = null,
 
     @SerializedName("name")
     val name: String,
@@ -49,7 +49,8 @@ data class ItemDto(
 
     @SerializedName("meta")
     val meta: ItemMetaDto?,
-    @SerializedName("images") val images: List<ItemImageDto>? = emptyList(),
+    @SerializedName("images")
+    val images: List<String>? = emptyList(),
     @SerializedName("image")
     val image: String?,  // ← Single image URL from home feed
 

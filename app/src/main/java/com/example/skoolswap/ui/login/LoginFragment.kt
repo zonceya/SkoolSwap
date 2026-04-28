@@ -26,7 +26,7 @@ class LoginFragment : Fragment() {
 
     @Inject
     lateinit var appPreferences: AppPreferences
-
+    private var isSigningIn = false
     private var videoBackgroundManager: VideoBackgroundManager? = null
 
     override fun onCreateView(
@@ -92,26 +92,46 @@ class LoginFragment : Fragment() {
             Log.e("LoginFragment", "🎯 User email: ${user.email}")
             Log.e("LoginFragment", "🎯 schoolMapped: ${user.schoolMapped}")
 
-            try {
-                if (user.schoolMapped) {
-                    Log.e("LoginFragment", "🚀 Navigating to HOME using ID: ${R.id.nav_home}")
-                    findNavController().navigate(R.id.action_loginFragment_to_nav_home)
-                } else {
-                    Log.e("LoginFragment", "🚀 Navigating to PROFILE using ID: ${R.id.nav_profile}")
-                    findNavController().navigate(R.id.action_loginFragment_to_profileFragment)
+            // ✅ Check if fragment is still attached
+            if (isAdded && !isDetached) {
+                try {
+                    if (user.schoolMapped) {
+                        Log.e("LoginFragment", "🚀 Navigating to HOME")
+                        findNavController().navigate(R.id.action_loginFragment_to_nav_home)
+                    } else {
+                        Log.e("LoginFragment", "🚀 Navigating to PROFILE")
+                        findNavController().navigate(R.id.action_loginFragment_to_profileFragment)
+                    }
+                    Log.e("LoginFragment", "✅ Navigation call completed")
+                } catch (e: Exception) {
+                    Log.e("LoginFragment", "❌ Navigation failed: ${e.message}")
+                    e.printStackTrace()
                 }
-                Log.e("LoginFragment", "✅ Navigation call completed")
-            } catch (e: Exception) {
-                Log.e("LoginFragment", "❌ Navigation failed: ${e.message}")
-                e.printStackTrace()
+            } else {
+                Log.e("LoginFragment", "⚠️ Fragment not attached, skipping navigation")
             }
         }
     }
 
     private fun setupUI() {
         binding.signInButton.setOnClickListener {
+            // Prevent multiple clicks
+            if (isSigningIn) {
+                Log.d("LoginFragment", "⚠️ Already signing in, ignoring click")
+                return@setOnClickListener
+            }
+
+            isSigningIn = true
+            binding.signInButton.isEnabled = false
+
             Log.e("LoginFragment", "🔥 SIGN IN CLICKED at ${System.currentTimeMillis()}")
             viewModel.signInWithGoogle(requireActivity())
+
+            // Reset after 5 seconds in case of error
+            binding.signInButton.postDelayed({
+                isSigningIn = false
+                binding.signInButton.isEnabled = true
+            }, 5000)
         }
     }
 

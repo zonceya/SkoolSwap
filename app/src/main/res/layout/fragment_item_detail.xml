@@ -145,13 +145,21 @@
                     android:layout_height="wrap_content"
                     android:textColor="@android:color/white"
                     android:background="@android:color/black"
+                    android:textStyle="bold"
                     android:paddingStart="12dp"
                     android:paddingEnd="12dp"
                     android:paddingTop="6dp"
                     android:paddingBottom="6dp"
                     android:layout_marginTop="12dp"
                     android:visibility="gone"/>
-
+                <TextView
+                    android:id="@+id/productCondition"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textColor="#666666"
+                    android:layout_marginTop="4dp"
+                    android:visibility="gone"/>
                 <!-- Divider -->
                 <View
                     android:layout_width="match_parent"

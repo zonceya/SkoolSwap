@@ -1,5 +1,6 @@
 package com.example.skoolswap.domain.model
 
+// In your Item model file (likely Item.kt)
 data class Item(
     val id: String,
     val shopId: Long,
@@ -24,10 +25,16 @@ data class Item(
     val reserved: Int = 0,
     val createdAt: String,
     val shop: Shop? = null,
-    val image: String? = null,  // For backward compatibility
-    val coverImage: String? = null,  // Explicit cover photo
-    val images: List<ItemImage> = emptyList()
-)
+    val images: List<ItemImage> = emptyList(), // For backward compatibility
+    val coverImage: String? = null,
+    val sizeName: String? = null,
+    val colorName: String? = null,
+    val brandName: String? = null,
+    val conditionName: String? = null
+) {
+    val availableQuantity: Int
+        get() = quantity - reserved
+}
 
 data class ItemMeta(
     val color: String?,

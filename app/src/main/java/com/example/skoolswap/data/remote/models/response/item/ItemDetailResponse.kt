@@ -36,7 +36,11 @@ data class ItemDetailDto(
 
     @SerializedName("available_quantity")
     val availableQuantity: Int,
+    @SerializedName("size")
+    val size: SizeDto?,
 
+    @SerializedName("color")
+    val color: ColorDto?,
     @SerializedName("status")
     val status: String,
 
@@ -44,7 +48,7 @@ data class ItemDetailDto(
     val image: String?,  // Single image URL
 
     @SerializedName("images")
-    val images: List<String>?,  // Array of image URLs (as strings)
+    val images: List<String>? = emptyList(), // Array of image URLs (as strings)
 
     @SerializedName("cover_photo")
     val coverPhoto: String?,  // Cover photo URL
