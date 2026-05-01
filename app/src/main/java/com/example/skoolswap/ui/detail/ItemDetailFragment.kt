@@ -14,7 +14,6 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentItemDetailBinding
-import com.example.skoolswap.domain.model.ItemImage
 import com.example.skoolswap.ui.detail.adapter.ImageSliderAdapter
 import com.example.skoolswap.ui.detail.adapter.SimilarItemsAdapter
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -69,7 +68,6 @@ class ItemDetailFragment : Fragment() {
         setupListeners()
         observeViewModel()
 
-        // Never call clearState() — let ViewModel handle it
         Log.d(TAG, "Loading item: $itemId from source: $source")
         viewModel.loadItem(itemId, source)
     }
@@ -109,9 +107,10 @@ class ItemDetailFragment : Fragment() {
             shareItem()
         }
 
+        // FIXED: Only ONE favorite button listener
         binding.favBtn.setOnClickListener {
             Log.d(TAG, "Favorite button clicked")
-            toggleFavorite()
+            viewModel.toggleFavorite()  // Call ViewModel method directly
         }
 
         binding.contactSeller.setOnClickListener {
@@ -253,9 +252,27 @@ class ItemDetailFragment : Fragment() {
                 currentImageUrls = urls
             }
         }
+
+        lifecycleScope.launch {
+            viewModel.isFavorite.collect { isFavorite ->
+                Log.d(TAG, "Favorite status changed: $isFavorite")
+                updateFavoriteButtonIcon(isFavorite)
+            }
+        }
     }
 
-    private fun bindItem(item: com.example.skoolswap.domain.model.Item) {
+    private fun updateFavoriteButtonIcon(isFavorite: Boolean) {
+        if (isFavorite) {
+            binding.favBtn.setImageResource(R.drawable.ic_favorite_filled)
+            binding.favBtn.setColorFilter(android.graphics.Color.BLACK)
+        } else {
+            binding.favBtn.setImageResource(R.drawable.ic_favorite)
+            binding.favBtn.setColorFilter(android.graphics.Color.BLACK)
+        }
+        Log.d(TAG, "Favorite button icon updated: ${if (isFavorite) "filled" else "outline"}")
+    }
+
+    private fun bindItem(item: Item) {
         Log.d(TAG, "=== BINDING ITEM START ===")
         Log.d(TAG, "Item ID: ${item.id}")
         Log.d(TAG, "Item Name: ${item.name}")
@@ -322,24 +339,11 @@ class ItemDetailFragment : Fragment() {
         binding.imageSlider.visibility = View.VISIBLE
         Log.d(TAG, "Image slider visible")
 
-        // Log current adapter state
-        val existingAdapter = binding.imageSlider.adapter as? ImageSliderAdapter
-        if (existingAdapter != null) {
-            Log.d(TAG, "Existing adapter found with ${existingAdapter.imageUrls.size} images")
-            Log.d(TAG, "Existing URLs: ${existingAdapter.imageUrls}")
-            Log.d(TAG, "New URLs: $imageUrls")
-            Log.d(TAG, "URLs equal? ${existingAdapter.imageUrls == imageUrls}")
-        } else {
-            Log.d(TAG, "No existing adapter found")
-        }
-
-        // ALWAYS create a new adapter - don't try to reuse
         Log.d(TAG, "Creating new ImageSliderAdapter with ${imageUrls.size} images")
         val newAdapter = ImageSliderAdapter(imageUrls)
         binding.imageSlider.adapter = newAdapter
         binding.imageSlider.setCurrentItem(0, false)
 
-        // Force ViewPager2 to refresh
         binding.imageSlider.post {
             binding.imageSlider.setCurrentItem(0, false)
             Log.d(TAG, "Force refreshed ViewPager2 to position 0")
@@ -349,26 +353,37 @@ class ItemDetailFragment : Fragment() {
     }
 
     private fun shareItem() {
-        Log.d(TAG, "shareItem called")
         val currentState = viewModel.itemState.value
         if (currentState is ItemDetailViewModel.ItemDetailState.Success) {
             val item = currentState.item
+
+            // Build richer share message
+            val shareText = buildString {
+                appendLine("📦 ${item.name}")
+                appendLine("💰 Price: R${String.format("%.2f", item.price)}")
+                if (!item.brandName.isNullOrBlank()) {
+                    appendLine("🏷️ Brand: ${item.brandName}")
+                }
+                if (!item.sizeName.isNullOrBlank()) {
+                    appendLine("📏 Size: ${item.sizeName.replace("Adult", "UK")}")
+                }
+                if (!item.conditionName.isNullOrBlank()) {
+                    appendLine("✅ Condition: ${item.conditionName}")
+                }
+                appendLine()
+                appendLine("Check it out on SkoolSwap app!")
+            }
+
             val shareIntent = android.content.Intent().apply {
                 action = android.content.Intent.ACTION_SEND
-                putExtra(android.content.Intent.EXTRA_TEXT, "${item.name}\nR${item.price}\nCheck it out!")
+                putExtra(android.content.Intent.EXTRA_TEXT, shareText)
                 type = "text/plain"
             }
-            startActivity(android.content.Intent.createChooser(shareIntent, "Share item"))
-            Log.d(TAG, "Share intent launched")
-        } else {
-            Log.w(TAG, "Cannot share - no item loaded")
+            startActivity(android.content.Intent.createChooser(shareIntent, "Share via"))
         }
     }
 
-    private fun toggleFavorite() {
-        Log.d(TAG, "toggleFavorite called (TODO)")
-        // TODO: Implement favorite functionality
-    }
+    // REMOVED the empty toggleFavorite() method since we're using viewModel.toggleFavorite()
 
     private fun contactSeller() {
         Log.d(TAG, "contactSeller called")

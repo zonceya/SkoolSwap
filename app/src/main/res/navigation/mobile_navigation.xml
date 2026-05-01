@@ -70,7 +70,19 @@
         <action
             android:id="@+id/action_homeFragment_to_recentFragment"
             app:destination="@id/recentFragment" />
+
+        <!-- Add action to navigate to favorites from home -->
+        <action
+            android:id="@+id/action_nav_home_to_nav_favorites"
+            app:destination="@id/nav_favorites" />
     </fragment>
+
+    <!-- Favorite Fragment - ADD THIS -->
+    <fragment
+        android:id="@+id/nav_favorites"
+        android:name="com.example.skoolswap.ui.favorites.FavoritesFragment"
+        android:label="Favorites"
+        tools:layout="@layout/fragment_favorites" />
 
     <!-- Drawer Menu Fragments -->
     <fragment

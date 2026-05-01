@@ -28,7 +28,8 @@ import java.io.File
         GenderEntity::class,
         TagEntity::class,
         LocationEntity::class,
-        ItemImageEntity::class,  // This should now resolve
+        ItemImageEntity::class,
+        FavoriteEntity::class,
         UserSchoolEntity::class
     ],
     version = 9,
@@ -54,6 +55,7 @@ abstract class SkoolSwapDatabase : RoomDatabase() {
     abstract fun tagDao(): TagDao
     abstract fun locationDao(): LocationDao
     abstract fun userSchoolDao(): UserSchoolDao
+    abstract fun favoriteDao(): FavoriteDao
 
     companion object {
         @Volatile

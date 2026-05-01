@@ -426,23 +426,37 @@ class ItemRepository @Inject constructor(
         // 1. Check memory cache first (fastest)
         memoryCache[itemId]?.let { cachedItem ->
             val cacheAge = System.currentTimeMillis() - (memoryCacheTime[itemId] ?: 0)
-            if (cacheAge < CACHE_DURATION_MS) {
+            if (cacheAge < CACHE_DURATION_MS && cachedItem.images.isNotEmpty()) {
                 Log.d(TAG, "✅ Using MEMORY cache (age: ${cacheAge}ms)")
                 Log.d(TAG, "   - Images: ${cachedItem.images.size}")
                 return Result.success(cachedItem)
             } else {
-                Log.d(TAG, "⚠️ Memory cache expired")
+                Log.d(TAG, "⚠️ Memory cache expired or has no images")
                 memoryCache.remove(itemId)
                 memoryCacheTime.remove(itemId)
             }
         }
 
-        // 2. Check database cache (without ItemWithImages)
+        // 2. Check database cache with images
         try {
             val dbItem = itemDao.getItemById(itemId)
             if (dbItem != null) {
                 Log.d(TAG, "💾 Using database cache")
-                // Convert Entity to Domain (you'll need images from somewhere else)
+
+                // Load images from database
+                val images = itemImageDao.getImagesForItem(itemId).map { imageEntity ->
+                    ItemImage(
+                        id = imageEntity.id,
+                        url = imageEntity.url,
+                        filename = null,
+                        contentType = null,
+                        createdAt = null,
+                        isCover = imageEntity.isCover
+                    )
+                }
+
+                Log.d(TAG, "   - Loaded ${images.size} images from database")
+
                 val domainItem = Item(
                     id = dbItem.id,
                     shopId = dbItem.shopId,
@@ -462,8 +476,8 @@ class ItemRepository @Inject constructor(
                     conditionName = dbItem.conditionName,
                     createdAt = dbItem.createdAt,
                     updatedAt = dbItem.updatedAt,
-                    images = emptyList(), // You'll need to load images separately
-                    coverImage = null,
+                    images = images,  // Now with actual images!
+                    coverImage = images.firstOrNull { it.isCover }?.url ?: images.firstOrNull()?.url,
                     shop = null,
                     provinceId = dbItem.provinceId,
                     locationId = dbItem.locationId,
@@ -506,12 +520,8 @@ class ItemRepository @Inject constructor(
                 Log.d(TAG, "   - Name: ${item.name}")
                 Log.d(TAG, "   - Images: ${item.images.size}")
 
-                // Save to database (without images for now)
-                try {
-                    itemDao.insertItem(item.toEntity())
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to save to database: ${e.message}")
-                }
+                // Save to database WITH images
+                saveToDatabaseWithImages(item)
 
                 // Update memory cache
                 memoryCache[itemId] = item
@@ -528,6 +538,44 @@ class ItemRepository @Inject constructor(
         }
     }
 
+    // Add this method to ItemRepositoryInterface and implementation
+    override suspend fun getItemWithRefresh(itemId: String): Result<Item> {
+        Log.d(TAG, "getItemWithRefresh called for ID: $itemId")
+
+        // Clear cache for this item
+        memoryCache.remove(itemId)
+        memoryCacheTime.remove(itemId)
+
+        // Force network fetch
+        return try {
+            val response = itemApiService.getItem(itemId)
+
+            if (!response.isSuccessful) {
+                return Result.failure(Exception("Server error: ${response.code()}"))
+            }
+
+            val itemResponse = response.body()
+            if (itemResponse?.success == true && itemResponse.item != null) {
+                val item = mapItemDetailToDomain(itemResponse.item)
+
+                Log.d(TAG, "✅ Force refresh: ${item.name}, Images: ${item.images.size}")
+
+                // Save to database WITH images
+                saveToDatabaseWithImages(item)
+
+                // Update memory cache
+                memoryCache[itemId] = item
+                memoryCacheTime[itemId] = System.currentTimeMillis()
+
+                Result.success(item)
+            } else {
+                Result.failure(Exception("Item not found"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Force refresh failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
     // Extension function to convert Domain Item to ItemEntity
     fun Item.toEntity(): ItemEntity {
         return ItemEntity(

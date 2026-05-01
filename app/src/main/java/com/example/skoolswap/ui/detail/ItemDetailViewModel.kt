@@ -8,6 +8,7 @@ import com.example.skoolswap.data.local.database.dao.ColorDao
 import com.example.skoolswap.data.local.database.dao.SchoolDao
 import com.example.skoolswap.data.local.database.dao.SizeDao
 import com.example.skoolswap.domain.model.Item
+import com.example.skoolswap.domain.repository.FavoriteRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.domain.repository.ProductsRepositoryInterface
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,6 +24,7 @@ class ItemDetailViewModel @Inject constructor(
     private val itemRepository: ItemRepositoryInterface,
     private val productsRepository: ProductsRepositoryInterface,
     private val sizeDao: SizeDao,
+    private val favoriteRepository: FavoriteRepositoryInterface,
     private val schoolDao: SchoolDao,
     private val colorDao: ColorDao,
     private val brandDao: BrandDao
@@ -50,7 +52,8 @@ class ItemDetailViewModel @Inject constructor(
     // Add this with your other private val declarations (around line 30)
     private val _imageUrls = MutableStateFlow<List<String>>(emptyList())
     val imageUrls: StateFlow<List<String>> = _imageUrls.asStateFlow()
-    // Add this to your ViewModel
+    private val _isFavorite = MutableStateFlow(false)
+    val isFavorite: StateFlow<Boolean> = _isFavorite.asStateFlow()
 
 
     fun loadItem(itemId: String, source: String) {
@@ -59,11 +62,27 @@ class ItemDetailViewModel @Inject constructor(
 
             // Always show loading when reopening (prevents stale empty data)
             _itemState.value = ItemDetailState.Loading
-
+            checkFavoriteStatus(itemId)
             trackView(itemId, source)
-
-            // Fetch fresh data — don't rely on cache for UI on second open
             fetchItem(itemId)
+
+        }
+    }
+    private suspend fun checkFavoriteStatus(itemId: String) {
+        _isFavorite.value = favoriteRepository.isFavorite(itemId)
+        Log.d("ItemDetailVM", "Favorite status for $itemId: ${_isFavorite.value}")
+    }
+    fun toggleFavorite() {
+        viewModelScope.launch {
+            currentItemId?.let { itemId ->
+                val newStatus = favoriteRepository.toggleFavorite(itemId)
+                _isFavorite.value = newStatus
+                Log.d("ItemDetailVM", "Toggled favorite for $itemId: $newStatus")
+
+                // Show feedback
+                val message = if (newStatus) "Added to favorites" else "Removed from favorites"
+                // You can show a snackbar or toast here
+            }
         }
     }
     private suspend fun fetchItem(itemId: String) {

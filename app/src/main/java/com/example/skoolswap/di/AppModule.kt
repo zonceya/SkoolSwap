@@ -1,12 +1,11 @@
-// di/AppModule.kt
 package com.example.skoolswap.di
-
 
 import android.content.Context
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.credentials.CredentialManager
 import com.example.skoolswap.data.local.database.SkoolSwapDatabase
+import com.example.skoolswap.data.local.database.dao.FavoriteDao
 import com.example.skoolswap.data.local.database.dao.ItemDao
 import com.example.skoolswap.data.local.database.dao.ItemImageDao
 import com.example.skoolswap.data.local.database.dao.ProvinceDao
@@ -26,6 +25,7 @@ import com.example.skoolswap.data.remote.api.ShopApiService
 import com.example.skoolswap.data.remote.api.UserApiService
 import com.example.skoolswap.data.remote.api.UserSchoolApiService
 import com.example.skoolswap.data.repository.AuthRepository
+import com.example.skoolswap.data.repository.FavoriteRepository
 import com.example.skoolswap.data.repository.FilterRepository
 import com.example.skoolswap.data.repository.HomeRepository
 import com.example.skoolswap.data.repository.ItemRepository
@@ -33,13 +33,14 @@ import com.example.skoolswap.data.repository.SchoolRepository
 import com.example.skoolswap.data.repository.ShopRepository
 import com.example.skoolswap.data.repository.UserSchoolRepository
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
+import com.example.skoolswap.domain.repository.FavoriteRepositoryInterface
 import com.example.skoolswap.domain.repository.FilterRepositoryInterface
 import com.example.skoolswap.domain.repository.HomeRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.domain.repository.ShopRepositoryInterface
-
 import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.Gson
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -89,20 +90,40 @@ object AppModule {
         return database.shopDao()
     }
 
+    @Provides
+    @Singleton
+    fun provideFavoriteDao(database: SkoolSwapDatabase): FavoriteDao {
+        return database.favoriteDao()
+    }
+
+ /*   @Provides
+    @Singleton
+    fun provideItemDao(database: SkoolSwapDatabase): ItemDao {
+        return database.itemDao()
+    }*/
+
+//    @Provides
+//    @Singleton
+//    fun provideItemImageDao(database: SkoolSwapDatabase): ItemImageDao {
+//        return database.itemImageDao()
+//    }
+
     // ========== API SERVICES ==========
     @Provides
     @Singleton
     fun provideUserApiService(retrofit: Retrofit): UserApiService {
         return retrofit.create(UserApiService::class.java)
     }
+
     @Provides
     @Singleton
     fun provideShopApiService(retrofit: Retrofit): ShopApiService {
         return retrofit.create(ShopApiService::class.java)
     }
+
     @Provides
     @Singleton
-    fun provideItemApiService(retrofit: Retrofit): ItemApiService {  // ← Inject Retrofit
+    fun provideItemApiService(retrofit: Retrofit): ItemApiService {
         return retrofit.create(ItemApiService::class.java)
     }
 
@@ -150,8 +171,6 @@ object AppModule {
     @Singleton
     fun provideAppPreferences(@ApplicationContext context: Context): AppPreferences =
         AppPreferences(context)
-
-    // REMOVED: Gson provider (already in NetworkModule)
 
     // ========== REPOSITORY PROVIDERS ==========
     @Provides
@@ -239,13 +258,21 @@ object AppModule {
         filterApiService: FilterApiService,
         authRepository: AuthRepositoryInterface,
         appPreferences: AppPreferences,
-        gson: Gson  // This Gson comes from NetworkModule
+        gson: Gson
     ): FilterRepositoryInterface {
         return FilterRepository(
             api = filterApiService,
             authRepository = authRepository,
             appPreferences = appPreferences
-
         )
+    }
+
+    // FIXED: @Binds method must be ABSTRACT and have NO BODY
+    @Provides
+    @Singleton
+    fun provideFavoriteRepository(
+        favoriteRepository: FavoriteRepository
+    ): FavoriteRepositoryInterface {
+        return favoriteRepository
     }
 }
