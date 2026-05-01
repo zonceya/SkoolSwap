@@ -1,12 +1,14 @@
 // di/ItemModule.kt - REMOVE ProvinceDao
 package com.example.skoolswap.di
 
+
 import com.example.skoolswap.data.local.database.SkoolSwapDatabase
 import com.example.skoolswap.data.local.database.dao.BrandDao
 import com.example.skoolswap.data.local.database.dao.ColorDao
 import com.example.skoolswap.data.local.database.dao.ConditionDao
 import com.example.skoolswap.data.local.database.dao.GenderDao
 import com.example.skoolswap.data.local.database.dao.ItemDao
+import com.example.skoolswap.data.local.database.dao.ItemImageDao
 import com.example.skoolswap.data.local.database.dao.ItemTypeDao
 import com.example.skoolswap.data.local.database.dao.LocationDao
 import com.example.skoolswap.data.local.database.dao.MainCategoryDao
@@ -74,6 +76,9 @@ object ItemModule {
     @Provides
     @Singleton
     fun provideLocationDao(database: SkoolSwapDatabase): LocationDao = database.locationDao()
+    @Provides
+    @Singleton
+    fun provideItemImageDao(database: SkoolSwapDatabase): ItemImageDao = database.itemImageDao()
 
     @Provides
     @Singleton

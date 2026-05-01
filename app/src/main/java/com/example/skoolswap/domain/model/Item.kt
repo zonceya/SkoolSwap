@@ -23,6 +23,7 @@ data class Item(
     val meta: ItemMeta? = null,
     val label: String? = null,
     val reserved: Int = 0,
+    val updatedAt: String? = null,
     val createdAt: String,
     val shop: Shop? = null,
     val images: List<ItemImage> = emptyList(), // For backward compatibility

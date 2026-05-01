@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -36,7 +37,7 @@ class ItemDetailViewModel @Inject constructor(
 
     private val _sizeName = MutableStateFlow<String?>(null)
     val sizeName: StateFlow<String?> = _sizeName.asStateFlow()
-
+    private var cachedItem: Item? = null
     private val _schoolName = MutableStateFlow<String?>(null)
     val schoolName: StateFlow<String?> = _schoolName.asStateFlow()
     private val _colorName = MutableStateFlow<String?>(null)
@@ -45,50 +46,61 @@ class ItemDetailViewModel @Inject constructor(
     val brandName: StateFlow<String?> = _brandName.asStateFlow()
     private val _conditionName = MutableStateFlow<String?>(null)
     val conditionName: StateFlow<String?> = _conditionName.asStateFlow()
+    private var currentItemId: String? = null
+    // Add this with your other private val declarations (around line 30)
+    private val _imageUrls = MutableStateFlow<List<String>>(emptyList())
+    val imageUrls: StateFlow<List<String>> = _imageUrls.asStateFlow()
+    // Add this to your ViewModel
+
+
     fun loadItem(itemId: String, source: String) {
         viewModelScope.launch {
+            currentItemId = itemId
+
+            // Always show loading when reopening (prevents stale empty data)
             _itemState.value = ItemDetailState.Loading
+
             trackView(itemId, source)
 
-            val result = itemRepository.getItem(itemId)
+            // Fetch fresh data — don't rely on cache for UI on second open
+            fetchItem(itemId)
+        }
+    }
+    private suspend fun fetchItem(itemId: String) {
+        val result = itemRepository.getItem(itemId)
 
-            // ADD THESE LOGS
-            android.util.Log.d("ItemDetailVM", "Result isSuccess: ${result.isSuccess}")
-
-            if (result.isSuccess) {
-                val item = result.getOrNull()
-                android.util.Log.d("ItemDetailVM", "Item name: ${item?.name}")
-                android.util.Log.d("ItemDetailVM", "Item price: ${item?.price}")
-                android.util.Log.d("ItemDetailVM", "Item brandId: ${item?.brandId}")
-                android.util.Log.d("ItemDetailVM", "Item colorId: ${item?.colorId}")
-                android.util.Log.d("ItemDetailVM", "Item schoolId: ${item?.schoolId}")
-
-                if (item != null) {
-                    _itemState.value = ItemDetailState.Success(item)
-                    loadReferenceData(item)
-                    loadSimilarItems(item)
-                } else {
-                    _itemState.value = ItemDetailState.Error("Item data is null")
-                }
+        if (result.isSuccess) {
+            val item = result.getOrNull()
+            if (item != null) {
+                cachedItem = item
+                _itemState.value = ItemDetailState.Success(item)
+                loadReferenceData(item)
+                loadSimilarItems(item)
             } else {
-                val exception = result.exceptionOrNull()
-                android.util.Log.e("ItemDetailVM", "Error: ${exception?.message}")
-                _itemState.value = ItemDetailState.Error(exception?.message ?: "Failed to load item")
+                _itemState.value = ItemDetailState.Error("Item data is null")
             }
+        } else {
+            _itemState.value = ItemDetailState.Error(
+                "Unable to load item. Please check your internet connection."
+            )
         }
     }
 
     private suspend fun loadReferenceData(item: Item) {
-        android.util.Log.d("ItemDetailVM", "Images count: ${item.images.size}")
+        Timber.tag("ItemDetailVM").d("Images count: ${item.images.size}")
         item.images.forEachIndexed { index, image ->
-            android.util.Log.d("ItemDetailVM", "Image $index: ${image.url}")
+            Timber.tag("ItemDetailVM").d("Image $index: ${image.url}")
         }
-        Log.d("ItemDetailVM", "=== IMAGES DEBUG ===")
-        Log.d("ItemDetailVM", "Images count: ${item.images.size}")
+        Timber.tag("ItemDetailVM").d("=== IMAGES DEBUG ===")
+        Timber.tag("ItemDetailVM").d("Images count: ${item.images.size}")
         item.images.forEachIndexed { index, image ->
-            Log.d("ItemDetailVM", "Image $index: ${image.url}")
+            Timber.tag("ItemDetailVM").d("Image $index: ${image.url}")
         }
-        Log.d("ItemDetailVM", "==================")
+        Timber.tag("ItemDetailVM").d("==================")
+
+        // ADD THIS LINE - Extract image URLs
+        _imageUrls.value = item.images.map { it.url }
+
         _sizeName.value = item.sizeName
         _colorName.value = item.colorName
         _brandName.value = item.brandName
@@ -99,7 +111,6 @@ class ItemDetailViewModel @Inject constructor(
             val school = schoolDao.getById(schoolId)
             _schoolName.value = school?.name
         }
-
     }
 
     private suspend fun loadSimilarItems(currentItem: Item) {
@@ -128,10 +139,49 @@ class ItemDetailViewModel @Inject constructor(
             productsRepository.trackClick(itemId, source, 0)
         }
     }
-
+    fun getImageUrls(): List<String> {
+        val urls = _imageUrls.value
+        Timber.tag("ItemDetailVM").d("getImageUrls returning ${urls.size} URLs")
+        return urls
+    }
+    // Add this function to your ItemDetailViewModel
+    fun clearState() {
+        _itemState.value = ItemDetailState.Loading
+        _similarItems.value = emptyList()
+        _sizeName.value = null
+        _schoolName.value = null
+        _colorName.value = null
+        _brandName.value = null
+        _conditionName.value = null
+        Timber.tag("ItemDetailVM").d("State cleared - ready for fresh load")
+    }
     sealed class ItemDetailState {
         object Loading : ItemDetailState()
         data class Success(val item: Item) : ItemDetailState()
         data class Error(val message: String) : ItemDetailState()
+    }
+    private fun refreshItemInBackground(itemId: String) {
+        viewModelScope.launch {
+            try {
+                val result = itemRepository.getItem(itemId)
+                if (result.isSuccess) {
+                    val freshItem = result.getOrNull() ?: return@launch
+
+                    // Only update UI if something actually changed
+                    if (freshItem.updatedAt != cachedItem?.updatedAt) {
+                        Timber.tag("ItemDetailVM").d("Item changed, updating UI")
+                        cachedItem = freshItem
+                        _itemState.value = ItemDetailState.Success(freshItem)
+                        loadReferenceData(freshItem)
+                        loadSimilarItems(freshItem)
+                    } else {
+                        Timber.tag("ItemDetailVM").d("Item unchanged, keeping cache")
+                    }
+                }
+            } catch (e: Exception) {
+                Timber.tag("ItemDetailVM").e("Background refresh failed: ${e.message}")
+            }
+        }
+
     }
 }

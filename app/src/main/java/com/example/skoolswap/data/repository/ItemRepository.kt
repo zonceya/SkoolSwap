@@ -1,9 +1,12 @@
 package com.example.skoolswap.data.repository
 
+import com.example.skoolswap.data.local.database.dao.ItemImageDao
+import com.example.skoolswap.data.local.database.entities.ItemImageEntity
 import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.example.skoolswap.data.local.database.dao.ItemDao
+import com.example.skoolswap.data.local.database.entities.ItemEntity
 import com.example.skoolswap.data.mapper.toDomain
 import com.example.skoolswap.data.mapper.toEntity
 import com.example.skoolswap.data.remote.api.ItemApiService
@@ -22,6 +25,7 @@ import com.example.skoolswap.domain.model.Shop
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.utils.ImageMultipartHelper
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,12 +37,14 @@ import javax.inject.Singleton
 class ItemRepository @Inject constructor(
     private val itemApiService: ItemApiService,
     private val itemDao: ItemDao,
+    private val itemImageDao: ItemImageDao,
     private val authRepository: AuthRepositoryInterface
 ) : ItemRepositoryInterface {
 
     companion object {
         private const val TAG = "ItemRepository"
         private const val MAX_IMAGES = 3
+        private const val CACHE_DURATION_MS = 5 * 60 * 1000 // 5 minutes cache
     }
 
     private val _recentlyCreatedItem = MutableStateFlow<Item?>(null)
@@ -46,7 +52,8 @@ class ItemRepository @Inject constructor(
 
     private val _currentItems = MutableStateFlow<List<Item>>(emptyList())
     override val currentItems: StateFlow<List<Item>> = _currentItems.asStateFlow()
-
+    private val memoryCache = mutableMapOf<String, Item>()
+    private val memoryCacheTime = mutableMapOf<String, Long>()
     // ============ CREATE ITEM WITHOUT IMAGES ============
     override suspend fun createItemSimple(
         name: String,
@@ -265,7 +272,17 @@ class ItemRepository @Inject constructor(
 
             val body = response.body()
             if (body?.success == true) {
-                val images = body.images?.map { it.toDomain() } ?: emptyList()
+                // Fix: Map to ItemImage, not Item
+                val images = body.images?.map { imageDto ->
+                    ItemImage(
+                        id = imageDto.id,
+                        url = imageDto.url,
+                        filename = imageDto.filename,
+                        contentType = imageDto.contentType,
+                        createdAt = imageDto.createdAt,
+                        isCover = false
+                    )
+                } ?: emptyList()
                 Timber.tag(TAG).i("Added ${images.size} images to item $itemId")
                 Result.success(images)
             } else {
@@ -404,34 +421,146 @@ class ItemRepository @Inject constructor(
 
     // ============ GET SINGLE ITEM ============
     override suspend fun getItem(itemId: String): Result<Item> {
-        return try {
-            val cachedItem = itemDao.getItemById(itemId)
-            if (cachedItem != null) {
-                Timber.tag(TAG).d("Returning cached item: $itemId")
-                return Result.success(cachedItem.toDomain())
-            }
+        Log.d(TAG, "getItem called for ID: $itemId")
 
+        // 1. Check memory cache first (fastest)
+        memoryCache[itemId]?.let { cachedItem ->
+            val cacheAge = System.currentTimeMillis() - (memoryCacheTime[itemId] ?: 0)
+            if (cacheAge < CACHE_DURATION_MS) {
+                Log.d(TAG, "✅ Using MEMORY cache (age: ${cacheAge}ms)")
+                Log.d(TAG, "   - Images: ${cachedItem.images.size}")
+                return Result.success(cachedItem)
+            } else {
+                Log.d(TAG, "⚠️ Memory cache expired")
+                memoryCache.remove(itemId)
+                memoryCacheTime.remove(itemId)
+            }
+        }
+
+        // 2. Check database cache (without ItemWithImages)
+        try {
+            val dbItem = itemDao.getItemById(itemId)
+            if (dbItem != null) {
+                Log.d(TAG, "💾 Using database cache")
+                // Convert Entity to Domain (you'll need images from somewhere else)
+                val domainItem = Item(
+                    id = dbItem.id,
+                    shopId = dbItem.shopId,
+                    name = dbItem.name,
+                    description = dbItem.description,
+                    price = dbItem.price,
+                    quantity = dbItem.quantity,
+                    status = dbItem.status,
+                    brandId = dbItem.brandId,
+                    sizeId = dbItem.sizeId,
+                    schoolId = dbItem.schoolId,
+                    itemConditionId = dbItem.itemConditionId,
+                    genderId = dbItem.genderId,
+                    sizeName = dbItem.sizeName,
+                    colorName = dbItem.colorName,
+                    brandName = dbItem.brandName,
+                    conditionName = dbItem.conditionName,
+                    createdAt = dbItem.createdAt,
+                    updatedAt = dbItem.updatedAt,
+                    images = emptyList(), // You'll need to load images separately
+                    coverImage = null,
+                    shop = null,
+                    provinceId = dbItem.provinceId,
+                    locationId = dbItem.locationId,
+                    label = dbItem.label,
+                    reserved = dbItem.reserved,
+                    meta = null,
+                    itemTypeId = dbItem.itemTypeId
+                )
+
+                // Update memory cache
+                memoryCache[itemId] = domainItem
+                memoryCacheTime[itemId] = System.currentTimeMillis()
+
+                return Result.success(domainItem)
+            } else {
+                Log.d(TAG, "💾 No database cache found")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Database error: ${e.message}", e)
+        }
+
+        // 3. Fetch from network (slowest but most reliable)
+        Log.d(TAG, "🌐 Fetching from NETWORK...")
+        val startTime = System.currentTimeMillis()
+
+        return try {
             val response = itemApiService.getItem(itemId)
+            val duration = System.currentTimeMillis() - startTime
 
             if (!response.isSuccessful) {
+                Log.e(TAG, "Network error: ${response.code()}")
                 return Result.failure(Exception("Server error: ${response.code()}"))
             }
 
             val itemResponse = response.body()
             if (itemResponse?.success == true && itemResponse.item != null) {
                 val item = mapItemDetailToDomain(itemResponse.item)
-                itemDao.insertItem(item.toEntity())
-                Timber.tag(TAG).i("Fetched item from API: ${item.name} with ${item.images.size} images")
+
+                Log.d(TAG, "✅ Network fetch successful (${duration}ms):")
+                Log.d(TAG, "   - Name: ${item.name}")
+                Log.d(TAG, "   - Images: ${item.images.size}")
+
+                // Save to database (without images for now)
+                try {
+                    itemDao.insertItem(item.toEntity())
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to save to database: ${e.message}")
+                }
+
+                // Update memory cache
+                memoryCache[itemId] = item
+                memoryCacheTime[itemId] = System.currentTimeMillis()
+
                 Result.success(item)
             } else {
+                Log.e(TAG, "Item not found in response")
                 Result.failure(Exception("Item not found"))
             }
         } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "Get item failed")
+            Log.e(TAG, "Network exception: ${e.message}", e)
             Result.failure(e)
         }
     }
 
+    // Extension function to convert Domain Item to ItemEntity
+    fun Item.toEntity(): ItemEntity {
+        return ItemEntity(
+            id = id,
+            shopId = shopId,
+            name = name,
+            description = description,
+            price = price,
+            quantity = quantity,
+            status = status,
+            itemTypeId = null, // Add if you have this in your Item domain model
+            brandId = brandId,
+            sizeId = sizeId,
+            schoolId = schoolId,
+            sizeName = sizeName,
+            colorName = colorName,
+            brandName = brandName,
+            conditionName = conditionName,
+            itemConditionId = itemConditionId,
+            locationId = null, // Add if you have this in your Item domain model
+            provinceId = provinceId,
+            genderId = genderId,
+            metaColor = null, // Add if you have this in your Item domain model
+            metaSize = null, // Add if you have this in your Item domain model
+            label = null, // Add if you have this in your Item domain model
+            reserved = 0, // Add if you have this in your Item domain model
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+            deleted = false,
+            imageCount = images.size,
+            lastCacheTime = System.currentTimeMillis()
+        )
+    }
     private fun mapItemDetailToDomain(dto: ItemDetailDto): Item {
         val imageList = mutableListOf<ItemImage>()
 
@@ -587,13 +716,13 @@ class ItemRepository @Inject constructor(
                 val entities = items.map { it.toEntity() }
                 itemDao.insertItems(entities)
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to cache items", e)
+                Timber.tag(TAG).w(e, "Failed to cache items")
             }
 
-            Log.i(TAG, "Fetched ${items.size} shop items")
+            Timber.tag(TAG).i("Fetched ${items.size} shop items")
             Result.success(items)
         } catch (e: Exception) {
-            Log.e(TAG, "Get my shop items failed", e)
+            Timber.tag(TAG).e(e, "Get my shop items failed")
             Result.failure(e)
         }
     }
@@ -602,7 +731,7 @@ class ItemRepository @Inject constructor(
         return try {
             val cachedItems = itemDao.getItemsByShopId(shopId)
             if (cachedItems.isNotEmpty()) {
-                Log.d(TAG, "Returning ${cachedItems.size} cached items for shop $shopId")
+                Timber.tag(TAG).d("Returning ${cachedItems.size} cached items for shop $shopId")
                 return Result.success(cachedItems.map { it.toDomain() })
             }
 
@@ -653,6 +782,30 @@ class ItemRepository @Inject constructor(
             Log.i(TAG, "Cleared all cached items")
         } catch (e: Exception) {
             Log.e(TAG, "Clear items failed", e)
+        }
+    }
+    private suspend fun saveToDatabaseWithImages(item: Item) {
+        try {
+            Log.d(TAG, "💾 Saving item to database with ${item.images.size} images")
+
+            // Save the item entity
+            itemDao.insertItem(item.toEntity())
+
+            // Save all images as separate entities
+            val imageEntities = item.images.mapIndexed { index, image ->
+                ItemImageEntity(
+                    itemId = item.id,
+                    url = image.url,
+                    isCover = index == 0,
+                    position = index
+                )
+            }
+
+            itemImageDao.updateImagesForItem(item.id, imageEntities)
+
+            Log.d(TAG, "✅ Successfully saved item and ${imageEntities.size} images to database")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save to database: ${e.message}", e)
         }
     }
 

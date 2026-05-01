@@ -96,6 +96,7 @@ dependencies {
     implementation(libs.glide)
     implementation(libs.androidx.viewpager2)
     implementation(libs.facebook.shimmer)
+    implementation(libs.subsampling.scale.image.view)
 
     // Networking
     implementation(libs.retrofit)
@@ -105,6 +106,7 @@ dependencies {
     // Database
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.firebase.crashlytics.buildtools)
     kapt(libs.room.compiler)
     implementation(libs.kotlinx.datetime)
     implementation(libs.play.services.cast.framework)

@@ -1,5 +1,6 @@
 package com.example.skoolswap.ui.detail.adapter
 
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
@@ -13,8 +14,16 @@ class SimilarItemsAdapter(
 ) : RecyclerView.Adapter<SimilarItemsAdapter.ViewHolder>() {
 
     private var items: List<Item> = emptyList()
+    private val TAG = "SimilarItemsAdapter"
 
     fun submitList(newItems: List<Item>) {
+        Log.d(TAG, "submitList called with ${newItems.size} items")
+        newItems.forEachIndexed { index, item ->
+            Log.d(TAG, "Item $index: ${item.name}, images: ${item.images.size}")
+            if (item.images.isNotEmpty()) {
+                Log.d(TAG, "  First image URL: ${item.images.first().url}")
+            }
+        }
         items = newItems
         notifyDataSetChanged()
     }
@@ -49,13 +58,22 @@ class SimilarItemsAdapter(
             binding.productTitle.text = item.name
             binding.productPrice.text = "R${String.format("%.2f", item.price)}"
 
+            Log.d(TAG, "Binding item: ${item.name}, images count: ${item.images.size}")
+
             if (item.images.isNotEmpty()) {
+                val imageUrl = item.images.first().url
+                Log.d(TAG, "Loading image: $imageUrl")
+
                 Glide.with(binding.root.context)
-                    .load(item.images.first().url)
+                    .load(imageUrl)
                     .placeholder(R.drawable.ic_create_item_placeholder)
                     .error(R.drawable.ic_create_item_placeholder)
                     .centerCrop()
                     .into(binding.productImage)
+            } else {
+                Log.w(TAG, "No images for item: ${item.name}")
+                // Set placeholder when no images
+                binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
             }
         }
     }

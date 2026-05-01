@@ -62,7 +62,8 @@ data class ItemDto(
 
     @SerializedName("created_at")
     val createdAt: String,
-
+    @SerializedName("updated_at")
+    val updatedAt: String?,
     // ===== ADD ALL THESE MISSING FIELDS =====
     @SerializedName("brand")
     val brand: BrandDto?,

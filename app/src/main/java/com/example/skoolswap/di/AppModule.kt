@@ -1,12 +1,14 @@
 // di/AppModule.kt
 package com.example.skoolswap.di
 
+
 import android.content.Context
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.credentials.CredentialManager
 import com.example.skoolswap.data.local.database.SkoolSwapDatabase
 import com.example.skoolswap.data.local.database.dao.ItemDao
+import com.example.skoolswap.data.local.database.dao.ItemImageDao
 import com.example.skoolswap.data.local.database.dao.ProvinceDao
 import com.example.skoolswap.data.local.database.dao.SchoolDao
 import com.example.skoolswap.data.local.database.dao.ShopDao
@@ -35,7 +37,7 @@ import com.example.skoolswap.domain.repository.FilterRepositoryInterface
 import com.example.skoolswap.domain.repository.HomeRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.domain.repository.ShopRepositoryInterface
-import com.example.skoolswap.domain.repository.UserSchoolRepositoryInterface
+
 import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.Gson
 import dagger.Module
@@ -208,11 +210,13 @@ object AppModule {
     fun provideItemRepository(
         itemApiService: ItemApiService,
         itemDao: ItemDao,
+        itemImageDao: ItemImageDao,
         authRepository: AuthRepositoryInterface
     ): ItemRepositoryInterface {
         return ItemRepository(
             itemApiService = itemApiService,
             itemDao = itemDao,
+            itemImageDao = itemImageDao,
             authRepository = authRepository
         )
     }

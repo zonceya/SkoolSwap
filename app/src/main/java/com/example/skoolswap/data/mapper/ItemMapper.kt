@@ -10,6 +10,8 @@ import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.ItemImage
 import com.example.skoolswap.domain.model.ItemMeta
 import com.example.skoolswap.domain.model.Shop
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 
 // ============ ITEM DTO TO DOMAIN ============
 fun ItemDto.toDomain(): Item {
@@ -23,6 +25,7 @@ fun ItemDto.toDomain(): Item {
         status = status,
         meta = meta?.toDomain(),
         createdAt = createdAt,
+        updatedAt = updatedAt,
         shop = shop?.toDomain(),
         images = emptyList()
     )
@@ -35,7 +38,8 @@ fun ItemImageDto.toDomain(): ItemImage {
         url = url,
         filename = filename,
         contentType = contentType,
-        createdAt = createdAt
+        createdAt = createdAt,
+        isCover = false
     )
 }
 
@@ -46,7 +50,8 @@ fun ShopItemImageDto.toDomain(): ItemImage {
         url = url,
         filename = filename,
         contentType = contentType,
-        createdAt = createdAt
+        createdAt = createdAt,
+        isCover = false
     )
 }
 
@@ -54,7 +59,8 @@ fun ShopItemImageDto.toDomain(): ItemImage {
 fun PublicShopItemImageDto.toDomain(): ItemImage {
     return ItemImage(
         id = id,
-        url = url
+        url = url,
+        isCover = false
     )
 }
 
@@ -147,7 +153,7 @@ fun CreateItemResponse.toDomain(): Item {
         meta = itemData?.meta?.toDomain(),
         createdAt = itemData?.createdAt ?: "",
         shop = itemData?.shop?.toDomain(),
-        images = finalImages,  // ← List<ItemImage>
+        images = finalImages,
         coverImage = coverPhotoUrl,
         brandId = itemData?.brand?.id,
         sizeId = itemData?.size?.id,
@@ -163,7 +169,11 @@ fun CreateItemResponse.toDomain(): Item {
             it.quantity - (it.availableQuantity ?: it.quantity)
         } ?: 0,
         label = itemData?.label,
-        itemTypeId = null
+        itemTypeId = null,
+        sizeName = itemData?.size?.name,
+        colorName = itemData?.color?.name,
+        brandName = itemData?.brand?.name,
+        conditionName = itemData?.condition?.name
     )
 }
 
@@ -237,8 +247,24 @@ fun ShopItemDto.toDomain(shopId: Long): Item {
     )
 }
 
-// ============ DOMAIN TO ENTITY ============
+// ============ DOMAIN TO ENTITY (WITH IMAGES JSON) ============
 fun Item.toEntity(): ItemEntity {
+    // Convert images to JSON string
+    val imagesJson = if (images.isNotEmpty()) {
+        val imagesData = images.map { image ->
+            mapOf(
+                "url" to image.url,
+                "isCover" to image.isCover
+            )
+        }
+        Gson().toJson(imagesData)
+    } else {
+        "[]"
+    }
+
+    // Get cover image URL
+    val coverImageUrl = coverImage ?: images.firstOrNull { it.isCover }?.url ?: images.firstOrNull()?.url
+
     return ItemEntity(
         id = id,
         shopId = shopId,
@@ -247,25 +273,78 @@ fun Item.toEntity(): ItemEntity {
         price = price,
         quantity = quantity,
         status = status,
-        itemTypeId = null,
-        brandId = null,
-        sizeId = null,
-        schoolId = null,
-        itemConditionId = null,
-        locationId = null,
-        provinceId = null,
-        genderId = null,
+        itemTypeId = itemTypeId,
+        brandId = brandId,
+        sizeId = sizeId,
+        schoolId = schoolId,
+        itemConditionId = itemConditionId,
+        locationId = locationId,
+        provinceId = provinceId,
+        genderId = genderId,
         metaColor = meta?.color,
         metaSize = meta?.size,
-        label = null,
-        reserved = 0,
+        label = label,
+        reserved = reserved,
         createdAt = createdAt,
-        imageCount = images.size
+        updatedAt = updatedAt,
+        deleted = false,
+        imageCount = images.size,
+        lastCacheTime = System.currentTimeMillis(),
+        sizeName = sizeName,
+        colorName = colorName,
+        brandName = brandName,
+        conditionName = conditionName,
+        imagesJson = imagesJson,
+        coverImage = coverImageUrl
     )
 }
 
-// ============ ENTITY TO DOMAIN ============
+// ============ ENTITY TO DOMAIN (WITH IMAGES FROM JSON) ============
 fun ItemEntity.toDomain(): Item {
+    // Parse images from JSON
+    val imagesList = mutableListOf<ItemImage>()
+
+    try {
+        if (imagesJson.isNotEmpty() && imagesJson != "[]") {
+            val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+            val imagesData: List<Map<String, Any>> = Gson().fromJson(imagesJson, type)
+
+            imagesData.forEachIndexed { index, imageData ->
+                val url = imageData["url"] as? String ?: ""
+                val isCover = imageData["isCover"] as? Boolean ?: (index == 0)
+
+                if (url.isNotEmpty()) {
+                    imagesList.add(
+                        ItemImage(
+                            id = 0,
+                            url = url,
+                            filename = null,
+                            contentType = null,
+                            createdAt = null,
+                            isCover = isCover
+                        )
+                    )
+                }
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+
+    // Fallback: If no images parsed and there's a coverImage field, use it
+    if (imagesList.isEmpty() && coverImage != null && coverImage!!.isNotEmpty()) {
+        imagesList.add(
+            ItemImage(
+                id = 0,
+                url = coverImage!!,
+                filename = null,
+                contentType = null,
+                createdAt = null,
+                isCover = true
+            )
+        )
+    }
+
     return Item(
         id = id,
         shopId = shopId,
@@ -278,7 +357,23 @@ fun ItemEntity.toDomain(): Item {
             ItemMeta(color = metaColor, size = metaSize)
         } else null,
         createdAt = createdAt,
+        updatedAt = updatedAt,
         shop = null,
-        images = emptyList()
+        images = imagesList,
+        coverImage = coverImage ?: imagesList.firstOrNull()?.url,
+        brandId = brandId,
+        sizeId = sizeId,
+        schoolId = schoolId,
+        itemConditionId = itemConditionId,
+        locationId = locationId,
+        provinceId = provinceId,
+        genderId = genderId,
+        label = label,
+        reserved = reserved,
+        itemTypeId = itemTypeId,
+        sizeName = sizeName,
+        colorName = colorName,
+        brandName = brandName,
+        conditionName = conditionName
     )
 }
