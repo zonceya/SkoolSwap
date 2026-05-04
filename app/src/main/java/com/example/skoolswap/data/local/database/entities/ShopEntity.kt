@@ -12,6 +12,7 @@ data class ShopEntity(
     val displayName: String = "",
     val userId: Long,
     val sellerName: String,
+    val sellerMobile: String?,  // ← FIXED: added 'val' and '?' for nullability
     val profilePictureUrl: String,
     val createdAt: String,
     val itemsCount: Int = 0,

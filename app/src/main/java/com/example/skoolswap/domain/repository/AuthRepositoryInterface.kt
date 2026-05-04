@@ -18,6 +18,7 @@ interface AuthRepositoryInterface {
     // For server user - renamed to avoid conflict
     fun getServerUser(): StateFlow<User?>
     fun getAuthToken(): StateFlow<String?>
+    suspend fun getUserById(userId: Long): Result<User>
     // For Firebase compatibility - properties
     val currentUser: StateFlow<FirebaseUser?>
     val loading: StateFlow<Boolean>

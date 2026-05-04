@@ -7,6 +7,7 @@ import com.example.skoolswap.data.remote.models.response.profile.ProfileResponse
 import com.example.skoolswap.data.remote.models.response.school.AssignSchoolResponse
 import com.example.skoolswap.data.remote.models.response.user.SignInResponse
 import com.example.skoolswap.data.remote.models.response.user.UpdateMobileResponse
+import com.example.skoolswap.data.remote.models.response.user.UserResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -14,6 +15,7 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Path
 
 interface UserApiService {
 
@@ -35,5 +37,11 @@ interface UserApiService {
     suspend fun deleteProfile(
         @Header("Authorization") authToken: String
     ): Response<DeleteProfileResponse>
+
+    @GET("api/v1/users/{userId}")
+    suspend fun getUserById(
+        @Header("Authorization") authToken: String,
+        @Path("userId") userId: Long
+    ): Response<UserResponse>
 
 }

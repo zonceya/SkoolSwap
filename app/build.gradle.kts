@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.skoolswap"
-        minSdk = 24
+        minSdk = 25
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -38,6 +38,7 @@ android {
     }
     kotlinOptions {
         jvmTarget = "11"
+        freeCompilerArgs = listOf("-XXLanguage:+PropertyParamAnnotationDefaultTargetMode")
 
     }
     packagingOptions {
@@ -107,6 +108,7 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     implementation(libs.firebase.crashlytics.buildtools)
+    implementation(libs.androidx.compose.material3)
     kapt(libs.room.compiler)
     implementation(libs.kotlinx.datetime)
     implementation(libs.play.services.cast.framework)

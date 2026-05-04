@@ -1,22 +1,18 @@
 package com.example.skoolswap.data.remote.models.response.shop
 
-import com.google.gson.annotations.SerializedName  // Add this import
+import com.google.gson.annotations.SerializedName
 import android.os.Build
 import androidx.annotation.RequiresApi
 import com.example.skoolswap.domain.model.Shop
 
-data class ShopResponse(
-    val success: Boolean,
-    val shop: ShopDto?,
-    val error: String? = null
-)
-
+// Your existing ShopDto
 data class ShopDto(
     val id: Long,
     val name: String,
     val display_name: String = "",
     val user_id: Long,
     val seller_name: String,
+    val seller_mobile: String?,
     val created_at: String,
     val items_count: Int = 0
 ) {
@@ -28,6 +24,7 @@ data class ShopDto(
             displayName = display_name,
             userId = user_id,
             sellerName = seller_name,
+            sellerMobile = seller_mobile,
             profilePictureUrl = profilePictureUrl,
             createdAt = created_at,
             itemsCount = items_count
@@ -35,47 +32,96 @@ data class ShopDto(
     }
 }
 
+// ✅ ADD MISSING UpdateShopResponse
 data class UpdateShopResponse(
+    @SerializedName("success")
     val success: Boolean,
+
+    @SerializedName("message")
     val message: String? = null,
+
+    @SerializedName("shop")
     val shop: UpdateShopDto? = null,
+
+    @SerializedName("error")
     val error: String? = null,
+
+    @SerializedName("errors")
     val errors: List<String>? = null
 )
 
+// ✅ ADD MISSING UpdateShopDto
 data class UpdateShopDto(
+    @SerializedName("id")
     val id: Long,
+
+    @SerializedName("name")
     val name: String,
-    val display_name: String = ""
+
+    @SerializedName("display_name")
+    val displayName: String = ""
 )
 
-data class PublicShopResponse(
-    val success: Boolean,
-    val shop: PublicShopDto? = null,
-    val error: String? = null
-)
-
-data class PublicShopDto(
-    val id: Long,
-    val name: String,
-    val seller: SellerDto,
-    val stats: ShopStatsDto,
-    val created_at: String
-)
-
-data class SellerDto(
-    val id: Long,
-    val name: String
-)
-
-// ✅ KEEP THIS VERSION (with all 4 fields and @SerializedName)
 data class ShopStatsDto(
     @SerializedName("total_items")
     val totalItems: Int,
+
     @SerializedName("active_items")
     val activeItems: Int,
+
     @SerializedName("sold_items")
     val soldItems: Int,
+
     @SerializedName("inactive_items")
     val inactiveItems: Int
+)
+
+data class ShopResponse(
+    @SerializedName("success")
+    val success: Boolean,
+
+    @SerializedName("shop")
+    val shop: ShopDto?,
+
+    @SerializedName("error")
+    val error: String? = null
+)
+
+
+data class PublicShopResponse(
+    @SerializedName("success")
+    val success: Boolean,
+
+    @SerializedName("shop")
+    val shop: PublicShopDto? = null,
+
+    @SerializedName("error")
+    val error: String? = null
+)
+
+
+data class PublicShopDto(
+    @SerializedName("id")
+    val id: Long,
+
+    @SerializedName("name")
+    val name: String,
+
+    @SerializedName("seller")
+    val seller: SellerDto,
+
+    @SerializedName("stats")
+    val stats: ShopStatsDto,
+
+    @SerializedName("created_at")
+    val createdAt: String
+)
+
+
+data class SellerDto(
+    @SerializedName("id")
+    val id: Long,
+
+    @SerializedName("name")
+    val name: String
 )

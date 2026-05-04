@@ -5,6 +5,7 @@ data class Shop(
     val name: String,
     val displayName: String = "",
     val userId: Long,
+    val sellerMobile: String?,
     val sellerName: String,
     val profilePictureUrl: String,
     val createdAt: String, // Changed from LocalDateTime to String

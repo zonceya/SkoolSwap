@@ -80,6 +80,7 @@ fun ItemShopDto.toDomain(): Shop {
         displayName = "",
         userId = 0L,
         sellerName = "",
+        sellerMobile = "",
         profilePictureUrl = "",
         createdAt = "",
         itemsCount = 0

@@ -210,6 +210,43 @@ class AuthRepository @Inject constructor(
             Log.e(TAG, "Error caching user data", e)
         }
     }
+    // In AuthRepository.kt
+    override suspend fun getUserById(userId: Long): Result<User> {
+        return try {
+            val token = _authToken.value
+            if (token == null) {
+                return Result.failure(Exception("Not authenticated"))
+            }
+
+            val response = userApiService.getUserById("Bearer $token", userId)
+
+            if (response.isSuccessful) {
+                val userResponse = response.body()
+                if (userResponse != null) {
+                    val user = User(
+                        id = userResponse.id,
+                        name = userResponse.name,
+                        email = userResponse.email,
+                        mobile = userResponse.mobile,
+                        username = userResponse.username,
+                        profilePictureUrl = userResponse.profilePictureUrl,
+                        authMode = userResponse.authMode,
+                        role = userResponse.role,
+                        token = token,
+                        createdAt = userResponse.createdAt,
+                        updatedAt = userResponse.updatedAt
+                    )
+                    Result.success(user)
+                } else {
+                    Result.failure(Exception("User not found"))
+                }
+            } else {
+                Result.failure(Exception("Failed to get user: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
     private suspend fun refreshSchoolMapping(userId: Int) {
         try {
             val token = _authToken.value ?: return

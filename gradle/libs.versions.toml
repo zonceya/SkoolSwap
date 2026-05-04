@@ -37,6 +37,7 @@ timber = "5.0.1"
 touchimageview = "3.7.2"
 subsampling = "3.10.0"
 firebaseCrashlyticsBuildtools = "3.0.7"
+composeMaterial3 = "1.6.1"
 
 
 [libraries]
@@ -85,6 +86,7 @@ androidx-viewpager2 = { module = "androidx.viewpager2:viewpager2", version.ref =
 facebook-shimmer = { module = "com.facebook.shimmer:shimmer", version.ref = "shimmer" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 firebase-crashlytics-buildtools = { group = "com.google.firebase", name = "firebase-crashlytics-buildtools", version.ref = "firebaseCrashlyticsBuildtools" }
+androidx-compose-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "composeMaterial3" }
 
 
 

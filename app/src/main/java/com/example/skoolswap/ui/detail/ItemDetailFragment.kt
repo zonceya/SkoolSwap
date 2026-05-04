@@ -5,6 +5,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
@@ -386,13 +387,22 @@ class ItemDetailFragment : Fragment() {
     // REMOVED the empty toggleFavorite() method since we're using viewModel.toggleFavorite()
 
     private fun contactSeller() {
-        Log.d(TAG, "contactSeller called")
         val currentState = viewModel.itemState.value
         if (currentState is ItemDetailViewModel.ItemDetailState.Success) {
-            Log.d(TAG, "Contact seller for item: ${currentState.item.name}")
-            // TODO: Navigate to chat with seller
-        } else {
-            Log.w(TAG, "Cannot contact seller - no item loaded")
+            val item = currentState.item
+            val sellerMobile = item.shop?.sellerMobile
+
+            if (!sellerMobile.isNullOrBlank()) {
+                Log.d(TAG, "Contacting seller via mobile: $sellerMobile")
+                // Open WhatsApp or dialer
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                    data = android.net.Uri.parse("https://wa.me/${sellerMobile.replace(Regex("[^0-9]"), "")}")
+                }
+                startActivity(intent)
+            } else {
+                Log.w(TAG, "No seller mobile available")
+                // Show dialog or fallback to chat
+            }
         }
     }
 
@@ -400,8 +410,18 @@ class ItemDetailFragment : Fragment() {
         Log.d(TAG, "onBuyClick called")
         val currentState = viewModel.itemState.value
         if (currentState is ItemDetailViewModel.ItemDetailState.Success) {
-            Log.d(TAG, "Buy item: ${currentState.item.name}")
-            // TODO: Handle buy action
+            val item = currentState.item
+            val sellerMobile = viewModel.sellerMobile.value  // Get from ViewModel
+
+            if (sellerMobile.isNullOrBlank()) {
+                Toast.makeText(requireContext(),
+                    "Seller contact information not available",
+                    Toast.LENGTH_SHORT).show()
+                return
+            }
+
+            val bottomSheet = ContactOptionsBottomSheet(item, sellerMobile)  // Pass mobile number
+            bottomSheet.show(parentFragmentManager, "contact_options")
         } else {
             Log.w(TAG, "Cannot buy - no item loaded")
         }

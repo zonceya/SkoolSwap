@@ -310,7 +310,7 @@
         android:id="@+id/buyButton"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:text="BUY"
+        android:text="I'm Interested"
         android:textColor="@android:color/white"
         android:backgroundTint="@android:color/black"
         android:layout_margin="16dp"

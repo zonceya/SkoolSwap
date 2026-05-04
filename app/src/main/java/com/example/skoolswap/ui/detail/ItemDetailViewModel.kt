@@ -8,6 +8,7 @@ import com.example.skoolswap.data.local.database.dao.ColorDao
 import com.example.skoolswap.data.local.database.dao.SchoolDao
 import com.example.skoolswap.data.local.database.dao.SizeDao
 import com.example.skoolswap.domain.model.Item
+import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.domain.repository.FavoriteRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.domain.repository.ProductsRepositoryInterface
@@ -25,10 +26,10 @@ class ItemDetailViewModel @Inject constructor(
     private val productsRepository: ProductsRepositoryInterface,
     private val sizeDao: SizeDao,
     private val favoriteRepository: FavoriteRepositoryInterface,
+    private val authRepository: AuthRepositoryInterface,  // ← ADD THIS
     private val schoolDao: SchoolDao,
     private val colorDao: ColorDao,
     private val brandDao: BrandDao
-
 ) : ViewModel() {
 
     private val _itemState = MutableStateFlow<ItemDetailState>(ItemDetailState.Loading)
@@ -49,42 +50,52 @@ class ItemDetailViewModel @Inject constructor(
     private val _conditionName = MutableStateFlow<String?>(null)
     val conditionName: StateFlow<String?> = _conditionName.asStateFlow()
     private var currentItemId: String? = null
-    // Add this with your other private val declarations (around line 30)
     private val _imageUrls = MutableStateFlow<List<String>>(emptyList())
     val imageUrls: StateFlow<List<String>> = _imageUrls.asStateFlow()
     private val _isFavorite = MutableStateFlow(false)
     val isFavorite: StateFlow<Boolean> = _isFavorite.asStateFlow()
 
+    private val _sellerMobile = MutableStateFlow<String?>(null)
+    val sellerMobile: StateFlow<String?> = _sellerMobile.asStateFlow()
+
+    private val TAG = "ItemDetailVM"
 
     fun loadItem(itemId: String, source: String) {
         viewModelScope.launch {
             currentItemId = itemId
-
-            // Always show loading when reopening (prevents stale empty data)
             _itemState.value = ItemDetailState.Loading
             checkFavoriteStatus(itemId)
             trackView(itemId, source)
             fetchItem(itemId)
-
         }
     }
+
     private suspend fun checkFavoriteStatus(itemId: String) {
         _isFavorite.value = favoriteRepository.isFavorite(itemId)
-        Log.d("ItemDetailVM", "Favorite status for $itemId: ${_isFavorite.value}")
+        Log.d(TAG, "Favorite status for $itemId: ${_isFavorite.value}")
     }
+
     fun toggleFavorite() {
         viewModelScope.launch {
             currentItemId?.let { itemId ->
                 val newStatus = favoriteRepository.toggleFavorite(itemId)
                 _isFavorite.value = newStatus
-                Log.d("ItemDetailVM", "Toggled favorite for $itemId: $newStatus")
-
-                // Show feedback
-                val message = if (newStatus) "Added to favorites" else "Removed from favorites"
-                // You can show a snackbar or toast here
+                Log.d(TAG, "Toggled favorite for $itemId: $newStatus")
             }
         }
     }
+
+    private suspend fun loadSellerContact(sellerUserId: Long) {
+        val result = authRepository.getUserById(sellerUserId)
+        if (result.isSuccess) {
+            val seller = result.getOrNull()
+            _sellerMobile.value = seller?.mobile
+            Log.d(TAG, "Loaded seller mobile: ${_sellerMobile.value}")
+        } else {
+            Log.e(TAG, "Failed to load seller contact: ${result.exceptionOrNull()?.message}")
+        }
+    }
+
     private suspend fun fetchItem(itemId: String) {
         val result = itemRepository.getItem(itemId)
 
@@ -95,13 +106,10 @@ class ItemDetailViewModel @Inject constructor(
                 _itemState.value = ItemDetailState.Success(item)
                 loadReferenceData(item)
                 loadSimilarItems(item)
-            } else {
-                _itemState.value = ItemDetailState.Error("Item data is null")
+
+                _sellerMobile.value = item.shop?.sellerMobile
+                Log.d(TAG, "Seller mobile: ${_sellerMobile.value}")
             }
-        } else {
-            _itemState.value = ItemDetailState.Error(
-                "Unable to load item. Please check your internet connection."
-            )
         }
     }
 
@@ -110,14 +118,7 @@ class ItemDetailViewModel @Inject constructor(
         item.images.forEachIndexed { index, image ->
             Timber.tag("ItemDetailVM").d("Image $index: ${image.url}")
         }
-        Timber.tag("ItemDetailVM").d("=== IMAGES DEBUG ===")
-        Timber.tag("ItemDetailVM").d("Images count: ${item.images.size}")
-        item.images.forEachIndexed { index, image ->
-            Timber.tag("ItemDetailVM").d("Image $index: ${image.url}")
-        }
-        Timber.tag("ItemDetailVM").d("==================")
 
-        // ADD THIS LINE - Extract image URLs
         _imageUrls.value = item.images.map { it.url }
 
         _sizeName.value = item.sizeName
@@ -158,12 +159,13 @@ class ItemDetailViewModel @Inject constructor(
             productsRepository.trackClick(itemId, source, 0)
         }
     }
+
     fun getImageUrls(): List<String> {
         val urls = _imageUrls.value
         Timber.tag("ItemDetailVM").d("getImageUrls returning ${urls.size} URLs")
         return urls
     }
-    // Add this function to your ItemDetailViewModel
+
     fun clearState() {
         _itemState.value = ItemDetailState.Loading
         _similarItems.value = emptyList()
@@ -172,35 +174,14 @@ class ItemDetailViewModel @Inject constructor(
         _colorName.value = null
         _brandName.value = null
         _conditionName.value = null
+        _isFavorite.value = false
+        _sellerMobile.value = null
         Timber.tag("ItemDetailVM").d("State cleared - ready for fresh load")
     }
+
     sealed class ItemDetailState {
         object Loading : ItemDetailState()
         data class Success(val item: Item) : ItemDetailState()
         data class Error(val message: String) : ItemDetailState()
-    }
-    private fun refreshItemInBackground(itemId: String) {
-        viewModelScope.launch {
-            try {
-                val result = itemRepository.getItem(itemId)
-                if (result.isSuccess) {
-                    val freshItem = result.getOrNull() ?: return@launch
-
-                    // Only update UI if something actually changed
-                    if (freshItem.updatedAt != cachedItem?.updatedAt) {
-                        Timber.tag("ItemDetailVM").d("Item changed, updating UI")
-                        cachedItem = freshItem
-                        _itemState.value = ItemDetailState.Success(freshItem)
-                        loadReferenceData(freshItem)
-                        loadSimilarItems(freshItem)
-                    } else {
-                        Timber.tag("ItemDetailVM").d("Item unchanged, keeping cache")
-                    }
-                }
-            } catch (e: Exception) {
-                Timber.tag("ItemDetailVM").e("Background refresh failed: ${e.message}")
-            }
-        }
-
     }
 }

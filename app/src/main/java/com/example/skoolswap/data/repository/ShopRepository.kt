@@ -207,8 +207,9 @@ class ShopRepository @Inject constructor(
                         displayName = "",
                         userId = publicResponse.shop.seller.id,
                         sellerName = publicResponse.shop.seller.name,
+                        sellerMobile = null,
                         profilePictureUrl = "",
-                        createdAt = publicResponse.shop.created_at,
+                        createdAt = publicResponse.shop.createdAt,
                         itemsCount = publicResponse.shop.stats.totalItems
                     )
 

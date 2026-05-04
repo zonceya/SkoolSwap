@@ -109,7 +109,12 @@ data class ViewShopDto(
     val id: Long,
 
     @SerializedName("name")
-    val name: String
+    val name: String,
+    @SerializedName("seller_name")
+    val sellerName: String?,
+
+    @SerializedName("seller_mobile")
+    val sellerMobile: String?
 )
 
 data class ViewCategoryDto(

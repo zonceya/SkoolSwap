@@ -411,6 +411,7 @@ class ItemRepository @Inject constructor(
                     sellerName = "",
                     profilePictureUrl = "",
                     createdAt = "",
+                    sellerMobile = it.sellerMobile,
                     itemsCount = 0
                 )
             },
@@ -686,6 +687,7 @@ class ItemRepository @Inject constructor(
                     sellerName = it.sellerName ?: "",
                     profilePictureUrl = "",
                     createdAt = "",
+                    sellerMobile = it.sellerMobile,
                     itemsCount = 0
                 )
             },
