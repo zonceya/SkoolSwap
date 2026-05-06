@@ -1,6 +1,7 @@
 package com.example.skoolswap.data.mapper
 
 import com.example.skoolswap.data.local.database.entities.ItemEntity
+import com.example.skoolswap.data.remote.models.response.home.RecommendationItemDto
 import com.example.skoolswap.data.remote.models.response.item.*
 import com.example.skoolswap.data.remote.models.response.shop.PublicShopItemDto
 import com.example.skoolswap.data.remote.models.response.shop.PublicShopItemImageDto
@@ -299,7 +300,62 @@ fun Item.toEntity(): ItemEntity {
         coverImage = coverImageUrl
     )
 }
-
+fun RecommendationItemDto.toDomain(): Item {
+    return Item(
+        id = this.id,
+        shopId = this.shop?.id ?: 0L,
+        name = this.name,
+        description = this.description ?: "",
+        price = this.price,
+        quantity = this.availableQuantity,
+        status = "active",
+        itemTypeId = null,
+        gender = this.gender,
+        brandId = null,
+        sizeId = null,
+        colorId = null,
+        mainCategoryId = null,
+        subCategoryId = null,
+        schoolId = this.schoolId,
+        itemConditionId = null,
+        locationId = null,
+        provinceId = null,
+        genderId = null,
+        meta = null,
+        label = null,
+        reserved = 0,
+        updatedAt = null,
+        createdAt = this.createdAt,
+        images = this.images?.map { imageUrl ->
+            ItemImage(
+                id = 0,
+                url = imageUrl,
+                filename = null,
+                contentType = null,
+                createdAt = null,
+                isCover = imageUrl == this.coverPhoto
+            )
+        } ?: emptyList(),
+        coverImage = this.coverPhoto ?: this.image,
+        sizeName = this.sizeName,
+        colorName = this.colorName,
+        brandName = this.brandName,
+        conditionName = this.conditionName,
+        shop = this.shop?.let {
+            Shop(
+                id = it.id,
+                name = it.name,
+                displayName = "",
+                userId = 0L,
+                sellerName = it.sellerName ?: "",
+                sellerMobile = it.sellerMobile,
+                profilePictureUrl = "",
+                createdAt = "",
+                itemsCount = 0
+            )
+        }
+    )
+}
 // ============ ENTITY TO DOMAIN (WITH IMAGES FROM JSON) ============
 fun ItemEntity.toDomain(): Item {
     // Parse images from JSON

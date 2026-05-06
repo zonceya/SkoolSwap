@@ -1,7 +1,7 @@
 package com.example.skoolswap.domain.repository
 
 import com.example.skoolswap.domain.model.Item
-import com.example.skoolswap.domain.model.PaginatedResponse
+import com.example.skoolswap.data.remote.models.response.home.PaginatedResponse
 import com.example.skoolswap.utils.Result
 
 interface ProductsRepositoryInterface {
@@ -42,6 +42,14 @@ interface ProductsRepositoryInterface {
         conditionId: Int? = null,
         minPrice: Float? = null,
         maxPrice: Float? = null
+    ): Result<PaginatedResponse<Item>>
+
+    // ADD THIS NEW METHOD FOR SEARCH
+    suspend fun searchItems(
+        query: String,
+        categoryId: Int? = null,
+        page: Int = 1,
+        perPage: Int = 20
     ): Result<PaginatedResponse<Item>>
 
     suspend fun trackClick(

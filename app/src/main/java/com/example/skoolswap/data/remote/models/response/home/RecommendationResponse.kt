@@ -76,9 +76,24 @@ data class RecommendationItemDto(
     @SerializedName("description") val description: String?,
     @SerializedName("price") val price: Double,
     @SerializedName("image") val image: String?,
+    @SerializedName("cover_photo") val coverPhoto: String?,
     @SerializedName("school_id") val schoolId: Int,
     @SerializedName("category") val category: String?,
     @SerializedName("gender") val gender: String?,
     @SerializedName("reason") val reason: String?,
-    @SerializedName("created_at") val createdAt: String
+    @SerializedName("created_at") val createdAt: String,
+    @SerializedName("size_name") val sizeName: String?,
+    @SerializedName("color_name") val colorName: String?,
+    @SerializedName("condition_name") val conditionName: String?,
+    @SerializedName("brand_name") val brandName: String?,
+    @SerializedName("available_quantity") val availableQuantity: Int,
+    @SerializedName("images") val images: List<String>?,
+    @SerializedName("shop") val shop: ShopInfoDto?
+)
+
+data class ShopInfoDto(
+    @SerializedName("id") val id: Long,
+    @SerializedName("name") val name: String,
+    @SerializedName("seller_name") val sellerName: String?,
+    @SerializedName("seller_mobile") val sellerMobile: String?
 )

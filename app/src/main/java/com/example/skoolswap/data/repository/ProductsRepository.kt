@@ -4,7 +4,7 @@ package com.example.skoolswap.data.repository
 import android.util.Log
 import com.example.skoolswap.data.mapper.toDomain
 import com.example.skoolswap.data.remote.api.RecommendationsApiService
-import com.example.skoolswap.domain.model.PaginatedResponse
+import com.example.skoolswap.data.remote.models.response.home.PaginatedResponse
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.repository.ProductsRepositoryInterface
 import com.example.skoolswap.utils.Result
@@ -100,7 +100,50 @@ class ProductsRepository @Inject constructor(
             Result.Error(e)
         }
     }
+    // Add this to your ProductsRepository class
+    // In ProductsRepository.kt, update the search method:
 
+    override suspend fun searchItems(
+        query: String,
+        categoryId: Int?,
+        page: Int,
+        perPage: Int
+    ): Result<PaginatedResponse<Item>> {
+        return try {
+            val schoolId = getCurrentSchoolId()
+            if (schoolId == null) {
+                return Result.Error(Exception("No school selected"))
+            }
+
+            val response = api.searchItems(
+                schoolId = schoolId,
+                query = query,
+                categoryId = categoryId,
+                page = page,
+                perPage = perPage
+            )
+
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body?.success == true) {
+                    val items = body.items.map { itemDto ->
+                        itemDto.toDomain()  // ← This uses your existing mapper
+                    }
+                    Result.Success(PaginatedResponse(
+                        items = items,
+                        pagination = body.pagination  // ← Make sure PaginationDto exists
+                    ))
+                } else {
+                    Result.Error(Exception("Failed to search items"))
+                }
+            } else {
+                Result.Error(Exception("Server error: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e("ProductsRepository", "Search failed", e)
+            Result.Error(e)
+        }
+    }
     override suspend fun getTrendingAll(
         period: String,
         page: Int,

@@ -1,204 +1,456 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout
+<androidx.drawerlayout.widget.DrawerLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/drawerLayout"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="#F7F7F7">
+    android:layout_height="match_parent">
 
-    <com.google.android.material.appbar.AppBarLayout
+    <!-- Main Content -->
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/white"
-        android:elevation="0dp">
+        android:layout_height="match_parent"
+        android:background="#F7F7F7">
 
-        <LinearLayout
+        <com.google.android.material.appbar.AppBarLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:background="@color/white"
+            android:elevation="0dp">
 
-            <!-- Top Tabs -->
             <LinearLayout
-                android:id="@+id/topTabs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Top Tabs -->
+                <LinearLayout
+                    android:id="@+id/topTabs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:padding="12dp"
+                    android:weightSum="4">
+
+                    <TextView
+                        android:id="@+id/tabHome"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="16dp"
+                        android:background="@drawable/tablayout_selector"
+                        android:gravity="center"
+                        android:text="Home"
+                        android:textColor="@android:color/white"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tabUniform"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="16dp"
+                        android:background="@drawable/tablayout_unselected"
+                        android:gravity="center"
+                        android:text="Uniform"
+                        android:textColor="@android:color/black"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tabSport"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="16dp"
+                        android:background="@drawable/tablayout_unselected"
+                        android:gravity="center"
+                        android:text="Sport"
+                        android:textColor="@android:color/black"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tabRecent"
+                        android:layout_width="0dp"
+                        android:layout_height="36dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/tablayout_unselected"
+                        android:gravity="center"
+                        android:text="Recent"
+                        android:textColor="@android:color/black"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.appbar.AppBarLayout>
+
+        <!-- Main Content Scroll Area -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+            <!-- Banner Slider -->
+            <androidx.viewpager2.widget.ViewPager2
+                android:id="@+id/bannerViewPager"
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Indicator Dots -->
+            <LinearLayout
+                android:id="@+id/indicatorDots"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:padding="8dp" />
+
+            <!-- Filter Bar (Visible during search) -->
+            <LinearLayout
+                android:id="@+id/filterBar"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:padding="12dp"
-                android:weightSum="4">
+                android:visibility="gone">
 
                 <TextView
-                    android:id="@+id/tabHome"
+                    android:id="@+id/sortBtn"
                     android:layout_width="0dp"
-                    android:layout_height="36dp"
+                    android:layout_height="40dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="16dp"
-                    android:background="@drawable/tablayout_selector"
+                    android:layout_marginEnd="8dp"
+                    android:text="SORT ▼"
                     android:gravity="center"
-                    android:text="Home"
-                    android:textColor="@android:color/white"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tabUniform"
-                    android:layout_width="0dp"
-                    android:layout_height="36dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="16dp"
-                    android:background="@drawable/tablayout_unselected"
-                    android:gravity="center"
-                    android:text="Uniform"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
                     android:textColor="@android:color/black"
-                    android:textStyle="bold" />
+                    android:background="#F0F0F0"
+                    android:padding="8dp" />
 
                 <TextView
-                    android:id="@+id/tabSport"
+                    android:id="@+id/filterBtn"
                     android:layout_width="0dp"
-                    android:layout_height="36dp"
+                    android:layout_height="40dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="16dp"
-                    android:background="@drawable/tablayout_unselected"
+                    android:layout_marginStart="8dp"
+                    android:text="FILTER ▼"
                     android:gravity="center"
-                    android:text="Sport"
+                    android:textStyle="bold"
+                    android:textSize="14sp"
                     android:textColor="@android:color/black"
-                    android:textStyle="bold" />
+                    android:background="#F0F0F0"
+                    android:padding="8dp" />
 
-                <TextView
-                    android:id="@+id/tabRecent"
-                    android:layout_width="0dp"
-                    android:layout_height="36dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/tablayout_unselected"
-                    android:gravity="center"
-                    android:text="Recent"
-                    android:textColor="@android:color/black"
-                    android:textStyle="bold" />
             </LinearLayout>
+
+            <!-- Home Feed RecyclerView -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/homeRecycler"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:paddingBottom="80dp"
+                android:clipToPadding="false"
+                android:visibility="visible" />
+
+            <!-- Search Results Area -->
+            <LinearLayout
+                android:id="@+id/searchResultsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <!-- Server Items Badge -->
+                <TextView
+                    android:id="@+id/serverItemsBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textSize="12sp"
+                    android:textColor="#4CAF50"
+                    android:padding="8dp"
+                    android:visibility="gone"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/badge_background" />
+
+                <!-- Search Results RecyclerView -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/searchResultsRecycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:padding="8dp"
+                    android:clipToPadding="false" />
+
+                <!-- Loading More Indicator -->
+                <LinearLayout
+                    android:id="@+id/loadingMoreLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:padding="16dp"
+                    android:visibility="gone">
+
+                    <ProgressBar
+                        android:id="@+id/loadingMoreProgress"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:indeterminateTint="@color/black" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Searching for more items..."
+                        android:textSize="12sp"
+                        android:textColor="#666"
+                        android:layout_marginTop="8dp" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Empty Search Results -->
+            <TextView
+                android:id="@+id/emptySearchResults"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:text="No results found"
+                android:gravity="center"
+                android:textSize="16sp"
+                android:visibility="gone" />
+
         </LinearLayout>
-    </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- Main Content - Banner and RecyclerView together -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
-
-        <!-- Banner Slider -->
-        <androidx.viewpager2.widget.ViewPager2
-            android:id="@+id/bannerViewPager"
-            android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:layout_marginStart="16dp"
-            android:layout_marginEnd="16dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="8dp" />
-
-        <!-- Indicator Dots -->
+        <!-- Shimmer Layout -->
         <LinearLayout
-            android:id="@+id/indicatorDots"
+            android:id="@+id/shimmerLayout"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:padding="16dp"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+            <include layout="@layout/shimmer_banner" />
+            <include layout="@layout/shimmer_section" />
+            <include layout="@layout/shimmer_grid" />
+            <include layout="@layout/shimmer_section" />
+            <include layout="@layout/shimmer_list" />
+        </LinearLayout>
+
+        <!-- Error Layout -->
+        <LinearLayout
+            android:id="@+id/errorLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:gravity="center"
-            android:orientation="horizontal"
-            android:padding="8dp" />
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:padding="32dp"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <!-- RecyclerView -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/homeRecycler"
+            <ImageView
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:src="@drawable/ic_error_placeholder" />
+
+            <TextView
+                android:id="@+id/errorMessage"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Failed to load content"
+                android:textSize="16sp"
+                android:textColor="#666"
+                android:layout_marginTop="16dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/retryButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Retry"
+                android:layout_marginTop="24dp" />
+        </LinearLayout>
+
+        <!-- No School Layout -->
+        <LinearLayout
+            android:id="@+id/noSchoolLayout"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:paddingBottom="80dp"
-            android:clipToPadding="false" />
-    </LinearLayout>
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:padding="32dp"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-    <!-- Shimmer, Error, Empty states remain the same -->
+            <ImageView
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:src="@drawable/ic_school_placeholder" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="No School Selected"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_marginTop="16dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Please select a school to see recommendations"
+                android:textSize="14sp"
+                android:textColor="#666"
+                android:layout_marginTop="8dp"
+                android:gravity="center" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/selectSchoolButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Select School"
+                android:layout_marginTop="24dp" />
+        </LinearLayout>
+
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+    <!-- Filter Drawer -->
     <LinearLayout
-        android:id="@+id/shimmerLayout"
-        android:layout_width="match_parent"
+        android:id="@+id/filterDrawer"
+        android:layout_width="320dp"
         android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:background="@android:color/white"
         android:orientation="vertical"
-        android:visibility="gone"
         android:padding="16dp"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        android:elevation="8dp">
 
-        <include layout="@layout/shimmer_banner" />
-        <include layout="@layout/shimmer_section" />
-        <include layout="@layout/shimmer_grid" />
-        <include layout="@layout/shimmer_section" />
-        <include layout="@layout/shimmer_list" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/errorLayout"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:visibility="gone"
-        android:padding="32dp"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
-
-        <ImageView
-            android:layout_width="120dp"
-            android:layout_height="120dp"
-            android:src="@drawable/ic_error_placeholder" />
-
+        <!-- Header -->
         <TextView
-            android:id="@+id/errorMessage"
+            android:id="@+id/filterHeaderTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Failed to load content"
-            android:textSize="16sp"
-            android:textColor="#666"
-            android:layout_marginTop="16dp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/retryButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Retry"
-            android:layout_marginTop="24dp" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/noSchoolLayout"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:visibility="gone"
-        android:padding="32dp"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
-
-        <ImageView
-            android:layout_width="120dp"
-            android:layout_height="120dp"
-            android:src="@drawable/ic_school_placeholder" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="No School Selected"
-            android:textSize="18sp"
+            android:text="Filter"
+            android:textSize="20sp"
             android:textStyle="bold"
-            android:layout_marginTop="16dp" />
+            android:layout_marginBottom="16dp"/>
+
+        <!-- Options Header (back button) -->
+        <LinearLayout
+            android:id="@+id/optionsHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            android:layout_marginBottom="16dp">
+
+            <ImageView
+                android:id="@+id/backToMain"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_back"
+                app:tint="#000000" />
+
+            <TextView
+                android:id="@+id/optionsTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Filter Options"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:layout_marginStart="16dp"/>
+
+        </LinearLayout>
+
+        <!-- Dynamic Filter Container -->
+        <LinearLayout
+            android:id="@+id/dynamicFilterContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="visible"/>
+
+        <!-- Options Container -->
+        <LinearLayout
+            android:id="@+id/optionsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:padding="8dp"/>
+
+        <!-- Price Range Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Price Range"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:paddingStart="8dp"
+            android:layout_marginTop="16dp"/>
 
         <TextView
-            android:layout_width="wrap_content"
+            android:id="@+id/selectedPriceRange"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Please select a school to see recommendations"
+            android:text="R0 - R1000"
             android:textSize="14sp"
             android:textColor="#666"
-            android:layout_marginTop="8dp"
-            android:gravity="center" />
+            android:paddingStart="8dp"
+            android:paddingBottom="8dp"/>
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/selectSchoolButton"
-            android:layout_width="wrap_content"
+        <com.google.android.material.slider.RangeSlider
+            android:id="@+id/priceSlider"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Select School"
-            android:layout_marginTop="24dp" />
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="16dp"
+            android:valueFrom="0"
+            android:valueTo="1000"
+            app:thumbColor="@color/black"
+            app:trackColorActive="@color/black"
+            app:trackColorInactive="#E0E0E0"/>
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"/>
+
+        <!-- Reset/Apply Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:paddingTop="8dp">
+
+            <Button
+                android:id="@+id/resetFilters"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:text="Reset"
+                android:layout_height="match_parent"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"/>
+
+            <Button
+                android:id="@+id/applyFilters"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:text="Apply"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"/>
+
+        </LinearLayout>
+
     </LinearLayout>
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+</androidx.drawerlayout.widget.DrawerLayout>

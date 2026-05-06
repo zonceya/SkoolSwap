@@ -1,5 +1,6 @@
 package com.example.skoolswap.ui.home.adapter
 
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
@@ -71,10 +72,22 @@ class HomeFeedAdapter(
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (holder) {
-            is RecommendedViewHolder -> holder.bind(sections[position] as Section.Recommended)
-            is EssentialsViewHolder -> holder.bind(sections[position] as Section.Essentials)
-            is TrendingViewHolder -> holder.bind(sections[position] as Section.Trending)
-            is RecentViewHolder -> holder.bind(sections[position] as Section.Recent)
+            is RecommendedViewHolder -> {
+                Log.d("HomeFeedAdapter", "Binding Recommended at position $position")
+                holder.bind(sections[position] as Section.Recommended)
+            }
+            is EssentialsViewHolder -> {
+                Log.d("HomeFeedAdapter", "Binding Essentials at position $position")
+                holder.bind(sections[position] as Section.Essentials)
+            }
+            is TrendingViewHolder -> {
+                Log.d("HomeFeedAdapter", "Binding Trending at position $position")
+                holder.bind(sections[position] as Section.Trending)
+            }
+            is RecentViewHolder -> {
+                Log.d("HomeFeedAdapter", "Binding Recent at position $position")
+                holder.bind(sections[position] as Section.Recent)
+            }
         }
     }
 

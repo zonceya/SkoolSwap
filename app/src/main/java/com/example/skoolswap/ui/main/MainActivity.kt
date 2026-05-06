@@ -4,10 +4,12 @@ import android.os.Bundle
 import android.util.Log
 import android.view.Menu
 import android.view.View
-import android.widget.FrameLayout
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -26,15 +28,17 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.example.skoolswap.R
 import com.example.skoolswap.common.constants.AppConstants
 import com.example.skoolswap.databinding.ActivityMainBinding
+import com.example.skoolswap.ui.home.HomeFragment
 import com.example.skoolswap.ui.navigationheader.NavigationHeaderViewModel
 import com.example.skoolswap.ui.navigationheader.UserState
 import com.google.android.material.navigation.NavigationView
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-
+import androidx.navigation.fragment.NavHostFragment
+import com.example.skoolswap.domain.repository.AuthRepositoryInterface
+import jakarta.inject.Inject
+import timber.log.Timber
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -45,10 +49,11 @@ class MainActivity : AppCompatActivity() {
     private val navHeaderViewModel: NavigationHeaderViewModel by viewModels()
 
     private lateinit var navController: NavController
-
+    @Inject
+    lateinit var authRepository: AuthRepositoryInterface
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.e("MainActivity", "🔥 onCreate at ${System.currentTimeMillis()}")
+        Timber.tag("MainActivity").e("🔥 onCreate at ${System.currentTimeMillis()}")
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -61,7 +66,24 @@ class MainActivity : AppCompatActivity() {
         setupNavigationListener()
         observeNavigation()
         observeAuthState()
+        lifecycleScope.launch {
+            delay(100) // Small delay to ensure UI is ready
+            val restored = authRepository.restoreSession()
+            Timber.tag("MainActivity").e("🔐 Session restored: $restored")
 
+            if (!restored) {
+                Timber.tag("MainActivity")
+                    .e("⚠️ No session, but we're on a content screen - this shouldn't happen")
+                // Only navigate to login if we're not already there
+                if (navController.currentDestination?.id != R.id.loginFragment) {
+                    navController.navigate(R.id.loginFragment)
+                }
+            } else {
+                Timber.tag("MainActivity").e("✅ Session restored successfully!")
+                // Optionally refresh user data
+                authRepository.refreshUserProfile()
+            }
+        }
     }
 
     private fun setupNavigationDrawer() {
@@ -82,10 +104,8 @@ class MainActivity : AppCompatActivity() {
         val userEmailTextView = headerView.findViewById<TextView>(R.id.userEmailTextView)
         val profileImageView = headerView.findViewById<ImageView>(R.id.profileImageView)
 
-        // Show loading overlay initially
         loadingOverlay.visibility = View.VISIBLE
 
-        // Observe navigation header view model
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 navHeaderViewModel.userState.collectLatest { userState ->
@@ -98,7 +118,6 @@ class MainActivity : AppCompatActivity() {
                         }
                         is UserState.Success -> {
                             loadingOverlay.visibility = View.GONE
-
                             usernameTextView.text = userState.name ?: "Welcome"
                             userEmailTextView.text = userState.email ?: "Sign in to continue"
 
@@ -108,7 +127,7 @@ class MainActivity : AppCompatActivity() {
                                     .circleCrop()
                                     .placeholder(R.drawable.ic_user)
                                     .error(R.drawable.ic_user)
-                                    .diskCacheStrategy(DiskCacheStrategy.NONE) // Force fresh load
+                                    .diskCacheStrategy(DiskCacheStrategy.NONE)
                                     .skipMemoryCache(true)
                                     .into(profileImageView)
                             } else {
@@ -117,7 +136,6 @@ class MainActivity : AppCompatActivity() {
                         }
                         is UserState.Error -> {
                             loadingOverlay.visibility = View.GONE
-
                             usernameTextView.text = "Error"
                             userEmailTextView.text = userState.message
                             profileImageView.setImageResource(R.drawable.ic_user)
@@ -131,21 +149,19 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-
-        // NO NEED to call loadProfile() - ViewModel observes automatically
     }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        // Save current destination
         outState.putInt("currentDestinationId", navController.currentDestination?.id ?: R.id.nav_home)
     }
+
     private fun setupNavigationListener() {
         val navView: NavigationView = binding.navView
         binding.appBarMain.fab.setOnClickListener {
             navController.navigate(R.id.createItemFragment)
         }
 
-        // Setup navigation item selection
         navView.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.nav_logout -> {
@@ -154,21 +170,19 @@ class MainActivity : AppCompatActivity() {
                 }
                 else -> {
                     try {
-                        // Check if we're already on this destination
                         if (navController.currentDestination?.id != menuItem.itemId) {
                             navController.navigate(menuItem.itemId)
                         }
                         binding.drawerLayout.closeDrawer(GravityCompat.START)
                         true
                     } catch (e: Exception) {
-                        Log.e("MainActivity", "Navigation error: ${e.message}")
+                        Timber.tag("MainActivity").e("Navigation error: ${e.message}")
                         false
                     }
                 }
             }
         }
 
-        // Setup destination changed listener
         navController.addOnDestinationChangedListener { _, destination, _ ->
             when (destination.id) {
                 R.id.viewPagerFragment, R.id.loginFragment -> {
@@ -195,64 +209,101 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Cancel", null)
             .show()
     }
+
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
         super.onRestoreInstanceState(savedInstanceState)
-        // Restore destination if needed
         val destinationId = savedInstanceState.getInt("currentDestinationId", R.id.nav_home)
         if (navController.currentDestination?.id != destinationId) {
             navController.navigate(destinationId)
         }
     }
-    private fun performLogout() {
-        // Close the drawer (optional if you're using a navigation drawer)
-        binding.drawerLayout.closeDrawer(GravityCompat.START)
 
-        // Get the ProgressBar and show it
+    private fun performLogout() {
+        binding.drawerLayout.closeDrawer(GravityCompat.START)
         val progressBar = findViewById<ProgressBar>(R.id.progressBar)
-        progressBar.visibility = View.VISIBLE  // Show ProgressBar
+        progressBar.visibility = View.VISIBLE
 
         lifecycleScope.launch {
             try {
-                // Sign out using ViewModel
                 viewModel.logout()
-
-                // Navigate to login screen
                 navController.navigate(R.id.loginFragment) {
                     popUpTo(R.id.nav_home) { inclusive = true }
                 }
-
-                // Show success message
                 Snackbar.make(binding.root, "Logged out successfully", Snackbar.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                // Handle logout failure
                 Snackbar.make(binding.root, "Logout failed: ${e.message}", Snackbar.LENGTH_LONG).show()
             } finally {
-                // Hide ProgressBar after operation is complete
-                progressBar.visibility = View.GONE  // Hide ProgressBar
+                progressBar.visibility = View.GONE
             }
         }
     }
 
-
     private fun observeAuthState() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                // This triggers profile refresh when activity resumes
                 delay(AppConstants.TIMEOUT)
-               // navHeaderViewModel.refresh() // ← This calls the profile API
             }
         }
     }
 
     override fun onStart() {
         super.onStart()
-        // Check if user is already logged in
         viewModel.checkAuthState()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main, menu)
+
+        val searchItem = menu.findItem(R.id.action_search)
+        val searchView = searchItem?.actionView as? androidx.appcompat.widget.SearchView
+
+        searchView?.apply {
+            queryHint = "Search..."
+            setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
+                override fun onQueryTextSubmit(query: String?): Boolean {
+                    query?.let { performSearch(it) }
+                    return true
+                }
+
+                override fun onQueryTextChange(newText: String?): Boolean {
+                    if (newText.isNullOrEmpty()) {
+                        clearHomeSearch()
+                    } else if (newText.length >= 2) {
+                        performSearch(newText)
+                    }
+                    return true
+                }
+            })
+
+            setOnCloseListener {
+                clearHomeSearch()
+                true
+            }
+        }
         return true
+    }
+
+    private fun performSearch(query: String) {
+        if (query.length < 2) return
+
+        // Get the current visible fragment
+        val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment_content_main) as? NavHostFragment
+        val currentFragment = navHostFragment?.childFragmentManager?.fragments?.firstOrNull()
+
+        if (currentFragment is HomeFragment) {
+            // Call HomeFragment's search
+            currentFragment.performLiveSearch(query)
+        } else {
+            Toast.makeText(this, "Search is only available on the Home screen", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun clearHomeSearch() {
+        val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment_content_main) as? NavHostFragment
+        val currentFragment = navHostFragment?.childFragmentManager?.fragments?.firstOrNull()
+        if (currentFragment is HomeFragment) {
+            currentFragment.exitSearchMode()
+        }
     }
 
     override fun onSupportNavigateUp(): Boolean {
@@ -260,48 +311,49 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun observeNavigation() {
-        Log.e("MainActivity", "👀 observeNavigation called at ${System.currentTimeMillis()}")
+        Timber.tag("MainActivity").e("👀 observeNavigation called at ${System.currentTimeMillis()}")
         viewModel.navigationDestination.observe(this) { destination ->
-            Log.e("MainActivity", "📡 navigationDestination observed: $destination at ${System.currentTimeMillis()}")
+            Timber.tag("MainActivity")
+                .e("📡 navigationDestination observed: $destination at ${System.currentTimeMillis()}")
 
             if (destination != null) {
                 navigateToDestination(destination)
-                // Clear the navigation destination after handling to prevent repeated navigation
                 viewModel.clearNavigationDestination()
             } else {
-                Log.e("MainActivity", "⏭️ Null destination - no navigation")
+                Timber.tag("MainActivity").e("⏭️ Null destination - no navigation")
             }
         }
 
         viewModel.forceNavigation.observe(this) { destination ->
-            Log.e("MainActivity", "📡 forceNavigation observed: $destination at ${System.currentTimeMillis()}")
+            Timber.tag("MainActivity")
+                .e("📡 forceNavigation observed: $destination at ${System.currentTimeMillis()}")
             destination?.let {
                 navigateToDestination(it)
                 viewModel.clearForceNavigation()
             }
         }
     }
+
     private fun navigateToDestination(destination: NavigationDestination) {
         val currentDestId = navController.currentDestination?.id
         val currentDestName = navController.currentDestination?.displayName
 
-        Log.e("MainActivity", "🎯 navigateToDestination: $destination, current: $currentDestName")
+        Timber.tag("MainActivity")
+            .e("🎯 navigateToDestination: $destination, current: $currentDestName")
 
-        // BLOCK ALL navigation when ProfileFragment is visible
         if (currentDestId == R.id.nav_profile) {
-            Log.e("MainActivity", "🛑 BLOCKING navigation to $destination - ProfileFragment is active")
+            Timber.tag("MainActivity")
+                .e("🛑 BLOCKING navigation to $destination - ProfileFragment is active")
             return
         }
 
-        // BLOCK navigation when on ProductsFragment (Uniform/Sport/Recent screens)
         if (currentDestId == R.id.productsFragment ||
             currentDestId == R.id.uniformFragment ||
             currentDestId == R.id.sportFragment) {
-            Log.e("MainActivity", "🛑 BLOCKED - Already on a content screen")
+            Timber.tag("MainActivity").e("🛑 BLOCKED - Already on a content screen")
             return
         }
 
-        // Also block if we're already at the destination
         when (destination) {
             NavigationDestination.ONBOARDING -> {
                 if (currentDestId != R.id.viewPagerFragment) {
@@ -309,7 +361,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             NavigationDestination.HOME -> {
-                // Only navigate to home if we're not already on a valid screen
                 if (currentDestId != R.id.nav_home &&
                     currentDestId != R.id.productsFragment &&
                     currentDestId != R.id.uniformFragment &&
@@ -317,7 +368,8 @@ class MainActivity : AppCompatActivity() {
                     currentDestId != R.id.recentFragment) {
                     navController.navigate(R.id.nav_home)
                 } else {
-                    Log.e("MainActivity", "🛑 Already on a valid screen, skipping HOME navigation")
+                    Timber.tag("MainActivity")
+                        .e("🛑 Already on a valid screen, skipping HOME navigation")
                 }
             }
             NavigationDestination.LOGIN -> {
@@ -327,13 +379,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
     override fun onResume() {
         super.onResume()
-        Log.e("MainActivity", "🔥 onResume at ${System.currentTimeMillis()}")
+        Timber.tag("MainActivity").e("🔥 onResume at ${System.currentTimeMillis()}")
     }
 
     override fun onPause() {
         super.onPause()
-        Log.e("MainActivity", "🔥 onPause at ${System.currentTimeMillis()}")
+        Timber.tag("MainActivity").e("🔥 onPause at ${System.currentTimeMillis()}")
     }
 }

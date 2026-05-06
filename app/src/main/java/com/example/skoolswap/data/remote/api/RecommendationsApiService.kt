@@ -5,6 +5,7 @@ import com.example.skoolswap.data.remote.models.response.home.RecentRecommendati
 import com.example.skoolswap.data.remote.models.response.home.SportRecommendationResponse
 import com.example.skoolswap.data.remote.models.response.home.UniformRecommendationResponse
 import com.example.skoolswap.data.remote.models.response.home.PaginatedItemsResponse
+import com.example.skoolswap.data.remote.models.response.home.RecommendedItemsResponse
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -97,4 +98,12 @@ interface RecommendationsApiService {
         @Query("source") source: String,
         @Query("position") position: Int
     ): Response<Unit>
+    @GET("api/v1/items")
+    suspend fun searchItems(
+        @Query("school_id") schoolId: Int,
+        @Query("q") query: String,
+        @Query("main_category_id") categoryId: Int? = null,
+        @Query("page") page: Int = 1,
+        @Query("per_page") perPage: Int = 20
+    ): Response<RecommendedItemsResponse>
 }

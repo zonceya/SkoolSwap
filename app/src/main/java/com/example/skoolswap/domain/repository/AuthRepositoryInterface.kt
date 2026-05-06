@@ -13,12 +13,18 @@ interface AuthRepositoryInterface {
     suspend fun updateMobile(mobile: String): Result<Boolean>
     suspend fun refreshUserProfile(): Result<User?>
     suspend fun deleteProfile(): Result<Boolean>
-     fun clearError()
+    fun clearError()
     fun checkCurrentUser()
+
     // For server user - renamed to avoid conflict
     fun getServerUser(): StateFlow<User?>
     fun getAuthToken(): StateFlow<String?>
     suspend fun getUserById(userId: Long): Result<User>
+
+    // Session management
+    suspend fun restoreSession(): Boolean
+    suspend fun getCurrentToken(): String?
+
     // For Firebase compatibility - properties
     val currentUser: StateFlow<FirebaseUser?>
     val loading: StateFlow<Boolean>

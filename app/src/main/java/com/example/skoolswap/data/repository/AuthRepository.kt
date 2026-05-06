@@ -42,6 +42,7 @@ import javax.inject.Singleton
 import com.example.skoolswap.data.remote.models.response.profile.DeleteProfileResponse
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.remote.api.UserSchoolApiService
+import kotlinx.coroutines.flow.first
 
 
 @Singleton
@@ -134,7 +135,33 @@ class AuthRepository @Inject constructor(
         val authResult = firebaseAuth.signInWithCredential(credential).await()
         return authResult.user ?: throw IllegalStateException("Firebase user is null")
     }
+    // In AuthRepository.kt
+    override suspend fun restoreSession(): Boolean {
+        return try {
+            val token = appPreferences.authToken.first()
+            Log.e(TAG, "🔐 restoreSession - Token found: ${token != null && token.isNotEmpty()}")
 
+            if (!token.isNullOrEmpty()) {
+                _authToken.value = token
+                loadCachedUser()
+
+                // Verify we actually have a user
+                val hasUser = _serverUser.value != null
+                Log.e(TAG, "🔐 restoreSession - User loaded: $hasUser")
+
+                return hasUser
+            } else {
+                Log.e(TAG, "🔐 restoreSession - No token found")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to restore session", e)
+            false
+        }
+    }
+    override suspend fun getCurrentToken(): String? {
+        return _authToken.value ?: appPreferences.authToken.first()
+    }
     private suspend fun handleSignInResponse(
         response: Response<SignInResponse>,
         firebaseUser: com.google.firebase.auth.FirebaseUser

@@ -141,38 +141,3 @@ fun RecentSectionDto.toDomain(): RecentSection {
     )
 }
 
-// ============ RECOMMENDATION ITEM TO DOMAIN ============
-fun RecommendationItemDto.toDomain(): Item {
-    return Item(
-        id = id,
-        shopId = 0L, // Not provided in recommendations
-        name = name,
-        description = description ?: "",
-        price = price,
-        quantity = 1, // Default
-        status = "active",
-        meta = null,
-        createdAt = createdAt,
-        shop = null,
-        images = if (!image.isNullOrEmpty()) {
-            listOf(
-                ItemImage(
-                    id = 0L,
-                    url = image,
-                    filename = null,
-                    contentType = null,
-                    createdAt = null
-                )
-            )
-        } else emptyList(),
-        brandId = null,
-        sizeId = null,
-        schoolId = schoolId,
-        itemConditionId = null,
-        locationId = null,
-        provinceId = null,
-        genderId = null,
-        label = null,
-        reserved = 0
-    )
-}

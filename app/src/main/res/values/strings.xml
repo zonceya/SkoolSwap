@@ -64,6 +64,7 @@
     <string name="select_province_first">select province first</string>
     <string name="search_school">search school</string>
     <string name="favorites">Favorites</string>
+    <string name="search">Search</string>
 
     <!-- Categories -->
     <string-array name="main_categories">
