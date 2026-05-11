@@ -98,12 +98,21 @@ interface RecommendationsApiService {
         @Query("source") source: String,
         @Query("position") position: Int
     ): Response<Unit>
+    // RecommendationsApiService.kt
     @GET("api/v1/items")
     suspend fun searchItems(
         @Query("school_id") schoolId: Int,
         @Query("q") query: String,
         @Query("main_category_id") categoryId: Int? = null,
+        @Query("gender_id") genderId: Int? = null,
+        @Query("brand_id") brandId: Int? = null,
+        @Query("size_id") sizeId: Int? = null,
+        @Query("color_id") colorId: Int? = null,
+        @Query("condition_id") conditionId: Int? = null,
+        @Query("min_price") minPrice: Float? = null,
+        @Query("max_price") maxPrice: Float? = null,
+        @Query("sort") sort: String? = null,
         @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 20
+        @Query("per_page") perPage: Int = 30
     ): Response<RecommendedItemsResponse>
 }

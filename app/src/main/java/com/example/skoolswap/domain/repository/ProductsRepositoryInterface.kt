@@ -44,13 +44,21 @@ interface ProductsRepositoryInterface {
         maxPrice: Float? = null
     ): Result<PaginatedResponse<Item>>
 
-    // ADD THIS NEW METHOD FOR SEARCH
-    suspend fun searchItems(
-        query: String,
-        categoryId: Int? = null,
-        page: Int = 1,
-        perPage: Int = 20
-    ): Result<PaginatedResponse<Item>>
+
+        suspend fun searchItems(
+            query: String,
+            categoryId: Int? = null,
+            genderId: Int? = null,
+            brandId: Int? = null,
+            sizeId: Int? = null,
+            colorId: Int? = null,
+            conditionId: Int? = null,
+            minPrice: Float? = null,
+            maxPrice: Float? = null,
+            sort: String? = null,
+            page: Int = 1,
+            perPage: Int = 30
+        ): Result<PaginatedResponse<Item>>
 
     suspend fun trackClick(
         itemId: String,

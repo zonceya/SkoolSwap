@@ -34,13 +34,11 @@ class OnboardingThirdScreen : Fragment() {
 
         finishButton.setOnClickListener {
             lifecycleScope.launch {
-                // Save onboarding completion
                 appPreferences.setOnboardingFinished(true)
 
-                // Navigate back to login
-                findNavController().navigate(
-                    R.id.action_viewPagerFragment_to_loginFragment
-                )
+                // DON'T navigate to login - just go back in the stack
+                // This returns to LoginFragment, which will see onboarding is done
+                findNavController().popBackStack()
             }
         }
 

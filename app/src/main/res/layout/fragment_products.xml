@@ -11,39 +11,6 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Top bar -->
-        <LinearLayout
-            android:id="@+id/topBar"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:padding="12dp">
-
-            <ImageView
-                android:id="@+id/backBtn"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_back"/>
-
-            <TextView
-                android:id="@+id/sectionTitle"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="All Items"
-                android:textSize="20sp"
-                android:textStyle="bold"
-                android:layout_marginStart="12dp"/>
-
-            <ImageView
-                android:id="@+id/searchBtn"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_search"/>
-
-        </LinearLayout>
-
         <!-- Sort / Filter Bar -->
         <LinearLayout
             android:id="@+id/sortFilterBar"
@@ -92,16 +59,57 @@
 
         </LinearLayout>
 
-        <!-- Products Grid -->
+        <!-- Products Grid (normal mode) -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/productsRecycler"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:padding="12dp"/>
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:padding="12dp"
+            android:visibility="visible"/>
+
+        <!-- Search Results Container (search mode) -->
+        <LinearLayout
+            android:id="@+id/searchResultsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <!-- Info text for cached results -->
+            <TextView
+                android:id="@+id/searchInfoText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:textSize="12sp"
+                android:textColor="#666"
+                android:visibility="gone"/>
+
+            <!-- Progress bar for loading -->
+            <ProgressBar
+                android:id="@+id/searchProgressBar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:visibility="gone"/>
+
+            <!-- Empty results -->
+            <TextView
+                android:id="@+id/emptySearchResults"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:text="No results found"
+                android:gravity="center"
+                android:textSize="16sp"
+                android:visibility="gone"/>
+
+        </LinearLayout>
 
     </LinearLayout>
 
-    <!-- Filter Drawer (Main - slides from right) -->
+    <!-- Filter Drawer (slides from right) -->
     <LinearLayout
         android:id="@+id/filterDrawer"
         android:layout_width="320dp"
@@ -111,7 +119,6 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Header that shows "Filter" -->
         <TextView
             android:id="@+id/filterHeaderTitle"
             android:layout_width="wrap_content"
@@ -121,7 +128,6 @@
             android:textStyle="bold"
             android:layout_marginBottom="16dp"/>
 
-        <!-- Header that shows back button and title (hidden initially) -->
         <LinearLayout
             android:id="@+id/optionsHeader"
             android:layout_width="match_parent"
@@ -149,7 +155,6 @@
 
         </LinearLayout>
 
-        <!-- Dynamic Filter Container (Category, Condition, Product Type, Brand) -->
         <LinearLayout
             android:id="@+id/dynamicFilterContainer"
             android:layout_width="match_parent"
@@ -157,7 +162,6 @@
             android:orientation="vertical"
             android:visibility="visible"/>
 
-        <!-- Options Container (hidden initially, shown when filter is clicked) -->
         <LinearLayout
             android:id="@+id/optionsContainer"
             android:layout_width="match_parent"
@@ -166,7 +170,6 @@
             android:visibility="gone"
             android:padding="8dp"/>
 
-        <!-- Price Range Section -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="48dp"
@@ -182,11 +185,10 @@
             android:layout_height="wrap_content"
             android:text="R0 - R1000"
             android:textSize="14sp"
-            android:textColor="@color/lightgray"
+            android:textColor="#666"
             android:paddingStart="8dp"
             android:paddingBottom="8dp"/>
 
-        <!-- Price Slider -->
         <com.google.android.material.slider.RangeSlider
             android:id="@+id/priceSlider"
             android:layout_width="match_parent"

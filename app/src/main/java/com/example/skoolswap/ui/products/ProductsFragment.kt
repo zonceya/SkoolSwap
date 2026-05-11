@@ -23,6 +23,8 @@ import com.example.skoolswap.domain.model.FilterConfig
 import com.example.skoolswap.domain.model.FilterOption
 import com.example.skoolswap.ui.products.adapter.ProductsAdapter
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
@@ -32,6 +34,10 @@ class ProductsFragment : Fragment() {
     private val binding get() = _binding!!
     private val viewModel: ProductsViewModel by activityViewModels()
     private lateinit var productsAdapter: ProductsAdapter
+
+    // Search state - NEEDED!
+    private var isInSearchMode = false
+    private var searchJob: Job? = null
 
     companion object {
         private const val TAG = "ProductsFragment"
@@ -55,21 +61,28 @@ class ProductsFragment : Fragment() {
         val categoryId = arguments?.getInt("CATEGORY_ID")
         val sportTypeId = arguments?.getInt("SPORT_TYPE_ID", -1)
         val gearType = arguments?.getString("GEAR_TYPE")
-        (requireActivity() as AppCompatActivity).supportActionBar?.hide()
+
+        // Show ActionBar (like HomeFragment)
+        (requireActivity() as AppCompatActivity).supportActionBar?.show()
+        (requireActivity() as AppCompatActivity).supportActionBar?.title = sectionTitle
+        (requireActivity() as AppCompatActivity).supportActionBar?.setDisplayHomeAsUpEnabled(true)
+
         if (sectionType == "sport") {
             viewModel.clearSavedCategory()
         }
+
+        viewModel.setSectionType(sectionType, period, categoryId)
+
+        // Show/hide sort/filter bar
         when (sectionType) {
             "recommended", "trending" -> {
-                binding.sortFilterBar.visibility = View.GONE  // No filter needed
-                binding.topBar.visibility = View.VISIBLE
+                binding.sortFilterBar.visibility = View.VISIBLE
             }
             else -> {
-                binding.sortFilterBar.visibility = View.VISIBLE  // Show filter for all others
-                binding.topBar.visibility = View.VISIBLE
+                binding.sortFilterBar.visibility = View.VISIBLE
             }
         }
-        setupToolbar(sectionTitle)
+
         setupRecyclerView()
         setupSortFilterBar()
         setupDrawer()
@@ -80,15 +93,56 @@ class ProductsFragment : Fragment() {
         viewModel.loadProducts(sectionType, period, categoryId, sportTypeId, gearType)
     }
 
-    private fun setupToolbar(title: String) {
-        binding.sectionTitle.text = title
-        binding.backBtn.setOnClickListener { findNavController().popBackStack() }
-        binding.searchBtn.setOnClickListener { }
+    // ==================== SEARCH METHODS (Called from MainActivity) ====================
+
+    fun performLiveSearch(query: String) {
+        Log.d(TAG, "🔍 performLiveSearch called with: $query")
+
+        if (query.length >= 2) {
+            isInSearchMode = true
+            enterSearchMode()
+
+            // Cancel previous search
+            searchJob?.cancel()
+
+            // Debounce 300ms
+            searchJob = viewLifecycleOwner.lifecycleScope.launch {
+                delay(300)
+                viewModel.searchInCurrentSection(query)
+            }
+        } else if (query.isEmpty()) {
+            exitSearchMode()
+        }
     }
+
+    fun exitSearchMode() {
+        isInSearchMode = false
+        binding.searchResultsContainer.visibility = View.GONE
+        binding.productsRecycler.visibility = View.VISIBLE
+        binding.emptySearchResults.visibility = View.GONE
+
+        // Clear search results
+        viewModel.clearSearchResults()
+
+        // Reload original products
+        viewModel.reloadCurrentSection()
+    }
+
+    private fun enterSearchMode() {
+        binding.searchResultsContainer.visibility = View.VISIBLE
+        binding.productsRecycler.visibility = View.GONE
+        binding.emptySearchResults.visibility = View.GONE
+    }
+
+    // ==================== END SEARCH METHODS ====================
 
     private fun setupRecyclerView() {
         productsAdapter = ProductsAdapter { item ->
             viewModel.trackClick(item.id, arguments?.getString("SECTION_TYPE") ?: "all", 0)
+            val bundle = Bundle().apply {
+                putString("itemId", item.id)
+            }
+            findNavController().navigate(R.id.itemDetailFragment, bundle)
         }
         binding.productsRecycler.apply {
             layoutManager = GridLayoutManager(requireContext(), 2)
@@ -150,7 +204,6 @@ class ProductsFragment : Fragment() {
                     if (filterConfig == null) return@collect
                     val priceGroup = filterConfig.filterGroups.find { it.id == "price" } ?: return@collect
 
-                    // Check if binding is still valid
                     if (_binding == null) return@collect
 
                     binding.priceSlider.apply {
@@ -198,7 +251,6 @@ class ProductsFragment : Fragment() {
         if (_binding == null) return
         binding.dynamicFilterContainer.removeAllViews()
 
-        // Add Category if we have a selected category
         val selectedCategoryId = viewModel.appliedFilters.value.categoryId ?: viewModel.getSavedCategoryId()
         if (selectedCategoryId != null) {
             val categoryGroup = viewModel.getGlobalFilterGroupById("category")
@@ -210,7 +262,6 @@ class ProductsFragment : Fragment() {
             }
         }
 
-        // Add all other filters
         filterConfig.filterGroups.forEach { group ->
             if (group.id == "price") return@forEach
             if (group.options.isEmpty()) return@forEach
@@ -244,7 +295,6 @@ class ProductsFragment : Fragment() {
     private fun showOptionsDrawer(groupId: String, groupName: String, options: List<FilterOption>, filterType: String) {
         if (_binding == null) return
 
-        // Switch to options view
         binding.filterHeaderTitle.visibility = View.GONE
         binding.optionsHeader.visibility = View.VISIBLE
         binding.optionsTitle.text = groupName
@@ -265,17 +315,14 @@ class ProductsFragment : Fragment() {
             checkIcon.visibility = if (isSelected) View.VISIBLE else View.GONE
 
             optionView.setOnClickListener {
-                // Update filter
                 viewModel.updateFilter(groupId, option.id)
                 viewModel.applyFilters()
 
-                // Switch back to main filter view
                 binding.filterHeaderTitle.visibility = View.VISIBLE
                 binding.optionsHeader.visibility = View.GONE
                 binding.dynamicFilterContainer.visibility = View.VISIBLE
                 binding.optionsContainer.visibility = View.GONE
 
-                // Rebuild main drawer to show updated value
                 viewModel.filterConfig.value?.let { rebuildFilterDrawer(it) }
             }
 
@@ -285,7 +332,6 @@ class ProductsFragment : Fragment() {
 
     private fun setupBackButton() {
         binding.backToMain.setOnClickListener {
-            // Switch back to main filter view
             binding.filterHeaderTitle.visibility = View.VISIBLE
             binding.optionsHeader.visibility = View.GONE
             binding.dynamicFilterContainer.visibility = View.VISIBLE
@@ -326,15 +372,38 @@ class ProductsFragment : Fragment() {
     }
 
     private fun observeViewModel() {
+        // Observe products (normal mode)
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.products.collect { products ->
-                    if (_binding != null) {
+                    if (_binding != null && !isInSearchMode) {
                         productsAdapter.submitList(products)
                     }
                 }
             }
         }
+
+        // Observe search results (search mode)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.searchResults.collect { results ->
+                    if (isInSearchMode) {
+                        if (results.isEmpty()) {
+                            binding.searchResultsContainer.visibility = View.VISIBLE
+                            binding.emptySearchResults.visibility = View.VISIBLE
+                            binding.productsRecycler.visibility = View.GONE
+                            productsAdapter.submitList(emptyList())
+                        } else {
+                            binding.searchResultsContainer.visibility = View.VISIBLE
+                            binding.emptySearchResults.visibility = View.GONE
+                            binding.productsRecycler.visibility = View.VISIBLE
+                            productsAdapter.submitList(results)
+                        }
+                    }
+                }
+            }
+        }
+
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.error.collect { error ->
@@ -348,7 +417,6 @@ class ProductsFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        (requireActivity() as AppCompatActivity).supportActionBar?.show()
         _binding = null
     }
 }

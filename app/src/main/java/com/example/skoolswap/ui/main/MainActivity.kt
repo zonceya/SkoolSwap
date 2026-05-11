@@ -15,6 +15,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -37,6 +38,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import androidx.navigation.fragment.NavHostFragment
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
+import com.example.skoolswap.ui.products.ProductsFragment
 import jakarta.inject.Inject
 import timber.log.Timber
 
@@ -286,18 +288,22 @@ class MainActivity : AppCompatActivity() {
     private fun performSearch(query: String) {
         if (query.length < 2) return
 
-        // Get the current visible fragment
-        val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment_content_main) as? NavHostFragment
-        val currentFragment = navHostFragment?.childFragmentManager?.fragments?.firstOrNull()
+        val currentFragment = getCurrentFragment()
 
-        if (currentFragment is HomeFragment) {
-            // Call HomeFragment's search
-            currentFragment.performLiveSearch(query)
-        } else {
-            Toast.makeText(this, "Search is only available on the Home screen", Toast.LENGTH_SHORT).show()
+        when (currentFragment) {
+            is HomeFragment -> currentFragment.performLiveSearch(query)
+            is ProductsFragment -> {
+                // Call ProductsFragment search
+                currentFragment.performLiveSearch(query)
+            }
+            else -> Toast.makeText(this, "Search not available here", Toast.LENGTH_SHORT).show()
         }
     }
-
+    private fun getCurrentFragment(): Fragment? {
+        val navHostFragment = supportFragmentManager
+            .findFragmentById(R.id.nav_host_fragment_content_main) as? NavHostFragment
+        return navHostFragment?.childFragmentManager?.fragments?.firstOrNull()
+    }
     private fun clearHomeSearch() {
         val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment_content_main) as? NavHostFragment
         val currentFragment = navHostFragment?.childFragmentManager?.fragments?.firstOrNull()

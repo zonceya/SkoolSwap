@@ -13,6 +13,7 @@ import com.example.skoolswap.domain.repository.ProductsRepositoryInterface
 import com.example.skoolswap.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -38,7 +39,7 @@ class SportViewModel @Inject constructor(
     fun loadSportData() {
         viewModelScope.launch {
             _isLoading.value = true
-            Log.d("SportViewModel", "loadSportData - START")
+            Timber.tag("SportViewModel").d("loadSportData - START")
 
             // Featured Sports (Grid)
             _featuredSports.value = listOf(
@@ -47,7 +48,7 @@ class SportViewModel @Inject constructor(
                 SportItem(7, "Cricket", R.drawable.ic_cricket),
                 SportItem(8, "Hockey", R.drawable.ic_hockey)
             )
-            Log.d("SportViewModel", "Featured sports set: ${_featuredSports.value?.size}")
+            Timber.tag("SportViewModel").d("Featured sports set: ${_featuredSports.value?.size}")
 
             // More Sports (Horizontal scroll - white chips)
             _moreSports.value = listOf(
@@ -56,7 +57,7 @@ class SportViewModel @Inject constructor(
                 SportItem(9, "Netball", R.drawable.ic_netball),
                 SportItem(37, "Basketball", R.drawable.ic_basketball)
             )
-            Log.d("SportViewModel", "More sports set: ${_moreSports.value?.size}")
+            Timber.tag("SportViewModel").d("More sports set: ${_moreSports.value?.size}")
 
             // Shop by Gear (Horizontal scroll - black chips)
             _gearItems.value = listOf(
@@ -77,7 +78,7 @@ class SportViewModel @Inject constructor(
     // ← ADD THIS FUNCTION
     private fun loadAllSportItems() {
         viewModelScope.launch {
-            Log.d("SportViewModel", "Loading all sport items from API")
+            Timber.tag("SportViewModel").d("Loading all sport items from API")
 
             val result = productsRepository.getRecommendedAll(
                 page = 1,
@@ -90,10 +91,12 @@ class SportViewModel @Inject constructor(
             when (result) {
                 is Result.Success -> {
                     _allSportItems.value = result.data.items
-                    Log.d("SportViewModel", "All sport items loaded: ${result.data.items.size}")
+                    Timber.tag("SportViewModel")
+                        .d("All sport items loaded: ${result.data.items.size}")
                 }
                 is Result.Error -> {
-                    Log.e("SportViewModel", "Failed to load sport items: ${result.exception.message}")
+                    Timber.tag("SportViewModel")
+                        .e("Failed to load sport items: ${result.exception.message}")
                     _allSportItems.value = emptyList()
                 }
             }

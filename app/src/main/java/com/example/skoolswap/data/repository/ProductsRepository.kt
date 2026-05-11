@@ -103,9 +103,18 @@ class ProductsRepository @Inject constructor(
     // Add this to your ProductsRepository class
     // In ProductsRepository.kt, update the search method:
 
+    // ProductsRepository.kt
     override suspend fun searchItems(
         query: String,
         categoryId: Int?,
+        genderId: Int?,
+        brandId: Int?,
+        sizeId: Int?,
+        colorId: Int?,
+        conditionId: Int?,
+        minPrice: Float?,
+        maxPrice: Float?,
+        sort: String?,
         page: Int,
         perPage: Int
     ): Result<PaginatedResponse<Item>> {
@@ -119,6 +128,14 @@ class ProductsRepository @Inject constructor(
                 schoolId = schoolId,
                 query = query,
                 categoryId = categoryId,
+                genderId = genderId,
+                brandId = brandId,
+                sizeId = sizeId,
+                colorId = colorId,
+                conditionId = conditionId,
+                minPrice = minPrice,
+                maxPrice = maxPrice,
+                sort = sort,
                 page = page,
                 perPage = perPage
             )
@@ -127,14 +144,14 @@ class ProductsRepository @Inject constructor(
                 val body = response.body()
                 if (body?.success == true) {
                     val items = body.items.map { itemDto ->
-                        itemDto.toDomain()  // ← This uses your existing mapper
+                        itemDto.toDomain()
                     }
                     Result.Success(PaginatedResponse(
                         items = items,
-                        pagination = body.pagination  // ← Make sure PaginationDto exists
+                        pagination = body.pagination
                     ))
                 } else {
-                    Result.Error(Exception("Failed to search items"))
+                    Result.Error(Exception("Failed to search items: ${response.code()}"))
                 }
             } else {
                 Result.Error(Exception("Server error: ${response.code()}"))
