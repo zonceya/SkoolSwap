@@ -40,31 +40,16 @@ class ViewPagerFragment : Fragment() {
 
         val adapter = ViewPagerAdapter(
             fragmentList,
-            requireActivity().supportFragmentManager,
+            childFragmentManager,
             lifecycle
         )
 
         viewPager = view.findViewById(R.id.viewPager)
         tabLayout = view.findViewById(R.id.tabLayout)
         viewPager.adapter = adapter
-        // Setup tab indicators with dots
-        TabLayoutMediator(tabLayout, viewPager) { tab, position ->
-            tab.customView = null
-            // Set initial icons
-            when (position) {
-                0 -> tab.setIcon(R.drawable.dot_inactive)
-                1 -> tab.setIcon(R.drawable.dot_inactive)
-                2 -> tab.setIcon(R.drawable.dot_active)
-            }
-        }.attach()
 
-        // Update dots when swiping
-        viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-            override fun onPageSelected(position: Int) {
-                super.onPageSelected(position)
-                updateTabIcons(position)
-            }
-        })
+        // Let the selector drawable handle active/inactive state automatically
+        TabLayoutMediator(tabLayout, viewPager) { _, _ -> }.attach()
 
         return view
     }
@@ -72,30 +57,17 @@ class ViewPagerFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val callback = object : OnBackPressedCallback(true) { // true = callback is enabled
-            override fun handleOnBackPressed() {
-                if (viewPager.currentItem == 0) {
-                    // On first screen, go back to login
-                    findNavController().popBackStack()
-                } else {
-                    // Go to previous onboarding screen
-                    viewPager.currentItem -= 1
-                }
-            }
-        }
-
         requireActivity().onBackPressedDispatcher.addCallback(
             viewLifecycleOwner,
-            callback
-        )
-    }
-    private fun updateTabIcons(currentPosition: Int) {
-        for (i in 0 until tabLayout.tabCount) {
-            val tab = tabLayout.getTabAt(i)
-            when {
-                i == currentPosition -> tab?.setIcon(R.drawable.dot_active)
-                else -> tab?.setIcon(R.drawable.dot_inactive)
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    if (viewPager.currentItem == 0) {
+                        findNavController().popBackStack()
+                    } else {
+                        viewPager.currentItem -= 1
+                    }
+                }
             }
-        }
+        )
     }
 }

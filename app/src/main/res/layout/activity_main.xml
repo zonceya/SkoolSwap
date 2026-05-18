@@ -9,12 +9,12 @@
     android:fitsSystemWindows="true"
     tools:openDrawer="start">
 
-    <!-- Loading overlay should be FIRST child -->
+    <!-- Loading overlay -->
     <FrameLayout
         android:id="@+id/loadingOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/white"
+        android:background="?android:colorBackground"
         android:visibility="visible"
         android:elevation="10dp">
 
@@ -38,7 +38,12 @@
         android:layout_height="match_parent"
         android:layout_gravity="start"
         android:fitsSystemWindows="true"
+        android:background="?attr/colorSurface"
+        app:insetForeground="@null"
         app:headerLayout="@layout/nav_header_main"
-        app:menu="@menu/activity_main_drawer" />
+        app:menu="@menu/activity_main_drawer"
+        app:itemTextColor="?attr/colorOnSurface"
+        app:itemIconTint="?attr/colorOnSurface"
+        app:itemBackground="@android:color/transparent" />
 
 </androidx.drawerlayout.widget.DrawerLayout>

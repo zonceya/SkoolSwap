@@ -16,6 +16,36 @@ import com.google.gson.reflect.TypeToken
 
 // ============ ITEM DTO TO DOMAIN ============
 fun ItemDto.toDomain(): Item {
+    // Parse all images from the API response
+    val allImages = mutableListOf<ItemImage>()
+
+    // 1. Add cover photo if exists
+    val coverPhotoUrl = cover_photo ?: image
+    coverPhotoUrl?.let { url ->
+        allImages.add(ItemImage(
+            id = 0,
+            url = url,
+            filename = null,
+            contentType = null,
+            createdAt = null,
+            isCover = true
+        ))
+    }
+
+    // 2. Add all images from the images array (THIS WAS THE PROBLEM!)
+    this.images?.forEach { imageUrl ->
+        if (imageUrl != coverPhotoUrl && imageUrl.isNotBlank()) {
+            allImages.add(ItemImage(
+                id = 0,
+                url = imageUrl,
+                filename = null,
+                contentType = null,
+                createdAt = null,
+                isCover = false
+            ))
+        }
+    }
+
     return Item(
         id = id,
         shopId = shopId,
@@ -28,7 +58,24 @@ fun ItemDto.toDomain(): Item {
         createdAt = createdAt,
         updatedAt = updatedAt,
         shop = shop?.toDomain(),
-        images = emptyList()
+        images = allImages,  // ✅ Now has all images!
+        coverImage = coverPhotoUrl,
+        brandId = brand?.id,
+        sizeId = size?.id,
+        colorId = color?.id,
+        schoolId = school?.id,
+        itemConditionId = condition?.id,
+        locationId = town?.id,
+        provinceId = province?.id,
+        genderId = gender?.id,
+        mainCategoryId = mainCategory?.id,
+        subCategoryId = subCategory?.id,
+        sizeName = size?.name,
+        colorName = color?.name,
+        brandName = brand?.name,
+        conditionName = condition?.name,
+        reserved = (quantity - (availableQuantity ?: quantity)),
+        label = label
     )
 }
 

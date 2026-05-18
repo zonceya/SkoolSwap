@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.Menu
 import android.view.View
+import android.view.ViewGroup
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import android.widget.ImageView
@@ -37,10 +38,13 @@ import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import androidx.navigation.fragment.NavHostFragment
+import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.ui.products.ProductsFragment
 import jakarta.inject.Inject
 import timber.log.Timber
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -49,16 +53,33 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val viewModel: MainViewModel by viewModels()
     private val navHeaderViewModel: NavigationHeaderViewModel by viewModels()
-
+    @Inject
+    lateinit var appPreferences: AppPreferences
     private lateinit var navController: NavController
     @Inject
     lateinit var authRepository: AuthRepositoryInterface
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Timber.tag("MainActivity").e("🔥 onCreate at ${System.currentTimeMillis()}")
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        val typedValue = android.util.TypedValue()
+        theme.resolveAttribute(com.google.android.material.R.attr.colorSurface, typedValue, true)
+        Timber.tag("THEME").e("colorSurface = #${Integer.toHexString(typedValue.data)}")
 
+        theme.resolveAttribute(android.R.attr.colorBackground, typedValue, true)
+        Timber.tag("THEME").e("colorBackground = #${Integer.toHexString(typedValue.data)}")
+
+        val nightMode = resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK
+        Timber.tag("THEME").e("Night mode = ${
+            when (nightMode) {
+                android.content.res.Configuration.UI_MODE_NIGHT_YES -> "DARK"
+                android.content.res.Configuration.UI_MODE_NIGHT_NO -> "LIGHT"
+                else -> "UNDEFINED"
+            }
+        }")
         navController = findNavController(R.id.nav_host_fragment_content_main)
 
         setSupportActionBar(binding.appBarMain.toolbar)
@@ -68,22 +89,26 @@ class MainActivity : AppCompatActivity() {
         setupNavigationListener()
         observeNavigation()
         observeAuthState()
-        lifecycleScope.launch {
-            delay(100) // Small delay to ensure UI is ready
-            val restored = authRepository.restoreSession()
-            Timber.tag("MainActivity").e("🔐 Session restored: $restored")
 
-            if (!restored) {
-                Timber.tag("MainActivity")
-                    .e("⚠️ No session, but we're on a content screen - this shouldn't happen")
-                // Only navigate to login if we're not already there
-                if (navController.currentDestination?.id != R.id.loginFragment) {
-                    navController.navigate(R.id.loginFragment)
+        // ✅ Initial FAB/toolbar state
+        binding.appBarMain.fab.visibility = View.GONE
+        supportActionBar?.hide()
+        binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+
+        // ✅ Route based on SplashActivity decision
+        if (savedInstanceState == null) {
+            when (intent.getStringExtra("destination")) {
+                "home" -> {
+                    val schoolMapped = runBlocking { appPreferences.hasSchoolMapped() }
+                    if (schoolMapped) {
+                        navController.navigate(R.id.action_loginFragment_to_nav_home)
+                    } else {
+                        navController.navigate(R.id.action_loginFragment_to_profileFragment)
+                    }
+                    lifecycleScope.launch { authRepository.refreshUserProfile() }
                 }
-            } else {
-                Timber.tag("MainActivity").e("✅ Session restored successfully!")
-                // Optionally refresh user data
-                authRepository.refreshUserProfile()
+                "onboarding" -> navController.navigate(R.id.viewPagerFragment)
+                else -> { /* stay on loginFragment */ }
             }
         }
     }
@@ -96,12 +121,86 @@ class MainActivity : AppCompatActivity() {
         )
         setupActionBarWithNavController(navController, appBarConfiguration)
     }
+    // Add this function to debug the divider color
+    private fun debugDividerColor() {
+        val navView: NavigationView = binding.navView
+        val headerView = navView.getHeaderView(0)
 
+        // Find the divider view
+        val divider = headerView.findViewById<View>(R.id.divider)
+
+        if (divider != null) {
+            // Get the divider background color
+            val background = divider.background
+            if (background != null) {
+                // For color drawable
+                if (background is android.graphics.drawable.ColorDrawable) {
+                    val colorInt = background.color
+                    val hexColor = String.format("#%08X", colorInt)
+                    val alpha = (colorInt shr 24) and 0xFF
+                    val alphaPercent = (alpha / 255.0) * 100
+
+                    Timber.tag("DIVIDER_DEBUG").e("=== DIVIDER COLOR DEBUG ===")
+                    Timber.tag("DIVIDER_DEBUG").e("Divider exists: YES")
+                    Timber.tag("DIVIDER_DEBUG").e("Color: $hexColor")
+                    Timber.tag("DIVIDER_DEBUG").e("Alpha: $alpha (${String.format("%.1f", alphaPercent)}%)")
+                    Timber.tag("DIVIDER_DEBUG").e("Visible: ${divider.visibility == View.VISIBLE}")
+                    Timber.tag("DIVIDER_DEBUG").e("Height: ${divider.layoutParams?.height}px")
+                    Timber.tag("DIVIDER_DEBUG").e("Alpha property: ${divider.alpha}")
+                }
+            } else {
+                Timber.tag("DIVIDER_DEBUG").e("Divider has no background drawable")
+            }
+
+            // Temporarily force the divider to be very visible for testing
+            // Uncomment to force visibility:
+            // forceDividerVisible(divider)
+        } else {
+            Timber.tag("DIVIDER_DEBUG").e("Divider not found in header layout!")
+
+            // List all views in header for debugging
+            listAllViews(headerView)
+        }
+    }
+
+    // Force divider to be very visible for testing
+    private fun forceDividerVisible(divider: View) {
+        Timber.tag("DIVIDER_DEBUG").e("=== FORCING DIVIDER VISIBLE FOR TEST ===")
+
+        // Make divider bright red for testing
+        divider.setBackgroundColor(android.graphics.Color.RED)
+        divider.alpha = 1.0f  // Fully opaque
+
+        // Increase height
+        val params = divider.layoutParams
+        params.height = 4  // 4dp for testing
+        divider.layoutParams = params
+    }
+
+    // Helper to list all views in header (for debugging)
+    private fun listAllViews(view: View, level: Int = 0) {
+        val indent = "  ".repeat(level)
+        Timber.tag("DIVIDER_DEBUG").e("$indent- ${view::class.java.simpleName} (id: ${view.id})")
+
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                listAllViews(view.getChildAt(i), level + 1)
+            }
+        }
+    }
+
+    // Call this function after setupNavigationHeader()
     private fun setupNavigationHeader() {
         val navView: NavigationView = binding.navView
         val headerView = navView.getHeaderView(0)
         val loadingOverlay = binding.loadingOverlay
-
+        headerView.setBackgroundColor(
+            com.google.android.material.color.MaterialColors.getColor(
+                navView,
+                com.google.android.material.R.attr.colorSurface
+            )
+        )
+        debugDividerColor()
         val usernameTextView = headerView.findViewById<TextView>(R.id.usernameTextView)
         val userEmailTextView = headerView.findViewById<TextView>(R.id.userEmailTextView)
         val profileImageView = headerView.findViewById<ImageView>(R.id.profileImageView)
@@ -187,15 +286,24 @@ class MainActivity : AppCompatActivity() {
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
             when (destination.id) {
-                R.id.viewPagerFragment, R.id.loginFragment -> {
+                R.id.viewPagerFragment,
+                R.id.loginFragment -> {
                     supportActionBar?.hide()
                     binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
                     binding.appBarMain.fab.visibility = View.GONE
+                }
+                R.id.signUpFragment,
+                R.id.otpFragment -> {
+                    supportActionBar?.show()
+                    binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                    binding.appBarMain.fab.visibility = View.GONE
+                    binding.appBarMain.toolbar.menu.findItem(R.id.action_search)?.isVisible = false
                 }
                 else -> {
                     supportActionBar?.show()
                     binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
                     binding.appBarMain.fab.visibility = View.VISIBLE
+                    binding.appBarMain.toolbar.menu.findItem(R.id.action_search)?.isVisible = true
                 }
             }
         }
@@ -222,12 +330,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun performLogout() {
         binding.drawerLayout.closeDrawer(GravityCompat.START)
-        val progressBar = findViewById<ProgressBar>(R.id.progressBar)
-        progressBar.visibility = View.VISIBLE
+
+        val progressBar = findViewById<ProgressBar?>(R.id.progressBar)
+        progressBar?.visibility = View.VISIBLE
 
         lifecycleScope.launch {
             try {
                 viewModel.logout()
+                appPreferences.clearUserData()
                 navController.navigate(R.id.loginFragment) {
                     popUpTo(R.id.nav_home) { inclusive = true }
                 }
@@ -235,7 +345,7 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Snackbar.make(binding.root, "Logout failed: ${e.message}", Snackbar.LENGTH_LONG).show()
             } finally {
-                progressBar.visibility = View.GONE
+                progressBar?.visibility = View.GONE
             }
         }
     }
@@ -293,17 +403,18 @@ class MainActivity : AppCompatActivity() {
         when (currentFragment) {
             is HomeFragment -> currentFragment.performLiveSearch(query)
             is ProductsFragment -> {
-                // Call ProductsFragment search
                 currentFragment.performLiveSearch(query)
             }
             else -> Toast.makeText(this, "Search not available here", Toast.LENGTH_SHORT).show()
         }
     }
+
     private fun getCurrentFragment(): Fragment? {
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment_content_main) as? NavHostFragment
         return navHostFragment?.childFragmentManager?.fragments?.firstOrNull()
     }
+
     private fun clearHomeSearch() {
         val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment_content_main) as? NavHostFragment
         val currentFragment = navHostFragment?.childFragmentManager?.fragments?.firstOrNull()
@@ -313,7 +424,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onSupportNavigateUp(): Boolean {
-        return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
+        val currentDestId = navController.currentDestination?.id
+
+        when (currentDestId) {
+            R.id.otpFragment -> {
+                val purpose = navController.currentBackStackEntry
+                    ?.arguments?.getString("purpose") ?: "LOGIN"
+
+                if (purpose == "SIGNUP") {
+                    navController.navigate(R.id.action_otpFragment_to_signUpFragment)
+                } else {
+                    navController.navigate(R.id.action_otpFragment_to_loginFragment)
+                }
+                return true
+            }
+            R.id.signUpFragment -> {
+                navController.navigate(R.id.action_signUpFragment_to_loginFragment)
+                return true
+            }
+            else -> {
+                return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
+            }
+        }
     }
 
     private fun observeNavigation() {

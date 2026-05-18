@@ -2,6 +2,7 @@ package com.example.skoolswap.data.repository
 
 import android.app.Activity
 import android.util.Log
+import android.util.Log.*
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
@@ -42,6 +43,9 @@ import javax.inject.Singleton
 import com.example.skoolswap.data.remote.models.response.profile.DeleteProfileResponse
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.remote.api.UserSchoolApiService
+import com.example.skoolswap.data.remote.models.request.SignUpRequest
+import com.example.skoolswap.data.remote.models.request.VerifyLoginRequest
+import com.example.skoolswap.data.remote.models.request.VerifySignUpRequest
 import kotlinx.coroutines.flow.first
 
 
@@ -97,7 +101,7 @@ class AuthRepository @Inject constructor(
                 _authToken.value = it.token
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error loading cached user", e)
+            e(TAG, "Error loading cached user", e)
         }
     }
 
@@ -123,7 +127,7 @@ class AuthRepository @Inject constructor(
 
         } catch (e: Exception) {
             _error.value = "Sign-in failed: ${e.localizedMessage}"
-            Log.e(TAG, "Google sign-in failed", e)
+            e(TAG, "Google sign-in failed", e)
             Result.failure(e)
         } finally {
             _loading.value = false
@@ -136,20 +140,30 @@ class AuthRepository @Inject constructor(
         return authResult.user ?: throw IllegalStateException("Firebase user is null")
     }
     // In AuthRepository.kt
+    // In AuthRepository.kt - update restoreSession method
+
     override suspend fun restoreSession(): Boolean {
         return try {
             val token = appPreferences.authToken.first()
             Log.e(TAG, "🔐 restoreSession - Token found: ${token != null && token.isNotEmpty()}")
 
             if (!token.isNullOrEmpty()) {
-                _authToken.value = token
-                loadCachedUser()
+                // Validate token by making a test API call
+                val isValid = validateToken(token)
 
-                // Verify we actually have a user
-                val hasUser = _serverUser.value != null
-                Log.e(TAG, "🔐 restoreSession - User loaded: $hasUser")
-
-                return hasUser
+                if (isValid) {
+                    _authToken.value = token
+                    loadCachedUser()
+                    val hasUser = _serverUser.value != null
+                    Log.e(TAG, "🔐 restoreSession - User loaded: $hasUser")
+                    return hasUser
+                } else {
+                    // Token is invalid, clear it
+                    Log.e(TAG, "🔐 Token is invalid, clearing session")
+                    clearUserData()
+                    appPreferences.clearUserData()
+                    return false
+                }
             } else {
                 Log.e(TAG, "🔐 restoreSession - No token found")
                 false
@@ -159,8 +173,19 @@ class AuthRepository @Inject constructor(
             false
         }
     }
+
     override suspend fun getCurrentToken(): String? {
         return _authToken.value ?: appPreferences.authToken.first()
+    }
+
+    // In AuthRepository.kt
+    override suspend fun validateToken(token: String): Boolean {
+        return try {
+            val response = userApiService.getProfile("Bearer $token")
+            response.isSuccessful
+        } catch (e: Exception) {
+            false
+        }
     }
     private suspend fun handleSignInResponse(
         response: Response<SignInResponse>,
@@ -219,7 +244,7 @@ class AuthRepository @Inject constructor(
                         updatedAt = null
                     )
                     userSchoolDao.insert(tempEntity)
-                    Log.i(TAG, "✅ Cached school in database: ${user.schoolName}")
+                    i(TAG, "✅ Cached school in database: ${user.schoolName}")
 
                     // Trigger background refresh to get real mapping_id
                     CoroutineScope(Dispatchers.IO).launch {
@@ -229,12 +254,12 @@ class AuthRepository @Inject constructor(
 
                 // You'll need userSchoolDao here - inject it in AuthRepository
                 // userSchoolDao.insert(tempEntity)
-                Log.i(TAG, "Cached school from sign-in: ${user.schoolName}")
+                i(TAG, "Cached school from sign-in: ${user.schoolName}")
             }
 
-            Log.i(TAG, "User data cached successfully: ${user.name}")
+            i(TAG, "User data cached successfully: ${user.name}")
         } catch (e: Exception) {
-            Log.e(TAG, "Error caching user data", e)
+            e(TAG, "Error caching user data", e)
         }
     }
     // In AuthRepository.kt
@@ -295,11 +320,11 @@ class AuthRepository @Inject constructor(
                     )
                     userSchoolDao.insert(entity)
 
-                    Log.i(TAG, "🔄 Refreshed school mapping: ${school.mapping_id}")
+                    i(TAG, "🔄 Refreshed school mapping: ${school.mapping_id}")
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Background refresh failed", e)
+            e(TAG, "Background refresh failed", e)
         }
     }
 
@@ -335,7 +360,7 @@ class AuthRepository @Inject constructor(
                     val updatedUser = currentUser.copy(mobile = formattedMobile)
                     _serverUser.value = updatedUser
                     userDao.insertUser(updatedUser.toEntity())
-                    Log.i(TAG, "Mobile updated locally")
+                    i(TAG, "Mobile updated locally")
                 }
 
                 // Optionally refresh from server if needed
@@ -344,7 +369,7 @@ class AuthRepository @Inject constructor(
                     val updatedUser = updateResponse.user.toDomain(token)
                     _serverUser.value = updatedUser
                     userDao.insertUser(updatedUser.toEntity())
-                    Log.i(TAG, "Mobile updated with server response")
+                    i(TAG, "Mobile updated with server response")
                 }
 
                 Result.success(true)
@@ -355,7 +380,7 @@ class AuthRepository @Inject constructor(
             }
         } catch (e: Exception) {
             _error.value = "Update mobile failed: ${e.localizedMessage}"
-            Log.e(TAG, "Update mobile failed", e)
+            e(TAG, "Update mobile failed", e)
             Result.failure(e)
         } finally {
             _loading.value = false
@@ -423,9 +448,9 @@ class AuthRepository @Inject constructor(
             appPreferences.setLoggedIn(false)
             appPreferences.clearUserData()
 
-            Log.i(TAG, "User signed out successfully after deletion")
+            i(TAG, "User signed out successfully after deletion")
         } catch (e: Exception) {
-            Log.e(TAG, "Error during sign out after deletion", e)
+            e(TAG, "Error during sign out after deletion", e)
             // Even if there's an error, we should continue with deletion
         }
     }
@@ -472,7 +497,7 @@ class AuthRepository @Inject constructor(
     }
 
     private fun handleCredentialException(e: GetCredentialException): Nothing {
-        Log.e(TAG, "Credential exception: ${e.javaClass.simpleName} - ${e.message}")
+        e(TAG, "Credential exception: ${e.javaClass.simpleName} - ${e.message}")
 
         when (e) {
             is androidx.credentials.exceptions.NoCredentialException -> {
@@ -523,12 +548,12 @@ class AuthRepository @Inject constructor(
     private fun logNetworkStatus() {
         if (isNetworkAvailable()) {
             val networkType = NetworkUtils.getNetworkType(context)
-            Log.d(TAG, "Network is available. Type: $networkType")
+            d(TAG, "Network is available. Type: $networkType")
 
             val isStable = NetworkUtils.isNetworkStable(context)
-            Log.d(TAG, "Network stability: ${if (isStable) "Stable" else "Unstable"}")
+            d(TAG, "Network stability: ${if (isStable) "Stable" else "Unstable"}")
         } else {
-            Log.w(TAG, "Network is NOT available")
+            w(TAG, "Network is NOT available")
         }
     }
 
@@ -543,23 +568,23 @@ class AuthRepository @Inject constructor(
                 return Result.failure(Exception("Not authenticated"))
             }
 
-            Log.d(TAG, "Calling delete profile API...")
+            d(TAG, "Calling delete profile API...")
             val response = userApiService.deleteProfile("Bearer $token")
 
-            Log.d(TAG, "Delete profile response code: ${response.code()}")
+            d(TAG, "Delete profile response code: ${response.code()}")
 
             if (response.isSuccessful) {
                 val deleteResponse: DeleteProfileResponse? = response.body()
 
                 if (deleteResponse != null) {
-                    Log.i(TAG, "Profile disabled successfully: ${deleteResponse.message}")
+                    i(TAG, "Profile disabled successfully: ${deleteResponse.message}")
 
                     // Clear all user data and sign out
                     signOut()
 
                     Result.success(true)
                 } else {
-                    Log.e(TAG, "Delete profile response body is null")
+                    e(TAG, "Delete profile response body is null")
                     _error.value = "Server returned empty response"
                     Result.failure(Exception("Server returned empty response"))
                 }
@@ -579,17 +604,234 @@ class AuthRepository @Inject constructor(
                     "Delete failed with code: ${response.code()}"
                 }
 
-                Log.e(TAG, "Delete profile failed: $errorMessage")
+                e(TAG, "Delete profile failed: $errorMessage")
                 _error.value = errorMessage
                 Result.failure(Exception(errorMessage))
             }
         } catch (e: Exception) {
             val errorMsg = "Delete profile failed: ${e.message}"
-            Log.e(TAG, errorMsg, e)
+            e(TAG, errorMsg, e)
             _error.value = errorMsg
             Result.failure(e)
         } finally {
             _loading.value = false
+        }
+    }
+
+    override suspend fun sendSignUpOtp(
+        email: String,
+        name: String,
+        password: String,
+        passwordConfirmation: String
+    ): Result<String> {
+        return try {
+            _loading.value = true
+            _error.value = null
+
+            val request = SignUpRequest(
+                name = name,
+                email = email,
+                password = password,
+                passwordConfirmation = passwordConfirmation
+            )
+
+            val response = userApiService.signUp(request)
+
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body?.success == true) {
+                    val otpToken = body.data?.authToken ?: ""
+
+                    // ✅ Add guard for empty token
+                    if (otpToken.isEmpty()) {
+                        Result.failure(Exception("Missing OTP token from server"))
+                    } else {
+                        Log.i(TAG, "✅ Sign up OTP sent to: $email")
+                        Result.success(otpToken)
+                    }
+                } else {
+                    val errorMsg = body?.message ?: "Sign up failed"
+                    _error.value = errorMsg
+                    Result.failure(Exception(errorMsg))
+                }
+            } else {
+                val errorMsg = when (response.code()) {
+                    409 -> "An account with this email already exists"
+                    else -> "Server error: ${response.code()}"
+                }
+                _error.value = errorMsg
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            _error.value = e.message ?: "Network error"
+            Result.failure(e)
+        } finally {
+            _loading.value = false
+        }
+    }
+
+    override suspend fun sendLoginOtp(email: String): Result<String> {
+        return try {
+            _loading.value = true
+            _error.value = null
+
+            Log.i(TAG, "📧 Sending login OTP to: $email")
+
+            val response = userApiService.sendLoginOtp(mapOf("email" to email))
+
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body?.success == true) {
+                    val otpToken = body.data?.authToken ?: ""
+                    Log.i(TAG, "✅ Login OTP sent to: $email")
+                    Result.success(otpToken)
+                } else {
+                    val errorMsg = body?.message ?: "Failed to send OTP"
+                    _error.value = errorMsg
+                    Result.failure(Exception(errorMsg))
+                }
+            } else {
+                val errorMsg = "Server error: ${response.code()}"
+                _error.value = errorMsg
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            _error.value = e.message ?: "Network error"
+            Result.failure(e)
+        } finally {
+            _loading.value = false
+        }
+    }
+
+    override suspend fun verifyOtp(
+        email: String,
+        otpToken: String,
+        otpCode: String,
+        purpose: String,
+        name: String?
+    ): Result<User> {
+        return try {
+            _loading.value = true
+            _error.value = null
+
+            Log.i(TAG, "🔐 Verifying OTP for: $email, purpose: $purpose")
+
+            val response = if (purpose == "SIGNUP") {
+                val request = VerifySignUpRequest(
+                    email = email,
+                    otpToken = otpToken,
+                    otpCode = otpCode,
+                    name = name
+                )
+                userApiService.verifySignUp(request)
+            } else {
+                val request = VerifyLoginRequest(
+                    email = email,
+                    otpToken = otpToken,
+                    otpCode = otpCode
+                )
+                userApiService.verifyLogin(request)
+            }
+
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body?.success == true) {
+                    val token = body.data?.token ?: ""
+                    val userResponse = body.data?.user
+
+                    if (userResponse != null) {
+                        val user = userResponse.toDomain(token)
+                        cacheUserAfterOtp(user, token)
+                        Log.i(TAG, "✅ OTP verified successfully for: ${user.email}")
+                        Result.success(user)
+                    } else {
+                        Result.failure(Exception("User data is null"))
+                    }
+                } else {
+                    val errorMsg = body?.message ?: "Verification failed"
+                    _error.value = errorMsg
+                    Result.failure(Exception(errorMsg))
+                }
+            } else {
+                val errorMsg = "Server error: ${response.code()}"
+                _error.value = errorMsg
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            _error.value = e.message ?: "Verification failed"
+            Result.failure(e)
+        } finally {
+            _loading.value = false
+        }
+    }
+
+    override suspend fun resendOtp(email: String, purpose: String): Result<String> {
+        return try {
+            _loading.value = true
+            _error.value = null
+
+            Log.i(TAG, "🔄 Resending OTP to: $email, purpose: $purpose")
+
+            val response = if (purpose == "SIGNUP") {
+                userApiService.resendSignUpOtp(mapOf("email" to email))
+            } else {
+                userApiService.resendLoginOtp(mapOf("email" to email))
+            }
+
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body?.success == true) {
+                    val otpToken = body.data?.authToken ?: ""
+                    Log.i(TAG, "✅ OTP resent to: $email")
+                    Result.success(otpToken)
+                } else {
+                    val errorMsg = body?.message ?: "Failed to resend OTP"
+                    _error.value = errorMsg
+                    Result.failure(Exception(errorMsg))
+                }
+            } else {
+                val errorMsg = "Server error: ${response.code()}"
+                _error.value = errorMsg
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            _error.value = e.message ?: "Network error"
+            Result.failure(e)
+        } finally {
+            _loading.value = false
+        }
+    }
+
+    private suspend fun cacheUserAfterOtp(user: User, token: String) {
+        try {
+            val userEntity = user.toEntity()
+            userDao.insertUser(userEntity)
+
+            _serverUser.value = user
+            _authToken.value = token
+            appPreferences.setAuthToken(token)
+            appPreferences.setLoggedIn(true)
+            appPreferences.setFirstTimeLogin(false)
+            appPreferences.setUserId(user.id.toString())
+            appPreferences.setUserName(user.name)
+            appPreferences.setUserEmail(user.email)
+
+            if (user.profilePictureUrl != null) {
+                appPreferences.setUserProfileImage(user.profilePictureUrl)
+            }
+
+            if (user.schoolMapped && user.schoolId != null) {
+                appPreferences.setSchoolMapped(true)
+                user.schoolId?.let { schoolId ->
+                    appPreferences.setSchoolInfo(schoolId, user.schoolName ?: "")
+                }
+            } else {
+                appPreferences.setSchoolMapped(false)
+            }
+
+            Log.i(TAG, "✅ User cached after OTP verification: ${user.name}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error caching user after OTP", e)
         }
     }
 
