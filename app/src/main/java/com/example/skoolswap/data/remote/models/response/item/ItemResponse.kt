@@ -90,10 +90,10 @@ data class ItemDto(
     val gender: GenderDto?,
 
     @SerializedName("main_category")
-    val mainCategory: MainCategoryDto?,  // ← Note: main_category maps to mainCategory
+    val mainCategory: MainCategoryDto?,
 
     @SerializedName("sub_category")
-    val subCategory: SubCategoryDto?,    // ← Note: sub_category maps to subCategory
+    val subCategory: SubCategoryDto?,
 
     @SerializedName("available_quantity")
     val availableQuantity: Int?,

@@ -1,8 +1,10 @@
 package com.example.skoolswap.ui.home.viewholders
 
+import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import androidx.core.content.ContextCompat
 import androidx.navigation.findNavController
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -23,6 +25,18 @@ class EssentialsViewHolder(
         Log.d(TAG, "=== BINDING ESSENTIALS SECTION ===")
 
         binding.header.sectionTitle.text = section.title
+
+        // Set text color based on theme
+        val isDarkMode = (itemView.context.resources.configuration.uiMode and
+                Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+
+        val textColor = if (isDarkMode) {
+            ContextCompat.getColor(itemView.context, R.color.white)
+        } else {
+            ContextCompat.getColor(itemView.context, R.color.black)
+        }
+
+        binding.header.sectionTitle.setTextColor(textColor)
         binding.header.viewAll.visibility = View.GONE
         Log.d(TAG, "Header title set to: ${section.title}")
 

@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
-    android:background="#F7F7F7">
+    android:background="?android:attr/colorBackground">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -16,7 +16,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Featured Sports"
-            android:textColor="@color/black"
+            android:textColor="?attr/colorOnSurface"
             android:textStyle="bold"
             android:textSize="18sp"
             android:padding="16dp"/>
@@ -34,7 +34,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="More Sports"
-            android:textColor="@color/black"
+            android:textColor="?attr/colorOnSurface"
             android:textStyle="bold"
             android:textSize="18sp"
             android:padding="16dp"
@@ -48,12 +48,12 @@
             android:paddingEnd="12dp"
             android:nestedScrollingEnabled="false"/>
 
-        <!-- Shop by Gear Section - TITLE FIRST, THEN RECYCLERVIEW -->
+        <!-- Shop by Gear Section -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Shop by Gear"
-            android:textColor="@color/black"
+            android:textColor="?attr/colorOnSurface"
             android:textStyle="bold"
             android:textSize="18sp"
             android:padding="16dp"
@@ -72,7 +72,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="All Sport Items"
-            android:textColor="@color/black"
+            android:textColor="?attr/colorOnSurface"
             android:textStyle="bold"
             android:textSize="18sp"
             android:padding="16dp"

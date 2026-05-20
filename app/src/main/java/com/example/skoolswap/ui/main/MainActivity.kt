@@ -14,6 +14,7 @@ import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
@@ -38,6 +39,7 @@ import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import androidx.navigation.fragment.NavHostFragment
+import com.bumptech.glide.load.engine.GlideException
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.ui.products.ProductsFragment
@@ -194,57 +196,96 @@ class MainActivity : AppCompatActivity() {
         val navView: NavigationView = binding.navView
         val headerView = navView.getHeaderView(0)
         val loadingOverlay = binding.loadingOverlay
-        headerView.setBackgroundColor(
-            com.google.android.material.color.MaterialColors.getColor(
-                navView,
-                com.google.android.material.R.attr.colorSurface
-            )
-        )
-        debugDividerColor()
+
         val usernameTextView = headerView.findViewById<TextView>(R.id.usernameTextView)
         val userEmailTextView = headerView.findViewById<TextView>(R.id.userEmailTextView)
         val profileImageView = headerView.findViewById<ImageView>(R.id.profileImageView)
+
+        // Log to check if views are found
+        Log.d("NavHeader", "usernameTextView: ${usernameTextView != null}")
+        Log.d("NavHeader", "userEmailTextView: ${userEmailTextView != null}")
+        Log.d("NavHeader", "profileImageView: ${profileImageView != null}")
 
         loadingOverlay.visibility = View.VISIBLE
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 navHeaderViewModel.userState.collectLatest { userState ->
+                    Log.d("NavHeader", "userState: $userState")
+
                     when (userState) {
                         is UserState.Loading -> {
+                            Log.d("NavHeader", "State: LOADING")
                             loadingOverlay.visibility = View.VISIBLE
                             usernameTextView.text = "Loading..."
                             userEmailTextView.text = ""
                             profileImageView.setImageResource(R.drawable.ic_user)
+                            profileImageView.setColorFilter(null)
                         }
                         is UserState.Success -> {
+                            Log.d("NavHeader", "State: SUCCESS")
+                            Log.d("NavHeader", "Name: ${userState.name}")
+                            Log.d("NavHeader", "Email: ${userState.email}")
+                            Log.d("NavHeader", "ProfileImageUrl: ${userState.profileImageUrl}")
+
                             loadingOverlay.visibility = View.GONE
                             usernameTextView.text = userState.name ?: "Welcome"
                             userEmailTextView.text = userState.email ?: "Sign in to continue"
 
                             if (!userState.profileImageUrl.isNullOrEmpty()) {
+                                Log.d("NavHeader", "Loading image from URL: ${userState.profileImageUrl}")
+
                                 Glide.with(this@MainActivity)
                                     .load(userState.profileImageUrl)
                                     .circleCrop()
                                     .placeholder(R.drawable.ic_user)
                                     .error(R.drawable.ic_user)
-                                    .diskCacheStrategy(DiskCacheStrategy.NONE)
-                                    .skipMemoryCache(true)
+                                    .override(72, 72)
+                                    .listener(object : com.bumptech.glide.request.RequestListener<android.graphics.drawable.Drawable> {
+                                        override fun onLoadFailed(
+                                            e: GlideException?,
+                                            model: Any?,
+                                            target: com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable>?,
+                                            isFirstResource: Boolean
+                                        ): Boolean {
+                                            Log.e("NavHeader", "Glide load failed", e)
+                                            return false
+                                        }
+
+                                        override fun onResourceReady(
+                                            resource: android.graphics.drawable.Drawable?,
+                                            model: Any?,
+                                            target: com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable>?,
+                                            dataSource: com.bumptech.glide.load.DataSource?,
+                                            isFirstResource: Boolean
+                                        ): Boolean {
+                                            Log.d("NavHeader", "Glide load success")
+                                            return false
+                                        }
+                                    })
                                     .into(profileImageView)
+                                profileImageView.setColorFilter(null)
                             } else {
+                                Log.d("NavHeader", "No profile image URL, using placeholder")
                                 profileImageView.setImageResource(R.drawable.ic_user)
+                                // Set tint based on theme
+                                val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                                        android.content.res.Configuration.UI_MODE_NIGHT_YES
+                                val tintColor = if (isDarkMode) {
+                                    ContextCompat.getColor(this@MainActivity, R.color.white)
+                                } else {
+                                    ContextCompat.getColor(this@MainActivity, R.color.black)
+                                }
+                                profileImageView.setColorFilter(tintColor)
                             }
                         }
                         is UserState.Error -> {
+                            Log.e("NavHeader", "State: ERROR - ${userState.message}")
                             loadingOverlay.visibility = View.GONE
                             usernameTextView.text = "Error"
                             userEmailTextView.text = userState.message
                             profileImageView.setImageResource(R.drawable.ic_user)
-
-                            headerView.setOnClickListener {
-                                loadingOverlay.visibility = View.VISIBLE
-                                navHeaderViewModel.refresh()
-                            }
+                            profileImageView.setColorFilter(null)
                         }
                     }
                 }
@@ -298,6 +339,14 @@ class MainActivity : AppCompatActivity() {
                     binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
                     binding.appBarMain.fab.visibility = View.GONE
                     binding.appBarMain.toolbar.menu.findItem(R.id.action_search)?.isVisible = false
+                }
+                R.id.nav_profile,
+                R.id.nav_favorites,
+                R.id.nav_shop -> {
+                    supportActionBar?.show()
+                    binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
+                    binding.appBarMain.fab.visibility = View.VISIBLE
+                    binding.appBarMain.toolbar.menu.findItem(R.id.action_search)?.isVisible = false  // Hide search
                 }
                 else -> {
                     supportActionBar?.show()

@@ -2,5 +2,6 @@
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval">
     <size android:width="10dp" android:height="10dp" />
-    <solid android:color="?attr/colorPrimary" />  <!-- White in your theme -->
+    <stroke android:width="0.5dp" android:color="@color/white_60" />
+    <solid android:color="#00FFFFFF" />
 </shape>

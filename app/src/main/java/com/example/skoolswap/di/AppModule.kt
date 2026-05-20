@@ -214,13 +214,15 @@ object AppModule {
         shopApiService: ShopApiService,
         shopDao: ShopDao,
         authRepository: AuthRepositoryInterface,
-        itemRepository: ItemRepositoryInterface
+        itemRepository: ItemRepositoryInterface,
+        appPreferences: AppPreferences
     ): ShopRepositoryInterface {
         return ShopRepository(
             shopApiService = shopApiService,
             shopDao = shopDao,
             authRepository = authRepository as AuthRepository,
-            itemRepository = itemRepository
+            itemRepository = itemRepository,
+            appPreferences= appPreferences
         )
     }
 
@@ -230,13 +232,15 @@ object AppModule {
         itemApiService: ItemApiService,
         itemDao: ItemDao,
         itemImageDao: ItemImageDao,
-        authRepository: AuthRepositoryInterface
+        authRepository: AuthRepositoryInterface,
+        appPreferences: AppPreferences
     ): ItemRepositoryInterface {
         return ItemRepository(
             itemApiService = itemApiService,
             itemDao = itemDao,
             itemImageDao = itemImageDao,
-            authRepository = authRepository
+            authRepository = authRepository,
+            appPreferences = appPreferences
         )
     }
 
@@ -244,11 +248,13 @@ object AppModule {
     @Singleton
     fun provideHomeRepository(
         recommendationsApiService: RecommendationsApiService,
-        authRepository: AuthRepositoryInterface
+        authRepository: AuthRepositoryInterface,
+        appPreferences: AppPreferences
     ): HomeRepositoryInterface {
         return HomeRepository(
             recommendationsApiService = recommendationsApiService,
-            authRepository = authRepository
+            authRepository = authRepository,
+            appPreferences = appPreferences
         )
     }
 

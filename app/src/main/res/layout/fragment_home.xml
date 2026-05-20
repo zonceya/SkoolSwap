@@ -10,12 +10,12 @@
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#F7F7F7">
+        android:background="?android:attr/colorBackground" >
 
         <com.google.android.material.appbar.AppBarLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/white"
+            android:background="?attr/colorSurface"
             android:elevation="0dp">
 
             <LinearLayout
@@ -29,6 +29,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
+                    android:background="?attr/colorSurface"
                     android:padding="12dp"
                     android:weightSum="4">
 
@@ -86,6 +87,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:background="?attr/colorSurface"
             android:orientation="vertical"
             app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
@@ -329,7 +331,7 @@
         android:layout_width="320dp"
         android:layout_height="match_parent"
         android:layout_gravity="end"
-        android:background="@android:color/white"
+        android:background="?attr/colorSurface"
         android:orientation="vertical"
         android:padding="16dp"
         android:elevation="8dp">
@@ -417,9 +419,9 @@
             android:layout_marginBottom="16dp"
             android:valueFrom="0"
             android:valueTo="1000"
-            app:thumbColor="@color/black"
-            app:trackColorActive="@color/black"
-            app:trackColorInactive="#E0E0E0"/>
+            app:thumbColor="?attr/colorOnSurface"
+            app:trackColorActive="?attr/colorOnSurface"
+            app:trackColorInactive="@color/lightgray" />
 
         <Space
             android:layout_width="match_parent"

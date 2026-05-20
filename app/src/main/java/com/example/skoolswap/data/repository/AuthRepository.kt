@@ -139,8 +139,7 @@ class AuthRepository @Inject constructor(
         val authResult = firebaseAuth.signInWithCredential(credential).await()
         return authResult.user ?: throw IllegalStateException("Firebase user is null")
     }
-    // In AuthRepository.kt
-    // In AuthRepository.kt - update restoreSession method
+
 
     override suspend fun restoreSession(): Boolean {
         return try {
@@ -148,17 +147,51 @@ class AuthRepository @Inject constructor(
             Log.e(TAG, "🔐 restoreSession - Token found: ${token != null && token.isNotEmpty()}")
 
             if (!token.isNullOrEmpty()) {
-                // Validate token by making a test API call
                 val isValid = validateToken(token)
 
                 if (isValid) {
-                    _authToken.value = token
+                    _authToken.value = token  // ✅ set token in memory
+
+                    // Try Room first
                     loadCachedUser()
-                    val hasUser = _serverUser.value != null
-                    Log.e(TAG, "🔐 restoreSession - User loaded: $hasUser")
-                    return hasUser
+
+                    // If Room had nothing, rebuild from appPreferences
+                    if (_serverUser.value == null) {
+                        Log.e(TAG, "🔐 Room empty - rebuilding user from appPreferences")
+                        val userId = appPreferences.getUserId() ?: 0
+                        val userName = appPreferences.userName.first() ?: ""
+                        val userEmail = appPreferences.userEmail.first() ?: ""
+                        val userProfileImage = appPreferences.userProfileImage.first()
+                        val schoolMapped = appPreferences.hasSchoolMapped()
+                        val schoolId = if (schoolMapped) appPreferences.schoolId.first() else null
+                        val schoolName = if (schoolMapped) appPreferences.schoolName.first() else null
+
+                        val restoredUser = User(
+                            id = userId,
+                            name = userName,
+                            email = userEmail,
+                            mobile = null,
+                            username = userName,
+                            profilePictureUrl = userProfileImage,
+                            authMode = "google",
+                            role = "user",
+                            token = token,
+                            createdAt = "",
+                            updatedAt = "",
+                            schoolMapped = schoolMapped,
+                            schoolId = schoolId,
+                            schoolName = schoolName
+                        )
+
+                        _serverUser.value = restoredUser
+                        // Also persist to Room so next launch works from cache
+                        userDao.insertUser(restoredUser.toEntity())
+                    }
+
+                    Log.e(TAG, "🔐 restoreSession - User loaded: ${_serverUser.value != null}")
+                    return _serverUser.value != null
+
                 } else {
-                    // Token is invalid, clear it
                     Log.e(TAG, "🔐 Token is invalid, clearing session")
                     clearUserData()
                     appPreferences.clearUserData()
@@ -488,37 +521,54 @@ class AuthRepository @Inject constructor(
             .addCredentialOption(googleIdOption)
             .build()
 
-        return try {
-            val response = credentialManager.getCredential(activity, request)
-            parseGoogleIdToken(response)
-        } catch (e: GetCredentialException) {
-            handleCredentialException(e)
+        // Retry up to 3 times for transient failures
+        var lastException: GetCredentialException? = null
+        repeat(3) { attempt ->
+            try {
+                val response = credentialManager.getCredential(activity, request)
+                return parseGoogleIdToken(response)
+            } catch (e: androidx.credentials.exceptions.GetCredentialCancellationException) {
+                // User cancelled — don't retry
+                handleCredentialException(e)
+            } catch (e: GetCredentialException) {
+                lastException = e
+                Log.w(TAG, "Credential attempt ${attempt + 1} failed: ${e.javaClass.simpleName}")
+                if (attempt < 2) {
+                    // Wait before retrying: 500ms, then 1500ms
+                    kotlinx.coroutines.delay(500L * (attempt + 1))
+                }
+            }
         }
+
+        handleCredentialException(lastException!!)
     }
 
     private fun handleCredentialException(e: GetCredentialException): Nothing {
-        e(TAG, "Credential exception: ${e.javaClass.simpleName} - ${e.message}")
+        Log.e(TAG, "Credential exception: ${e.javaClass.simpleName} - ${e.message}")
 
         when (e) {
             is androidx.credentials.exceptions.NoCredentialException -> {
                 if (!isNetworkAvailable()) {
                     throw IllegalStateException(ErrorConstants.Auth.NO_INTERNET)
                 }
-                if (!NetworkUtils.isNetworkStable(context)) {
-                    throw IllegalStateException(ErrorConstants.Auth.UNSTABLE_CONNECTION)
-                }
-                throw IllegalStateException(ErrorConstants.Auth.NO_GOOGLE_ACCOUNTS)
+                // Network is available but credential failed — likely a transient
+                // Credential Manager issue, NOT necessarily missing accounts
+                throw IllegalStateException(ErrorConstants.Auth.GOOGLE_SIGN_IN_FAILED.let {
+                    "Sign-in failed. Please try again."
+                })
             }
             is androidx.credentials.exceptions.GetCredentialCancellationException -> {
                 throw IllegalStateException(ErrorConstants.Auth.SIGN_IN_CANCELLED)
             }
             else -> {
-                val errorMessage = ErrorConstants.format(ErrorConstants.Auth.GOOGLE_SIGN_IN_FAILED, e.message ?: "Unknown error")
+                val errorMessage = ErrorConstants.format(
+                    ErrorConstants.Auth.GOOGLE_SIGN_IN_FAILED,
+                    e.message ?: "Unknown error"
+                )
                 throw IllegalStateException(errorMessage)
             }
         }
     }
-
     private fun parseGoogleIdToken(response: GetCredentialResponse): String {
         val credential = response.credential
         return when (credential) {

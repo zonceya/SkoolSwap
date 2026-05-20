@@ -257,7 +257,7 @@ class ProfileFragment : Fragment() {
                     // Show in the selected text view
                     binding.selectedSchoolText.text = "Selected: ${school.name}"
                     binding.selectedSchoolText.visibility = View.VISIBLE
-                    binding.selectedSchoolText.setTextColor(ContextCompat.getColor(requireContext(), R.color.green))
+                    binding.selectedSchoolText.setTextColor(ContextCompat.getColor(requireContext(), R.color.red))
 
                     // Set text in search box so user can see and edit/delete
                     isSettingTextProgrammatically = true

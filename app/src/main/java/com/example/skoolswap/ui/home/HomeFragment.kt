@@ -48,8 +48,6 @@ class HomeFragment : Fragment() {
     internal var searchJob: Job? = null
     private var isInSearchMode = false
     private var currentSearchResults = mutableListOf<Item>()
-
-    // Filter selection variables - ADDED GENDER
     private var selectedGender: String? = null
     private var selectedCondition: String? = null
     private var selectedSize: String? = null
@@ -128,6 +126,39 @@ class HomeFragment : Fragment() {
         binding.filterBtn.setOnClickListener {
             rebuildLocalFilters()
             binding.drawerLayout.openDrawer(GravityCompat.END)
+        }
+
+        val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+        if (isDarkMode) {
+            // Use existing dark_surface color for background
+            binding.sortBtn.setBackgroundColor(
+                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.dark_surface)
+            )
+            binding.filterBtn.setBackgroundColor(
+                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.dark_surface)
+            )
+            binding.sortBtn.setTextColor(
+                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white)
+            )
+            binding.filterBtn.setTextColor(
+                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white)
+            )
+        } else {
+            // Use existing light_background color for light mode
+            binding.sortBtn.setBackgroundColor(
+                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.light_background)
+            )
+            binding.filterBtn.setBackgroundColor(
+                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.light_background)
+            )
+            binding.sortBtn.setTextColor(
+                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.black)
+            )
+            binding.filterBtn.setTextColor(
+                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.black)
+            )
         }
     }
 
@@ -425,9 +456,24 @@ class HomeFragment : Fragment() {
 
     private fun setupCustomTabs() {
         val tabs = listOf(binding.tabHome, binding.tabUniform, binding.tabSport, binding.tabRecent)
+
+        // Check if dark mode is active
+        val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+        // Choose the correct drawable based on theme
+        val unselectedDrawable = if (isDarkMode) {
+            R.drawable.tablayout_unselected_night
+        } else {
+            R.drawable.tablayout_unselected
+        }
+
+        // Apply to all tabs initially
         tabs.forEach { tab ->
+            tab.setBackgroundResource(unselectedDrawable)
             tab.setOnClickListener { selectTab(tab) }
         }
+
         selectTab(binding.tabHome)
     }
 
@@ -438,19 +484,49 @@ class HomeFragment : Fragment() {
             else -> null
         }
     }
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Re-apply correct drawable when theme changes
+        val isDarkMode = (newConfig.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
 
+        val unselectedDrawable = if (isDarkMode) {
+            R.drawable.tablayout_unselected_night
+        } else {
+            R.drawable.tablayout_unselected
+        }
+
+        // Update all unselected tabs
+        val tabs = listOf(binding.tabHome, binding.tabUniform, binding.tabSport, binding.tabRecent)
+        tabs.forEach { tab ->
+            if (tab.id != currentTabId) {
+                tab.setBackgroundResource(unselectedDrawable)
+            }
+        }
+    }
     private fun selectTab(selectedTab: TextView) {
         currentTabId = selectedTab.id
         val tabs = listOf(binding.tabHome, binding.tabUniform, binding.tabSport, binding.tabRecent)
 
+        // Check dark mode
+        val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+
         tabs.forEach { tab ->
             if (tab == selectedTab) {
+                // Selected tab - black background, WHITE text
                 tab.setBackgroundResource(R.drawable.tablayout_selector)
-                tab.setTextColor(resources.getColor(android.R.color.white, null))
+                tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), android.R.color.white))
                 tab.setTypeface(null, android.graphics.Typeface.BOLD)
             } else {
-                tab.setBackgroundResource(R.drawable.tablayout_unselected)
-                tab.setTextColor(resources.getColor(android.R.color.black, null))
+                // Unselected tab - use theme-aware background
+                if (isDarkMode) {
+                    tab.setBackgroundResource(R.drawable.tablayout_unselected_night)
+                    tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white_70))
+                } else {
+                    tab.setBackgroundResource(R.drawable.tablayout_unselected)
+                    tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.black_70))
+                }
                 tab.setTypeface(null, android.graphics.Typeface.NORMAL)
             }
         }
@@ -466,7 +542,6 @@ class HomeFragment : Fragment() {
             R.id.tabRecent -> navigateToRecentTab()
         }
     }
-
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.homeFeed.collect { feed ->
@@ -532,9 +607,11 @@ class HomeFragment : Fragment() {
 
     private fun setupIndicatorDots() {
         binding.indicatorDots.removeAllViews()
+
         bannerItems.forEachIndexed { index, _ ->
             val dot = ImageView(requireContext()).apply {
-                setImageResource(if (index == 0) R.drawable.dot_active else R.drawable.dot_inactive)
+                setImageResource(R.drawable.dot_selector)
+                isSelected = (index == 0)
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
@@ -548,7 +625,7 @@ class HomeFragment : Fragment() {
     private fun updateIndicatorDots(currentIndex: Int) {
         for (i in 0 until binding.indicatorDots.childCount) {
             val dot = binding.indicatorDots.getChildAt(i) as ImageView
-            dot.setImageResource(if (i == currentIndex) R.drawable.dot_active else R.drawable.dot_inactive)
+            dot.isSelected = (i == currentIndex)
         }
     }
 

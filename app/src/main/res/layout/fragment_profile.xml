@@ -83,7 +83,7 @@
                     android:cursorVisible="false"
                     android:focusable="false"
                     android:inputType="none"
-                    android:textColor="@color/black" />
+                    android:textColor="?attr/colorOnSurface"  />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Contact Number Field -->
@@ -112,7 +112,7 @@
                     android:drawableEnd="@drawable/ic_edit"
                     android:inputType="phone"
                     android:maxLength="10"
-                    android:textColor="@color/black" />
+                    android:textColor="?attr/colorOnSurface"  />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Province Dropdown -->
@@ -133,7 +133,7 @@
                 app:boxCornerRadiusTopStart="12dp"
                 app:endIconMode="dropdown_menu"
                 app:startIconDrawable="@drawable/ic_location"
-                app:startIconTint="@color/black">
+                app:startIconTint="?attr/colorOnSurface">
 
                 <AutoCompleteTextView
                     android:paddingEnd="45dp"
@@ -142,11 +142,10 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="none"
-                    android:textColor="@color/black" />
+                    android:textColor="?attr/colorOnSurface"  />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- School Search -->
-            <!-- School Search - FIXED -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/schoolSearchLayout"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
@@ -163,8 +162,8 @@
                 app:boxCornerRadiusTopStart="12dp"
                 app:endIconMode="clear_text"
                 app:startIconDrawable="@drawable/ic_search"
-                app:startIconTint="@color/black"
-                app:endIconTint="@color/black"
+                app:startIconTint="?attr/colorOnSurface"
+                app:endIconTint="?attr/colorOnSurface"
                 app:placeholderText="@string/select_province_first"
                 app:placeholderTextColor="@color/darker_grey_light">
 
@@ -174,7 +173,7 @@
                     android:layout_height="wrap_content"
                     android:enabled="false"
                     android:inputType="text"
-                    android:textColor="@color/black"
+                    android:textColor="?attr/colorOnSurface"
                     android:textColorHint="@color/darker_grey_light"
                     android:paddingEnd="8dp"
                     android:paddingStart="8dp" />
@@ -247,7 +246,7 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="Delete Profile"
-                android:textColor="@color/black"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:visibility="visible" />
@@ -261,7 +260,7 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="@string/deleting_your_account_is_permanent_and_cannot_be_undone_all_your_data_will_be_permanently_lost"
-                android:textColor="@color/darker_grey_light"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="14sp"
                 android:lineSpacingExtra="4dp"
                 android:visibility="visible" />

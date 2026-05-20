@@ -16,6 +16,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Product Name"
+        android:textColor="?attr/colorOnSurface"
         android:textSize="14sp"
         android:textStyle="bold"
         android:layout_marginTop="8dp" />
@@ -24,7 +25,8 @@
         android:id="@+id/productPrice"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:textColor="?attr/colorPrimary"
         android:text="R399"
         android:textSize="14sp"
-        android:textColor="@color/black" />
+        />
 </LinearLayout>

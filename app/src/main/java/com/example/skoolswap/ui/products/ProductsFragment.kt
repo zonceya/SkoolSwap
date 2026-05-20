@@ -89,7 +89,7 @@ class ProductsFragment : Fragment() {
         setupBackButton()
         observeViewModel()
         observeFilterConfig()
-
+        debugThemeColors()
         viewModel.loadProducts(sectionType, period, categoryId, sportTypeId, gearType)
     }
 
@@ -151,14 +151,15 @@ class ProductsFragment : Fragment() {
     }
 
     private fun setupSortFilterBar() {
-        binding.sortBtn.setOnClickListener { showSortMenu() }
-        binding.filterBtn.setOnClickListener {
+        // If using sortText and filterText TextViews
+        binding.sortContainer.setOnClickListener { showSortMenu() }
+        binding.filterContainer.setOnClickListener {
             binding.drawerLayout.openDrawer(GravityCompat.END)
         }
     }
 
     private fun showSortMenu() {
-        val popup = PopupMenu(requireContext(), binding.sortBtn)
+        val popup = PopupMenu(requireContext(), binding.sortContainer)  // Use sortContainer
         popup.menuInflater.inflate(R.menu.menu_sort, popup.menu)
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
@@ -249,6 +250,10 @@ class ProductsFragment : Fragment() {
 
     private fun rebuildFilterDrawer(filterConfig: FilterConfig) {
         if (_binding == null) return
+
+        Log.d("ProductsFragment", "=== rebuildFilterDrawer ===")
+        Log.d("ProductsFragment", "filterConfig groups: ${filterConfig.filterGroups.size}")
+
         binding.dynamicFilterContainer.removeAllViews()
 
         val selectedCategoryId = viewModel.appliedFilters.value.categoryId ?: viewModel.getSavedCategoryId()
@@ -267,6 +272,7 @@ class ProductsFragment : Fragment() {
             if (group.options.isEmpty()) return@forEach
 
             val selectedValue = getSelectedValueDisplay(group.id)
+            Log.d("ProductsFragment", "Adding filter: ${group.name}, selected: $selectedValue")
             addFilterItem(group.name, selectedValue) {
                 showOptionsDrawer(group.id, group.name, group.options, group.filterType)
             }
@@ -281,9 +287,20 @@ class ProductsFragment : Fragment() {
 
         titleView.text = title
 
+        // Ensure text colors are correct
+        val typedValue = android.util.TypedValue()
+        requireContext().theme.resolveAttribute(com.google.android.material.R.attr.colorOnSurface, typedValue, true)
+        val textColor = typedValue.data
+
+        Log.d("ProductsFragment", "addFilterItem: $title, textColor: #${Integer.toHexString(textColor)}")
+
+        titleView.setTextColor(textColor)
+
         if (!selectedValue.isNullOrEmpty()) {
             valueView.text = selectedValue
             valueView.visibility = View.VISIBLE
+            valueView.setTextColor(textColor)
+            valueView.alpha = 0.7f
         } else {
             valueView.visibility = View.GONE
         }
@@ -292,6 +309,21 @@ class ProductsFragment : Fragment() {
         binding.dynamicFilterContainer.addView(itemView)
     }
 
+    private fun debugThemeColors() {
+        val typedValue = android.util.TypedValue()
+
+        // Log colorSurface
+        requireContext().theme.resolveAttribute(com.google.android.material.R.attr.colorSurface, typedValue, true)
+        Log.d("ProductsFragment", "colorSurface = #${Integer.toHexString(typedValue.data)}")
+
+        // Log colorOnSurface
+        requireContext().theme.resolveAttribute(com.google.android.material.R.attr.colorOnSurface, typedValue, true)
+        Log.d("ProductsFragment", "colorOnSurface = #${Integer.toHexString(typedValue.data)}")
+
+        // Log dark mode status
+        val nightMode = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK
+        Log.d("ProductsFragment", "Dark mode active: ${nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES}")
+    }
     private fun showOptionsDrawer(groupId: String, groupName: String, options: List<FilterOption>, filterType: String) {
         if (_binding == null) return
 
@@ -301,8 +333,17 @@ class ProductsFragment : Fragment() {
         binding.dynamicFilterContainer.visibility = View.GONE
         binding.optionsContainer.visibility = View.VISIBLE
 
+        // REMOVE the manual setBackgroundColor block entirely - XML handles it
+
         val container = binding.optionsContainer
         container.removeAllViews()
+
+        // Resolve once, reuse for all options
+        val typedValue = android.util.TypedValue()
+        requireContext().theme.resolveAttribute(
+            com.google.android.material.R.attr.colorOnSurface, typedValue, true
+        )
+        val textColor = typedValue.data
 
         options.forEach { option ->
             val optionView = layoutInflater.inflate(R.layout.item_filter_option, container, false)
@@ -310,26 +351,28 @@ class ProductsFragment : Fragment() {
             val checkIcon = optionView.findViewById<ImageView>(R.id.checkIcon)
 
             textView.text = option.name
+            textView.setTextColor(textColor)
 
             val isSelected = isOptionSelected(groupId, option.id)
             checkIcon.visibility = if (isSelected) View.VISIBLE else View.GONE
+            if (isSelected) {
+                // FIX: was incorrectly passing a color int as a resource ID
+                checkIcon.imageTintList = android.content.res.ColorStateList.valueOf(textColor)
+            }
 
             optionView.setOnClickListener {
                 viewModel.updateFilter(groupId, option.id)
                 viewModel.applyFilters()
-
                 binding.filterHeaderTitle.visibility = View.VISIBLE
                 binding.optionsHeader.visibility = View.GONE
                 binding.dynamicFilterContainer.visibility = View.VISIBLE
                 binding.optionsContainer.visibility = View.GONE
-
                 viewModel.filterConfig.value?.let { rebuildFilterDrawer(it) }
             }
 
             container.addView(optionView)
         }
     }
-
     private fun setupBackButton() {
         binding.backToMain.setOnClickListener {
             binding.filterHeaderTitle.visibility = View.VISIBLE

@@ -1,6 +1,5 @@
 package com.example.skoolswap.domain.model
 
-// In your Item model file (likely Item.kt)
 data class Item(
     val id: String,
     val shopId: Long,
@@ -16,6 +15,7 @@ data class Item(
     val mainCategoryId: Int? = null,
     val subCategoryId: Int? = null,
     val schoolId: Int? = null,
+    val schoolName: String? = null,
     val itemConditionId: Int? = null,
     val locationId: Int? = null,
     val provinceId: Int? = null,

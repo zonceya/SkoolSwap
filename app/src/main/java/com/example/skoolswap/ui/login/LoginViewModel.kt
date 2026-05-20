@@ -94,7 +94,11 @@ class LoginViewModel @Inject constructor(
     }
 
 
-    // ✅ Add this
+    fun restoreSession() {
+        viewModelScope.launch {
+            authRepository.restoreSession()
+        }
+    }
     fun clearLoginSuccess() {
         _loginSuccess.value = null
     }

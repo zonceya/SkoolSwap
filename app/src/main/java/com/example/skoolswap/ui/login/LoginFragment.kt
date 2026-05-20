@@ -22,14 +22,14 @@ import javax.inject.Inject
 class LoginFragment : Fragment() {
 
     private var _binding: FragmentLoginBinding? = null
-    private val binding get() = _binding!!
+    private val binding get() = _binding!!  // Line 25 - This will crash if _binding is null
     private val viewModel: LoginViewModel by viewModels()
 
     @Inject
     lateinit var appPreferences: AppPreferences
 
     @Inject
-    lateinit var authRepository: AuthRepositoryInterface  // ADD THIS
+    lateinit var authRepository: AuthRepositoryInterface
 
     private var isSigningIn = false
     private var isSendingOtp = false
@@ -50,12 +50,15 @@ class LoginFragment : Fragment() {
         Log.e("LoginFragment", "🔥 onViewCreated")
 
         checkExistingSession()
-      //  setupVideoBackground()
+        // setupVideoBackground() // Commented out
         setupUI()
         observeViewModel()
     }
 
     private fun setupUI() {
+        // SAFE: Only access binding if we're in a valid state
+        if (_binding == null) return
+
         binding.signInButton.setOnClickListener {
             if (isSigningIn) return@setOnClickListener
 
@@ -66,7 +69,9 @@ class LoginFragment : Fragment() {
             binding.signInButton.postDelayed({
                 if (isSigningIn) {
                     isSigningIn = false
-                    binding.signInButton.isEnabled = true
+                    if (_binding != null) {  // Check binding still exists
+                        binding.signInButton.isEnabled = true
+                    }
                 }
             }, 5000)
         }
@@ -95,18 +100,25 @@ class LoginFragment : Fragment() {
             binding.loginButton.postDelayed({
                 if (isSendingOtp) {
                     isSendingOtp = false
-                    binding.loginButton.isEnabled = true
+                    if (_binding != null) {
+                        binding.loginButton.isEnabled = true
+                    }
                 }
             }, 10000)
         }
 
         binding.textSignUpLink.setOnClickListener {
-            findNavController().navigate(R.id.action_loginFragment_to_signUpFragment)
+            if (_binding != null) {
+                findNavController().navigate(R.id.action_loginFragment_to_signUpFragment)
+            }
         }
     }
 
     private fun observeViewModel() {
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
+            // SAFE: Check binding exists before accessing UI
+            if (_binding == null) return@observe
+
             if (isLoading) {
                 binding.signInButton.isEnabled = false
                 binding.loginButton.isEnabled = false
@@ -119,7 +131,7 @@ class LoginFragment : Fragment() {
         }
 
         viewModel.error.observe(viewLifecycleOwner) { error ->
-            if (error != null) {
+            if (error != null && _binding != null) {
                 com.google.android.material.snackbar.Snackbar.make(
                     binding.root,
                     error,
@@ -135,13 +147,13 @@ class LoginFragment : Fragment() {
         }
 
         viewModel.loginSuccess.observe(viewLifecycleOwner) { user ->
-            if (user != null) {
+            if (user != null && _binding != null) {
                 navigateAfterLogin(user)
             }
         }
 
         viewModel.otpSent.observe(viewLifecycleOwner) { otpToken ->
-            if (otpToken != null) {
+            if (otpToken != null && _binding != null) {
                 val email = binding.emailInput.text.toString().trim()
                 val bundle = Bundle().apply {
                     putString("email", email)
@@ -166,64 +178,52 @@ class LoginFragment : Fragment() {
         }
     }
 
-
     private fun checkExistingSession() {
         lifecycleScope.launch {
             try {
                 val isOnboardingFinished = appPreferences.isOnboardingFinished.first()
+
+                // CRITICAL FIX: Check both fragment state AND binding exists
+                if (!isAdded || isDetached || _binding == null) {
+                    Log.d("LoginFragment", "Fragment not in valid state, skipping session check")
+                    return@launch
+                }
 
                 if (!isOnboardingFinished) {
                     findNavController().navigate(R.id.action_loginFragment_to_onboarding)
                     return@launch
                 }
 
-                val isLoggedIn = isUserLoggedIn()
+                val restored = authRepository.restoreSession()
 
-                if (isLoggedIn) {
-                    val authToken = appPreferences.authToken.first() ?: ""
-                    val isValid = authRepository.validateToken(authToken)
-
-                    if (isValid) {
-                        // Only hide AFTER we know we're navigating away
-                        binding.root.visibility = View.INVISIBLE
-
-                        val schoolMapped = appPreferences.hasSchoolMapped()
-                        val userId = appPreferences.getUserId() ?: 0
-                        val userName = appPreferences.userName.first() ?: ""
-                        val userEmail = appPreferences.userEmail.first() ?: ""
-                        val userProfileImage = appPreferences.userProfileImage.first() ?: ""
-
-                        val restoredUser = com.example.skoolswap.domain.model.User(
-                            id = userId.toInt(),
-                            name = userName,
-                            email = userEmail,
-                            mobile = null,
-                            username = userName,
-                            profilePictureUrl = userProfileImage,
-                            authMode = "google",
-                            role = "user",
-                            token = authToken,
-                            createdAt = "",
-                            updatedAt = "",
-                            schoolMapped = schoolMapped,
-                            schoolId = if (schoolMapped) appPreferences.schoolId.first() else null,
-                            schoolName = if (schoolMapped) appPreferences.schoolName.first() else null
-                        )
-
-                        viewModel.setRestoredUser(restoredUser)
-                        navigateAfterLogin(restoredUser)
-                        return@launch
-                    } else {
-                        appPreferences.clearUserData()
-                    }
+                // CRITICAL FIX: Check again after suspend call
+                if (!isAdded || isDetached || _binding == null) {
+                    Log.d("LoginFragment", "Fragment state changed during restore, aborting")
+                    return@launch
                 }
 
-                // Not logged in — show login UI normally
-                binding.root.visibility = View.VISIBLE
+                if (restored) {
+                    binding.root.visibility = View.INVISIBLE
+                    val user = authRepository.getServerUser().first()
+
+                    // Check again before navigation
+                    if (!isAdded || isDetached || _binding == null) return@launch
+
+                    if (user == null) {
+                        binding.root.visibility = View.VISIBLE
+                        return@launch
+                    }
+                    navigateAfterLogin(user)
+                } else {
+                    binding.root.visibility = View.VISIBLE
+                }
 
             } catch (e: Exception) {
                 Log.e("LoginFragment", "❌ Error checking session: ${e.message}")
-                binding.root.visibility = View.VISIBLE
+                // SAFE: Check binding exists before accessing UI
+                if (isAdded && !isDetached && _binding != null) {
+                    binding.root.visibility = View.VISIBLE
+                }
             }
         }
     }
@@ -243,6 +243,7 @@ class LoginFragment : Fragment() {
     }
 
     private fun setupVideoBackground() {
+        if (_binding == null) return
         val videoPath = "android.resource://${requireContext().packageName}/${R.raw.login_background}"
         videoBackgroundManager = VideoBackgroundManager(binding.videoView, videoPath)
         videoBackgroundManager?.setupVideo()
@@ -250,7 +251,9 @@ class LoginFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        videoBackgroundManager?.resumeVideo()
+        if (_binding != null) {
+            videoBackgroundManager?.resumeVideo()
+        }
     }
 
     override fun onPause() {

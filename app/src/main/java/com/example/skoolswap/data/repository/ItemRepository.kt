@@ -7,6 +7,7 @@ import android.net.Uri
 import android.util.Log
 import com.example.skoolswap.data.local.database.dao.ItemDao
 import com.example.skoolswap.data.local.database.entities.ItemEntity
+import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.mapper.toDomain
 import com.example.skoolswap.data.mapper.toEntity
 import com.example.skoolswap.data.remote.api.ItemApiService
@@ -38,7 +39,9 @@ class ItemRepository @Inject constructor(
     private val itemApiService: ItemApiService,
     private val itemDao: ItemDao,
     private val itemImageDao: ItemImageDao,
-    private val authRepository: AuthRepositoryInterface
+    private val authRepository: AuthRepositoryInterface,
+    private val appPreferences: AppPreferences
+
 ) : ItemRepositoryInterface {
 
     companion object {

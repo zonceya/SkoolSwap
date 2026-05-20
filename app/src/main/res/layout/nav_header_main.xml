@@ -27,12 +27,12 @@
 
             <ImageView
                 android:id="@+id/profileImageView"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
                 android:layout_gravity="center"
+                android:scaleType="centerCrop"
                 android:contentDescription="Profile image"
-                android:src="@drawable/ic_user"
-                app:tint="?attr/colorOnSurface" />
+                android:src="@drawable/ic_user" />
         </FrameLayout>
 
         <LinearLayout

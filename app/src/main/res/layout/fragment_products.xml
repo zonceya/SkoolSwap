@@ -16,44 +16,59 @@
             android:id="@+id/sortFilterBar"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:background="#F3F3F3"
-            android:orientation="horizontal">
+            android:background="?attr/colorSurface"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
 
             <LinearLayout
-                android:id="@+id/sortBtn"
+                android:id="@+id/sortContainer"
                 android:layout_width="0dp"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:gravity="center"
-                android:layout_height="match_parent">
+                android:orientation="horizontal"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
 
                 <TextView
                     android:id="@+id/sortText"
-                    android:text="RECOMMENDED"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="RECOMMENDED ▼"
                     android:textStyle="bold"
                     android:textSize="14sp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"/>
+                    android:textColor="?attr/colorOnSurface" />
 
             </LinearLayout>
 
             <View
                 android:layout_width="1dp"
-                android:layout_height="match_parent"
-                android:background="#DDDDDD"/>
+                android:layout_height="24dp"
+                android:layout_gravity="center_vertical"
+                android:background="?attr/colorOnSurface"
+                android:alpha="0.12" />
 
             <LinearLayout
-                android:id="@+id/filterBtn"
+                android:id="@+id/filterContainer"
                 android:layout_width="0dp"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:gravity="center"
-                android:layout_height="match_parent">
+                android:orientation="horizontal"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
 
                 <TextView
-                    android:text="FILTER"
+                    android:id="@+id/filterText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="FILTER ▼"
                     android:textStyle="bold"
                     android:textSize="14sp"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"/>
+                    android:textColor="?attr/colorOnSurface" />
 
             </LinearLayout>
 
@@ -115,7 +130,7 @@
         android:layout_width="320dp"
         android:layout_height="match_parent"
         android:layout_gravity="end"
-        android:background="@android:color/white"
+        android:background="?attr/colorSurface"
         android:orientation="vertical"
         android:padding="16dp">
 
@@ -124,6 +139,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Filter"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="20sp"
             android:textStyle="bold"
             android:layout_marginBottom="16dp"/>
@@ -141,14 +157,16 @@
                 android:id="@+id/backToMain"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
+                app:tint="?attr/colorOnSurface"
                 android:src="@drawable/ic_back"
-                app:tint="#000000" />
+           />
 
             <TextView
                 android:id="@+id/optionsTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Product Type"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 android:layout_marginStart="16dp"/>
@@ -174,6 +192,7 @@
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:text="Price Range"
+            android:textColor="?attr/colorOnSurface"
             android:textSize="16sp"
             android:textStyle="bold"
             android:paddingStart="8dp"
@@ -185,7 +204,7 @@
             android:layout_height="wrap_content"
             android:text="R0 - R1000"
             android:textSize="14sp"
-            android:textColor="#666"
+            android:textColor="?attr/colorOnSurface"
             android:paddingStart="8dp"
             android:paddingBottom="8dp"/>
 
@@ -197,8 +216,8 @@
             android:layout_marginBottom="16dp"
             android:valueFrom="0"
             android:valueTo="1000"
-            app:thumbColor="@color/black"
-            app:trackColorActive="@color/black"
+            app:thumbColor="?attr/colorOnSurface"
+            app:trackColorActive="?attr/colorOnSurface"
             app:trackColorInactive="#E0E0E0"/>
 
         <Space
