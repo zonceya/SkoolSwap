@@ -75,7 +75,40 @@ class SportViewModel @Inject constructor(
         }
     }
 
-    // ← ADD THIS FUNCTION
+    // Add this function to ShopViewModel
+    private fun getSampleItems(): List<Item> {
+        return listOf(
+            createSampleItem("1", "School Bag", 59.00, 4, "Medium", "Good"),      // Accessories
+            createSampleItem("2", "Acer Laptop", 900.00, 4, "15 inch", "Used"),   // Accessories
+            createSampleItem("3", "History Book", 200.00, 5, "Paperback", "Good"), // Books
+            createSampleItem("4", "Math Textbook", 150.00, 5, "Hardcover", "Like New"), // Books
+            createSampleItem("5", "Soccer Ball", 25.00, 2, "Size 5", "Good"),      // Sport
+            createSampleItem("6", "Notebook", 45.00, 3, "A4", "New"),              // Stationary
+            createSampleItem("7", "Uniform Shirt", 85.00, 1, "Large", "Excellent") // Uniform
+        )
+    }
+
+    private fun createSampleItem(
+        id: String,
+        name: String,
+        price: Double,
+        typeId: Int,
+        size: String,
+        condition: String
+    ): Item {
+        return Item(
+            id = id,
+            shopId = 1L,
+            name = name,
+            description = "$size, Condition: $condition",
+            price = price,
+            quantity = 1,
+            status = "active",
+            createdAt = "",
+            itemTypeId = typeId,  // This is key for category filtering!
+            images = emptyList()
+        )
+    }
     private fun loadAllSportItems() {
         viewModelScope.launch {
             Timber.tag("SportViewModel").d("Loading all sport items from API")

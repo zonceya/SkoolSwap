@@ -19,7 +19,7 @@
 
         <!-- Image container -->
         <FrameLayout
-            android:layout_width="120dp"
+            android:layout_width="140dp"
             android:layout_height="120dp"
             android:background="?attr/colorSurface"
             android:foreground="?attr/selectableItemBackground">

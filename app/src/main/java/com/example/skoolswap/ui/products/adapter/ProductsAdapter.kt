@@ -64,7 +64,7 @@ class ProductsAdapter(
                     .load(item.images.first().url)
                     .placeholder(R.drawable.ic_create_item_placeholder)
                     .error(R.drawable.ic_create_item_placeholder)
-                    .centerCrop()
+                    .fitCenter()
                     .into(binding.productImage)
             } else {
                 binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)

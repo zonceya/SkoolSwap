@@ -15,12 +15,16 @@
         android:elevation="0dp"
         app:elevation="0dp">
 
-        <androidx.appcompat.widget.Toolbar
+        <!-- Changed to MaterialToolbar -->
+        <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="?attr/colorPrimaryVariant"
+            android:background="?attr/colorSurface"
             android:elevation="0dp"
+            app:titleTextColor="?attr/colorOnSurface"
+            app:subtitleTextColor="?attr/colorOnSurface"
+            app:navigationIconTint="?attr/colorOnSurface"
             app:popupTheme="@style/Theme.SkoolSwap.PopupOverlay" />
 
     </com.google.android.material.appbar.AppBarLayout>

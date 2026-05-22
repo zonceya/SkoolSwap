@@ -1,6 +1,10 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <style name="Theme.SkoolSwap" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
-        <!-- Primary brand color - WHITE for dark mode too -->
+    <style name="Theme.SkoolSwap" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- ADD THESE - Launch window background -->
+        <item name="android:windowBackground">@color/dark_background</item>
+        <item name="android:windowIsTranslucent">false</item>
+
+        <!-- Primary brand color - WHITE for dark mode -->
         <item name="colorPrimary">@color/white</item>
         <item name="colorPrimaryVariant">@color/dark_surface</item>
         <item name="colorOnPrimary">@color/black</item>
@@ -34,8 +38,12 @@
         <item name="colorControlHighlight">@color/white_transparent_20</item>
         <item name="colorAccent">@color/teal_200</item>
         <item name="elevationOverlayEnabled">false</item>
+
+        <!-- Action Bar Theme for dark mode -->
+        <item name="actionBarTheme">@style/Theme.SkoolSwap.AppBarOverlay</item>
     </style>
 
+    <!-- Rest of your dark mode styles -->
     <style name="CustomTabText" parent="TextAppearance.Design.Tab">
         <item name="android:textSize">16sp</item>
         <item name="android:textStyle">normal</item>
@@ -62,6 +70,12 @@
         <item name="android:minHeight">20dp</item>
         <item name="android:maxHeight">20dp</item>
         <item name="android:progressDrawable">@drawable/rating_bar_gold</item>
+    </style>
+
+    <style name="Theme.SkoolSwap.NoActionBar" parent="Theme.SkoolSwap">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowBackground">@color/dark_background</item>
     </style>
 
     <style name="FullScreenDialogStyle" parent="Theme.MaterialComponents.Dialog">

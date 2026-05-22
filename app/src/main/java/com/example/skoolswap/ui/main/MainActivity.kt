@@ -63,9 +63,31 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Timber.tag("MainActivity").e("🔥 onCreate at ${System.currentTimeMillis()}")
+
+        val nightMode = resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK
+        val isDark = nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+        // Set status bar color explicitly based on mode
+        window.statusBarColor = if (isDark) {
+            android.graphics.Color.BLACK
+        } else {
+            android.graphics.Color.WHITE
+        }
+
+        // Set icon tint — light icons for dark, dark icons for light
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = if (isDark) {
+            0  // dark background = light icons, clear the flag
+        } else {
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR  // light background = dark icons
+        }
+
+        // Only inflate once!
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // Debug theme colors
         val typedValue = android.util.TypedValue()
         theme.resolveAttribute(com.google.android.material.R.attr.colorSurface, typedValue, true)
         Timber.tag("THEME").e("colorSurface = #${Integer.toHexString(typedValue.data)}")
@@ -73,15 +95,8 @@ class MainActivity : AppCompatActivity() {
         theme.resolveAttribute(android.R.attr.colorBackground, typedValue, true)
         Timber.tag("THEME").e("colorBackground = #${Integer.toHexString(typedValue.data)}")
 
-        val nightMode = resources.configuration.uiMode and
-                android.content.res.Configuration.UI_MODE_NIGHT_MASK
-        Timber.tag("THEME").e("Night mode = ${
-            when (nightMode) {
-                android.content.res.Configuration.UI_MODE_NIGHT_YES -> "DARK"
-                android.content.res.Configuration.UI_MODE_NIGHT_NO -> "LIGHT"
-                else -> "UNDEFINED"
-            }
-        }")
+        Timber.tag("THEME").e("Night mode = ${if (isDark) "DARK" else "LIGHT"}")
+
         navController = findNavController(R.id.nav_host_fragment_content_main)
 
         setSupportActionBar(binding.appBarMain.toolbar)
@@ -92,22 +107,25 @@ class MainActivity : AppCompatActivity() {
         observeNavigation()
         observeAuthState()
 
-        // ✅ Initial FAB/toolbar state
+        // Initial FAB/toolbar state
         binding.appBarMain.fab.visibility = View.GONE
         supportActionBar?.hide()
         binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
 
-        // ✅ Route based on SplashActivity decision
+        // ✅ FIXED: Route based on SplashActivity decision - NO runBlocking!
         if (savedInstanceState == null) {
             when (intent.getStringExtra("destination")) {
                 "home" -> {
-                    val schoolMapped = runBlocking { appPreferences.hasSchoolMapped() }
-                    if (schoolMapped) {
-                        navController.navigate(R.id.action_loginFragment_to_nav_home)
-                    } else {
-                        navController.navigate(R.id.action_loginFragment_to_profileFragment)
+                    // Move blocking call off main thread
+                    lifecycleScope.launch {
+                        val schoolMapped = appPreferences.hasSchoolMapped()
+                        if (schoolMapped) {
+                            navController.navigate(R.id.action_loginFragment_to_nav_home)
+                        } else {
+                            navController.navigate(R.id.action_loginFragment_to_profileFragment)
+                        }
+                        authRepository.refreshUserProfile()
                     }
-                    lifecycleScope.launch { authRepository.refreshUserProfile() }
                 }
                 "onboarding" -> navController.navigate(R.id.viewPagerFragment)
                 else -> { /* stay on loginFragment */ }
@@ -332,7 +350,11 @@ class MainActivity : AppCompatActivity() {
                     supportActionBar?.hide()
                     binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
                     binding.appBarMain.fab.visibility = View.GONE
+                    window.statusBarColor = android.graphics.Color.BLACK
+                    @Suppress("DEPRECATION")
+                    window.decorView.systemUiVisibility = 0 // light icons
                 }
+
                 R.id.signUpFragment,
                 R.id.otpFragment -> {
                     supportActionBar?.show()
@@ -340,22 +362,35 @@ class MainActivity : AppCompatActivity() {
                     binding.appBarMain.fab.visibility = View.GONE
                     binding.appBarMain.toolbar.menu.findItem(R.id.action_search)?.isVisible = false
                 }
+
                 R.id.nav_profile,
                 R.id.nav_favorites,
                 R.id.nav_shop -> {
                     supportActionBar?.show()
                     binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
                     binding.appBarMain.fab.visibility = View.VISIBLE
-                    binding.appBarMain.toolbar.menu.findItem(R.id.action_search)?.isVisible = false  // Hide search
+                    binding.appBarMain.toolbar.menu.findItem(R.id.action_search)?.isVisible = false
                 }
+
                 else -> {
                     supportActionBar?.show()
                     binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
                     binding.appBarMain.fab.visibility = View.VISIBLE
                     binding.appBarMain.toolbar.menu.findItem(R.id.action_search)?.isVisible = true
+
+                    // Restore theme-based status bar for all other screens
+                    val nightMode = resources.configuration.uiMode and
+                            android.content.res.Configuration.UI_MODE_NIGHT_MASK
+                    val isDark = nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES
+                    window.statusBarColor = if (isDark) android.graphics.Color.BLACK
+                    else android.graphics.Color.WHITE
+                    @Suppress("DEPRECATION")
+                    window.decorView.systemUiVisibility = if (isDark) 0
+                    else View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
                 }
             }
         }
+
     }
 
     private fun showLogoutConfirmationDialog() {
