@@ -21,8 +21,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-
-
 @HiltViewModel
 class EditItemViewModel @Inject constructor(
     private val itemRepository: ItemRepositoryInterface,
@@ -47,7 +45,6 @@ class EditItemViewModel @Inject constructor(
     private val _images = MutableStateFlow<List<EditImage>>(emptyList())
     val images: StateFlow<List<EditImage>> = _images.asStateFlow()
 
-    // Track which existing images to delete
     private val _imagesToDelete = MutableStateFlow<Set<Long>>(emptySet())
     val imagesToDelete: StateFlow<Set<Long>> = _imagesToDelete.asStateFlow()
 
@@ -86,6 +83,12 @@ class EditItemViewModel @Inject constructor(
     private val _genders = MutableStateFlow<List<Gender>>(emptyList())
     val genders: StateFlow<List<Gender>> = _genders.asStateFlow()
 
+    private val _tags = MutableStateFlow<List<Tag>>(emptyList())
+    val tags: StateFlow<List<Tag>> = _tags.asStateFlow()
+
+    private val _locations = MutableStateFlow<List<Location>>(emptyList())
+    val locations: StateFlow<List<Location>> = _locations.asStateFlow()
+
     // ============ SELECTED VALUES ============
     private val _selectedMainCategoryId = MutableStateFlow<Int?>(null)
     val selectedMainCategoryId: StateFlow<Int?> = _selectedMainCategoryId.asStateFlow()
@@ -93,56 +96,107 @@ class EditItemViewModel @Inject constructor(
     private val _selectedProvinceId = MutableStateFlow<Int?>(null)
     val selectedProvinceId: StateFlow<Int?> = _selectedProvinceId.asStateFlow()
 
-    // ============ INIT ============
     init {
         viewModelScope.launch {
-            // Use the existing bulk method to load ALL reference data at once
-            val result = referenceRepository.refreshAllReferenceDataBulk()
+            _isLoading.value = true
 
-            if (result.isSuccess) {
-                Log.d(TAG, "✅ Successfully loaded all reference data in bulk")
-
-                // Now collect each flow to populate the StateFlows
-                launch { referenceRepository.getMainCategories().collect { _mainCategories.value = it } }
-
-                // ✅ FIXED: Use getSubCategories() for subcategories
-                launch { referenceRepository.getSubCategories().collect { _subCategories.value = it } }
-
-                launch { referenceRepository.getConditions().collect { _conditions.value = it } }
-                launch { referenceRepository.getGenders().collect { _genders.value = it } }
-                launch { referenceRepository.getSchools().collect { _schools.value = it } }
-                launch { referenceRepository.getSizes().collect { _sizes.value = it } }
-                launch { referenceRepository.getBrands().collect { _brands.value = it } }
-                launch { referenceRepository.getColors().collect { _colors.value = it } }
-                launch { referenceRepository.getProvinces().collect { _provinces.value = it } }
-            } else {
-                Log.e(TAG, "❌ Failed to load reference data")
+            // STEP 1: Start collecting from DB FIRST (so we catch any updates)
+            launch {
+                referenceRepository.getMainCategories().collect {
+                    _mainCategories.value = it
+                    Log.d(TAG, "Loaded ${it.size} main categories from DB")
+                }
+            }
+            launch {
+                referenceRepository.getColors().collect {
+                    _colors.value = it
+                    Log.d(TAG, "Loaded ${it.size} colors from DB")
+                }
+            }
+            launch {
+                referenceRepository.getSizes().collect {
+                    _sizes.value = it
+                    Log.d(TAG, "Loaded ${it.size} sizes from DB")
+                }
+            }
+            launch {
+                referenceRepository.getBrands().collect {
+                    _brands.value = it
+                    Log.d(TAG, "Loaded ${it.size} brands from DB")
+                }
+            }
+            launch {
+                referenceRepository.getConditions().collect {
+                    _conditions.value = it
+                    Log.d(TAG, "Loaded ${it.size} conditions from DB")
+                }
+            }
+            launch {
+                referenceRepository.getProvinces().collect {
+                    _provinces.value = it
+                    Log.d(TAG, "Loaded ${it.size} provinces from DB")
+                }
+            }
+            launch {
+                referenceRepository.getSchools().collect {
+                    _schools.value = it
+                    Log.d(TAG, "Loaded ${it.size} schools from DB")
+                }
+            }
+            launch {
+                referenceRepository.getGenders().collect {
+                    _genders.value = it
+                    Log.d(TAG, "Loaded ${it.size} genders from DB")
+                }
+            }
+            launch {
+                referenceRepository.getTags().collect {
+                    _tags.value = it
+                    Log.d(TAG, "Loaded ${it.size} tags from DB")
+                }
+            }
+            launch {
+                referenceRepository.getLocations().collect {
+                    _locations.value = it
+                    Log.d(TAG, "Loaded ${it.size} locations from DB")
+                }
             }
 
-            // Set up observers
+            // STEP 2: Set up observers
             observeSubCategories()
             observeTowns()
 
-            // Load the item
+            // STEP 3: Now trigger the refresh (ONCE) - DB flows will update automatically
+            try {
+                val result = referenceRepository.refreshAllReferenceDataBulk(forceRefresh = false)
+                if (result.isSuccess) {
+                    Log.d(TAG, "✅ Reference data refreshed successfully")
+                } else {
+                    Log.w(TAG, "⚠️ Refresh failed, using cached: ${result.exceptionOrNull()?.message}")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "⚠️ Refresh error: ${e.message}")
+            }
+
+            // STEP 4: Load the item after reference data is ready
             if (itemId.isNotEmpty()) {
                 loadItem(itemId)
+            } else {
+                _isLoading.value = false
             }
         }
     }
 
     fun loadItem(itemId: String) {
         viewModelScope.launch {
-            _isLoading.value = true
             Log.d(TAG, "🔄 Loading item for edit: $itemId")
 
-            // CHANGE THIS LINE - use the new method
             val result = itemRepository.getShopItemForEdit(itemId)
 
             result.fold(
                 onSuccess = { item ->
                     Log.d(TAG, "✅ Item loaded successfully with ${item.images.size} images")
                     _item.value = item
-                    // Convert item images to EditImage.Existing
                     val existingImages = item.images.map { image ->
                         EditImage.Existing(image.id, image.url)
                     }
@@ -157,61 +211,17 @@ class EditItemViewModel @Inject constructor(
         }
     }
 
-    private fun loadReferenceData() {
-        viewModelScope.launch {
-            // Load main categories
-            referenceRepository.getMainCategories().collect {
-                _mainCategories.value = it
-            }
-
-            // Load colors
-            referenceRepository.getColors().collect {
-                _colors.value = it
-            }
-
-            // Load sizes
-            referenceRepository.getSizes().collect {
-                _sizes.value = it
-            }
-
-            // Load brands
-            referenceRepository.getBrands().collect {
-                _brands.value = it
-            }
-
-            // Load conditions
-            referenceRepository.getConditions().collect {
-                _conditions.value = it
-            }
-
-            // Load provinces
-            referenceRepository.getProvinces().collect {
-                _provinces.value = it
-            }
-
-            // Load schools
-            referenceRepository.getSchools().collect {
-                _schools.value = it
-            }
-
-            // Load genders
-            referenceRepository.getGenders().collect {
-                _genders.value = it
-            }
-        }
-    }
-
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun observeSubCategories() {
         viewModelScope.launch {
             _selectedMainCategoryId
                 .filterNotNull()
                 .flatMapLatest { mainCategoryId ->
-                    referenceRepository.refreshSubCategories(mainCategoryId)
                     referenceRepository.getSubCategories(mainCategoryId)
                 }
                 .collect { subCats ->
                     _subCategories.value = subCats
+                    Log.d(TAG, "📦 Received ${subCats.size} subcategories for selected main category")
                 }
         }
     }
@@ -221,9 +231,11 @@ class EditItemViewModel @Inject constructor(
             _selectedProvinceId
                 .filterNotNull()
                 .collect { provinceId ->
+                    Log.d(TAG, "🔍 Province selected: $provinceId")
                     referenceRepository.refreshTowns(provinceId)
                     referenceRepository.getTowns(provinceId).collect { townList ->
                         _towns.value = townList
+                        Log.d(TAG, "Loaded ${townList.size} towns for province $provinceId")
                     }
                 }
         }
@@ -259,7 +271,6 @@ class EditItemViewModel @Inject constructor(
     fun addImage(uri: Uri, position: Int) {
         val currentList = _images.value.toMutableList()
         if (position in 0 until currentList.size) {
-            // Replace whatever is at that position with a new image
             currentList[position] = EditImage.New(uri, isUploading = false)
             _images.value = currentList
         }
@@ -269,13 +280,9 @@ class EditItemViewModel @Inject constructor(
         val currentList = _images.value.toMutableList()
         if (position in 0 until currentList.size) {
             val currentImage = currentList[position]
-
-            // If it was an existing image, mark it for deletion
             if (currentImage is EditImage.Existing && !currentImage.isMarkedForDeletion) {
                 _imagesToDelete.value += currentImage.id
             }
-
-            // Replace with new image
             currentList[position] = EditImage.New(uri, isUploading = false)
             _images.value = currentList
         }
@@ -285,21 +292,16 @@ class EditItemViewModel @Inject constructor(
         val currentList = _images.value.toMutableList()
         if (position in 0 until currentList.size) {
             val image = currentList[position]
-
-            // If it's an existing image, mark for deletion
             if (image is EditImage.Existing && !image.isMarkedForDeletion) {
                 _imagesToDelete.value += image.id
             }
-
-            // Replace with empty slot
             currentList[position] = EditImage.Empty
             _images.value = currentList
         }
     }
 
     fun getImagesForUpload(): List<Uri> {
-        return _images.value.filterIsInstance<EditImage.New>()
-            .map { it.uri }
+        return _images.value.filterIsInstance<EditImage.New>().map { it.uri }
     }
 
     fun getDeletionIds(): List<Long> {
@@ -356,8 +358,6 @@ class EditItemViewModel @Inject constructor(
                 onSuccess = { updatedItem ->
                     _item.value = updatedItem
                     _uiState.value = EditItemUiState.Success("Item updated successfully!")
-
-                    // Clear deletion set after successful update
                     _imagesToDelete.value = emptySet()
                 },
                 onFailure = { error ->
@@ -379,9 +379,7 @@ class EditItemViewModel @Inject constructor(
     fun deleteItem(itemId: String) {
         viewModelScope.launch {
             _uiState.value = EditItemUiState.Loading
-
             val result = itemRepository.deleteItem(itemId)
-
             result.fold(
                 onSuccess = {
                     _uiState.value = EditItemUiState.Success("Item deleted successfully!")

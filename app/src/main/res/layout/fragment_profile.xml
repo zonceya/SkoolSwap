@@ -280,7 +280,6 @@
                 android:textStyle="bold"
                 android:visibility="visible"
                 app:backgroundTint="@null" />
-
         </RelativeLayout>
 
         <!-- Loading Indicator -->

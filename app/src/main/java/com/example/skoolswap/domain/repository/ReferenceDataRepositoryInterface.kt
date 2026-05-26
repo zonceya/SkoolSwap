@@ -10,6 +10,12 @@ interface ReferenceDataRepositoryInterface {
     suspend fun refreshMainCategories(): Result<Unit>
     suspend fun getMainCategoryById(id: Int): MainCategory?
 
+    // ============ BULK OPERATIONS ============
+    // Keep ONLY this one - with the forceRefresh parameter
+    suspend fun refreshAllReferenceDataBulk(forceRefresh: Boolean = false): Result<Unit>
+    suspend fun refreshAllReferenceData(): Result<Unit>
+    suspend fun clearAllCache()
+
     // ============ SUB CATEGORIES ============
     fun getSubCategories(mainCategoryId: Int? = null): Flow<List<SubCategory>>
     suspend fun refreshSubCategories(mainCategoryId: Int? = null): Result<Unit>
@@ -64,11 +70,4 @@ interface ReferenceDataRepositoryInterface {
     fun getLocations(): Flow<List<Location>>
     suspend fun refreshLocations(): Result<Unit>
     suspend fun getLocationById(id: Int): Location?
-
-    // ============ BULK OPERATIONS ============
-    suspend fun refreshAllReferenceData(): Result<Unit>
-
-    suspend fun refreshAllReferenceDataBulk(): Result<Unit>
-
-    suspend fun clearAllCache()
 }

@@ -1,4 +1,3 @@
-// ui/home/viewholders/RecentViewHolder.kt
 package com.example.skoolswap.ui.home.viewholders
 
 import android.content.res.Configuration
@@ -17,6 +16,22 @@ class RecentViewHolder(
     private val onItemClick: (Item, String) -> Unit,
     private val onViewAllClick: (String) -> Unit
 ) : RecyclerView.ViewHolder(binding.root) {
+
+    // Create adapter once and reuse it
+    private val recentAdapter = RecentItemsAdapter(
+        onItemClick = { item ->
+            onItemClick(item, "recent")
+        },
+        maxItems = 4
+    )
+
+    init {
+        // Set up the recycler view once
+        binding.recentRecycler.apply {
+            layoutManager = LinearLayoutManager(itemView.context)
+            adapter = recentAdapter
+        }
+    }
 
     fun bind(section: Section.Recent) {
         val sectionTitle = binding.root.findViewById<TextView>(R.id.sectionTitle)
@@ -42,18 +57,7 @@ class RecentViewHolder(
             onViewAllClick(section.type)
         }
 
-        // Only show first 4 items
-        val adapter = RecentItemsAdapter(
-            items = section.items,
-            onItemClick = { item ->
-                onItemClick(item, section.type)
-            },
-            maxItems = 4  // Show only 4 items
-        )
-
-        binding.recentRecycler.apply {
-            layoutManager = LinearLayoutManager(itemView.context)
-            this.adapter = adapter
-        }
+        // Update the existing adapter with new items
+        recentAdapter.updateItems(section.items)
     }
 }

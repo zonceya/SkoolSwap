@@ -365,6 +365,8 @@ class MainActivity : AppCompatActivity() {
 
                 R.id.nav_profile,
                 R.id.nav_favorites,
+                R.id.createItemFragment,
+                R.id.editItemFragment,
                 R.id.nav_shop -> {
                     supportActionBar?.show()
                     binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
@@ -414,22 +416,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun performLogout() {
         binding.drawerLayout.closeDrawer(GravityCompat.START)
-
-        val progressBar = findViewById<ProgressBar?>(R.id.progressBar)
-        progressBar?.visibility = View.VISIBLE
-
         lifecycleScope.launch {
             try {
                 viewModel.logout()
                 appPreferences.clearUserData()
-                navController.navigate(R.id.loginFragment) {
-                    popUpTo(R.id.nav_home) { inclusive = true }
-                }
+
+                // Use the action from loginFragment
+                navController.navigate(R.id.action_global_logout)
+
                 Snackbar.make(binding.root, "Logged out successfully", Snackbar.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 Snackbar.make(binding.root, "Logout failed: ${e.message}", Snackbar.LENGTH_LONG).show()
-            } finally {
-                progressBar?.visibility = View.GONE
             }
         }
     }

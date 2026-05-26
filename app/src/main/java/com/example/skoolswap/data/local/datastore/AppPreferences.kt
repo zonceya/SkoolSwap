@@ -1,6 +1,7 @@
 package com.example.skoolswap.data.local.datastore
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -9,6 +10,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import dagger.Provides
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -219,6 +221,7 @@ class AppPreferences @Inject constructor(
     suspend fun getCachedCategoryFilterConfig(categoryId: Int): String? {
         return context.dataStore.data.map { it[stringPreferencesKey("${CATEGORY_FILTER_CACHE_PREFIX}$categoryId")] }.first()
     }
+
 
     /**
      * Check if category-specific filter config cache is still valid (less than 1 hour old)

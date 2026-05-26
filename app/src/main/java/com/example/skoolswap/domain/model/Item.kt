@@ -49,5 +49,5 @@ data class ItemImage(
     val filename: String? = null,
     val contentType: String? = null,
     val createdAt: String? = null,
-    val isCover: Boolean = false  // ← Add this to identify cover image
+    val isCover: Boolean = false
 )

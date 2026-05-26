@@ -54,14 +54,14 @@ class ShopViewModel @Inject constructor(
                 if (items.isNotEmpty()) {
                     _allItems.value = items
                 } else {
-                    // Use sample data if API returns empty
-                    _allItems.value = getSampleItems()
+                    // ✅ USE THE SAMPLE ITEMS FROM THE FILE
+                    _allItems.value = sampleItems
                 }
                 extractCategoriesFromItems(_allItems.value)
                 filterItemsByCategory()
             }.onFailure { error ->
-                // Use sample data on error
-                _allItems.value = getSampleItems()
+                // ✅ USE THE SAMPLE ITEMS FROM THE FILE ON ERROR
+                _allItems.value = sampleItems
                 extractCategoriesFromItems(_allItems.value)
                 filterItemsByCategory()
                 _error.value = error.message
@@ -140,42 +140,5 @@ class ShopViewModel @Inject constructor(
     }
 
     fun clearError() { _error.value = null }
-
-    // ============ ADD THESE TWO FUNCTIONS ============
-
-    private fun getSampleItems(): List<Item> {
-        return listOf(
-            createSampleItem("1", "School Bag", 59.00, 4, "Medium", "Good"),
-            createSampleItem("2", "Acer Laptop", 900.00, 4, "15 inch", "Used"),
-            createSampleItem("3", "History Book - Grade 11", 200.00, 5, "Paperback", "Good"),
-            createSampleItem("4", "Math Textbook", 150.00, 5, "Hardcover", "Like New"),
-            createSampleItem("5", "Soccer Ball", 25.00, 2, "Size 5", "Good"),
-            createSampleItem("6", "Notebook Pack", 45.00, 3, "A4", "New"),
-            createSampleItem("7", "Wireless Headphones", 120.00, 4, "Wireless", "Good"),
-            createSampleItem("8", "School Uniform Shirt", 85.00, 1, "Large", "Excellent")
-        )
-    }
-
-    private fun createSampleItem(
-        id: String,
-        name: String,
-        price: Double,
-        typeId: Int,
-        size: String,
-        condition: String
-    ): Item {
-        return Item(
-            id = id,
-            shopId = 1L,
-            name = name,
-            description = "$size, Condition: $condition",
-            price = price,
-            quantity = 1,
-            status = "active",
-            createdAt = "",
-            itemTypeId = typeId,  // This is key for category filtering!
-            images = emptyList()
-        )
-    }
 
 }

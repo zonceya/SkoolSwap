@@ -4,7 +4,6 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
-import com.bumptech.glide.load.resource.bitmap.RoundedCorners
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestOptions
 import com.example.skoolswap.R
@@ -12,12 +11,11 @@ import com.example.skoolswap.databinding.ItemHomeRecentItemBinding
 import com.example.skoolswap.domain.model.Item
 
 class RecentItemsAdapter(
-    private val items: List<Item>,
     private val onItemClick: (Item) -> Unit,
     private val maxItems: Int = 4
 ) : RecyclerView.Adapter<RecentItemsAdapter.ViewHolder>() {
 
-    private val displayItems = items.take(maxItems)
+    private var displayItems: List<Item> = emptyList()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ItemHomeRecentItemBinding.inflate(
@@ -32,6 +30,14 @@ class RecentItemsAdapter(
 
     override fun getItemCount() = displayItems.size
 
+    fun updateItems(newItems: List<Item>) {
+        val newDisplayItems = newItems.take(maxItems)
+        if (displayItems != newDisplayItems) {
+            displayItems = newDisplayItems
+            notifyDataSetChanged()
+        }
+    }
+
     inner class ViewHolder(
         private val binding: ItemHomeRecentItemBinding
     ) : RecyclerView.ViewHolder(binding.root) {
@@ -39,7 +45,7 @@ class RecentItemsAdapter(
         init {
             binding.root.setOnClickListener {
                 val position = adapterPosition
-                if (position != RecyclerView.NO_POSITION) {
+                if (position != RecyclerView.NO_POSITION && position < displayItems.size) {
                     onItemClick(displayItems[position])
                 }
             }
@@ -47,9 +53,17 @@ class RecentItemsAdapter(
 
         fun bind(item: Item) {
             binding.recentTitle.text = item.name
-            binding.recentPrice.text = "R${item.price}"
-            val schoolName = item.schoolName ?: "School Item"
-            binding.recentSchool.text = schoolName
+            binding.recentSchool.text = item.schoolName ?: "School Item"
+
+            // Fix price display
+            val price = item.price
+            if (price != null && price > 0) {
+                binding.recentPrice.text = "R${price}"
+                binding.recentPrice.visibility = android.view.View.VISIBLE
+            } else {
+                binding.recentPrice.visibility = android.view.View.GONE
+            }
+
             val imageUrl = item.images?.firstOrNull()?.url
             if (!imageUrl.isNullOrEmpty()) {
                 Glide.with(binding.root.context)
@@ -57,13 +71,12 @@ class RecentItemsAdapter(
                     .apply(RequestOptions()
                         .placeholder(R.drawable.ic_create_item_placeholder)
                         .error(R.drawable.ic_create_item_placeholder)
-                        .centerCrop()  // This ensures image fills the 80dp x 80dp space
+                        .fitCenter()
                     )
                     .transition(DrawableTransitionOptions.withCrossFade())
                     .into(binding.recentImage)
             } else {
                 binding.recentImage.setImageResource(R.drawable.ic_create_item_placeholder)
-                // Apply centerCrop to placeholder too
                 binding.recentImage.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
             }
         }

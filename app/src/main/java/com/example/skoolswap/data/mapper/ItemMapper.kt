@@ -20,7 +20,7 @@ fun ItemDto.toDomain(): Item {
     val allImages = mutableListOf<ItemImage>()
 
     // 1. Add cover photo if exists
-    val coverPhotoUrl = cover_photo ?: image
+    val coverPhotoUrl = coverPhoto ?: image
     coverPhotoUrl?.let { url ->
         allImages.add(ItemImage(
             id = 0,
@@ -143,7 +143,7 @@ fun CreateItemResponse.toDomain(): Item {
     // 1. Get cover photo (primary image)
     val coverPhotoUrl = when {
         !itemData?.image.isNullOrEmpty() -> itemData.image
-        !itemData?.cover_photo.isNullOrEmpty() -> itemData.cover_photo
+        !itemData?.coverPhoto.isNullOrEmpty() -> itemData.coverPhoto
         else -> null
     }
 
@@ -159,34 +159,19 @@ fun CreateItemResponse.toDomain(): Item {
         ))
     }
 
-    // 2. Get additional images from images array
-    val additionalImages = when (val imagesRaw = itemData?.imagesRaw) {
-        is List<*> -> {
-            imagesRaw.mapNotNull { image ->
-                when (image) {
-                    is String -> {
-                        if (image != coverPhotoUrl) {
-                            ItemImage(
-                                id = 0,
-                                url = image,
-                                filename = null,
-                                contentType = null,
-                                createdAt = null,
-                                isCover = false
-                            )
-                        } else null
-                    }
-                    is ItemImageDto -> {
-                        if (image.url != coverPhotoUrl) {
-                            image.toDomain().copy(isCover = false)
-                        } else null
-                    }
-                    else -> null
-                }
-            }
-        }
-        else -> emptyList()
-    }
+
+    val additionalImages = itemData?.images
+        ?.filter { it != coverPhotoUrl && it.isNotBlank() }
+        ?.map { imageUrl ->
+            ItemImage(
+                id = 0,
+                url = imageUrl,
+                filename = null,
+                contentType = null,
+                createdAt = null,
+                isCover = false
+            )
+        } ?: emptyList()
 
     allImages.addAll(additionalImages)
     val finalImages = allImages.take(3)
@@ -363,6 +348,7 @@ fun RecommendationItemDto.toDomain(): Item {
         colorId = null,
         mainCategoryId = null,
         subCategoryId = null,
+        schoolName = this.school,
         schoolId = this.schoolId,
         itemConditionId = null,
         locationId = null,

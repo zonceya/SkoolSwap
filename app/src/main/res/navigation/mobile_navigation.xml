@@ -54,6 +54,11 @@
             app:destination="@id/signUpFragment"
             app:popUpTo="@id/loginFragment"
             app:popUpToInclusive="false" />
+        <action
+            android:id="@+id/action_global_logout"
+            app:destination="@id/loginFragment"
+            app:popUpTo="@id/mobile_navigation"
+            app:popUpToInclusive="true" />
 
     </fragment>
 
@@ -233,7 +238,6 @@
         <argument
             android:name="itemId"
             app:argType="string" />
-
     </fragment>
 
     <!-- Products Fragment -->
@@ -344,5 +348,6 @@
             android:defaultValue="@null" />
 
     </fragment>
+    <!-- Add a global action at the root level of your navigation graph -->
 
 </navigation>

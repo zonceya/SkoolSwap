@@ -82,85 +82,89 @@ class CreateItemViewModel @Inject constructor(
     private val _selectedProvinceId = MutableStateFlow<Int?>(null)
     val selectedProvinceId: StateFlow<Int?> = _selectedProvinceId.asStateFlow()
 
-    // ============ INIT ============
     init {
         viewModelScope.launch {
             _isLoading.value = true
 
-            // ONE API CALL to get ALL reference data
-            val result = referenceRepository.refreshAllReferenceDataBulk()
+            // STEP 1: Start collecting from DB FIRST (so we catch any updates)
+            launch {
+                referenceRepository.getMainCategories().collect {
+                    _mainCategories.value = it
+                    Log.d("CreateItemVM", "Loaded ${it.size} main categories from DB")
+                }
+            }
+            launch {
+                referenceRepository.getColors().collect {
+                    _colors.value = it
+                    Log.d("CreateItemVM", "Loaded ${it.size} colors from DB")
+                }
+            }
+            launch {
+                referenceRepository.getSizes().collect {
+                    _sizes.value = it
+                    Log.d("CreateItemVM", "Loaded ${it.size} sizes from DB")
+                }
+            }
+            launch {
+                referenceRepository.getBrands().collect {
+                    _brands.value = it
+                    Log.d("CreateItemVM", "Loaded ${it.size} brands from DB")
+                }
+            }
+            launch {
+                referenceRepository.getConditions().collect {
+                    _conditions.value = it
+                    Log.d("CreateItemVM", "Loaded ${it.size} conditions from DB")
+                }
+            }
+            launch {
+                referenceRepository.getProvinces().collect {
+                    _provinces.value = it
+                    Log.d("CreateItemVM", "Loaded ${it.size} provinces from DB")
+                }
+            }
+            launch {
+                referenceRepository.getSchools().collect {
+                    _schools.value = it
+                    Log.d("CreateItemVM", "Loaded ${it.size} schools from DB")
+                }
+            }
+            launch {
+                referenceRepository.getGenders().collect {
+                    _genders.value = it
+                    Log.d("CreateItemVM", "Loaded ${it.size} genders from DB")
+                }
+            }
+            launch {
+                referenceRepository.getTags().collect {
+                    _tags.value = it
+                    Log.d("CreateItemVM", "Loaded ${it.size} tags from DB")
+                }
+            }
+            launch {
+                referenceRepository.getLocations().collect {
+                    _locations.value = it
+                    Log.d("CreateItemVM", "Loaded ${it.size} locations from DB")
+                }
+            }
 
-            if (result.isSuccess) {
-                Log.d("CreateItemVM", "✅ Successfully loaded all reference data in one call")
+            // STEP 2: Set up observers
+            observeSubCategories()
+            observeTowns()
 
-                // Now collect ALL the flows from database
-                launch {
-                    referenceRepository.getMainCategories().collect {
-                        _mainCategories.value = it
-                        Log.d("CreateItemVM", "Loaded ${it.size} main categories from DB")
-                    }
+            // STEP 3: Now trigger the refresh (ONCE) - DB flows will update automatically
+            try {
+                val result = referenceRepository.refreshAllReferenceDataBulk(forceRefresh = false)
+                if (result.isSuccess) {
+                    Log.d("CreateItemVM", "✅ Reference data refreshed successfully")
+                } else {
+                    Log.w("CreateItemVM", "⚠️ Refresh failed, using cached: ${result.exceptionOrNull()?.message}")
                 }
-                launch {
-                    referenceRepository.getColors().collect {
-                        _colors.value = it
-                        Log.d("CreateItemVM", "Loaded ${it.size} colors from DB")
-                    }
-                }
-                launch {
-                    referenceRepository.getSizes().collect {
-                        _sizes.value = it
-                        Log.d("CreateItemVM", "Loaded ${it.size} sizes from DB")
-                    }
-                }
-                launch {
-                    referenceRepository.getBrands().collect {
-                        _brands.value = it
-                        Log.d("CreateItemVM", "Loaded ${it.size} brands from DB")
-                    }
-                }
-                launch {
-                    referenceRepository.getConditions().collect {
-                        _conditions.value = it
-                        Log.d("CreateItemVM", "Loaded ${it.size} conditions from DB")
-                    }
-                }
-                launch {
-                    referenceRepository.getProvinces().collect {
-                        _provinces.value = it
-                        Log.d("CreateItemVM", "Loaded ${it.size} provinces from DB")
-                    }
-                }
-                launch {
-                    referenceRepository.getSchools().collect {
-                        _schools.value = it
-                        Log.d("CreateItemVM", "Loaded ${it.size} schools from DB")
-                    }
-                }
-                launch {
-                    referenceRepository.getGenders().collect {
-                        _genders.value = it
-                        Log.d("CreateItemVM", "Loaded ${it.size} genders from DB")
-                    }
-                }
-                launch {
-                    referenceRepository.getTags().collect {
-                        _tags.value = it
-                        Log.d("CreateItemVM", "Loaded ${it.size} tags from DB")
-                    }
-                }
-                launch {
-                    referenceRepository.getLocations().collect {
-                        _locations.value = it
-                        Log.d("CreateItemVM", "Loaded ${it.size} locations from DB")
-                    }
-                }
-            } else {
-                Log.e("CreateItemVM", "❌ Failed to load reference data")
+            } catch (e: Exception) {
+                Log.w("CreateItemVM", "⚠️ Refresh error: ${e.message}")
             }
 
             _isLoading.value = false
-            observeSubCategories()
-            observeTowns()
         }
     }
 
@@ -171,9 +175,6 @@ class CreateItemViewModel @Inject constructor(
             _selectedMainCategoryId
                 .filterNotNull()
                 .flatMapLatest { mainCategoryId ->
-                    // Refresh first
-                    referenceRepository.refreshSubCategories(mainCategoryId)
-                    // Then return the Flow
                     referenceRepository.getSubCategories(mainCategoryId)
                 }
                 .collect { subCats ->
@@ -189,11 +190,7 @@ class CreateItemViewModel @Inject constructor(
                 .filterNotNull()
                 .collect { provinceId ->
                     Log.d("CreateItemVM", "🔍 Province selected: $provinceId")
-
-                    // Refresh towns for this province
                     referenceRepository.refreshTowns(provinceId)
-
-                    // Collect from database
                     referenceRepository.getTowns(provinceId).collect { townList ->
                         _towns.value = townList
                         Log.d("CreateItemVM", "Loaded ${townList.size} towns for province $provinceId")
@@ -291,13 +288,6 @@ class CreateItemViewModel @Inject constructor(
                     _uiState.value = CreateItemUiState.Error(error.message ?: "Failed to create item")
                 }
             )
-        }
-    }
-
-    // ============ REFRESH METHODS ============
-    fun refreshSubCategories(mainCategoryId: Int) {
-        viewModelScope.launch {
-            referenceRepository.refreshSubCategories(mainCategoryId)
         }
     }
 

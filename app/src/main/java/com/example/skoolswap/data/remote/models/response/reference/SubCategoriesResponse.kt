@@ -10,28 +10,13 @@ data class SubCategoriesResponse(
     val subCategories: List<SubCategoryDto>?,
 
     @SerializedName("main_category")
-    val mainCategory: MainCategoryInfo? ,
+    val mainCategory: MainCategoryInfo?,
 
     @SerializedName("error")
-        val error: String?
+    val error: String?
 )
+
 data class MainCategoryInfo(
     @SerializedName("id") val id: Int,
     @SerializedName("name") val name: String
-)
-
-data class SubCategoryDto(
-    @SerializedName("id")
-    val id: Int,
-
-    @SerializedName("name")
-    val name: String,
-
-    @SerializedName("description")
-    val description: String?,
-
-    @SerializedName("display_order")
-    val displayOrder: Int
-
-    // Remove mainCategoryId - it's not in the response
 )

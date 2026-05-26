@@ -16,6 +16,7 @@ import com.bumptech.glide.Glide
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentShopBinding
 import com.example.skoolswap.domain.model.Item
+import com.example.skoolswap.domain.model.ItemCategorySection
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
@@ -149,11 +150,11 @@ class ShopFragment : Fragment() {
         }
     }
 
-    private fun groupItemsByCategory(items: List<Item>): List<CategorySection> {
+    private fun groupItemsByCategory(items: List<Item>): List<ItemCategorySection> {
         return items.groupBy { item ->
             viewModel.getCategoryFromTypeId(item.itemTypeId) ?: "Other"
         }.map { (categoryName, categoryItems) ->
-            CategorySection(
+            ItemCategorySection(
                 categoryName = categoryName,
                 items = categoryItems
             )

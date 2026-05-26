@@ -2,8 +2,10 @@ package com.example.skoolswap.data.remote.models.response.item
 
 import com.example.skoolswap.data.remote.models.response.reference.BrandDto
 import com.example.skoolswap.data.remote.models.response.reference.GenderDto
+import com.example.skoolswap.data.remote.models.response.reference.MainCategoryDto
 import com.example.skoolswap.data.remote.models.response.reference.ProvinceDto
 import com.example.skoolswap.data.remote.models.response.reference.SchoolDto
+import com.example.skoolswap.data.remote.models.response.reference.SubCategoryDto
 import com.example.skoolswap.data.remote.models.response.reference.TownDto
 import com.google.gson.annotations.SerializedName
 

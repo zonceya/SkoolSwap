@@ -1,6 +1,7 @@
 package com.example.skoolswap.di
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.credentials.CredentialManager
@@ -58,7 +59,13 @@ object AppModule {
     fun provideDatabase(@ApplicationContext context: Context): SkoolSwapDatabase {
         return SkoolSwapDatabase.getInstance(context)
     }
-
+    @Provides
+    @Singleton
+    fun provideSharedPreferences(
+        @ApplicationContext context: Context
+    ): SharedPreferences {
+        return context.getSharedPreferences("skoolswap_prefs", Context.MODE_PRIVATE)
+    }
     // ========== DAO PROVIDERS ==========
     @Provides
     @Singleton

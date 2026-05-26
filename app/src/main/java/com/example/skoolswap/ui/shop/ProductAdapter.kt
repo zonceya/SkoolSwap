@@ -1,6 +1,7 @@
 package com.example.skoolswap.ui.shop
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
@@ -45,15 +46,23 @@ class ProductAdapter(
         private val binding: ItemProductBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(item: Item) {  // Now accepts domain Item
+        fun bind(item: Item) {
             binding.apply {
                 productName.text = item.name
-                productPrice.text = "R${item.price}"  // Format price
+                productPrice.text = "R${item.price}"
 
-                // Get first image URL or empty string
-                val imageUrl = item.images.firstOrNull()?.url ?: ""
+                // Show sold badge if item is sold
+                if (item.status == "sold" || item.quantity <= 0) {
+                    soldBadge.visibility = View.VISIBLE
+                    productName.alpha = 0.5f
+                    productPrice.alpha = 0.5f
+                } else {
+                    soldBadge.visibility = View.GONE
+                    productName.alpha = 1f
+                    productPrice.alpha = 1f
+                }
 
-                // In HorizontalItemsAdapter.kt
+                // Load image
                 if (!item.images.isNullOrEmpty()) {
                     Glide.with(binding.root.context)
                         .load(item.images.first().url)
@@ -62,12 +71,11 @@ class ProductAdapter(
                         .centerCrop()
                         .into(binding.productImage)
                 } else {
-                    // Always use placeholder when no images
                     binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
                 }
 
                 root.setOnClickListener {
-                    onItemClick(item.id)  // Pass item ID for editing
+                    onItemClick(item.id)
                 }
             }
         }

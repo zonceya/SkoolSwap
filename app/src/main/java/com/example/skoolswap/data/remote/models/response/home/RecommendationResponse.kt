@@ -87,6 +87,7 @@ data class RecommendationItemDto(
     @SerializedName("condition_name") val conditionName: String?,
     @SerializedName("brand_name") val brandName: String?,
     @SerializedName("available_quantity") val availableQuantity: Int,
+    @SerializedName("school") val school: String?,
     @SerializedName("images") val images: List<String>?,
     @SerializedName("shop") val shop: ShopInfoDto?
 )
