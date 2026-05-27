@@ -1,8 +1,7 @@
-package com.example.skoolswap.ui.detail
+package com.example.skoolswap.ui.detail.zoom
 
 import android.os.Bundle
 import android.transition.TransitionInflater
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -38,14 +37,17 @@ class FullScreenImageViewerDialogFragment : DialogFragment() {
         super.onCreate(savedInstanceState)
         setStyle(STYLE_NORMAL, R.style.FullScreenDialogStyle)
 
-        // Enable smooth enter and exit transition
         sharedElementEnterTransition = TransitionInflater.from(requireContext())
             .inflateTransition(android.R.transition.move)
         sharedElementReturnTransition = TransitionInflater.from(requireContext())
             .inflateTransition(android.R.transition.move)
     }
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
         _binding = DialogFullScreenImageViewerBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -74,15 +76,8 @@ class FullScreenImageViewerDialogFragment : DialogFragment() {
             }
         })
 
-        // Set click on both the ImageView AND its parent for better reliability
-        binding.btnBack.setOnClickListener {
-            Log.d("FullScreenDialog", "Back button clicked!")
-            dismiss()
-        }
-
-        // Also set on parent FrameLayout
-        (binding.btnBack.parent as? View)?.setOnClickListener {
-            Log.d("FullScreenDialog", "Back button parent clicked!")
+        // Single click listener on the container — ImageView has clickable=false so it won't intercept
+        binding.btnBackContainer.setOnClickListener {
             dismiss()
         }
 
@@ -90,6 +85,7 @@ class FullScreenImageViewerDialogFragment : DialogFragment() {
             ViewCompat.setTransitionName(binding.viewPager, transitionName)
         }
     }
+
     private fun updatePositionText(current: Int, total: Int) {
         binding.tvPosition.text = "$current/$total"
     }

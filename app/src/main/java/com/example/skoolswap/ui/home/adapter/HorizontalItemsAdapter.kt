@@ -1,12 +1,14 @@
 package com.example.skoolswap.ui.home.adapter
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemHomeProductBinding
 import com.example.skoolswap.domain.model.Item
+import com.example.skoolswap.utils.extensions.formatViewCount
 
 class HorizontalItemsAdapter(
     private val items: List<Item>,
@@ -45,16 +47,26 @@ class HorizontalItemsAdapter(
             binding.productTitle.text = item.name
             binding.productPrice.text = "R${item.price}"
 
-            // FIXED: Using existing ic_create_item_placeholder instead of missing item_placeholder
-            if (!item.images.isNullOrEmpty()) {
-                Glide.with(binding.root.context)
-                    .load(item.images.first().url)
-                    .placeholder(R.drawable.ic_create_item_placeholder)
-                    .error(R.drawable.ic_create_item_placeholder)
-                    .centerCrop()
-                    .into(binding.productImage)
+
+            // ✅ ADD SOLD BADGE
+            if (item.status == "sold" || item.quantity <= 0) {
+                binding.soldBadge.visibility = View.VISIBLE
+                binding.productTitle.alpha = 0.5f
+                binding.productPrice.alpha = 0.5f
             } else {
-                binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
+                binding.soldBadge.visibility = View.GONE
+                binding.productTitle.alpha = 1f
+                binding.productPrice.alpha = 1f
+                if (!item.images.isNullOrEmpty()) {
+                    Glide.with(binding.root.context)
+                        .load(item.images.first().url)
+                        .placeholder(R.drawable.ic_create_item_placeholder)
+                        .error(R.drawable.ic_create_item_placeholder)
+                        .centerCrop()
+                        .into(binding.productImage)
+                } else {
+                    binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
+                }
             }
         }
     }

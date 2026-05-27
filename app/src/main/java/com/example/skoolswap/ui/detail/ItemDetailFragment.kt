@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import androidx.core.view.isVisible
 import com.example.skoolswap.domain.model.Item
+import com.example.skoolswap.utils.extensions.formatViewCount
 
 private const val TAG = "ItemDetailFragment"
 
@@ -68,7 +69,7 @@ class ItemDetailFragment : Fragment() {
         hideFab()
         setupListeners()
         observeViewModel()
-
+        viewModel.trackView(itemId, source)
         Log.d(TAG, "Loading item: $itemId from source: $source")
         viewModel.loadItem(itemId, source)
     }
@@ -284,6 +285,13 @@ class ItemDetailFragment : Fragment() {
         binding.productTitle.text = item.name
         binding.productPrice.text = "R${String.format("%.2f", item.price)}"
 
+        // ADD THIS
+        if (item.viewCount > 0) {
+            binding.viewCountContainer.visibility = View.VISIBLE
+            binding.viewCount.text = item.viewCount.formatViewCount()
+        } else {
+            binding.viewCountContainer.visibility = View.GONE
+        }
         if (item.description.isNotEmpty()) {
             binding.productDescription.text = item.description
             binding.productDescription.visibility = View.VISIBLE

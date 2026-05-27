@@ -546,6 +546,32 @@ class HomeFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.homeFeed.collect { feed ->
                 feed?.let {
+                    Log.d("HomeFragment", "=== HOME FEED RECEIVED ===")
+                    Log.d("HomeFragment", "Sections count: ${it.sections.size}")
+
+                    it.sections.forEach { section ->
+                        when (section) {
+                            is Section.Recommended -> {
+                                Log.d("HomeFragment", "Recommended section: ${section.items.size} items")
+                                section.items.forEach { item ->
+                                    Log.d("HomeFragment", "  Item: ${item.name}, viewCount: ${item.viewCount}")
+                                }
+                            }
+                            is Section.Trending -> {
+                                Log.d("HomeFragment", "Trending section: ${section.items.size} items")
+                                section.items.forEach { item ->
+                                    Log.d("HomeFragment", "  Item: ${item.name}, viewCount: ${item.viewCount}")
+                                }
+                            }
+                            is Section.Recent -> {
+                                Log.d("HomeFragment", "Recent section: ${section.items.size} items")
+                                section.items.forEach { item ->
+                                    Log.d("HomeFragment", "  Item: ${item.name}, viewCount: ${item.viewCount}")
+                                }
+                            }
+                            else -> {}
+                        }
+                    }
                     homeAdapter.submitList(it.sections)
                 }
             }

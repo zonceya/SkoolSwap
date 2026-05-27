@@ -5,6 +5,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.example.skoolswap.databinding.ItemChipBlackBinding
 import com.example.skoolswap.domain.model.GearItem
+import com.example.skoolswap.utils.extensions.dpToPx
 
 class GearAdapter(
     private val onItemClick: (GearItem) -> Unit
@@ -36,9 +37,31 @@ class GearAdapter(
 
         fun bind(gear: GearItem) {
             binding.chipText.text = gear.name
-            binding.root.setOnClickListener {
-                onItemClick(gear)
+
+            val typedValue = android.util.TypedValue()
+
+            // Resolve colors
+            itemView.context.theme.resolveAttribute(
+                com.google.android.material.R.attr.colorOnSurface, typedValue, true
+            )
+            val bgColor = typedValue.data
+
+            itemView.context.theme.resolveAttribute(
+                com.google.android.material.R.attr.colorSurface, typedValue, true
+            )
+            val textAndBorderColor = typedValue.data
+
+            // Apply rounded background with border
+            val drawable = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                setColor(bgColor)
+                setStroke(2, textAndBorderColor)
+                cornerRadius = 16f.dpToPx(itemView.context)
             }
+            binding.root.background = drawable
+            binding.chipText.setTextColor(textAndBorderColor)
+
+            binding.root.setOnClickListener { onItemClick(gear) }
         }
     }
 }

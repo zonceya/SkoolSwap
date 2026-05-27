@@ -8,7 +8,8 @@
         <item name="colorPrimary">@color/white</item>
         <item name="colorPrimaryVariant">@color/dark_surface</item>
         <item name="colorOnPrimary">@color/black</item>
-
+        <item name="colorSurfaceVariant">#333333</item>
+        <item name="colorOnSurfaceVariant">#CCCCCC</item>
         <!-- Secondary brand color -->
         <item name="colorSecondary">@color/teal_200</item>
         <item name="colorSecondaryVariant">@color/teal_200</item>

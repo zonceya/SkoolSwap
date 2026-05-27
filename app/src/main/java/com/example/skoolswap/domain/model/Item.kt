@@ -32,7 +32,8 @@ data class Item(
     val sizeName: String? = null,
     val colorName: String? = null,
     val brandName: String? = null,
-    val conditionName: String? = null
+    val conditionName: String? = null,
+    val viewCount: Int = 0,
 ) {
     val availableQuantity: Int
         get() = quantity - reserved

@@ -64,6 +64,9 @@ data class ItemDetailDto(
     @SerializedName("shop")
     val shop: ShopDetailDto?,
 
+    @SerializedName("view_count")
+    val viewCount: Int = 0,
+
     @SerializedName("main_category")
     val mainCategory: MainCategoryDto?,
 

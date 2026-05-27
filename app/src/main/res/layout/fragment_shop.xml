@@ -55,20 +55,50 @@
                 android:progressBackgroundTint="?attr/colorOnSurface"
                 android:alpha="0.8" />
 
-            <TextView
-                android:id="@+id/storeStats"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="31 bought • 624 sold • 51 Current items"
-                android:textSize="12sp"
-                android:textColor="?attr/colorOnSurface"
-                android:alpha="0.7"
-                android:layout_marginTop="4dp" />
+                android:orientation="horizontal"
+                android:layout_marginTop="4dp">
+
+                <TextView
+                    android:id="@+id/storeStats"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0 items"
+                    android:textSize="12sp"
+                    android:textColor="?attr/colorOnSurface"
+                    android:alpha="0.7" />
+
+                <TextView
+                    android:id="@+id/totalViews"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp"
+                    android:text="0 views"
+                    android:textSize="11sp"
+                    android:textColor="?attr/colorOnSurface"
+                    android:alpha="0.7"
+                    android:drawablePadding="4dp"
+                    android:background="@drawable/badge_rounded"
+                    android:visibility="gone" />
+
+            </LinearLayout>
 
         </LinearLayout>
 
     </LinearLayout>
-
+    <ProgressBar
+        android:id="@+id/loadingProgress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:visibility="visible"
+        android:layout_weight="0" />
     <!-- STATIC TABS (All Items / Categories) -->
     <LinearLayout
         android:layout_width="match_parent"

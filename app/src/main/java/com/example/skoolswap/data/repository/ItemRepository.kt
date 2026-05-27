@@ -616,45 +616,17 @@ class ItemRepository @Inject constructor(
     private fun mapItemDetailToDomain(dto: ItemDetailDto): Item {
         val imageList = mutableListOf<ItemImage>()
 
-        // 1. Add cover photo as FIRST image (primary)
         dto.coverPhoto?.let { url ->
-            imageList.add(ItemImage(
-                id = 0,
-                url = url,
-                filename = null,
-                contentType = null,
-                createdAt = null,
-                isCover = true
-            ))
+            imageList.add(ItemImage(id = 0, url = url, isCover = true))
         }
-
-        // 2. Add additional images from images array (avoid duplicate cover)
         dto.images?.forEach { url ->
             if (url != dto.coverPhoto && !imageList.any { it.url == url }) {
-                imageList.add(ItemImage(
-                    id = 0,
-                    url = url,
-                    filename = null,
-                    contentType = null,
-                    createdAt = null,
-                    isCover = false
-                ))
+                imageList.add(ItemImage(id = 0, url = url, isCover = false))
             }
         }
-
-        // 3. Fallback: If no cover photo but there's an image field, use that
         if (imageList.isEmpty() && dto.image != null) {
-            imageList.add(ItemImage(
-                id = 0,
-                url = dto.image,
-                filename = null,
-                contentType = null,
-                createdAt = null,
-                isCover = true
-            ))
+            imageList.add(ItemImage(id = 0, url = dto.image, isCover = true))
         }
-
-        Log.d("Mapper", "Mapped ${imageList.size} images")
 
         return Item(
             id = dto.id,
@@ -664,8 +636,10 @@ class ItemRepository @Inject constructor(
             price = dto.price,
             quantity = dto.quantity,
             status = dto.status,
+            viewCount = dto.viewCount,
             createdAt = dto.createdAt,
-            images = imageList,  // ← List<ItemImage>
+            images = imageList,
+            coverImage = dto.coverPhoto,
             brandId = dto.brand?.id,
             schoolId = dto.school?.id,
             provinceId = dto.province?.id,
@@ -696,9 +670,7 @@ class ItemRepository @Inject constructor(
             },
             label = null,
             itemTypeId = null,
-            meta = null,
-            coverImage = dto.coverPhoto
-            // Remove: image = dto.image,
+            meta = null
         )
     }
 
@@ -737,45 +709,37 @@ class ItemRepository @Inject constructor(
 
             val response = itemApiService.getMyShopItems("Bearer $token")
 
+            // ✅ ADD THIS LOGGING
+            Log.d(TAG, "Response code: ${response.code()}")
+            Log.d(TAG, "Response successful: ${response.isSuccessful}")
+
             if (!response.isSuccessful) {
+                val errorBody = response.errorBody()?.string()
+                Log.e(TAG, "Error response: $errorBody")
                 return Result.failure(Exception("Server error: ${response.code()}"))
             }
 
             val responseBody = response.body()
+            Log.d(TAG, "Response body success: ${responseBody?.success}")
+            Log.d(TAG, "Items count: ${responseBody?.items?.size}")
+            Log.d(TAG, "Shop: ${responseBody?.shop}")
+
             if (responseBody?.success != true) {
                 return Result.failure(Exception("Failed to load items"))
             }
 
-            val shopId = responseBody.shop?.id ?: 0L
+            val items = responseBody.items?.map { it.toDomain(responseBody.shop?.id ?: 0L) } ?: emptyList()
 
-            val items: List<Item> = when (val itemsList = responseBody.items) {
-                is List<*> -> {
-                    itemsList.mapNotNull { item ->
-                        when (item) {
-                            is ShopItemDto -> item.toDomain(shopId)
-                            else -> {
-                                Log.w(TAG, "Unexpected item type: ${item?.javaClass?.simpleName}")
-                                null
-                            }
-                        }
-                    }
-                }
-                else -> emptyList()
+            // ✅ Log each item
+            items.forEach { item ->
+                Log.d(TAG, "Item: ${item.name}, ViewCount: ${item.viewCount}, Status: ${item.status}")
             }
 
             _currentItems.value = items
-
-            try {
-                val entities = items.map { it.toEntity() }
-                itemDao.insertItems(entities)
-            } catch (e: Exception) {
-                Timber.tag(TAG).w(e, "Failed to cache items")
-            }
-
-            Timber.tag(TAG).i("Fetched ${items.size} shop items")
             Result.success(items)
+
         } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "Get my shop items failed")
+            Log.e(TAG, "Get my shop items failed", e)
             Result.failure(e)
         }
     }

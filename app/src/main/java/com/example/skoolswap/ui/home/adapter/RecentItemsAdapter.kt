@@ -1,6 +1,7 @@
 package com.example.skoolswap.ui.home.adapter
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -9,6 +10,7 @@ import com.bumptech.glide.request.RequestOptions
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemHomeRecentItemBinding
 import com.example.skoolswap.domain.model.Item
+import com.example.skoolswap.utils.extensions.formatViewCount
 
 class RecentItemsAdapter(
     private val onItemClick: (Item) -> Unit,
@@ -55,7 +57,12 @@ class RecentItemsAdapter(
             binding.recentTitle.text = item.name
             binding.recentSchool.text = item.schoolName ?: "School Item"
 
-            // Fix price display
+               // ✅ ADD SOLD BADGE
+            if (item.status == "sold" || item.quantity <= 0) {
+                binding.soldBadge.visibility = View.VISIBLE
+            } else {
+                binding.soldBadge.visibility = View.GONE
+            }
             val price = item.price
             if (price != null && price > 0) {
                 binding.recentPrice.text = "R${price}"

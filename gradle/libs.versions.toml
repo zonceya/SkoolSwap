@@ -38,6 +38,8 @@ touchimageview = "3.7.2"
 subsampling = "3.10.0"
 firebaseCrashlyticsBuildtools = "3.0.7"
 composeMaterial3 = "1.6.1"
+navigationFragmentKtxVersion = "2.9.8"
+navigationUiKtxVersion = "2.9.8"
 
 
 [libraries]
@@ -87,6 +89,8 @@ facebook-shimmer = { module = "com.facebook.shimmer:shimmer", version.ref = "shi
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 firebase-crashlytics-buildtools = { group = "com.google.firebase", name = "firebase-crashlytics-buildtools", version.ref = "firebaseCrashlyticsBuildtools" }
 androidx-compose-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "composeMaterial3" }
+navigation-fragment-ktx = { group = "androidx.navigation", name = "navigation-fragment-ktx", version.ref = "navigationFragmentKtxVersion" }
+navigation-ui-ktx = { group = "androidx.navigation", name = "navigation-ui-ktx", version.ref = "navigationUiKtxVersion" }
 
 
 

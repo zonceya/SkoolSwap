@@ -256,16 +256,17 @@ fun ShopItemDto.toDomain(shopId: Long): Item {
         price = price,
         quantity = quantity,
         status = status,
+        viewCount = viewCount,
         createdAt = createdAt,
-        images = images.map { imageDto ->
-            when (imageDto) {
-                is ShopItemImageDto -> imageDto.toDomain()
-                is String -> ItemImage(id = 0, url = imageDto)
-                else -> {
-                    val url = (imageDto as? Map<*, *>)?.get("url") as? String ?: ""
-                    ItemImage(id = 0, url = url)
-                }
-            }
+        images = images.mapIndexed { index, url ->
+            ItemImage(
+                id = 0,
+                url = url,
+                filename = null,
+                contentType = null,
+                createdAt = null,
+                isCover = index == 0
+            )
         },
         brandId = null,
         sizeId = null,
@@ -277,7 +278,10 @@ fun ShopItemDto.toDomain(shopId: Long): Item {
         label = null,
         reserved = quantity - availableQuantity,
         meta = null,
-        shop = null
+        shop = null,
+        itemTypeId = null,
+        mainCategoryId = mainCategoryId,
+        subCategoryId = subCategoryId
     )
 }
 
@@ -343,6 +347,7 @@ fun RecommendationItemDto.toDomain(): Item {
         status = "active",
         itemTypeId = null,
         gender = this.gender,
+        viewCount = this.viewCount,
         brandId = null,
         sizeId = null,
         colorId = null,

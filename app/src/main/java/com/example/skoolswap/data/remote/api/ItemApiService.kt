@@ -51,7 +51,8 @@ interface ItemApiService {
         @Query("province_id") provinceId: Int? = null,
         @Query("town_id") townId: Int? = null
     ): Response<List<CreateItemResponse>>
-    @GET("api/v1/my-shop/items")
+
+    @GET("api/v1/items/shop_items")  // ✅ CORRECT
     suspend fun getMyShopItems(
         @Header("Authorization") authToken: String
     ): Response<ShopItemsResponse>

@@ -1,6 +1,8 @@
 package com.example.skoolswap.ui.products.adapter
 
+import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.core.os.bundleOf
 import androidx.navigation.findNavController
@@ -9,6 +11,8 @@ import com.bumptech.glide.Glide
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemHomeProductBinding
 import com.example.skoolswap.domain.model.Item
+import com.example.skoolswap.utils.extensions.formatViewCount
+import timber.log.Timber
 
 class ProductsAdapter(
     private val onItemClick: (Item) -> Unit
@@ -44,7 +48,6 @@ class ProductsAdapter(
                 if (position != RecyclerView.NO_POSITION) {
                     val item = items[position]
 
-                    // Navigate to detail fragment
                     val bundle = bundleOf(
                         "itemId" to item.id,
                         "source" to "products_screen"
@@ -56,8 +59,20 @@ class ProductsAdapter(
         }
 
         fun bind(item: Item) {
+
+            Timber.tag("ProductsAdapter")
+                .d("Binding product: ${item.name}, viewCount: ${item.viewCount}, status: ${item.status}")
+
             binding.productTitle.text = item.name
             binding.productPrice.text = "R${item.price}"
+
+
+            if (item.status == "sold" || item.quantity <= 0) {
+                Timber.tag("ProductsAdapter").d("  ✅ Showing SOLD badge")
+                binding.soldBadge.visibility = View.VISIBLE
+            } else {
+                binding.soldBadge.visibility = View.GONE
+            }
 
             if (item.images.isNotEmpty()) {
                 Glide.with(binding.root.context)

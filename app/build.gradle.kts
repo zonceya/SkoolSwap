@@ -110,6 +110,8 @@ dependencies {
     implementation(libs.room.ktx)
     implementation(libs.firebase.crashlytics.buildtools)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.navigation.fragment.ktx)
+    implementation(libs.navigation.ui.ktx)
     kapt(libs.room.compiler)
     implementation(libs.kotlinx.datetime)
     implementation(libs.play.services.cast.framework)

@@ -36,14 +36,13 @@ class CategorySectionAdapter(
     class SectionViewHolder(
         private val binding: ItemCategorySectionBinding,
         private val onItemClick: (String) -> Unit,
-        private val adapter: CategorySectionAdapter  // Pass adapter reference
+        private val adapter: CategorySectionAdapter
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(section: ItemCategorySection, position: Int) {
             binding.categoryTitle.text = section.categoryName
             binding.itemCount.text = "${section.items.size} items"
 
-            // Set arrow direction based on expanded state
             val arrowRes = if (section.isExpanded) {
                 R.drawable.ic_chevron_down
             } else {
@@ -53,12 +52,12 @@ class CategorySectionAdapter(
 
             // Determine which items to show
             val itemsToShow = if (section.isExpanded) {
-                section.items  // Show ALL items
+                section.items
             } else {
-                section.items.take(2)  // Show only FIRST 2 items
+                section.items.take(2)
             }
 
-            // Setup grid adapter
+            // Setup grid adapter - sold badge handled inside CategoryGridAdapter
             val gridAdapter = CategoryGridAdapter { itemId ->
                 onItemClick(itemId)
             }
@@ -73,13 +72,13 @@ class CategorySectionAdapter(
             // Handle header click (expand/collapse)
             binding.headerContainer.setOnClickListener {
                 section.isExpanded = !section.isExpanded
-                adapter.notifyItemChanged(position)  // Use adapter reference
+                adapter.notifyItemChanged(position)
             }
 
             // Handle arrow click
             binding.arrowIcon.setOnClickListener {
                 section.isExpanded = !section.isExpanded
-                adapter.notifyItemChanged(position)  // Use adapter reference
+                adapter.notifyItemChanged(position)
             }
 
             // Hide divider for last category
@@ -88,4 +87,3 @@ class CategorySectionAdapter(
         }
     }
 }
-

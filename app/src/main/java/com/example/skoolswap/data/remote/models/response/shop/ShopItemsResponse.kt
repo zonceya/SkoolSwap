@@ -32,7 +32,8 @@ data class ShopItemDto(
 
     @SerializedName("quantity")
     val quantity: Int,
-
+    @SerializedName("view_count")
+    val viewCount: Int = 0,
     @SerializedName("available_quantity")
     val availableQuantity: Int,
 
@@ -82,10 +83,11 @@ data class ShopItemDto(
     val updatedAt: String,
 
     @SerializedName("images")
-    val images: List<ShopItemImageDto>,
+    val images: List<String> = emptyList(),
 
     @SerializedName("tags")
     val tags: List<String>
+
 )
 
 data class ShopItemImageDto(

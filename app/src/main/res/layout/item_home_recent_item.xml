@@ -26,9 +26,24 @@
                 android:id="@+id/recentImage"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:scaleType="fitCenter"
+                android:scaleType="centerCrop"
                 android:padding="4dp"
                 android:src="@drawable/ic_create_item_placeholder" />
+
+            <!-- SOLD BADGE (stays on image) -->
+            <TextView
+                android:id="@+id/soldBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SOLD"
+                android:textColor="@android:color/white"
+                android:background="@android:color/holo_red_dark"
+                android:padding="4dp"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:layout_gravity="top|end"
+                android:layout_margin="4dp"
+                android:visibility="gone" />
 
         </FrameLayout>
 
@@ -40,16 +55,27 @@
             android:orientation="vertical"
             android:gravity="center_vertical">
 
-            <TextView
-                android:id="@+id/recentTitle"
+            <!-- Title Row with View Count -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Soccer Boots"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:maxLines="2"
-                android:ellipsize="end"
-                android:textColor="?attr/colorOnSurface" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/recentTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Soccer Boots"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:textColor="?attr/colorOnSurface" />
+
+
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/recentSchool"
@@ -70,8 +96,7 @@
                 android:layout_marginTop="8dp"
                 android:text="R1060.0"
                 android:textColor="?attr/colorOnSurface"
-                android:textSize="16sp"
-                />
+                android:textSize="16sp" />
 
         </LinearLayout>
 

@@ -51,20 +51,11 @@ class ShopViewModel @Inject constructor(
         viewModelScope.launch {
             val result = itemRepository.getMyShopItems()
             result.onSuccess { items ->
-                if (items.isNotEmpty()) {
-                    _allItems.value = items
-                } else {
-                    // ✅ USE THE SAMPLE ITEMS FROM THE FILE
-                    _allItems.value = sampleItems
-                }
-                extractCategoriesFromItems(_allItems.value)
+                _allItems.value = items
+                extractCategoriesFromItems(items)
                 filterItemsByCategory()
-            }.onFailure { error ->
-                // ✅ USE THE SAMPLE ITEMS FROM THE FILE ON ERROR
-                _allItems.value = sampleItems
-                extractCategoriesFromItems(_allItems.value)
-                filterItemsByCategory()
-                _error.value = error.message
+            }.onFailure { e ->
+                _error.value = e.message
             }
         }
     }

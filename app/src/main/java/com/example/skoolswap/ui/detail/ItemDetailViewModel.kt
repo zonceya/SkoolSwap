@@ -72,7 +72,7 @@ class ItemDetailViewModel @Inject constructor(
 
     private suspend fun checkFavoriteStatus(itemId: String) {
         _isFavorite.value = favoriteRepository.isFavorite(itemId)
-        Log.d(TAG, "Favorite status for $itemId: ${_isFavorite.value}")
+        Timber.tag(TAG).d("Favorite status for $itemId: ${_isFavorite.value}")
     }
 
     fun toggleFavorite() {
@@ -154,7 +154,7 @@ class ItemDetailViewModel @Inject constructor(
         }
     }
 
-    private fun trackView(itemId: String, source: String) {
+    fun trackView(itemId: String, source: String) {
         viewModelScope.launch {
             productsRepository.trackClick(itemId, source, 0)
         }

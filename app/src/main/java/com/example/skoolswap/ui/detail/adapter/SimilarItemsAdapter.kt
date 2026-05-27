@@ -2,12 +2,14 @@ package com.example.skoolswap.ui.detail.adapter
 
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemSimilarProductBinding
 import com.example.skoolswap.domain.model.Item
+import com.example.skoolswap.utils.extensions.formatViewCount
 
 class SimilarItemsAdapter(
     private val onItemClick: (Item) -> Unit
@@ -18,12 +20,6 @@ class SimilarItemsAdapter(
 
     fun submitList(newItems: List<Item>) {
         Log.d(TAG, "submitList called with ${newItems.size} items")
-        newItems.forEachIndexed { index, item ->
-            Log.d(TAG, "Item $index: ${item.name}, images: ${item.images.size}")
-            if (item.images.isNotEmpty()) {
-                Log.d(TAG, "  First image URL: ${item.images.first().url}")
-            }
-        }
         items = newItems
         notifyDataSetChanged()
     }
@@ -40,6 +36,7 @@ class SimilarItemsAdapter(
     }
 
     override fun getItemCount(): Int = items.size
+
 
     inner class ViewHolder(
         private val binding: ItemSimilarProductBinding
@@ -58,12 +55,18 @@ class SimilarItemsAdapter(
             binding.productTitle.text = item.name
             binding.productPrice.text = "R${String.format("%.2f", item.price)}"
 
-            Log.d(TAG, "Binding item: ${item.name}, images count: ${item.images.size}")
+            // ✅ SHOW SOLD BADGE
+            if (item.status == "sold" || item.quantity <= 0) {
+                binding.soldBadge.visibility = View.VISIBLE
+            } else {
+                binding.soldBadge.visibility = View.GONE
+            }
 
+
+
+            // Load image
             if (item.images.isNotEmpty()) {
                 val imageUrl = item.images.first().url
-                Log.d(TAG, "Loading image: $imageUrl")
-
                 Glide.with(binding.root.context)
                     .load(imageUrl)
                     .placeholder(R.drawable.ic_create_item_placeholder)
@@ -71,9 +74,15 @@ class SimilarItemsAdapter(
                     .centerCrop()
                     .into(binding.productImage)
             } else {
-                Log.w(TAG, "No images for item: ${item.name}")
-                // Set placeholder when no images
                 binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
+            }
+
+            // Show size if available
+            if (!item.sizeName.isNullOrBlank()) {
+                binding.productSize.text = item.sizeName
+                binding.productSize.visibility = View.VISIBLE
+            } else {
+                binding.productSize.visibility = View.GONE
             }
         }
     }

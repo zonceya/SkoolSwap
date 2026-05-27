@@ -1,6 +1,7 @@
 package com.example.skoolswap.ui.shop
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -18,6 +19,7 @@ import com.example.skoolswap.databinding.FragmentShopBinding
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.ItemCategorySection
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
+import com.example.skoolswap.utils.extensions.formatViewCount
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
 import kotlinx.coroutines.flow.collectLatest
@@ -162,49 +164,55 @@ class ShopFragment : Fragment() {
     }
 
     private fun setupObservers() {
-        // Observe all items
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.allItems.collectLatest { items ->
+                Log.d("ShopFragment", "=== ALL ITEMS RECEIVED ===")
+                Log.d("ShopFragment", "Total items count: ${items.size}")
+                items.forEachIndexed { i, item ->
+                    Log.d("ShopFragment", "Item[$i]: ${item.name}, viewCount: ${item.viewCount}, status: ${item.status}")
+                }
+                Log.d("ShopFragment", "Total shop views: ${items.sumOf { it.viewCount }}")
+
+                // Don't react until we have real data OR loading is done
+                if (items.isEmpty()) {
+                    // Still loading — keep progress visible, hide content
+                    binding.loadingProgress.visibility = View.VISIBLE
+                    binding.productRecyclerView.visibility = View.GONE
+                    binding.emptyStateText.visibility = View.GONE
+                    return@collectLatest
+                }
+
+                // Data arrived — hide progress, show content
+                binding.loadingProgress.visibility = View.GONE
+
+                binding.emptyStateText.visibility = View.GONE
+                binding.productRecyclerView.visibility = View.VISIBLE
+
                 if (isCategoriesView) {
                     val sections = groupItemsByCategory(items)
                     categorySectionAdapter.submitSections(sections)
+                    binding.productRecyclerView.layoutManager = LinearLayoutManager(requireContext())
+                    binding.productRecyclerView.adapter = categorySectionAdapter
                 } else {
                     productAdapter.submitList(items)
+                    binding.productRecyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
+                    binding.productRecyclerView.adapter = productAdapter
                 }
 
-                // Update stats
-                viewModel.currentShop.value?.let { shop ->
-                    binding.storeStats.text = "${items.size} items"
-                }
-
-                // Handle empty state
-                if (items.isEmpty()) {
-                    binding.emptyStateText.visibility = View.VISIBLE
-                    binding.productRecyclerView.visibility = View.GONE
-                } else {
-                    binding.emptyStateText.visibility = View.GONE
-                    binding.productRecyclerView.visibility = View.VISIBLE
-                }
+                binding.storeStats.text = "${items.size} items"
             }
         }
 
-        // Observe shop info - UPDATED with profile picture loading
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.currentShop.collectLatest { shop ->
                 shop?.let {
                     binding.storeName.text = it.displayName.ifEmpty { it.name }
-                    binding.storeStats.text = "${viewModel.allItems.value.size} items"
-
-                    // Load profile picture
                     if (it.profilePictureUrl.isNotEmpty()) {
                         loadProfilePicture(it.profilePictureUrl)
                     } else {
-                        // Fallback to user profile picture
                         authRepository.getServerUser().collect { user ->
                             user?.profilePictureUrl?.let { url ->
-                                if (url.isNotEmpty()) {
-                                    loadProfilePicture(url)
-                                }
+                                if (url.isNotEmpty()) loadProfilePicture(url)
                             }
                         }
                     }

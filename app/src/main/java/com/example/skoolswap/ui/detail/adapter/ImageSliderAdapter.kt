@@ -11,7 +11,7 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.engine.GlideException
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemImageSliderBinding
-import com.example.skoolswap.ui.detail.FullScreenImageViewerDialogFragment
+import com.example.skoolswap.ui.detail.zoom.FullScreenImageViewerDialogFragment
 
 private const val TAG = "ImageSliderAdapter"
 
