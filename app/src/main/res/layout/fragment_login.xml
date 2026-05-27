@@ -5,31 +5,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/transparent"
+    android:background="@drawable/login_background"
     tools:context=".ui.login.LoginFragment">
-
-    <!-- Video Background -->
-    <VideoView
-        android:id="@+id/videoView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:scaleType="centerCrop"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
-
-    <!-- Semi-transparent overlay to improve text readability -->
-    <View
-        android:id="@+id/overlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@color/black"
-        android:alpha="0.3"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
 
     <!-- Logo -->
     <TextView
@@ -42,14 +19,14 @@
         android:textSize="42sp"
         android:fontFamily="@font/mulish"
         android:textStyle="bold"
-        android:shadowColor="@color/white"
+        android:shadowColor="@color/black"
         android:shadowDx="0"
         android:shadowDy="0"
+        android:visibility="gone"
         android:shadowRadius="6"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
-
 
     <!-- Loading Indicator -->
     <ProgressBar
@@ -65,8 +42,8 @@
     <!-- Email Input Field -->
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/email_layout"
-        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-        android:background="@drawable/custom_border"
+        style="@style/WhiteOutlinedBox"
+        app:boxBackgroundMode="outline"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="32dp"
@@ -76,6 +53,13 @@
         android:textColorHint="@color/white"
         app:hintTextColor="@color/white"
         app:boxStrokeColor="@color/white"
+        app:boxStrokeWidth="1.5dp"
+        app:boxStrokeWidthFocused="2dp"
+        app:boxBackgroundColor="@android:color/transparent"
+        app:boxCornerRadiusBottomEnd="12dp"
+        app:boxCornerRadiusBottomStart="12dp"
+        app:boxCornerRadiusTopEnd="12dp"
+        app:boxCornerRadiusTopStart="12dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
@@ -86,15 +70,15 @@
             android:layout_height="wrap_content"
             android:inputType="textEmailAddress"
             android:textColor="@color/white"
-            android:textColorHint="@color/white" />
+            android:textColorHint="@color/white"
+            android:textSize="16sp" />
 
     </com.google.android.material.textfield.TextInputLayout>
 
     <!-- Password Input Field -->
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/password_layout"
-        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-        android:background="@drawable/custom_border"
+        style="@style/WhiteOutlinedBox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="32dp"
@@ -104,6 +88,13 @@
         android:textColorHint="@color/white"
         app:hintTextColor="@color/white"
         app:boxStrokeColor="@color/white"
+        app:boxStrokeWidth="1.5dp"
+        app:boxStrokeWidthFocused="2dp"
+        app:boxBackgroundColor="@android:color/transparent"
+        app:boxCornerRadiusBottomEnd="12dp"
+        app:boxCornerRadiusBottomStart="12dp"
+        app:boxCornerRadiusTopEnd="12dp"
+        app:boxCornerRadiusTopStart="12dp"
         app:passwordToggleEnabled="true"
         app:passwordToggleTint="@color/white"
         app:layout_constraintEnd_toEndOf="parent"
@@ -116,7 +107,8 @@
             android:layout_height="wrap_content"
             android:inputType="textPassword"
             android:textColor="@color/white"
-            android:textColorHint="@color/white" />
+            android:textColorHint="@color/white"
+            android:textSize="16sp" />
 
     </com.google.android.material.textfield.TextInputLayout>
 
@@ -128,7 +120,7 @@
         android:layout_marginStart="32dp"
         android:layout_marginTop="24dp"
         android:layout_marginEnd="32dp"
-        android:text="Login"
+        android:text="LOGIN"
         android:textColor="@color/black"
         android:textSize="16sp"
         android:textStyle="bold"
@@ -144,7 +136,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="32dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="16dp"
         android:layout_marginEnd="32dp"
         android:gravity="center"
         android:orientation="horizontal"
@@ -177,6 +169,7 @@
 
     </LinearLayout>
 
+    <!-- Google Sign In Button -->
     <LinearLayout
         android:id="@+id/google_sign_in_container"
         android:layout_width="match_parent"
@@ -193,31 +186,29 @@
 
         <LinearLayout
             android:id="@+id/sign_in_button"
-            android:layout_width="320dp"
+            android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="horizontal"
-            android:background="@drawable/ic_google_rounded"
-            android:gravity="start|center_vertical">
+            android:gravity="center">
 
             <ImageView
-                android:layout_width="30dp"
-                android:layout_height="30dp"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:layout_marginEnd="10dp"
                 android:contentDescription="@string/todo"
-                android:paddingStart="12dp"
-                android:paddingEnd="2dp"
                 android:src="@drawable/ic_google_logo" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:paddingStart="50dp"
-                android:paddingEnd="20dp"
-                android:text="@string/sign_in_with_google"
+                android:text="Continue with Google"
                 android:textColor="@color/black"
+                android:textSize="14sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
+
+    <!-- Sign Up Link -->
     <LinearLayout
         android:id="@+id/signup_container"
         android:layout_width="wrap_content"
@@ -241,7 +232,7 @@
             android:layout_height="wrap_content"
             android:text="Sign Up"
             android:textColor="@color/white"
-            android:textSize="16sp"
+            android:textSize="14sp"
             android:textStyle="bold"
             android:clickable="true"
             android:focusable="true" />

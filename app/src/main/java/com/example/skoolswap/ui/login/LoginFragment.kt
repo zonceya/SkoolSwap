@@ -1,10 +1,12 @@
 package com.example.skoolswap.ui.login
 
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -13,6 +15,7 @@ import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentLoginBinding
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
+import com.google.android.material.textfield.TextInputLayout
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -22,7 +25,7 @@ import javax.inject.Inject
 class LoginFragment : Fragment() {
 
     private var _binding: FragmentLoginBinding? = null
-    private val binding get() = _binding!!  // Line 25 - This will crash if _binding is null
+    private val binding get() = _binding!!  // Safe after onViewCreated
     private val viewModel: LoginViewModel by viewModels()
 
     @Inject
@@ -33,7 +36,7 @@ class LoginFragment : Fragment() {
 
     private var isSigningIn = false
     private var isSendingOtp = false
-    private var videoBackgroundManager: VideoBackgroundManager? = null
+    // REMOVED: private var videoBackgroundManager: VideoBackgroundManager? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -50,15 +53,15 @@ class LoginFragment : Fragment() {
         Log.e("LoginFragment", "🔥 onViewCreated")
 
         checkExistingSession()
-        // setupVideoBackground() // Commented out
+        // REMOVED: setupVideoBackground()
         setupUI()
         observeViewModel()
     }
 
     private fun setupUI() {
-        // SAFE: Only access binding if we're in a valid state
         if (_binding == null) return
-
+        setBoxStrokeColor(binding.emailLayout, ContextCompat.getColor(requireContext(), R.color.white))
+        setBoxStrokeColor(binding.passwordLayout, ContextCompat.getColor(requireContext(), R.color.white))
         binding.signInButton.setOnClickListener {
             if (isSigningIn) return@setOnClickListener
 
@@ -69,7 +72,7 @@ class LoginFragment : Fragment() {
             binding.signInButton.postDelayed({
                 if (isSigningIn) {
                     isSigningIn = false
-                    if (_binding != null) {  // Check binding still exists
+                    if (_binding != null) {
                         binding.signInButton.isEnabled = true
                     }
                 }
@@ -113,10 +116,26 @@ class LoginFragment : Fragment() {
             }
         }
     }
+    private fun setBoxStrokeColor(textInputLayout: TextInputLayout, color: Int) {
+        try {
+            val states = arrayOf(
+                intArrayOf(android.R.attr.state_focused),
+                intArrayOf(android.R.attr.state_hovered),
+                intArrayOf(-android.R.attr.state_enabled),
+                intArrayOf() // default
+            )
+            val colors = intArrayOf(color, color, color, color)
+            val colorStateList = ColorStateList(states, colors)
 
+            textInputLayout.setBoxStrokeColorStateList(colorStateList)
+            textInputLayout.hintTextColor = colorStateList
+            textInputLayout.defaultHintTextColor = colorStateList
+        } catch (e: Exception) {
+            Log.e("LoginFragment", "Error setting box stroke color: ${e.message}")
+        }
+    }
     private fun observeViewModel() {
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
-            // SAFE: Check binding exists before accessing UI
             if (_binding == null) return@observe
 
             if (isLoading) {
@@ -183,7 +202,6 @@ class LoginFragment : Fragment() {
             try {
                 val isOnboardingFinished = appPreferences.isOnboardingFinished.first()
 
-                // CRITICAL FIX: Check both fragment state AND binding exists
                 if (!isAdded || isDetached || _binding == null) {
                     Log.d("LoginFragment", "Fragment not in valid state, skipping session check")
                     return@launch
@@ -196,7 +214,6 @@ class LoginFragment : Fragment() {
 
                 val restored = authRepository.restoreSession()
 
-                // CRITICAL FIX: Check again after suspend call
                 if (!isAdded || isDetached || _binding == null) {
                     Log.d("LoginFragment", "Fragment state changed during restore, aborting")
                     return@launch
@@ -206,7 +223,6 @@ class LoginFragment : Fragment() {
                     binding.root.visibility = View.INVISIBLE
                     val user = authRepository.getServerUser().first()
 
-                    // Check again before navigation
                     if (!isAdded || isDetached || _binding == null) return@launch
 
                     if (user == null) {
@@ -220,7 +236,6 @@ class LoginFragment : Fragment() {
 
             } catch (e: Exception) {
                 Log.e("LoginFragment", "❌ Error checking session: ${e.message}")
-                // SAFE: Check binding exists before accessing UI
                 if (isAdded && !isDetached && _binding != null) {
                     binding.root.visibility = View.VISIBLE
                 }
@@ -242,29 +257,14 @@ class LoginFragment : Fragment() {
         }
     }
 
-    private fun setupVideoBackground() {
-        if (_binding == null) return
-        val videoPath = "android.resource://${requireContext().packageName}/${R.raw.login_background}"
-        videoBackgroundManager = VideoBackgroundManager(binding.videoView, videoPath)
-        videoBackgroundManager?.setupVideo()
-    }
+    // REMOVED: setupVideoBackground() method
 
-    override fun onResume() {
-        super.onResume()
-        if (_binding != null) {
-            videoBackgroundManager?.resumeVideo()
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        videoBackgroundManager?.pauseVideo()
-    }
+    // REMOVED: onResume, onPause video calls
 
     override fun onDestroyView() {
         super.onDestroyView()
-        videoBackgroundManager?.release()
-        videoBackgroundManager = null
+        // REMOVED: videoBackgroundManager?.release()
+        // REMOVED: videoBackgroundManager = null
         _binding = null
     }
 }
