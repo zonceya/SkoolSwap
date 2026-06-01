@@ -43,7 +43,15 @@
         <!-- Action Bar Theme for dark mode -->
         <item name="actionBarTheme">@style/Theme.SkoolSwap.AppBarOverlay</item>
     </style>
-
+    <style name="LogoutButtonStyle" parent="Widget.Material3.Button">
+        <item name="android:backgroundTint">@color/white</item>
+        <item name="android:textColor">@color/black</item>
+    </style>
+    <!-- Dialog Animation -->
+    <style name="DialogAnimation" parent="android:Animation">
+        <item name="android:windowEnterAnimation">@anim/dialog_enter</item>
+        <item name="android:windowExitAnimation">@anim/dialog_exit</item>
+    </style>
     <!-- Rest of your dark mode styles -->
     <style name="CustomTabText" parent="TextAppearance.Design.Tab">
         <item name="android:textSize">16sp</item>

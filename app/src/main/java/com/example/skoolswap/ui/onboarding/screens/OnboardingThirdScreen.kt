@@ -5,12 +5,12 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.example.skoolswap.R
 import com.example.skoolswap.data.local.datastore.AppPreferences
-import com.google.android.material.floatingactionbutton.FloatingActionButton
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -24,31 +24,49 @@ class OnboardingThirdScreen : Fragment() {
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View {
+    ): View? {
         val view = inflater.inflate(R.layout.fragment_onboarding_third_screen, container, false)
         val finishButton = view.findViewById<TextView>(R.id.finish)
 
-        // Safe FAB hiding
-        val fab = activity?.findViewById<FloatingActionButton>(R.id.fab)
-        fab?.visibility = View.GONE
+        // Debug logging
+        android.util.Log.d("OnboardingThird", "onCreateView called")
 
-        finishButton.setOnClickListener {
-            lifecycleScope.launch {
-                appPreferences.setOnboardingFinished(true)
+        if (finishButton == null) {
+            android.util.Log.e("OnboardingThird", "Finish button not found! Check ID in layout")
+            Toast.makeText(requireContext(), "Error: Finish button not found", Toast.LENGTH_LONG).show()
+        } else {
+            android.util.Log.d("OnboardingThird", "Finish button found, setting click listener")
 
-                // DON'T navigate to login - just go back in the stack
-                // This returns to LoginFragment, which will see onboarding is done
-                findNavController().popBackStack()
+            finishButton.setOnClickListener {
+                android.util.Log.d("OnboardingThird", "Finish button clicked!")
+
+                lifecycleScope.launch {
+                    try {
+                        // Save that onboarding is finished
+                        appPreferences.setOnboardingFinished(true)
+                        android.util.Log.d("OnboardingThird", "Onboarding saved as finished")
+
+                        // Use the existing navigation action from nav_graph
+                        // This will navigate to loginFragment
+                        findNavController().navigate(
+                            R.id.action_viewPagerFragment_to_loginFragment
+                        )
+
+                        android.util.Log.d("OnboardingThird", "Navigation to login executed")
+
+                    } catch (e: Exception) {
+                        android.util.Log.e("OnboardingThird", "Error during navigation", e)
+                        Toast.makeText(requireContext(), "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
             }
         }
 
         return view
     }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
-        // Safe FAB showing
-        val fab = activity?.findViewById<FloatingActionButton>(R.id.fab)
-        fab?.visibility = View.VISIBLE
+    override fun onResume() {
+        super.onResume()
+        android.util.Log.d("OnboardingThird", "onResume called - Fragment is visible")
     }
 }

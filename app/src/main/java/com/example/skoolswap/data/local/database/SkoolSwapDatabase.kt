@@ -30,9 +30,10 @@ import java.io.File
         LocationEntity::class,
         ItemImageEntity::class,
         FavoriteEntity::class,
-        UserSchoolEntity::class
+        UserSchoolEntity::class,
+        HomeFeedEntity::class
     ],
-    version = 9,
+    version = 11,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -56,7 +57,7 @@ abstract class SkoolSwapDatabase : RoomDatabase() {
     abstract fun locationDao(): LocationDao
     abstract fun userSchoolDao(): UserSchoolDao
     abstract fun favoriteDao(): FavoriteDao
-
+    abstract fun homeFeedDao(): HomeFeedDao
     companion object {
         @Volatile
         private var INSTANCE: SkoolSwapDatabase? = null
@@ -64,7 +65,7 @@ abstract class SkoolSwapDatabase : RoomDatabase() {
         fun getInstance(context: Context): SkoolSwapDatabase {
             return INSTANCE ?: synchronized(this) {
                 // Force delete old database to avoid migration issues
-                context.getDatabasePath("skoolswap_database").delete()
+              //  context.getDatabasePath("skoolswap_database").delete()
 
                 val instance = Room.databaseBuilder(
                     context.applicationContext,

@@ -1,6 +1,7 @@
 // data/mapper/RecommendationMapper.kt
 package com.example.skoolswap.data.mapper
 
+import com.example.skoolswap.data.local.database.entities.HomeFeedEntity
 import com.example.skoolswap.data.remote.models.response.home.EssentialsSectionsDto
 import com.example.skoolswap.data.remote.models.response.home.HomeRecommendationResponse
 import com.example.skoolswap.data.remote.models.response.home.HomeSectionDto
@@ -21,6 +22,7 @@ import com.example.skoolswap.domain.model.homefeed.SportFeed
 import com.example.skoolswap.domain.model.homefeed.SportSection
 import com.example.skoolswap.domain.model.homefeed.UniformFeed
 import com.example.skoolswap.domain.model.homefeed.UniformSection
+import com.google.gson.Gson
 
 // ============ HOME RESPONSE TO DOMAIN ============
 fun HomeRecommendationResponse.toDomain(): HomeFeed {
@@ -140,4 +142,18 @@ fun RecentSectionDto.toDomain(): RecentSection {
         items = items.map { it.toDomain() }
     )
 }
+// ============ LOCAL CACHE ============
+fun HomeFeed.toEntity(): HomeFeedEntity {
+    return HomeFeedEntity(
+        id = "home_feed",
+        sectionsJson = Gson().toJson(this)
+    )
+}
 
+fun HomeFeedEntity.toDomain(): HomeFeed {
+    return try {
+        Gson().fromJson(sectionsJson, HomeFeed::class.java)
+    } catch (e: Exception) {
+        HomeFeed(success = false, schoolId = 0, message = null, sections = emptyList())
+    }
+}

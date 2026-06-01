@@ -1,5 +1,6 @@
 package com.example.skoolswap.ui.detail.zoom
 
+import android.app.Dialog
 import android.os.Bundle
 import android.transition.TransitionInflater
 import android.view.LayoutInflater
@@ -85,7 +86,17 @@ class FullScreenImageViewerDialogFragment : DialogFragment() {
             ViewCompat.setTransitionName(binding.viewPager, transitionName)
         }
     }
-
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        val dialog = super.onCreateDialog(savedInstanceState)
+        dialog.setOnKeyListener { _, keyCode, event ->
+            if (keyCode == android.view.KeyEvent.KEYCODE_BACK && event.action == android.view.KeyEvent.ACTION_UP) {
+                dismiss()
+                return@setOnKeyListener true
+            }
+            false
+        }
+        return dialog
+    }
     private fun updatePositionText(current: Int, total: Int) {
         binding.tvPosition.text = "$current/$total"
     }

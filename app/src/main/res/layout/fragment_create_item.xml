@@ -520,7 +520,7 @@
             android:layout_width="match_parent"
             android:layout_height="76dp"
         android:textStyle="bold"
-        android:textSize="26sp"
+        android:textSize="22sp"
         android:textColor="@color/white"
         app:backgroundTint="@color/black"
         app:cornerRadius="8dp"

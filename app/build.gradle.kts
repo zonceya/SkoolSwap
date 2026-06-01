@@ -99,6 +99,7 @@ dependencies {
     implementation(libs.androidx.viewpager2)
     implementation(libs.facebook.shimmer)
     implementation(libs.subsampling.scale.image.view)
+    implementation(libs.lottie)
 
     // Networking
     implementation(libs.retrofit)
@@ -112,6 +113,8 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.navigation.fragment.ktx)
     implementation(libs.navigation.ui.ktx)
+    implementation(libs.androidx.swiperefreshlayout)
+    implementation(libs.androidx.compose.remote.creation.core)
     kapt(libs.room.compiler)
     implementation(libs.kotlinx.datetime)
     implementation(libs.play.services.cast.framework)

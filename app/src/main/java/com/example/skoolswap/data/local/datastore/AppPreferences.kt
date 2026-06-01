@@ -15,6 +15,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,7 +28,8 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class AppPreferences @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-
+    @Volatile
+    private var cachedToken: String? = null
     companion object {
         // Boolean preferences
         val ONBOARDING_FINISHED = booleanPreferencesKey("onboarding_finished")
@@ -170,11 +174,29 @@ class AppPreferences @Inject constructor(
     }
 
     suspend fun setAuthToken(token: String) {
+        cachedToken = token
         context.dataStore.edit { preferences ->
             preferences[AUTH_TOKEN] = token
         }
     }
+    fun getAuthTokenSync(): String? {
+        // If we have cached token, return it immediately
+        cachedToken?.let { return it }
 
+        // Try to load from DataStore with timeout (max 100ms to avoid ANR)
+        return try {
+            runBlocking {
+                withTimeoutOrNull(100L) {
+                    val token = authToken.first()
+                    cachedToken = token
+                    token
+                }
+            }
+        } catch (e: Exception) {
+            Timber.tag("AppPreferences").e(e, "Failed to get token sync")
+            null
+        }
+    }
     // ==================== Filter Cache Methods ====================
 
     /**
@@ -278,6 +300,7 @@ class AppPreferences @Inject constructor(
      * Clear all user data (for logout/delete)
      */
     suspend fun clearUserData() {
+        cachedToken = null
         context.dataStore.edit { preferences ->
             preferences.remove(LOGGED_IN)
             preferences.remove(FIRST_TIME_LOGIN)

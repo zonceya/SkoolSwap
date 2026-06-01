@@ -2,8 +2,6 @@ package com.example.skoolswap.di
 
 import android.util.Log
 import com.example.skoolswap.data.local.datastore.AppPreferences
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.Response
 import timber.log.Timber
@@ -25,27 +23,12 @@ class AuthInterceptor @Inject constructor(
 
         Timber.tag(TAG).d("🔍 Intercepting: $path")
 
-        // Get token from preferences
-        val token = runBlocking {
-            try {
-                val tokenValue = appPreferences.authToken.first()
-                Timber.tag(TAG).d(
-                    "📦 Token from preferences: ${
-                        if (tokenValue != null) "Present (${
-                            tokenValue.take(10)
-                        }...)" else "NULL"
-                    }"
-                )
-                tokenValue
-            } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "❌ Error getting auth token")
-                null
-            }
-        }
+        // Synchronous, non-blocking token access (uses cache)
+        val token = appPreferences.getAuthTokenSync()
 
         // Build request with or without token
         val request = if (!token.isNullOrBlank()) {
-            Timber.tag(TAG).d("✅ Adding Bearer token to: $path")
+            Timber.tag(TAG).d("✅ Adding Bearer token to: $path (token: ${token.take(10)}...)")
             originalRequest.newBuilder()
                 .header("Authorization", "Bearer $token")
                 .build()

@@ -45,4 +45,5 @@
     <color name="purple">#800080</color>
     <color name="pink">#FFC0CB</color>
     <color name="white_20">#33FFFFFF</color>
+    <color name="logout_button_bg">#000000</color>
 </resources>

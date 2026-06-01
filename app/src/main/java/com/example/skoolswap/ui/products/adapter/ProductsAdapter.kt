@@ -59,27 +59,26 @@ class ProductsAdapter(
         }
 
         fun bind(item: Item) {
-
             Timber.tag("ProductsAdapter")
-                .d("Binding product: ${item.name}, viewCount: ${item.viewCount}, status: ${item.status}")
+                .d("Binding: ${item.name} | cover: ${item.coverImage} | images: ${item.images.size} | status: ${item.status}")
 
             binding.productTitle.text = item.name
-            binding.productPrice.text = "R${item.price}"
+            binding.productPrice.text = "R${String.format("%.2f", item.price)}"
 
-
+            // Sold badge
             if (item.status == "sold" || item.quantity <= 0) {
-                Timber.tag("ProductsAdapter").d("  ✅ Showing SOLD badge")
                 binding.soldBadge.visibility = View.VISIBLE
             } else {
                 binding.soldBadge.visibility = View.GONE
             }
+            val imageUrl = item.resolveImageUrl()
 
-            if (item.images.isNotEmpty()) {
+            if (!imageUrl.isNullOrBlank()) {
                 Glide.with(binding.root.context)
-                    .load(item.images.first().url)
+                    .load(imageUrl)
                     .placeholder(R.drawable.ic_create_item_placeholder)
                     .error(R.drawable.ic_create_item_placeholder)
-                    .fitCenter()
+                    .centerCrop()
                     .into(binding.productImage)
             } else {
                 binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)

@@ -12,6 +12,7 @@ import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.domain.repository.FavoriteRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.domain.repository.ProductsRepositoryInterface
+import com.example.skoolswap.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,7 +27,7 @@ class ItemDetailViewModel @Inject constructor(
     private val productsRepository: ProductsRepositoryInterface,
     private val sizeDao: SizeDao,
     private val favoriteRepository: FavoriteRepositoryInterface,
-    private val authRepository: AuthRepositoryInterface,  // ← ADD THIS
+    private val authRepository: AuthRepositoryInterface,
     private val schoolDao: SchoolDao,
     private val colorDao: ColorDao,
     private val brandDao: BrandDao
@@ -37,6 +38,13 @@ class ItemDetailViewModel @Inject constructor(
 
     private val _similarItems = MutableStateFlow<List<Item>>(emptyList())
     val similarItems: StateFlow<List<Item>> = _similarItems.asStateFlow()
+
+    // Add these for fallback UI
+    private val _similarSectionTitle = MutableStateFlow("Similar Items")
+    val similarSectionTitle: StateFlow<String> = _similarSectionTitle.asStateFlow()
+
+    private val _isLoadingSimilar = MutableStateFlow(false)
+    val isLoadingSimilar: StateFlow<Boolean> = _isLoadingSimilar.asStateFlow()
 
     private val _sizeName = MutableStateFlow<String?>(null)
     val sizeName: StateFlow<String?> = _sizeName.asStateFlow()
@@ -70,6 +78,7 @@ class ItemDetailViewModel @Inject constructor(
         }
     }
 
+    // This MUST be suspend because favoriteRepository.isFavorite() is suspend
     private suspend fun checkFavoriteStatus(itemId: String) {
         _isFavorite.value = favoriteRepository.isFavorite(itemId)
         Timber.tag(TAG).d("Favorite status for $itemId: ${_isFavorite.value}")
@@ -85,6 +94,7 @@ class ItemDetailViewModel @Inject constructor(
         }
     }
 
+    // This MUST be suspend because authRepository.getUserById() is suspend
     private suspend fun loadSellerContact(sellerUserId: Long) {
         val result = authRepository.getUserById(sellerUserId)
         if (result.isSuccess) {
@@ -96,6 +106,7 @@ class ItemDetailViewModel @Inject constructor(
         }
     }
 
+    // This MUST be suspend because itemRepository.getItem() is suspend
     private suspend fun fetchItem(itemId: String) {
         val result = itemRepository.getItem(itemId)
 
@@ -105,14 +116,17 @@ class ItemDetailViewModel @Inject constructor(
                 cachedItem = item
                 _itemState.value = ItemDetailState.Success(item)
                 loadReferenceData(item)
-                loadSimilarItems(item)
+                loadSimilarItems(item) // This calls suspend function
 
                 _sellerMobile.value = item.shop?.sellerMobile
                 Log.d(TAG, "Seller mobile: ${_sellerMobile.value}")
             }
+        } else {
+            _itemState.value = ItemDetailState.Error(result.exceptionOrNull()?.message ?: "Unknown error")
         }
     }
 
+    // This MUST be suspend because database operations are suspend
     private suspend fun loadReferenceData(item: Item) {
         Timber.tag("ItemDetailVM").d("Images count: ${item.images.size}")
         item.images.forEachIndexed { index, image ->
@@ -126,32 +140,116 @@ class ItemDetailViewModel @Inject constructor(
         _brandName.value = item.brandName
         _conditionName.value = item.conditionName
 
-        // Load school name from Room
+        // Load school name from Room (suspend)
         item.schoolId?.let { schoolId ->
             val school = schoolDao.getById(schoolId)
             _schoolName.value = school?.name
         }
     }
 
+    // UPDATED: This now has multiple fallback strategies
     private suspend fun loadSimilarItems(currentItem: Item) {
-        val result = productsRepository.getRecommendedAll(
-            page = 1,
-            perPage = 10,
-            categoryId = currentItem.mainCategoryId,
-            conditionId = null,
-            minPrice = null,
-            maxPrice = null
-        )
+        Log.d(TAG, "========== LOAD SIMILAR ITEMS START ==========")
+        _isLoadingSimilar.value = true
 
-        if (result.isSuccess) {
-            val paginatedResponse = result.getOrNull()
-            val similar = paginatedResponse?.items
-                ?.filter { it.id != currentItem.id }
-                ?.take(6) ?: emptyList()
-            _similarItems.value = similar
-        } else {
-            _similarItems.value = emptyList()
+        var items = emptyList<Item>()
+        var fallbackLevel = 0
+
+        // Try 1: Same category — always exclude current item
+        if (currentItem.mainCategoryId != null) {
+            items = fetchItemsByCategory(currentItem.mainCategoryId, currentItem.id)
+            if (items.isNotEmpty()) {
+                _similarSectionTitle.value = "Similar Items"
+                fallbackLevel = 1
+            }
         }
+
+        // Try 2: Trending — exclude current item
+        if (items.isEmpty()) {
+            items = fetchTrendingItems(excludeItemId = currentItem.id, period = "today")
+            if (items.isNotEmpty()) {
+                _similarSectionTitle.value = "Trending Today"
+                fallbackLevel = 2
+            }
+        }
+
+        // Try 3: Recent — exclude current item
+        if (items.isEmpty()) {
+            items = fetchRecentItems(excludeItemId = currentItem.id, period = "week")
+            if (items.isNotEmpty()) {
+                _similarSectionTitle.value = "Just Added"
+                fallbackLevel = 3
+            }
+        }
+
+        // Try 4: Any popular — exclude current item
+        if (items.isEmpty()) {
+            items = fetchAnyPopularItems(excludeItemId = currentItem.id)
+            if (items.isNotEmpty()) {
+                _similarSectionTitle.value = "Popular Items"
+                fallbackLevel = 4
+            }
+        }
+
+        Log.d(TAG, "Fallback level $fallbackLevel used, found ${items.size} items")
+        // ✅ Double-filter at the end as safety net
+        _similarItems.value = items
+            .filter { it.id != currentItem.id }
+            .take(6)
+        _isLoadingSimilar.value = false
+    }
+
+    // Helper suspend functions for each fallback
+    private suspend fun fetchItemsByCategory(categoryId: Int, excludeItemId: String): List<Item> {
+        return try {
+            val result = productsRepository.getRecommendedAll(
+                page = 1, perPage = 10, categoryId = categoryId,
+                conditionId = null, minPrice = null, maxPrice = null
+            )
+            when (result) {
+                is Result.Success -> result.data.items.filter { it.id != excludeItemId }
+                is Result.Error -> emptyList()
+            }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    private suspend fun fetchTrendingItems(excludeItemId: String, period: String = "today"): List<Item> {
+        return try {
+            val result = productsRepository.getTrendingAll(
+                period = period, page = 1, perPage = 10,
+                categoryId = null, conditionId = null, minPrice = null, maxPrice = null
+            )
+            when (result) {
+                is Result.Success -> result.data.items.filter { it.id != excludeItemId }
+                is Result.Error -> emptyList()
+            }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    private suspend fun fetchRecentItems(excludeItemId: String, period: String = "week"): List<Item> {
+        return try {
+            val result = productsRepository.getRecentAll(
+                period = period, page = 1, perPage = 10,
+                categoryId = null, conditionId = null, minPrice = null, maxPrice = null
+            )
+            when (result) {
+                is Result.Success -> result.data.items.filter { it.id != excludeItemId }
+                is Result.Error -> emptyList()
+            }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    private suspend fun fetchAnyPopularItems(excludeItemId: String): List<Item> {
+        return try {
+            val result = productsRepository.getRecommendedAll(
+                page = 1, perPage = 10, categoryId = null,
+                conditionId = null, minPrice = null, maxPrice = null
+            )
+            when (result) {
+                is Result.Success -> result.data.items.filter { it.id != excludeItemId }
+                is Result.Error -> emptyList()
+            }
+        } catch (e: Exception) { emptyList() }
     }
 
     fun trackView(itemId: String, source: String) {
@@ -169,6 +267,8 @@ class ItemDetailViewModel @Inject constructor(
     fun clearState() {
         _itemState.value = ItemDetailState.Loading
         _similarItems.value = emptyList()
+        _similarSectionTitle.value = "Similar Items"
+        _isLoadingSimilar.value = false
         _sizeName.value = null
         _schoolName.value = null
         _colorName.value = null

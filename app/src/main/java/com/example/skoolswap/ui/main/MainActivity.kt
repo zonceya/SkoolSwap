@@ -42,6 +42,7 @@ import androidx.navigation.fragment.NavHostFragment
 import com.bumptech.glide.load.engine.GlideException
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
+import com.example.skoolswap.ui.home.HomeViewModel
 import com.example.skoolswap.ui.products.ProductsFragment
 import jakarta.inject.Inject
 import timber.log.Timber
@@ -54,6 +55,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var binding: ActivityMainBinding
     private val viewModel: MainViewModel by viewModels()
+    private val viewHomeModel: HomeViewModel by viewModels()
     private val navHeaderViewModel: NavigationHeaderViewModel by viewModels()
     @Inject
     lateinit var appPreferences: AppPreferences
@@ -220,20 +222,20 @@ class MainActivity : AppCompatActivity() {
         val profileImageView = headerView.findViewById<ImageView>(R.id.profileImageView)
 
         // Log to check if views are found
-        Log.d("NavHeader", "usernameTextView: ${usernameTextView != null}")
-        Log.d("NavHeader", "userEmailTextView: ${userEmailTextView != null}")
-        Log.d("NavHeader", "profileImageView: ${profileImageView != null}")
+        Timber.tag("NavHeader").d("usernameTextView: ${usernameTextView != null}")
+        Timber.tag("NavHeader").d("userEmailTextView: ${userEmailTextView != null}")
+        Timber.tag("NavHeader").d("profileImageView: ${profileImageView != null}")
 
         loadingOverlay.visibility = View.VISIBLE
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 navHeaderViewModel.userState.collectLatest { userState ->
-                    Log.d("NavHeader", "userState: $userState")
+                    Timber.tag("NavHeader").d("userState: $userState")
 
                     when (userState) {
                         is UserState.Loading -> {
-                            Log.d("NavHeader", "State: LOADING")
+                            Timber.tag("NavHeader").d("State: LOADING")
                             loadingOverlay.visibility = View.VISIBLE
                             usernameTextView.text = "Loading..."
                             userEmailTextView.text = ""
@@ -241,17 +243,19 @@ class MainActivity : AppCompatActivity() {
                             profileImageView.setColorFilter(null)
                         }
                         is UserState.Success -> {
-                            Log.d("NavHeader", "State: SUCCESS")
-                            Log.d("NavHeader", "Name: ${userState.name}")
-                            Log.d("NavHeader", "Email: ${userState.email}")
-                            Log.d("NavHeader", "ProfileImageUrl: ${userState.profileImageUrl}")
+                            Timber.tag("NavHeader").d("State: SUCCESS")
+                            Timber.tag("NavHeader").d("Name: ${userState.name}")
+                            Timber.tag("NavHeader").d("Email: ${userState.email}")
+                            Timber.tag("NavHeader")
+                                .d("ProfileImageUrl: ${userState.profileImageUrl}")
 
                             loadingOverlay.visibility = View.GONE
                             usernameTextView.text = userState.name ?: "Welcome"
                             userEmailTextView.text = userState.email ?: "Sign in to continue"
 
                             if (!userState.profileImageUrl.isNullOrEmpty()) {
-                                Log.d("NavHeader", "Loading image from URL: ${userState.profileImageUrl}")
+                                Timber.tag("NavHeader")
+                                    .d("Loading image from URL: ${userState.profileImageUrl}")
 
                                 Glide.with(this@MainActivity)
                                     .load(userState.profileImageUrl)
@@ -266,7 +270,7 @@ class MainActivity : AppCompatActivity() {
                                             target: com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable>?,
                                             isFirstResource: Boolean
                                         ): Boolean {
-                                            Log.e("NavHeader", "Glide load failed", e)
+                                            Timber.tag("NavHeader").e(e, "Glide load failed")
                                             return false
                                         }
 
@@ -277,14 +281,14 @@ class MainActivity : AppCompatActivity() {
                                             dataSource: com.bumptech.glide.load.DataSource?,
                                             isFirstResource: Boolean
                                         ): Boolean {
-                                            Log.d("NavHeader", "Glide load success")
+                                            Timber.tag("NavHeader").d("Glide load success")
                                             return false
                                         }
                                     })
                                     .into(profileImageView)
                                 profileImageView.setColorFilter(null)
                             } else {
-                                Log.d("NavHeader", "No profile image URL, using placeholder")
+                                Timber.tag("NavHeader").d("No profile image URL, using placeholder")
                                 profileImageView.setImageResource(R.drawable.ic_user)
                                 // Set tint based on theme
                                 val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
@@ -298,7 +302,7 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                         is UserState.Error -> {
-                            Log.e("NavHeader", "State: ERROR - ${userState.message}")
+                            Timber.tag("NavHeader").e("State: ERROR - ${userState.message}")
                             loadingOverlay.visibility = View.GONE
                             usernameTextView.text = "Error"
                             userEmailTextView.text = userState.message
@@ -396,14 +400,51 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showLogoutConfirmationDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Logout")
-            .setMessage("Are you sure you want to logout?")
-            .setPositiveButton("Logout") { _, _ ->
-                performLogout()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+        // Inflate your custom dialog layout
+        val dialogView = layoutInflater.inflate(R.layout.dialog_logout, null)
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setCancelable(true)
+            .create()
+
+        // Make background transparent to show rounded corners
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        // Optional: Add animation
+        dialog.window?.attributes?.windowAnimations = R.style.DialogAnimation
+
+        // Get buttons from the custom layout
+        val btnCancel = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnCancel)
+        val btnLogout = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnLogout)
+
+        // Check current theme for proper button colors
+        val isDarkMode = (resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+        // Style the logout button based on theme
+        if (isDarkMode) {
+            // Dark mode: White button with black text
+            btnLogout.backgroundTintList = ContextCompat.getColorStateList(this, R.color.white)
+            btnLogout.setTextColor(ContextCompat.getColor(this, R.color.black))
+        } else {
+            // Light mode: Black button with white text
+            btnLogout.backgroundTintList = ContextCompat.getColorStateList(this, R.color.black)
+            btnLogout.setTextColor(ContextCompat.getColor(this, R.color.white))
+        }
+
+        // Set click listeners
+        btnCancel.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        btnLogout.setOnClickListener {
+            dialog.dismiss()
+            performLogout()
+        }
+
+        dialog.show()
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
@@ -419,6 +460,7 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 viewModel.logout()
+                viewHomeModel.clearHomeData()
                 appPreferences.clearUserData()
 
                 // Use the action from loginFragment
@@ -531,9 +573,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun observeNavigation() {
         Timber.tag("MainActivity").e("👀 observeNavigation called at ${System.currentTimeMillis()}")
+
         viewModel.navigationDestination.observe(this) { destination ->
             Timber.tag("MainActivity")
                 .e("📡 navigationDestination observed: $destination at ${System.currentTimeMillis()}")
+
+            // CRITICAL FIX: Don't navigate while IntroFragment is active
+            val currentDest = navController.currentDestination?.id
+            if (currentDest == R.id.introFragment) {
+                Timber.tag("MainActivity").e("⏸️ SKIPPING navigation - IntroFragment is handling routing")
+                return@observe
+            }
 
             if (destination != null) {
                 navigateToDestination(destination)
@@ -546,6 +596,14 @@ class MainActivity : AppCompatActivity() {
         viewModel.forceNavigation.observe(this) { destination ->
             Timber.tag("MainActivity")
                 .e("📡 forceNavigation observed: $destination at ${System.currentTimeMillis()}")
+
+            // CRITICAL FIX: Don't navigate while IntroFragment is active
+            val currentDest = navController.currentDestination?.id
+            if (currentDest == R.id.introFragment) {
+                Timber.tag("MainActivity").e("⏸️ SKIPPING force navigation - IntroFragment is handling routing")
+                return@observe
+            }
+
             destination?.let {
                 navigateToDestination(it)
                 viewModel.clearForceNavigation()

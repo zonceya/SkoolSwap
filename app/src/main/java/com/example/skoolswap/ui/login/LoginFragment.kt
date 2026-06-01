@@ -2,14 +2,12 @@ package com.example.skoolswap.ui.login
 
 import android.content.res.ColorStateList
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentLoginBinding
@@ -17,15 +15,14 @@ import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.google.android.material.textfield.TextInputLayout
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class LoginFragment : Fragment() {
 
     private var _binding: FragmentLoginBinding? = null
-    private val binding get() = _binding!!  // Safe after onViewCreated
+    private val binding get() = _binding!!
     private val viewModel: LoginViewModel by viewModels()
 
     @Inject
@@ -36,7 +33,6 @@ class LoginFragment : Fragment() {
 
     private var isSigningIn = false
     private var isSendingOtp = false
-    // REMOVED: private var videoBackgroundManager: VideoBackgroundManager? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -50,18 +46,32 @@ class LoginFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        Log.e("LoginFragment", "🔥 onViewCreated")
+        Timber.tag("LoginFragment").e("🔥 onViewCreated")
 
-        checkExistingSession()
-        // REMOVED: setupVideoBackground()
+        // Check if we came from IntroFragment
+        val fromIntro = arguments?.getBoolean("from_intro", false) ?: false
+
+        if (fromIntro) {
+            // Session already checked by IntroFragment, just show login UI
+            Timber.tag("LoginFragment").d("Coming from IntroFragment - session already validated")
+            binding.root.visibility = View.VISIBLE
+        } else {
+            // Only check session if not coming from IntroFragment
+            // This handles edge cases like direct navigation to login
+            Timber.tag("LoginFragment").d("Direct navigation - checking session")
+            checkExistingSession()
+        }
+
         setupUI()
         observeViewModel()
     }
 
     private fun setupUI() {
         if (_binding == null) return
+
         setBoxStrokeColor(binding.emailLayout, ContextCompat.getColor(requireContext(), R.color.white))
         setBoxStrokeColor(binding.passwordLayout, ContextCompat.getColor(requireContext(), R.color.white))
+
         binding.signInButton.setOnClickListener {
             if (isSigningIn) return@setOnClickListener
 
@@ -116,6 +126,7 @@ class LoginFragment : Fragment() {
             }
         }
     }
+
     private fun setBoxStrokeColor(textInputLayout: TextInputLayout, color: Int) {
         try {
             val states = arrayOf(
@@ -131,9 +142,10 @@ class LoginFragment : Fragment() {
             textInputLayout.hintTextColor = colorStateList
             textInputLayout.defaultHintTextColor = colorStateList
         } catch (e: Exception) {
-            Log.e("LoginFragment", "Error setting box stroke color: ${e.message}")
+            Timber.tag("LoginFragment").e("Error setting box stroke color: ${e.message}")
         }
     }
+
     private fun observeViewModel() {
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
             if (_binding == null) return@observe
@@ -186,61 +198,16 @@ class LoginFragment : Fragment() {
         }
     }
 
-    private suspend fun isUserLoggedIn(): Boolean {
-        return try {
-            val isLoggedIn = appPreferences.isLoggedIn.first()
-            val authToken = appPreferences.authToken.first()
-            val userId = appPreferences.getUserId()
-            isLoggedIn && !authToken.isNullOrEmpty() && userId != null
-        } catch (e: Exception) {
-            false
-        }
-    }
-
+    /**
+     * Only called when LoginFragment is accessed directly (not through IntroFragment)
+     * This handles edge cases like deeplinks or direct navigation
+     */
     private fun checkExistingSession() {
-        lifecycleScope.launch {
-            try {
-                val isOnboardingFinished = appPreferences.isOnboardingFinished.first()
-
-                if (!isAdded || isDetached || _binding == null) {
-                    Log.d("LoginFragment", "Fragment not in valid state, skipping session check")
-                    return@launch
-                }
-
-                if (!isOnboardingFinished) {
-                    findNavController().navigate(R.id.action_loginFragment_to_onboarding)
-                    return@launch
-                }
-
-                val restored = authRepository.restoreSession()
-
-                if (!isAdded || isDetached || _binding == null) {
-                    Log.d("LoginFragment", "Fragment state changed during restore, aborting")
-                    return@launch
-                }
-
-                if (restored) {
-                    binding.root.visibility = View.INVISIBLE
-                    val user = authRepository.getServerUser().first()
-
-                    if (!isAdded || isDetached || _binding == null) return@launch
-
-                    if (user == null) {
-                        binding.root.visibility = View.VISIBLE
-                        return@launch
-                    }
-                    navigateAfterLogin(user)
-                } else {
-                    binding.root.visibility = View.VISIBLE
-                }
-
-            } catch (e: Exception) {
-                Log.e("LoginFragment", "❌ Error checking session: ${e.message}")
-                if (isAdded && !isDetached && _binding != null) {
-                    binding.root.visibility = View.VISIBLE
-                }
-            }
-        }
+        // REMOVED: We no longer restore session here
+        // Session restoration is now handled ENTIRELY by IntroFragment
+        // LoginFragment only shows the login UI
+        Timber.tag("LoginFragment").d("LoginFragment - no session restore, just showing UI")
+        binding.root.visibility = View.VISIBLE
     }
 
     private fun navigateAfterLogin(user: com.example.skoolswap.domain.model.User) {
@@ -253,18 +220,12 @@ class LoginFragment : Fragment() {
                 findNavController().navigate(R.id.action_loginFragment_to_profileFragment)
             }
         } catch (e: Exception) {
-            Log.e("LoginFragment", "Navigation failed: ${e.message}")
+            Timber.tag("LoginFragment").e("Navigation failed: ${e.message}")
         }
     }
 
-    // REMOVED: setupVideoBackground() method
-
-    // REMOVED: onResume, onPause video calls
-
     override fun onDestroyView() {
         super.onDestroyView()
-        // REMOVED: videoBackgroundManager?.release()
-        // REMOVED: videoBackgroundManager = null
         _binding = null
     }
 }

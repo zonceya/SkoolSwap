@@ -4,7 +4,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:fillViewport="true"
+    android:background="?android:attr/colorBackground">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
@@ -53,7 +54,7 @@
                 android:layout_marginTop="8dp"
                 android:text="change_photo"
                 android:visibility="gone"
-                android:textColor="@color/black"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="14sp" />
 
             <!-- Name Field -->
@@ -71,9 +72,11 @@
                 app:boxCornerRadiusBottomStart="12dp"
                 app:boxCornerRadiusTopEnd="12dp"
                 app:boxCornerRadiusTopStart="12dp"
+                app:boxStrokeColor="?attr/colorOnSurface"
                 app:boxStrokeErrorColor="@color/red"
                 app:errorIconTint="@color/red"
-                app:errorTextColor="@color/red">
+                app:errorTextColor="@color/red"
+                app:hintTextColor="?attr/colorOnSurface">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/profile_name"
@@ -83,7 +86,7 @@
                     android:cursorVisible="false"
                     android:focusable="false"
                     android:inputType="none"
-                    android:textColor="?attr/colorOnSurface"  />
+                    android:textColor="?attr/colorOnSurface" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Contact Number Field -->
@@ -101,18 +104,21 @@
                 app:boxCornerRadiusBottomStart="12dp"
                 app:boxCornerRadiusTopEnd="12dp"
                 app:boxCornerRadiusTopStart="12dp"
+                app:boxStrokeColor="?attr/colorOnSurface"
                 app:boxStrokeErrorColor="@color/red"
                 app:errorIconTint="@color/red"
-                app:errorTextColor="@color/red">
+                app:errorTextColor="@color/red"
+                app:hintTextColor="?attr/colorOnSurface">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/contactNumber"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:drawableEnd="@drawable/ic_edit"
+                    android:drawableTint="?attr/colorOnSurface"
                     android:inputType="phone"
                     android:maxLength="10"
-                    android:textColor="?attr/colorOnSurface"  />
+                    android:textColor="?attr/colorOnSurface" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Province Dropdown -->
@@ -126,14 +132,15 @@
                 android:layout_marginEnd="8dp"
                 android:layout_marginStart="8dp"
                 android:hint="@string/select_province"
-
                 app:boxCornerRadiusBottomEnd="12dp"
                 app:boxCornerRadiusBottomStart="12dp"
                 app:boxCornerRadiusTopEnd="12dp"
                 app:boxCornerRadiusTopStart="12dp"
+                app:boxStrokeColor="?attr/colorOnSurface"
                 app:endIconMode="dropdown_menu"
                 app:startIconDrawable="@drawable/ic_location"
-                app:startIconTint="?attr/colorOnSurface">
+                app:startIconTint="?attr/colorOnSurface"
+                app:hintTextColor="?attr/colorOnSurface">
 
                 <AutoCompleteTextView
                     android:paddingEnd="45dp"
@@ -142,7 +149,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="none"
-                    android:textColor="?attr/colorOnSurface"  />
+                    android:textColor="?attr/colorOnSurface" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- School Search -->
@@ -160,12 +167,14 @@
                 app:boxCornerRadiusBottomStart="12dp"
                 app:boxCornerRadiusTopEnd="12dp"
                 app:boxCornerRadiusTopStart="12dp"
+                app:boxStrokeColor="?attr/colorOnSurface"
                 app:endIconMode="clear_text"
                 app:startIconDrawable="@drawable/ic_search"
                 app:startIconTint="?attr/colorOnSurface"
                 app:endIconTint="?attr/colorOnSurface"
                 app:placeholderText="@string/select_province_first"
-                app:placeholderTextColor="@color/darker_grey_light">
+                app:placeholderTextColor="?attr/colorOnSurface"
+                app:hintTextColor="?attr/colorOnSurface">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/schoolSearch"
@@ -174,10 +183,11 @@
                     android:enabled="false"
                     android:inputType="text"
                     android:textColor="?attr/colorOnSurface"
-                    android:textColorHint="@color/darker_grey_light"
+                    android:textColorHint="?attr/colorOnSurface"
                     android:paddingEnd="8dp"
                     android:paddingStart="8dp" />
             </com.google.android.material.textfield.TextInputLayout>
+
             <!-- Selected School Display -->
             <TextView
                 android:id="@+id/selectedSchoolText"
@@ -188,7 +198,8 @@
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp"
                 android:text="@string/no_school_selected"
-                android:textColor="@color/lightgray"
+                android:textColor="?attr/colorOnSurface"
+                android:alpha="0.7"
                 android:textSize="14sp"
                 android:visibility="gone" />
 
@@ -203,7 +214,7 @@
                 android:layout_marginEnd="8dp"
                 android:maxHeight="200dp"
                 android:visibility="gone"
-                android:background="@drawable/rounded_background"
+                android:background="?attr/colorSurface"
                 android:elevation="4dp" />
 
             <!-- No Results Message -->
@@ -217,10 +228,11 @@
                 android:layout_marginEnd="8dp"
                 android:text="@string/no_schools_found"
                 android:textAlignment="center"
-                android:textColor="@color/lightgray"
+                android:textColor="?attr/colorOnSurface"
+                android:alpha="0.7"
                 android:visibility="gone" />
 
-            <!-- Submit Button -->
+            <!-- Submit Button - KEEP ORIGINAL STYLE -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/submitButton"
                 android:layout_width="match_parent"
@@ -261,11 +273,12 @@
                 android:layout_marginEnd="8dp"
                 android:text="@string/deleting_your_account_is_permanent_and_cannot_be_undone_all_your_data_will_be_permanently_lost"
                 android:textColor="?attr/colorOnSurface"
+                android:alpha="0.7"
                 android:textSize="14sp"
                 android:lineSpacingExtra="4dp"
                 android:visibility="visible" />
 
-            <!-- Delete Button -->
+            <!-- Delete Button - KEEP ORIGINAL STYLE (RED) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/deleteButton"
                 android:layout_width="match_parent"
@@ -280,6 +293,7 @@
                 android:textStyle="bold"
                 android:visibility="visible"
                 app:backgroundTint="@null" />
+
         </RelativeLayout>
 
         <!-- Loading Indicator -->

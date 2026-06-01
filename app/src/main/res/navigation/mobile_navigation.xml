@@ -3,7 +3,39 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mobile_navigation"
-    app:startDestination="@id/loginFragment">
+    app:startDestination="@id/introFragment">  <!-- CHANGED: Now starts with IntroFragment -->
+
+    <!-- INTRO FRAGMENT - First screen, plays video -->
+    <fragment
+        android:id="@+id/introFragment"
+        android:name="com.example.skoolswap.ui.intro.IntroFragment"
+        android:label="Intro"
+        tools:layout="@layout/fragment_intro">
+
+        <action
+            android:id="@+id/action_introFragment_to_loginFragment"
+            app:destination="@id/loginFragment"
+            app:popUpTo="@id/introFragment"
+            app:popUpToInclusive="true" />
+
+        <action
+            android:id="@+id/action_introFragment_to_onboarding"
+            app:destination="@id/viewPagerFragment"
+            app:popUpTo="@id/introFragment"
+            app:popUpToInclusive="true" />
+
+        <action
+            android:id="@+id/action_introFragment_to_nav_home"
+            app:destination="@id/nav_home"
+            app:popUpTo="@id/introFragment"
+            app:popUpToInclusive="true" />
+
+        <action
+            android:id="@+id/action_introFragment_to_profileFragment"
+            app:destination="@id/nav_profile"
+            app:popUpTo="@id/introFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
 
     <!-- Onboarding Flow -->
     <fragment
@@ -54,6 +86,7 @@
             app:destination="@id/signUpFragment"
             app:popUpTo="@id/loginFragment"
             app:popUpToInclusive="false" />
+
         <action
             android:id="@+id/action_global_logout"
             app:destination="@id/loginFragment"
@@ -348,6 +381,5 @@
             android:defaultValue="@null" />
 
     </fragment>
-    <!-- Add a global action at the root level of your navigation graph -->
 
 </navigation>

@@ -2,7 +2,6 @@ package com.example.skoolswap.data.remote.models.response.home
 
 import com.google.gson.annotations.SerializedName
 
-// ============ HOME RESPONSE ============
 data class HomeRecommendationResponse(
     @SerializedName("success") val success: Boolean,
     @SerializedName("school_id") val schoolId: Int,

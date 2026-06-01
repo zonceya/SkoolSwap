@@ -35,9 +35,31 @@ data class Item(
     val conditionName: String? = null,
     val viewCount: Int = 0,
 ) {
-    val availableQuantity: Int
-        get() = quantity - reserved
-}
+
+        val availableQuantity: Int
+            get() = quantity - reserved
+
+        fun resolveImageUrl(): String? =
+            coverImage?.takeIf { it.isNotBlank() && it.startsWith("http") }
+                ?: images.firstOrNull { !it.url.isNullOrBlank() && it.url.startsWith("http") }?.url
+
+        fun resolveAllImageUrls(): List<String> {
+            val result = mutableListOf<String>()
+
+            coverImage?.takeIf { it.isNotBlank() && it.startsWith("http") }?.let {
+                result.add(it)
+            }
+
+            images
+                .mapNotNull { it.url }
+                .filter { it.startsWith("http") && it != coverImage }
+                .forEach { result.add(it) }
+
+            return result
+        }
+    }
+
+
 
 data class ItemMeta(
     val color: String?,

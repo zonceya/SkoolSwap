@@ -336,51 +336,33 @@ fun Item.toEntity(): ItemEntity {
         coverImage = coverImageUrl
     )
 }
-fun RecommendationItemDto.toDomain(): Item {
-    return Item(
-        id = this.id,
-        shopId = this.shop?.id ?: 0L,
-        name = this.name,
-        description = this.description ?: "",
-        price = this.price,
-        quantity = this.availableQuantity,
+// KEEP THIS VERSION
+fun RecommendationItemDto.toDomain(): com.example.skoolswap.domain.model.Item {
+    return com.example.skoolswap.domain.model.Item(
+        id = id,
+        shopId = shop?.id ?: 0L,
+        name = name,
+        description = description ?: "",
+        price = price,
+        quantity = availableQuantity,
         status = "active",
-        itemTypeId = null,
-        gender = this.gender,
-        viewCount = this.viewCount,
-        brandId = null,
-        sizeId = null,
-        colorId = null,
-        mainCategoryId = null,
-        subCategoryId = null,
-        schoolName = this.school,
-        schoolId = this.schoolId,
-        itemConditionId = null,
-        locationId = null,
-        provinceId = null,
-        genderId = null,
-        meta = null,
-        label = null,
-        reserved = 0,
-        updatedAt = null,
-        createdAt = this.createdAt,
-        images = this.images?.map { imageUrl ->
-            ItemImage(
+        createdAt = createdAt,
+        images = listOfNotNull(coverPhoto ?: image).map { url ->
+            com.example.skoolswap.domain.model.ItemImage(
                 id = 0,
-                url = imageUrl,
-                filename = null,
-                contentType = null,
-                createdAt = null,
-                isCover = imageUrl == this.coverPhoto
+                url = url,
+                isCover = true
             )
-        } ?: emptyList(),
-        coverImage = this.coverPhoto ?: this.image,
-        sizeName = this.sizeName,
-        colorName = this.colorName,
-        brandName = this.brandName,
-        conditionName = this.conditionName,
-        shop = this.shop?.let {
-            Shop(
+        },
+        coverImage = coverPhoto ?: image,
+        sizeName = sizeName,
+        colorName = colorName,
+        conditionName = conditionName,
+        brandName = brandName,
+        gender = gender,
+        viewCount = viewCount,
+        shop = shop?.let {
+            com.example.skoolswap.domain.model.Shop(
                 id = it.id,
                 name = it.name,
                 displayName = "",

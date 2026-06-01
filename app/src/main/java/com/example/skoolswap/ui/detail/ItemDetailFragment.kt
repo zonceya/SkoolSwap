@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
@@ -24,6 +25,7 @@ import timber.log.Timber
 import androidx.core.view.isVisible
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.utils.extensions.formatViewCount
+import com.example.skoolswap.utils.ColorUtils
 
 private const val TAG = "ItemDetailFragment"
 
@@ -43,7 +45,8 @@ class ItemDetailFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        Log.d(TAG, "onCreateView called")
+        (requireActivity() as AppCompatActivity).supportActionBar?.hide()
+        Timber.tag(TAG).d("onCreateView called")
         _binding = FragmentItemDetailBinding.inflate(inflater, container, false)
         (requireActivity() as AppCompatActivity).supportActionBar?.hide()
         return binding.root
@@ -51,15 +54,21 @@ class ItemDetailFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        Log.d(TAG, "onViewCreated called")
-
+        Timber.tag(TAG).d("onViewCreated called")
+        requireActivity().onBackPressedDispatcher.addCallback(
+            viewLifecycleOwner,
+            backPressedCallback
+        )
+        binding.shippingExpandableContent.visibility = View.GONE
+        binding.shippingToggle.text = "+"
+        binding.shippingAnimation.pauseAnimation()
         val itemId = arguments?.getString("itemId")
         val source = arguments?.getString("source") ?: "unknown"
 
-        Log.d(TAG, "Arguments - itemId: $itemId, source: $source")
+        Timber.tag(TAG).d("Arguments - itemId: $itemId, source: $source")
 
         if (itemId == null) {
-            Log.e(TAG, "itemId is null, popping backstack")
+            Timber.tag(TAG).e("itemId is null, popping backstack")
             findNavController().popBackStack()
             return
         }
@@ -70,20 +79,20 @@ class ItemDetailFragment : Fragment() {
         setupListeners()
         observeViewModel()
         viewModel.trackView(itemId, source)
-        Log.d(TAG, "Loading item: $itemId from source: $source")
+        Timber.tag(TAG).d("Loading item: $itemId from source: $source")
         viewModel.loadItem(itemId, source)
     }
 
     private fun hideFab() {
         val fab = activity?.findViewById<FloatingActionButton>(R.id.fab)
         fab?.visibility = View.GONE
-        Log.d(TAG, "FAB hidden")
+        Timber.tag(TAG).d("FAB hidden")
     }
 
     private fun setupViews() {
-        Log.d(TAG, "setupViews called")
+        Timber.tag(TAG).d("setupViews called")
         similarItemsAdapter = SimilarItemsAdapter { item ->
-            Log.d(TAG, "Similar item clicked: ${item.id}")
+            Timber.tag(TAG).d("Similar item clicked: ${item.id}")
             navigateToDetail(item.id)
         }
         binding.similarRecycler.apply {
@@ -94,79 +103,86 @@ class ItemDetailFragment : Fragment() {
             offscreenPageLimit = 2
             setCurrentItem(0, false)
         }
-        Log.d(TAG, "Views setup complete")
+        Timber.tag(TAG).d("Views setup complete")
     }
 
     private fun setupListeners() {
-        Log.d(TAG, "setupListeners called")
+        Timber.tag(TAG).d("setupListeners called")
         binding.backBtn.setOnClickListener {
-            Log.d(TAG, "Back button clicked")
+            Timber.tag(TAG).d("Back button clicked")
             findNavController().popBackStack()
         }
 
         binding.shareBtn.setOnClickListener {
-            Log.d(TAG, "Share button clicked")
+            Timber.tag(TAG).d("Share button clicked")
             shareItem()
         }
-
-        // FIXED: Only ONE favorite button listener
+        binding.shippingHeader.setOnClickListener {
+            Timber.tag(TAG).d("Shipping header clicked")
+            toggleShippingSection()
+        }
         binding.favBtn.setOnClickListener {
-            Log.d(TAG, "Favorite button clicked")
+            Timber.tag(TAG).d("Favorite button clicked")
             viewModel.toggleFavorite()  // Call ViewModel method directly
         }
 
-        binding.contactSeller.setOnClickListener {
-            Log.d(TAG, "Contact seller button clicked")
+      /*  binding.contactSeller.setOnClickListener {
+            Timber.tag(TAG).d("Contact seller button clicked")
             contactSeller()
-        }
+        }*/
 
         binding.buyButton.setOnClickListener {
-            Log.d(TAG, "Buy button clicked")
+            Timber.tag(TAG).d("Buy button clicked")
             onBuyClick()
         }
 
         binding.shippingHeader.setOnClickListener {
-            Log.d(TAG, "Shipping header clicked")
+            Timber.tag(TAG).d("Shipping header clicked")
             toggleShippingSection()
         }
     }
 
     private fun toggleShippingSection() {
-        val isVisible = binding.shippingExpandableContent.isVisible
-        Log.d(TAG, "Toggle shipping section, currently visible: $isVisible")
+        val content = binding.shippingExpandableContent
+        val toggle = binding.shippingToggle
 
-        if (isVisible) {
-            binding.shippingExpandableContent.visibility = View.GONE
-            binding.shippingToggle.text = "+"
+        if (content.visibility == View.VISIBLE) {
+            content.visibility = View.GONE      // Collapse
+            toggle.text = "+"                   // Show +
+            // Optional: pause animation when collapsed
+            binding.shippingAnimation.pauseAnimation()
         } else {
-            binding.shippingExpandableContent.visibility = View.VISIBLE
-            binding.shippingToggle.text = "-"
+            content.visibility = View.VISIBLE   // Expand
+            toggle.text = "−"                   // Show -
+            // Optional: play animation when expanded
+            binding.shippingAnimation.playAnimation()
         }
     }
 
     private fun observeViewModel() {
-        Log.d(TAG, "observeViewModel called")
+        Timber.tag(TAG).d("observeViewModel called")
 
         lifecycleScope.launch {
-            Log.d(TAG, "Starting itemState collection")
+            Timber.tag(TAG).d("Starting itemState collection")
             viewModel.itemState.collect { state ->
-                Log.d(TAG, "ItemState received: $state")
+                Timber.tag(TAG).d("ItemState received: $state")
                 when (state) {
                     is ItemDetailViewModel.ItemDetailState.Loading -> {
-                        Log.d(TAG, "State: Loading...")
+                        Timber.tag(TAG).d("State: Loading...")
                         showLoading(true)
                     }
                     is ItemDetailViewModel.ItemDetailState.Success -> {
-                        Log.d(TAG, "State: Success! Item: ${state.item.name}, ID: ${state.item.id}")
-                        Log.d(TAG, "Item images count: ${state.item.images.size}")
+                        Timber.tag(TAG)
+                            .d("State: Success! Item: ${state.item.name}, ID: ${state.item.id}")
+                        Timber.tag(TAG).d("Item images count: ${state.item.images.size}")
                         state.item.images.forEachIndexed { index, image ->
-                            Log.d(TAG, "  Image $index: ${image.url}")
+                            Timber.tag(TAG).d("  Image $index: ${image.url}")
                         }
                         showLoading(false)
                         bindItem(state.item)
                     }
                     is ItemDetailViewModel.ItemDetailState.Error -> {
-                        Log.e(TAG, "State: Error: ${state.message}")
+                        Timber.tag(TAG).e("State: Error: ${state.message}")
                         showLoading(false)
                         showError(state.message)
                     }
@@ -176,19 +192,20 @@ class ItemDetailFragment : Fragment() {
 
         lifecycleScope.launch {
             viewModel.similarItems.collect { items ->
-                Log.d(TAG, "Similar items updated: ${items.size} items")
+                Log.d(TAG, "Similar items received: ${items.size}")
+                items.forEach { Log.d(TAG, "  - ${it.name}, cover: ${it.coverImage}, images: ${it.images.size}") }
                 similarItemsAdapter.submitList(items)
             }
         }
 
         lifecycleScope.launch {
             viewModel.sizeName.collect { sizeName ->
-                Log.d(TAG, "Size name updated: $sizeName")
+                Timber.tag(TAG).d("Size name updated: $sizeName")
                 if (!sizeName.isNullOrEmpty()) {
                     val displaySize = sizeName.replace("Adult", "UK")
                     binding.productSize.text = "$displaySize"
                     binding.productSize.visibility = View.VISIBLE
-                    Log.d(TAG, "Size displayed: $displaySize")
+                    Timber.tag(TAG).d("Size displayed: $displaySize")
                 } else {
                     binding.productSize.visibility = View.GONE
                 }
@@ -197,7 +214,7 @@ class ItemDetailFragment : Fragment() {
 
         lifecycleScope.launch {
             viewModel.schoolName.collect { schoolName ->
-                Log.d(TAG, "School name updated: $schoolName")
+                Timber.tag(TAG).d("School name updated: $schoolName")
                 if (!schoolName.isNullOrEmpty()) {
                     binding.productSchool.text = schoolName
                     binding.productSchool.visibility = View.VISIBLE
@@ -207,12 +224,20 @@ class ItemDetailFragment : Fragment() {
             }
         }
 
-        lifecycleScope.launch {
+       lifecycleScope.launch {
             viewModel.colorName.collect { colorName ->
-                Log.d(TAG, "Color name updated: $colorName")
+                Timber.tag(TAG).d("Color name updated: $colorName")
                 if (!colorName.isNullOrEmpty()) {
                     binding.productColor.text = "Color: $colorName"
+                    val colorInt = ColorUtils.getColorInt(colorName)
+
+                    // Make sure to apply the color correctly
+                    binding.productColor.setTextColor(colorInt)
+                    // Also add a small color circle indicator if you want
+                    binding.productColor.setCompoundDrawablesWithIntrinsicBounds(null, null, null, null)
+
                     binding.productColor.visibility = View.VISIBLE
+                    Log.d(TAG, "Color set to: $colorName with color int: $colorInt")
                 } else {
                     binding.productColor.visibility = View.GONE
                 }
@@ -221,7 +246,7 @@ class ItemDetailFragment : Fragment() {
 
         lifecycleScope.launch {
             viewModel.conditionName.collect { conditionName ->
-                Log.d(TAG, "Condition name updated: $conditionName")
+                Timber.tag(TAG).d("Condition name updated: $conditionName")
                 if (!conditionName.isNullOrEmpty()) {
                     binding.productCondition.text = "Condition: $conditionName"
                     binding.productCondition.visibility = View.VISIBLE
@@ -233,7 +258,7 @@ class ItemDetailFragment : Fragment() {
 
         lifecycleScope.launch {
             viewModel.brandName.collect { brandName ->
-                Log.d(TAG, "Brand name updated: $brandName")
+                Timber.tag(TAG).d("Brand name updated: $brandName")
                 if (!brandName.isNullOrEmpty()) {
                     binding.productBrand.text = "Brand: $brandName"
                     binding.productBrand.visibility = View.VISIBLE
@@ -245,19 +270,19 @@ class ItemDetailFragment : Fragment() {
 
         lifecycleScope.launch {
             viewModel.imageUrls.collect { urls ->
-                Log.d(TAG, "===== IMAGE URLS FROM VIEWMODEL =====")
-                Log.d(TAG, "Received ${urls.size} image URLs")
+                Timber.tag(TAG).d("===== IMAGE URLS FROM VIEWMODEL =====")
+                Timber.tag(TAG).d("Received ${urls.size} image URLs")
                 urls.forEachIndexed { index, url ->
-                    Log.d(TAG, "  URL $index: $url")
+                    Timber.tag(TAG).d("  URL $index: $url")
                 }
-                Log.d(TAG, "=====================================")
+                Timber.tag(TAG).d("=====================================")
                 currentImageUrls = urls
             }
         }
 
         lifecycleScope.launch {
             viewModel.isFavorite.collect { isFavorite ->
-                Log.d(TAG, "Favorite status changed: $isFavorite")
+                Timber.tag(TAG).d("Favorite status changed: $isFavorite")
                 updateFavoriteButtonIcon(isFavorite)
             }
         }
@@ -275,12 +300,12 @@ class ItemDetailFragment : Fragment() {
     }
 
     private fun bindItem(item: Item) {
-        Log.d(TAG, "=== BINDING ITEM START ===")
-        Log.d(TAG, "Item ID: ${item.id}")
-        Log.d(TAG, "Item Name: ${item.name}")
-        Log.d(TAG, "Item Price: ${item.price}")
-        Log.d(TAG, "Item Status: ${item.status}")
-        Log.d(TAG, "Item Quantity: ${item.quantity}")
+        Timber.tag(TAG).d("=== BINDING ITEM START ===")
+        Timber.tag(TAG).d("Item ID: ${item.id}")
+        Timber.tag(TAG).d("Item Name: ${item.name}")
+        Timber.tag(TAG).d("Item Price: ${item.price}")
+        Timber.tag(TAG).d("Item Status: ${item.status}")
+        Timber.tag(TAG).d("Item Quantity: ${item.quantity}")
 
         binding.productTitle.text = item.name
         binding.productPrice.text = "R${String.format("%.2f", item.price)}"
@@ -295,70 +320,35 @@ class ItemDetailFragment : Fragment() {
         if (item.description.isNotEmpty()) {
             binding.productDescription.text = item.description
             binding.productDescription.visibility = View.VISIBLE
-            Log.d(TAG, "Description set: ${item.description.take(50)}...")
+            Timber.tag(TAG).d("Description set: ${item.description.take(50)}...")
         } else {
             binding.productDescription.visibility = View.GONE
-            Log.d(TAG, "No description")
+            Timber.tag(TAG).d("No description")
         }
 
         if (item.status == "sold" || item.quantity <= 0) {
             binding.soldBadge.visibility = View.VISIBLE
-            Log.d(TAG, "Sold badge visible")
+            Timber.tag(TAG).d("Sold badge visible")
         } else {
             binding.soldBadge.visibility = View.GONE
-            Log.d(TAG, "Sold badge hidden")
+            Timber.tag(TAG).d("Sold badge hidden")
         }
 
         setupImageSlider(item)
-        Log.d(TAG, "=== BINDING ITEM END ===")
+        Timber.tag(TAG).d("=== BINDING ITEM END ===")
     }
 
     private fun setupImageSlider(item: Item) {
-        Log.d(TAG, "=== SETUP IMAGE SLIDER START ===")
-
-        val imageUrls = mutableListOf<String>()
-
-        if (!item.coverImage.isNullOrBlank()) {
-            imageUrls.add(item.coverImage)
-            Log.d(TAG, "Added cover image: ${item.coverImage}")
-        } else {
-            Log.d(TAG, "No cover image")
-        }
-
-        Log.d(TAG, "Processing ${item.images.size} images from item.images")
-        item.images
-            .mapNotNull { it.url }
-            .filter { it.startsWith("http") && !imageUrls.contains(it) }
-            .forEach {
-                imageUrls.add(it)
-                Log.d(TAG, "Added image: $it")
-            }
-
-        Log.d(TAG, "Total image URLs collected: ${imageUrls.size}")
-        imageUrls.forEachIndexed { index, url ->
-            Log.d(TAG, "  Final URL $index: $url")
-        }
+        val imageUrls = item.resolveAllImageUrls()
 
         if (imageUrls.isEmpty()) {
-            Log.w(TAG, "No images to display, hiding slider")
             binding.imageSlider.visibility = View.GONE
             return
         }
 
         binding.imageSlider.visibility = View.VISIBLE
-        Log.d(TAG, "Image slider visible")
-
-        Log.d(TAG, "Creating new ImageSliderAdapter with ${imageUrls.size} images")
-        val newAdapter = ImageSliderAdapter(imageUrls)
-        binding.imageSlider.adapter = newAdapter
-        binding.imageSlider.setCurrentItem(0, false)
-
-        binding.imageSlider.post {
-            binding.imageSlider.setCurrentItem(0, false)
-            Log.d(TAG, "Force refreshed ViewPager2 to position 0")
-        }
-
-        Log.d(TAG, "=== SETUP IMAGE SLIDER END ===")
+        binding.imageSlider.adapter = ImageSliderAdapter(imageUrls)
+        binding.imageSlider.post { binding.imageSlider.setCurrentItem(0, false) }
     }
 
     private fun shareItem() {
@@ -392,8 +382,6 @@ class ItemDetailFragment : Fragment() {
         }
     }
 
-    // REMOVED the empty toggleFavorite() method since we're using viewModel.toggleFavorite()
-
     private fun contactSeller() {
         val currentState = viewModel.itemState.value
         if (currentState is ItemDetailViewModel.ItemDetailState.Success) {
@@ -401,21 +389,21 @@ class ItemDetailFragment : Fragment() {
             val sellerMobile = item.shop?.sellerMobile
 
             if (!sellerMobile.isNullOrBlank()) {
-                Log.d(TAG, "Contacting seller via mobile: $sellerMobile")
+                Timber.tag(TAG).d("Contacting seller via mobile: $sellerMobile")
                 // Open WhatsApp or dialer
                 val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
                     data = android.net.Uri.parse("https://wa.me/${sellerMobile.replace(Regex("[^0-9]"), "")}")
                 }
                 startActivity(intent)
             } else {
-                Log.w(TAG, "No seller mobile available")
+                Timber.tag(TAG).w("No seller mobile available")
                 // Show dialog or fallback to chat
             }
         }
     }
 
     private fun onBuyClick() {
-        Log.d(TAG, "onBuyClick called")
+        Timber.tag(TAG).d("onBuyClick called")
         val currentState = viewModel.itemState.value
         if (currentState is ItemDetailViewModel.ItemDetailState.Success) {
             val item = currentState.item
@@ -431,42 +419,56 @@ class ItemDetailFragment : Fragment() {
             val bottomSheet = ContactOptionsBottomSheet(item, sellerMobile)  // Pass mobile number
             bottomSheet.show(parentFragmentManager, "contact_options")
         } else {
-            Log.w(TAG, "Cannot buy - no item loaded")
+            Timber.tag(TAG).w("Cannot buy - no item loaded")
         }
     }
 
     private fun navigateToDetail(itemId: String) {
-        Log.d(TAG, "Navigating to item detail: $itemId")
+        Timber.tag(TAG).d("Navigating to item detail: $itemId")
         val bundle = bundleOf("itemId" to itemId)
         findNavController().navigate(R.id.itemDetailFragment, bundle)
-        Log.d(TAG, "Navigation called")
+        Timber.tag(TAG).d("Navigation called")
     }
 
     private fun showLoading(show: Boolean) {
-        Log.d(TAG, "showLoading: $show")
+        Timber.tag(TAG).d("showLoading: $show")
         binding.progressBar?.visibility = if (show) View.VISIBLE else View.GONE
         binding.scrollView?.visibility = if (show) View.GONE else View.VISIBLE
     }
 
     private fun showError(message: String) {
-        Log.e(TAG, "showError: $message")
+        Timber.tag(TAG).e("showError: $message")
         // TODO: Show error dialog or snackbar
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        Log.d(TAG, "onDestroyView called")
+        backPressedCallback.remove()
+        Timber.tag(TAG).d("onDestroyView called")
         (requireActivity() as AppCompatActivity).supportActionBar?.show()
         _binding = null
     }
 
     override fun onResume() {
         super.onResume()
-        Log.d(TAG, "onResume called - currentItemId: $currentItemId")
+        Timber.tag(TAG).d("onResume called - currentItemId: $currentItemId")
     }
 
     override fun onPause() {
         super.onPause()
-        Log.d(TAG, "onPause called")
+        Timber.tag(TAG).d("onPause called")
+    }
+    private val backPressedCallback = object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+            // If full screen dialog is open, let it handle back press
+            if (parentFragmentManager.findFragmentByTag("full_screen_viewer") != null) {
+                Timber.tag(TAG).d("Full screen dialog is open - letting it handle back")
+                return
+            }
+
+            Timber.tag(TAG).d("Back pressed - popping ItemDetailFragment")
+            isEnabled = false // Prevent infinite loop
+            findNavController().popBackStack()
+        }
     }
 }

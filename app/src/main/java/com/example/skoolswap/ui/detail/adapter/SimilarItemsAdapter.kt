@@ -10,6 +10,7 @@ import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemSimilarProductBinding
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.utils.extensions.formatViewCount
+import timber.log.Timber
 
 class SimilarItemsAdapter(
     private val onItemClick: (Item) -> Unit
@@ -19,7 +20,7 @@ class SimilarItemsAdapter(
     private val TAG = "SimilarItemsAdapter"
 
     fun submitList(newItems: List<Item>) {
-        Log.d(TAG, "submitList called with ${newItems.size} items")
+        Timber.tag(TAG).d("submitList called with ${newItems.size} items")
         items = newItems
         notifyDataSetChanged()
     }
@@ -55,18 +56,23 @@ class SimilarItemsAdapter(
             binding.productTitle.text = item.name
             binding.productPrice.text = "R${String.format("%.2f", item.price)}"
 
-            // ✅ SHOW SOLD BADGE
+            // Sold badge
             if (item.status == "sold" || item.quantity <= 0) {
                 binding.soldBadge.visibility = View.VISIBLE
             } else {
                 binding.soldBadge.visibility = View.GONE
             }
 
+            // ✅ Mirror the same image-picking logic as setupImageSlider in the fragment
+            val imageUrl: String? = when {
+                !item.coverImage.isNullOrBlank() -> item.coverImage
+                item.images.isNotEmpty() -> item.images.firstOrNull {
+                    !it.url.isNullOrBlank() && it.url.startsWith("http")
+                }?.url
+                else -> null
+            }
 
-
-            // Load image
-            if (item.images.isNotEmpty()) {
-                val imageUrl = item.images.first().url
+            if (!imageUrl.isNullOrBlank()) {
                 Glide.with(binding.root.context)
                     .load(imageUrl)
                     .placeholder(R.drawable.ic_create_item_placeholder)
@@ -77,13 +83,15 @@ class SimilarItemsAdapter(
                 binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
             }
 
-            // Show size if available
+            // Size
             if (!item.sizeName.isNullOrBlank()) {
-                binding.productSize.text = item.sizeName
+                binding.productSize.text = item.sizeName.replace("Adult", "UK")
                 binding.productSize.visibility = View.VISIBLE
             } else {
                 binding.productSize.visibility = View.GONE
             }
+
+            Log.d(TAG, "Binding item: ${item.name}, imageUrl: $imageUrl, images: ${item.images.size}, cover: ${item.coverImage}")
         }
     }
 }

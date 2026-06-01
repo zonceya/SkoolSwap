@@ -10,7 +10,7 @@
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="?android:attr/colorBackground" >
+        android:background="?android:attr/colorBackground">
 
         <com.google.android.material.appbar.AppBarLayout
             android:layout_width="match_parent"
@@ -149,15 +149,22 @@
 
             </LinearLayout>
 
-            <!-- Home Feed RecyclerView -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/homeRecycler"
+            <!-- SwipeRefreshLayout ONLY wraps RecyclerView -->
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                android:id="@+id/swipeRefreshLayout"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="1"
-                android:paddingBottom="80dp"
-                android:clipToPadding="false"
-                android:visibility="visible" />
+                android:layout_weight="1">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/homeRecycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:paddingBottom="80dp"
+                    android:clipToPadding="false"
+                    android:visibility="visible" />
+
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
             <!-- Search Results Area -->
             <LinearLayout
@@ -168,7 +175,6 @@
                 android:orientation="vertical"
                 android:visibility="gone">
 
-                <!-- Server Items Badge -->
                 <TextView
                     android:id="@+id/serverItemsBadge"
                     android:layout_width="wrap_content"
@@ -182,7 +188,6 @@
                     android:layout_marginTop="8dp"
                     android:background="@drawable/badge_background" />
 
-                <!-- Search Results RecyclerView -->
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/searchResultsRecycler"
                     android:layout_width="match_parent"
@@ -191,7 +196,6 @@
                     android:padding="8dp"
                     android:clipToPadding="false" />
 
-                <!-- Loading More Indicator -->
                 <LinearLayout
                     android:id="@+id/loadingMoreLayout"
                     android:layout_width="match_parent"
@@ -336,7 +340,6 @@
         android:padding="16dp"
         android:elevation="8dp">
 
-        <!-- Header -->
         <TextView
             android:id="@+id/filterHeaderTitle"
             android:layout_width="wrap_content"
@@ -346,7 +349,6 @@
             android:textStyle="bold"
             android:layout_marginBottom="16dp"/>
 
-        <!-- Options Header (back button) -->
         <LinearLayout
             android:id="@+id/optionsHeader"
             android:layout_width="match_parent"
@@ -361,7 +363,7 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:src="@drawable/ic_back"
-                app:tint="#000000" />
+                app:tint="?attr/colorOnSurface" />
 
             <TextView
                 android:id="@+id/optionsTitle"
@@ -374,7 +376,6 @@
 
         </LinearLayout>
 
-        <!-- Dynamic Filter Container -->
         <LinearLayout
             android:id="@+id/dynamicFilterContainer"
             android:layout_width="match_parent"
@@ -382,7 +383,6 @@
             android:orientation="vertical"
             android:visibility="visible"/>
 
-        <!-- Options Container -->
         <LinearLayout
             android:id="@+id/optionsContainer"
             android:layout_width="match_parent"
@@ -391,7 +391,6 @@
             android:visibility="gone"
             android:padding="8dp"/>
 
-        <!-- Price Range Section -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="48dp"
@@ -428,7 +427,6 @@
             android:layout_height="0dp"
             android:layout_weight="1"/>
 
-        <!-- Reset/Apply Buttons -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="56dp"

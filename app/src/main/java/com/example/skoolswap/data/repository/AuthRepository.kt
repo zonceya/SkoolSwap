@@ -47,6 +47,7 @@ import com.example.skoolswap.data.remote.models.request.SignUpRequest
 import com.example.skoolswap.data.remote.models.request.VerifyLoginRequest
 import com.example.skoolswap.data.remote.models.request.VerifySignUpRequest
 import kotlinx.coroutines.flow.first
+import timber.log.Timber
 
 
 @Singleton
@@ -188,11 +189,12 @@ class AuthRepository @Inject constructor(
                         userDao.insertUser(restoredUser.toEntity())
                     }
 
-                    Log.e(TAG, "🔐 restoreSession - User loaded: ${_serverUser.value != null}")
+                    Timber.tag(TAG)
+                        .e("🔐 restoreSession - User loaded: ${_serverUser.value != null}")
                     return _serverUser.value != null
 
                 } else {
-                    Log.e(TAG, "🔐 Token is invalid, clearing session")
+                    Timber.tag(TAG).e("🔐 Token is invalid, clearing session")
                     clearUserData()
                     appPreferences.clearUserData()
                     return false
@@ -247,12 +249,27 @@ class AuthRepository @Inject constructor(
                 Result.failure(Exception(errorMsg))
             }
         } else {
-            val errorMsg = "Server error: ${response.code()}"
+            // Handle specific HTTP error codes with user-friendly messages
+            val errorMsg = when (response.code()) {
+                530 -> "Service temporarily unavailable. Please try again later."
+                500, 502, 503, 504 -> "Server is currently busy. Please try again in a few moments."
+                401 -> "Authentication failed. Please try again."
+                403 -> "Access denied. Please contact support."
+                404 -> "Service not found. Please update the app."
+                408, 504 -> "Request timed out. Please check your connection and try again."
+                429 -> "Too many attempts. Please wait a moment before trying again."
+                in 400..499 -> "Something went wrong. Please try again."
+                in 500..599 -> "Server error. Our team has been notified. Please try again later."
+                else -> "Unable to connect to server. Please check your internet connection."
+            }
+
+            // Log the actual error for debugging
+            Log.e(TAG, "Sign in failed with code: ${response.code()}, error body: ${response.errorBody()?.string()}")
+
             _error.value = errorMsg
             Result.failure(Exception(errorMsg))
         }
     }
-
     // In AuthRepository.kt - update cacheUser method
     private suspend fun cacheUser(user: User, firebaseUser: com.google.firebase.auth.FirebaseUser) {
         try {
