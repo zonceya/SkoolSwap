@@ -225,7 +225,7 @@
             android:id="@+id/action_profile_to_home"
             app:destination="@id/nav_home"
             app:popUpTo="@id/nav_home"
-            app:popUpToInclusive="false" />
+            app:popUpToInclusive="true" />
 
     </fragment>
 

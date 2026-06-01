@@ -139,22 +139,25 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
+    // In ProfileViewModel.kt - modify selectProvince()
     fun selectProvince(province: Province, shouldClearSchool: Boolean = false) {
-        Log.d("ProfileViewModel", "📍 selectProvince called with: ${province.name}, shouldClearSchool: $shouldClearSchool")
+        Log.d("ProfileViewModel", "📍 selectProvince: ${province.name}, clearSchool: $shouldClearSchool")
+
+        // ✅ Don't clear if we already have a school and it matches this province
+        val currentSchool = _selectedSchool.value
+        if (currentSchool != null && currentSchool.provinceId == province.id) {
+            Log.d("ProfileViewModel", "✅ Keeping school because it matches province: ${currentSchool.name}")
+            _selectedProvince.value = province
+            return
+        }
 
         _selectedProvince.value = province
 
-        // Only clear school if explicitly told to (default true for user selection)
         if (shouldClearSchool) {
-            Log.d("ProfileViewModel", "🗑️ Clearing school because shouldClearSchool=true")
+            Log.d("ProfileViewModel", "🗑️ Clearing school selection")
             _selectedSchool.value = null
             _schools.value = emptyList()
-        } else {
-            Log.d("ProfileViewModel", "🔒 Keeping school because shouldClearSchool=false")
-            // Don't clear schools if we're just syncing province from school
         }
-
-        _isSearchActive.value = true
     }
     fun searchSchools(query: String) {
         val province = _selectedProvince.value ?: return

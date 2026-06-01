@@ -336,7 +336,10 @@ class AuthRepository @Inject constructor(
                         role = userResponse.role,
                         token = token,
                         createdAt = userResponse.createdAt,
-                        updatedAt = userResponse.updatedAt
+                        updatedAt = userResponse.updatedAt,
+                        schoolMapped = userResponse.schoolMapped ?: false,
+                        schoolId = userResponse.schoolId,
+                        schoolName = userResponse.schoolName
                     )
                     Result.success(user)
                 } else {
@@ -462,13 +465,19 @@ class AuthRepository @Inject constructor(
                         role = profileResponse.user.role,
                         token = token,
                         createdAt = profileResponse.user.createdAt,
-                        updatedAt = profileResponse.user.updatedAt
+                        updatedAt = profileResponse.user.updatedAt,
+                        schoolMapped = profileResponse.user.schoolMapped ?: false,
+                        schoolId = profileResponse.user.schoolId,
+                        schoolName = profileResponse.user.schoolName
                     )
 
                     // Update local cache
                     _serverUser.value = updatedUser
                     userDao.insertUser(updatedUser.toEntity())
-
+                    appPreferences.setSchoolMapped(updatedUser.schoolMapped)
+                    if (updatedUser.schoolMapped && updatedUser.schoolId != null) {
+                        appPreferences.setSchoolInfo(updatedUser.schoolId, updatedUser.schoolName ?: "")
+                    }
                     Result.success(updatedUser)
                 } else {
                     Result.failure(Exception("Empty profile response"))

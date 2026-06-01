@@ -11,7 +11,7 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Sort / Filter Bar -->
+        <!-- Sort / Filter Bar (FIXED - doesn't pull) -->
         <LinearLayout
             android:id="@+id/sortFilterBar"
             android:layout_width="match_parent"
@@ -74,14 +74,74 @@
 
         </LinearLayout>
 
-        <!-- Products Grid (normal mode) -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/productsRecycler"
+        <!-- Pull-to-Refresh ONLY wraps content (not sort bar) -->
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipeRefreshLayout"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
-            android:padding="12dp"
-            android:visibility="visible"/>
+            android:layout_weight="1">
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <!-- Shimmer Layout (shows while loading) -->
+                <LinearLayout
+                    android:id="@+id/shimmerLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:padding="16dp">
+
+                    <include layout="@layout/shimmer_grid" />
+
+                </LinearLayout>
+
+                <!-- Products Grid (normal mode) -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/productsRecycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="12dp"
+                    android:visibility="visible"/>
+
+                <!-- Error Layout -->
+                <LinearLayout
+                    android:id="@+id/errorLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:padding="32dp">
+
+                    <ImageView
+                        android:layout_width="120dp"
+                        android:layout_height="120dp"
+                        android:src="@drawable/ic_error_placeholder" />
+
+                    <TextView
+                        android:id="@+id/errorMessage"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Failed to load items"
+                        android:textSize="16sp"
+                        android:textColor="#666"
+                        android:layout_marginTop="16dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/retryButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Retry"
+                        android:layout_marginTop="24dp" />
+
+                </LinearLayout>
+
+            </FrameLayout>
+
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
         <!-- Search Results Container (search mode) -->
         <LinearLayout
@@ -92,7 +152,6 @@
             android:orientation="vertical"
             android:visibility="gone">
 
-            <!-- Info text for cached results -->
             <TextView
                 android:id="@+id/searchInfoText"
                 android:layout_width="match_parent"
@@ -102,7 +161,6 @@
                 android:textColor="#666"
                 android:visibility="gone"/>
 
-            <!-- Progress bar for loading -->
             <ProgressBar
                 android:id="@+id/searchProgressBar"
                 android:layout_width="wrap_content"
@@ -110,7 +168,6 @@
                 android:layout_gravity="center"
                 android:visibility="gone"/>
 
-            <!-- Empty results -->
             <TextView
                 android:id="@+id/emptySearchResults"
                 android:layout_width="match_parent"
@@ -132,7 +189,8 @@
         android:layout_gravity="end"
         android:background="?attr/colorSurface"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="16dp"
+        android:elevation="8dp">
 
         <TextView
             android:id="@+id/filterHeaderTitle"
@@ -158,8 +216,7 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 app:tint="?attr/colorOnSurface"
-                android:src="@drawable/ic_back"
-           />
+                android:src="@drawable/ic_back" />
 
             <TextView
                 android:id="@+id/optionsTitle"

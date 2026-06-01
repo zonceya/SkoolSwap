@@ -19,14 +19,33 @@ class FavoritesViewModel @Inject constructor(
     private val _favorites = MutableStateFlow<List<Item>>(emptyList())
     val favorites: StateFlow<List<Item>> = _favorites.asStateFlow()
 
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
     init {
+        loadFavorites()
+    }
+
+    fun refreshFavorites() {
         loadFavorites()
     }
 
     private fun loadFavorites() {
         viewModelScope.launch {
-            favoriteRepository.getAllFavorites().collect { items ->
-                _favorites.value = items
+            _isLoading.value = true
+            _error.value = null
+
+            try {
+                favoriteRepository.getAllFavorites().collect { items ->
+                    _favorites.value = items
+                    _isLoading.value = false
+                }
+            } catch (e: Exception) {
+                _error.value = e.message ?: "Failed to load favorites"
+                _isLoading.value = false
             }
         }
     }

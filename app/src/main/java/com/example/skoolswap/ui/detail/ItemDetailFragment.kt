@@ -432,13 +432,28 @@ class ItemDetailFragment : Fragment() {
 
     private fun showLoading(show: Boolean) {
         Timber.tag(TAG).d("showLoading: $show")
-        binding.progressBar?.visibility = if (show) View.VISIBLE else View.GONE
-        binding.scrollView?.visibility = if (show) View.GONE else View.VISIBLE
+        if (show) {
+            // Show shimmer, hide everything else
+            binding.shimmerLayout.visibility = View.VISIBLE
+            binding.progressBar.visibility = View.GONE
+            binding.scrollView.visibility = View.GONE
+            binding.errorLayout.visibility = View.GONE
+        } else {
+            // Hide shimmer, show content
+            binding.shimmerLayout.visibility = View.GONE
+            binding.progressBar.visibility = View.GONE
+            binding.scrollView.visibility = View.VISIBLE
+            binding.errorLayout.visibility = View.GONE
+        }
     }
 
     private fun showError(message: String) {
         Timber.tag(TAG).e("showError: $message")
-        // TODO: Show error dialog or snackbar
+        binding.shimmerLayout.visibility = View.GONE
+        binding.progressBar.visibility = View.GONE
+        binding.scrollView.visibility = View.GONE
+        binding.errorLayout.visibility = View.VISIBLE
+        binding.errorMessage.text = message
     }
 
     override fun onDestroyView() {

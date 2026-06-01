@@ -13,6 +13,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -31,6 +32,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import androidx.activity.OnBackPressedCallback
 
 @AndroidEntryPoint
 class ProfileFragment : Fragment() {
@@ -62,6 +64,8 @@ class ProfileFragment : Fragment() {
         setupUI()
         setupObservers()
         loadUserData()
+        setupBackButton()
+
     }
 
     private fun setupUI() {
@@ -87,7 +91,20 @@ class ProfileFragment : Fragment() {
             showDeleteConfirmationDialog()
         }
     }
-
+    private fun setupBackButton() {
+        // Handle system back button
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (viewModel.hasExistingSchool.value) {
+                    // Returning user - go back
+                    findNavController().navigateUp()
+                } else {
+                    // First-time user - block back
+                    Toast.makeText(requireContext(), "Please complete your profile setup first", Toast.LENGTH_SHORT).show()
+                }
+            }
+        })
+    }
     private fun setupMobileInput() {
         binding.contactNumber.apply {
             addTextChangedListener(object : TextWatcher {
@@ -112,20 +129,24 @@ class ProfileFragment : Fragment() {
             threshold = 1  // Show dropdown after 1 character
         }
 
+        // In setupProvinceDropdown() - modify the onItemClickListener
         binding.provinceSpinner.setOnItemClickListener { _, _, position, _ ->
             val province = viewModel.provinces.value[position]
-            viewModel.selectProvince(province, shouldClearSchool = true)
+
+            // ✅ Don't clear school if user already has one selected
+            val shouldClear = viewModel.selectedSchool.value == null
+            viewModel.selectProvince(province, shouldClearSchool = shouldClear)
 
             // Immediately show selected province
             binding.provinceSpinner.setText(province.name, false)
 
-            // Clear any existing school when province changes
-            binding.selectedSchoolText.visibility = View.GONE
-            binding.schoolSearch.text?.clear()
+            // Only clear UI if we're actually clearing the school
+            if (shouldClear) {
+                binding.selectedSchoolText.visibility = View.GONE
+                binding.schoolSearch.text?.clear()
+            }
 
-            // Clear error when province is selected
             binding.provinceTextInputLayout.error = null
-
             binding.schoolSearch.isEnabled = true
             binding.schoolSearchLayout.hint = "Search schools in ${province.name}"
             binding.schoolSearchLayout.placeholderText = "Type at least 2 characters"

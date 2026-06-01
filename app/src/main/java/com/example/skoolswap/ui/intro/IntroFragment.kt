@@ -76,68 +76,53 @@ class IntroFragment : Fragment() {
         setupVideo()
     }
 
+    // In IntroFragment.kt - modify determineDestination()
     private fun determineDestination() {
-        Timber.tag(TAG).e("determineDestination started")
         lifecycleScope.launch {
             try {
-                // Check onboarding status
                 val isOnboardingFinished = appPreferences.isOnboardingFinished.first()
-                Timber.tag(TAG).e("isOnboardingFinished: $isOnboardingFinished")
 
                 if (!isOnboardingFinished) {
-                    // First launch ever - go to onboarding
-                    Timber.tag(TAG).e("First launch - will go to onboarding")
                     onDestinationDetermined(R.id.viewPagerFragment)
                     return@launch
                 }
 
-                // Check login status
                 val isLoggedIn = appPreferences.isLoggedIn.first()
                 val authToken = appPreferences.authToken.first()
                 val userId = appPreferences.getUserId()
                 val isValidSession = isLoggedIn && !authToken.isNullOrEmpty() && userId != null
 
-                Timber.tag(TAG).e("isLoggedIn: $isLoggedIn")
-                Timber.tag(TAG)
-                    .e("authToken: ${if (!authToken.isNullOrEmpty()) "exists" else "null"}")
-                Timber.tag(TAG).e("userId: $userId")
-                Timber.tag(TAG).e("isValidSession: $isValidSession")
-
                 if (!isValidSession) {
-                    // Not logged in - go to login
-                    Timber.tag(TAG).e("Not logged in - will go to login")
                     onDestinationDetermined(R.id.loginFragment)
                     return@launch
                 }
 
-                // Try to restore session
-                Timber.tag(TAG).e("Attempting to restore session")
-                val restored = authRepository.restoreSession()
-                Timber.tag(TAG).e("Session restored: $restored")
-
-                if (restored) {
-                    val user = authRepository.getServerUser().first()
-                    Timber.tag(TAG).e("User retrieved: ${user?.email}")
-                    if (user != null) {
-                        // Logged in - check school mapping
-                        val destination = if (user.schoolMapped) {
-                            Timber.tag(TAG).e("User has school mapped - going to home")
-                            R.id.nav_home
-                        } else {
-                            Timber.tag(TAG).e("User needs school mapping - going to profile")
-                            R.id.nav_profile
-                        }
-                        onDestinationDetermined(destination)
-                    } else {
-                        Timber.tag(TAG).e("User is null - going to login")
-                        onDestinationDetermined(R.id.loginFragment)
-                    }
+                // ✅ FORCE refresh to get latest data
+                val refreshResult = authRepository.refreshUserProfile()
+                val user = if (refreshResult.isSuccess) {
+                    authRepository.getServerUser().first()
                 } else {
-                    Timber.tag(TAG).e("Session restore failed - going to login")
+                    // If refresh fails, try cached
+                    authRepository.getServerUser().first()
+                }
+
+                Timber.tag(TAG).e("User retrieved after refresh: ${user?.email}, schoolMapped: ${user?.schoolMapped}")
+
+                if (user != null) {
+                    // ✅ Use the correct condition
+                    val destination = if (user.schoolMapped == true) {
+                        Timber.tag(TAG).e("User HAS school mapped - going to HOME")
+                        R.id.nav_home
+                    } else {
+                        Timber.tag(TAG).e("User NEEDS school mapping - going to PROFILE")
+                        R.id.nav_profile
+                    }
+                    onDestinationDetermined(destination)
+                } else {
                     onDestinationDetermined(R.id.loginFragment)
                 }
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Error in determineDestination: ${e.message}")
+                Timber.tag(TAG).e(e, "Error in determineDestination")
                 onDestinationDetermined(R.id.loginFragment)
             }
         }

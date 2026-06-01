@@ -24,6 +24,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 @AndroidEntryPoint
 class ShopFragment : Fragment() {
@@ -37,6 +38,7 @@ class ShopFragment : Fragment() {
     @Inject
     lateinit var authRepository: AuthRepositoryInterface
     private var isCategoriesView = false
+    private var isFirstLoad = true
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -54,7 +56,10 @@ class ShopFragment : Fragment() {
         setupTabListeners()
         setupObservers()
 
-        // Load data
+        binding.retryButton.setOnClickListener {
+            binding.errorLayout.visibility = View.GONE
+            viewModel.refresh()
+        }
         viewModel.loadMyShop()
         viewModel.loadMyShopItems()
     }
@@ -164,14 +169,49 @@ class ShopFragment : Fragment() {
     }
 
     private fun setupObservers() {
+        // ========== LOADING STATE (SHIMMER) ==========
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.isLoading.collect { isLoading ->
+                if (isLoading && isFirstLoad && viewModel.allItems.value.isEmpty()) {
+                    // Show shimmer on first load
+                    binding.shimmerLayout.visibility = View.VISIBLE
+                    binding.productRecyclerView.visibility = View.GONE
+                    binding.emptyStateText.visibility = View.GONE
+                    binding.errorLayout.visibility = View.GONE
+                    binding.loadingProgress.visibility = View.GONE
+                } else {
+                    binding.shimmerLayout.visibility = View.GONE
+                }
+            }
+        }
+
+        // ========== ERROR STATE ==========
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.error.collect { errorMsg ->
+                if (errorMsg != null && viewModel.allItems.value.isEmpty()) {
+                    binding.errorLayout.visibility = View.VISIBLE
+                    binding.errorMessage.text = errorMsg
+                    binding.productRecyclerView.visibility = View.GONE
+                    binding.emptyStateText.visibility = View.GONE
+                    binding.shimmerLayout.visibility = View.GONE
+                    binding.loadingProgress.visibility = View.GONE
+                } else {
+                    binding.errorLayout.visibility = View.GONE
+                }
+            }
+        }
+
+
+
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.allItems.collectLatest { items ->
-                Log.d("ShopFragment", "=== ALL ITEMS RECEIVED ===")
-                Log.d("ShopFragment", "Total items count: ${items.size}")
+                Timber.tag("ShopFragment").d("=== ALL ITEMS RECEIVED ===")
+                Timber.tag("ShopFragment").d("Total items count: ${items.size}")
                 items.forEachIndexed { i, item ->
-                    Log.d("ShopFragment", "Item[$i]: ${item.name}, viewCount: ${item.viewCount}, status: ${item.status}")
+                    Timber.tag("ShopFragment")
+                        .d("Item[$i]: ${item.name}, viewCount: ${item.viewCount}, status: ${item.status}")
                 }
-                Log.d("ShopFragment", "Total shop views: ${items.sumOf { it.viewCount }}")
+                Timber.tag("ShopFragment").d("Total shop views: ${items.sumOf { it.viewCount }}")
 
                 // Don't react until we have real data OR loading is done
                 if (items.isEmpty()) {

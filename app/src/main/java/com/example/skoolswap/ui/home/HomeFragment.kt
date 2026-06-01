@@ -78,7 +78,7 @@ class HomeFragment : Fragment() {
         setupFilterDrawer()
         setupBackButton()
         observeViewModel()
-
+        setupSwipeRefresh()
         if (viewModel.homeFeed.value == null) {
             viewModel.loadHomeFeed()
         }
@@ -544,11 +544,53 @@ class HomeFragment : Fragment() {
     }
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.isLoading.collect { isLoading ->
+                Log.d("HomeFragment", "🔄 Loading state: $isLoading, hasData: ${viewModel.homeFeed.value != null}")
+                if (isLoading && viewModel.homeFeed.value == null) {
+                    // Show shimmer only on first load (no data yet)
+                    binding.shimmerLayout.visibility = View.VISIBLE
+                    binding.homeRecycler.visibility = View.GONE
+                    binding.errorLayout.visibility = View.GONE
+                    binding.noSchoolLayout.visibility = View.GONE
+                } else {
+                    // Hide shimmer when loading complete or data exists
+                    binding.shimmerLayout.visibility = View.GONE
+                    binding.swipeRefreshLayout.isRefreshing = false
+                }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.error.collect { errorMsg ->
+                // Hide technical errors from users
+                val isTechnicalError = errorMsg?.contains("401") == true ||
+                        errorMsg?.contains("token") == true ||
+                        errorMsg?.contains("Authorization") == true ||
+                        errorMsg?.contains("session") == true ||
+                        errorMsg?.contains("retry") == true ||
+                        errorMsg.isNullOrEmpty()
+
+                if (!isTechnicalError && viewModel.homeFeed.value == null) {
+                    binding.errorLayout.visibility = View.VISIBLE
+                    binding.errorMessage.text = errorMsg
+                    binding.homeRecycler.visibility = View.GONE
+                    binding.shimmerLayout.visibility = View.GONE
+                    binding.swipeRefreshLayout.isRefreshing = false
+                } else {
+                    binding.errorLayout.visibility = View.GONE
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.homeFeed.collect { feed ->
                 feed?.let {
                     Log.d("HomeFragment", "=== HOME FEED RECEIVED ===")
                     Log.d("HomeFragment", "Sections count: ${it.sections.size}")
-
+                    binding.shimmerLayout.visibility = View.GONE
+                    binding.homeRecycler.visibility = View.VISIBLE
+                    binding.errorLayout.visibility = View.GONE
+                    binding.noSchoolLayout.visibility = View.GONE
+                    binding.swipeRefreshLayout.isRefreshing = false
                     it.sections.forEach { section ->
                         when (section) {
                             is Section.Recommended -> {
@@ -613,7 +655,16 @@ class HomeFragment : Fragment() {
             }
         }
     }
-
+    private fun setupSwipeRefresh() {
+        binding.swipeRefreshLayout.apply {
+            setColorSchemeColors(
+                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.teal_200)
+            )
+            setOnRefreshListener {
+                viewModel.refreshHomeFeed()
+            }
+        }
+    }
     private fun setupBannerSlider() {
         bannerAdapter = BannerAdapter(bannerItems)
         binding.bannerViewPager.apply {

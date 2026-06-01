@@ -26,6 +26,8 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.core.content.ContextCompat
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 
 @AndroidEntryPoint
 class ProductsFragment : Fragment() {
@@ -38,7 +40,7 @@ class ProductsFragment : Fragment() {
     // Search state - NEEDED!
     private var isInSearchMode = false
     private var searchJob: Job? = null
-
+    private var isFirstLoad = true
     companion object {
         private const val TAG = "ProductsFragment"
     }
@@ -82,7 +84,9 @@ class ProductsFragment : Fragment() {
                 binding.sortFilterBar.visibility = View.VISIBLE
             }
         }
-
+        binding.retryButton.setOnClickListener {
+            viewModel.reloadCurrentSection()
+        }
         setupRecyclerView()
         setupSortFilterBar()
         setupDrawer()
@@ -90,6 +94,7 @@ class ProductsFragment : Fragment() {
         observeViewModel()
         observeFilterConfig()
         debugThemeColors()
+        setupSwipeRefresh()
         viewModel.loadProducts(sectionType, period, categoryId, sportTypeId, gearType)
     }
 
@@ -135,7 +140,18 @@ class ProductsFragment : Fragment() {
     }
 
     // ==================== END SEARCH METHODS ====================
-
+    private fun setupSwipeRefresh() {
+        binding.swipeRefreshLayout.apply {
+            setColorSchemeColors(
+                ContextCompat.getColor(requireContext(), R.color.teal_200)
+            )
+            setOnRefreshListener {
+                // Refresh with CURRENT filters (don't reset anything)
+                viewModel.reloadCurrentSection()
+                isRefreshing = false
+            }
+        }
+    }
     private fun setupRecyclerView() {
         productsAdapter = ProductsAdapter { item ->
             viewModel.trackClick(item.id, arguments?.getString("SECTION_TYPE") ?: "all", 0)
@@ -415,7 +431,80 @@ class ProductsFragment : Fragment() {
     }
 
     private fun observeViewModel() {
-        // Observe products (normal mode)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.isLoading.collect { isLoading ->
+                    if (isLoading && isFirstLoad && viewModel.products.value.isEmpty()) {
+                        // Show shimmer only on first load
+                        binding.shimmerLayout.visibility = View.VISIBLE
+                        binding.productsRecycler.visibility = View.GONE
+                        binding.errorLayout.visibility = View.GONE
+                    } else {
+                        binding.shimmerLayout.visibility = View.GONE
+                        binding.swipeRefreshLayout.isRefreshing = false
+                    }
+                }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.error.collect { error ->
+                    if (error != null && viewModel.products.value.isEmpty()) {
+                        binding.errorLayout.visibility = View.VISIBLE
+                        binding.errorMessage.text = error
+                        binding.productsRecycler.visibility = View.GONE
+                        binding.shimmerLayout.visibility = View.GONE
+                        binding.swipeRefreshLayout.isRefreshing = false
+                    } else {
+                        binding.errorLayout.visibility = View.GONE
+                    }
+                }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.products.collect { products ->
+                    if (_binding != null && !isInSearchMode) {
+                        // Data arrived - hide shimmer and show content
+                        isFirstLoad = false
+                        binding.shimmerLayout.visibility = View.GONE
+                        binding.productsRecycler.visibility = View.VISIBLE
+                        binding.errorLayout.visibility = View.GONE
+                        binding.swipeRefreshLayout.isRefreshing = false
+                        productsAdapter.submitList(products)
+                    }
+                }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.searchResults.collect { results ->
+                    if (isInSearchMode) {
+                        if (results.isEmpty()) {
+                            binding.searchResultsContainer.visibility = View.VISIBLE
+                            binding.emptySearchResults.visibility = View.VISIBLE
+                            binding.productsRecycler.visibility = View.GONE
+                            productsAdapter.submitList(emptyList())
+                        } else {
+                            binding.searchResultsContainer.visibility = View.VISIBLE
+                            binding.emptySearchResults.visibility = View.GONE
+                            binding.productsRecycler.visibility = View.VISIBLE
+                            productsAdapter.submitList(results)
+                        }
+                    }
+                }
+            }
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.error.collect { error ->
+                    if (error != null && _binding != null) {
+                        Log.e(TAG, "Error: $error")
+                    }
+                }
+            }
+        }
+
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.products.collect { products ->
