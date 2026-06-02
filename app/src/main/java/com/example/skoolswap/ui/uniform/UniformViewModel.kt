@@ -9,6 +9,9 @@ import com.example.skoolswap.R
 import com.example.skoolswap.domain.repository.FilterRepositoryInterface
 import com.example.skoolswap.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -22,6 +25,9 @@ class UniformViewModel @Inject constructor(
 
     private val _isLoading = MutableLiveData(false)
     val isLoading: LiveData<Boolean> = _isLoading
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
 
     // Only these uniform categories should be shown (no sport items)
     private val uniformOnlyTypeIds = setOf(
@@ -38,7 +44,9 @@ class UniformViewModel @Inject constructor(
     fun loadUniformCategories() {
         viewModelScope.launch {
             _isLoading.value = true
-            when (val result = filterRepository.getFilterConfig(1)) { // Category ID 1 = Uniforms
+            _error.value = null  // ← Clear previous error
+
+            when (val result = filterRepository.getFilterConfig(1)) {
                 is Result.Success -> {
                     val typeGroup = result.data.filterGroups.find { it.id == "type" }
                     val categories = typeGroup?.options
@@ -53,7 +61,8 @@ class UniformViewModel @Inject constructor(
                     _categories.value = categories
                 }
                 is Result.Error -> {
-                    _categories.value = getFallbackCategories()
+                    _error.value = result.exception.message  // ← Set error message
+                    _categories.value = getFallbackCategories()  // ← Still show fallback
                 }
             }
             _isLoading.value = false
@@ -62,14 +71,14 @@ class UniformViewModel @Inject constructor(
 
     private fun getImageResId(categoryId: Int): Int {
         return when (categoryId) {
-            27 -> R.drawable.ic_uniform_shirt     // Shirts & Golfers
-            28 -> R.drawable.ic_uniform_jersey    // Jerseys & Pullovers
-            29 -> R.drawable.ic_uniform_blazer    // Blazers & Jackets
-            30 -> R.drawable.ic_uniform_pants     // Trousers & Shorts
-            31 -> R.drawable.ic_uniform_skirt     // Skirts & Dresses
-            32 -> R.drawable.ic_uniform_tie       // Ties & Accessories
-            33 -> R.drawable.ic_uniform_socks     // Socks
-            34 -> R.drawable.ic_uniform_tracksuit // Sportswear
+            27 -> R.drawable.ic_uniform_shirt
+            28 -> R.drawable.ic_uniform_jersey
+            29 -> R.drawable.ic_uniform_blazer
+            30 -> R.drawable.ic_uniform_pants
+            31 -> R.drawable.ic_uniform_skirt
+            32 -> R.drawable.ic_uniform_tie
+            33 -> R.drawable.ic_uniform_socks
+            34 -> R.drawable.ic_uniform_tracksuit
             else -> R.drawable.ic_uniform_placeholder
         }
     }

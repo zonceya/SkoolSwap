@@ -237,7 +237,7 @@ class HomeFragment : Fragment() {
             }
         }.distinct()
 
-        Log.d("HomeFragment", "Genders found: $genders")
+        Timber.tag("HomeFragment").d("Genders found: $genders")
 
         if (genders.isNotEmpty()) {
             addFilterItem("Gender", selectedGender) {
@@ -594,21 +594,25 @@ class HomeFragment : Fragment() {
                     it.sections.forEach { section ->
                         when (section) {
                             is Section.Recommended -> {
-                                Log.d("HomeFragment", "Recommended section: ${section.items.size} items")
+                                Timber.tag("HomeFragment")
+                                    .d("Recommended section: ${section.items.size} items")
                                 section.items.forEach { item ->
                                     Log.d("HomeFragment", "  Item: ${item.name}, viewCount: ${item.viewCount}")
                                 }
                             }
                             is Section.Trending -> {
-                                Log.d("HomeFragment", "Trending section: ${section.items.size} items")
+                                Timber.tag("HomeFragment")
+                                    .d("Trending section: ${section.items.size} items")
                                 section.items.forEach { item ->
                                     Log.d("HomeFragment", "  Item: ${item.name}, viewCount: ${item.viewCount}")
                                 }
                             }
                             is Section.Recent -> {
-                                Log.d("HomeFragment", "Recent section: ${section.items.size} items")
+                                Timber.tag("HomeFragment")
+                                    .d("Recent section: ${section.items.size} items")
                                 section.items.forEach { item ->
-                                    Log.d("HomeFragment", "  Item: ${item.name}, viewCount: ${item.viewCount}")
+                                    Timber.tag("HomeFragment")
+                                        .d("  Item: ${item.name}, viewCount: ${item.viewCount}")
                                 }
                             }
                             else -> {}
@@ -621,34 +625,37 @@ class HomeFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.searchResults.collect { results ->
-                Log.d("HomeFragment", "=== SEARCH RESULTS CALLBACK ===")
-                Log.d("HomeFragment", "results.size: ${results.size}")
-                Log.d("HomeFragment", "isInSearchMode: $isInSearchMode")
-                Log.d("HomeFragment", "isLoadingMore: ${viewModel.isLoadingMore.value}")
+                Timber.tag("HomeFragment").d("=== SEARCH RESULTS CALLBACK ===")
+                Timber.tag("HomeFragment").d("results.size: ${results.size}")
+                Timber.tag("HomeFragment").d("isInSearchMode: $isInSearchMode")
+                Timber.tag("HomeFragment").d("isLoadingMore: ${viewModel.isLoadingMore.value}")
 
                 // Print each result
                 results.forEachIndexed { index, item ->
-                    Log.d("HomeFragment", "Result[$index]: ${item.name}, gender: ${item.gender}")
+                    Timber.tag("HomeFragment")
+                        .d("Result[$index]: ${item.name}, gender: ${item.gender}")
                 }
 
                 if (isInSearchMode) {
                     if (results.isEmpty()) {
-                        Log.d("HomeFragment", "Case: Empty results - showing empty state")
+                        Timber.tag("HomeFragment").d("Case: Empty results - showing empty state")
                         binding.searchResultsContainer.visibility = View.VISIBLE  // ← ADD THIS
                         binding.emptySearchResults.visibility = View.VISIBLE
                         binding.searchResultsRecycler.visibility = View.GONE
                     } else {
-                        Log.d("HomeFragment", "Case: Has ${results.size} results - showing recycler")
+                        Timber.tag("HomeFragment")
+                            .d("Case: Has ${results.size} results - showing recycler")
                         binding.searchResultsContainer.visibility = View.VISIBLE  // ← ADD THIS
                         binding.emptySearchResults.visibility = View.GONE
                         binding.searchResultsRecycler.visibility = View.VISIBLE
                         currentSearchResults.clear()
                         currentSearchResults.addAll(results)
 
-                        Log.d("HomeFragment", "Calling searchResultsAdapter.submitList with ${results.size} items")
+                        Timber.tag("HomeFragment")
+                            .d("Calling searchResultsAdapter.submitList with ${results.size} items")
                         searchResultsAdapter.submitList(results)
 
-                        Log.d("HomeFragment", "Calling rebuildLocalFilters")
+                        Timber.tag("HomeFragment").d("Calling rebuildLocalFilters")
                         rebuildLocalFilters()
                     }
                 }

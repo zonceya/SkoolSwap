@@ -8,6 +8,7 @@ import com.example.skoolswap.databinding.*
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.homefeed.Section
 import com.example.skoolswap.ui.home.viewholders.*
+import timber.log.Timber
 
 class HomeFeedAdapter(
     private val onItemClick: (Item, String) -> Unit,
@@ -73,19 +74,19 @@ class HomeFeedAdapter(
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (holder) {
             is RecommendedViewHolder -> {
-                Log.d("HomeFeedAdapter", "Binding Recommended at position $position")
+                Timber.tag("HomeFeedAdapter").d("Binding Recommended at position $position")
                 holder.bind(sections[position] as Section.Recommended)
             }
             is EssentialsViewHolder -> {
-                Log.d("HomeFeedAdapter", "Binding Essentials at position $position")
+                Timber.tag("HomeFeedAdapter").d("Binding Essentials at position $position")
                 holder.bind(sections[position] as Section.Essentials)
             }
             is TrendingViewHolder -> {
-                Log.d("HomeFeedAdapter", "Binding Trending at position $position")
+                Timber.tag("HomeFeedAdapter").d("Binding Trending at position $position")
                 holder.bind(sections[position] as Section.Trending)
             }
             is RecentViewHolder -> {
-                Log.d("HomeFeedAdapter", "Binding Recent at position $position")
+                Timber.tag("HomeFeedAdapter").d("Binding Recent at position $position")
                 holder.bind(sections[position] as Section.Recent)
             }
         }

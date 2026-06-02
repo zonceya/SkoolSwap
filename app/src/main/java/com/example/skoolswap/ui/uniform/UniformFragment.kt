@@ -6,11 +6,13 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentUniformBinding
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class UniformFragment : Fragment() {
@@ -34,6 +36,10 @@ class UniformFragment : Fragment() {
         setupRecyclerView()
         observeViewModel()
 
+        binding.retryButton.setOnClickListener {
+            binding.errorLayout.visibility = View.GONE
+            viewModel.loadUniformCategories()
+        }
         viewModel.loadUniformCategories()
     }
 
@@ -48,10 +54,48 @@ class UniformFragment : Fragment() {
     }
 
     private fun observeViewModel() {
+        // Loading state - show shimmer
+        viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
+            if (isLoading && viewModel.categories.value.isNullOrEmpty()) {
+                binding.shimmerLayout.visibility = View.VISIBLE
+                binding.uniformTabRecycler.visibility = View.GONE
+                binding.errorLayout.visibility = View.GONE
+            } else {
+                binding.shimmerLayout.visibility = View.GONE
+            }
+        }
+
+        // Error state
+        lifecycleScope.launch {
+            viewModel.error.collect { errorMsg ->
+                if (errorMsg != null && viewModel.categories.value.isNullOrEmpty()) {
+                    binding.errorLayout.visibility = View.VISIBLE
+                    binding.errorMessage.text = errorMsg
+                    binding.uniformTabRecycler.visibility = View.GONE
+                    binding.shimmerLayout.visibility = View.GONE
+                } else {
+                    binding.errorLayout.visibility = View.GONE
+                }
+            }
+        }
+
+        // Categories data
+        viewModel.categories.observe(viewLifecycleOwner) { categories ->
+            if (categories.isNotEmpty()) {
+                binding.shimmerLayout.visibility = View.GONE
+                binding.uniformTabRecycler.visibility = View.VISIBLE
+                binding.errorLayout.visibility = View.GONE
+                (binding.uniformTabRecycler.adapter as? UniformCategoryAdapter)?.submitList(categories)
+            }
+        }
         viewModel.categories.observe(viewLifecycleOwner) { categories ->
             (binding.uniformTabRecycler.adapter as? UniformCategoryAdapter)?.submitList(categories)
         }
     }
+
+
+
+
 
     private fun navigateToProducts(category: UniformCategory) {
         val bundle = Bundle().apply {

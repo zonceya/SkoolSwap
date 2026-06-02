@@ -1,90 +1,245 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.core.widget.NestedScrollView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true"
     android:background="?android:attr/colorBackground">
 
+    <!-- Shimmer Layout (shows while loading) -->
     <LinearLayout
+        android:id="@+id/shimmerLayout"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:padding="16dp">
 
-        <!-- Featured Sports Section -->
-        <TextView
+        <!-- Featured Sports shimmer -->
+        <View
+            android:layout_width="150dp"
+            android:layout_height="24dp"
+            android:layout_marginBottom="12dp"
+            android:background="@color/shimmer_background" />
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Featured Sports"
-            android:textColor="?attr/colorOnSurface"
-            android:textStyle="bold"
-            android:textSize="18sp"
-            android:padding="16dp"/>
+            android:orientation="horizontal">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/featuredSportsRecycler"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:nestedScrollingEnabled="false"/>
+            <View
+                android:layout_width="0dp"
+                android:layout_height="100dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:background="@color/shimmer_background" />
 
-        <!-- More Sports Section -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="More Sports"
-            android:textColor="?attr/colorOnSurface"
-            android:textStyle="bold"
-            android:textSize="18sp"
-            android:padding="16dp"
-            android:layout_marginTop="16dp"/>
+            <View
+                android:layout_width="0dp"
+                android:layout_height="100dp"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:background="@color/shimmer_background" />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/moreSportsRecycler"
+        </LinearLayout>
+
+        <!-- More Sports shimmer -->
+        <View
+            android:layout_width="150dp"
+            android:layout_height="24dp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp"
+            android:background="@color/shimmer_background" />
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="80dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:nestedScrollingEnabled="false"/>
+            android:orientation="horizontal">
 
-        <!-- Shop by Gear Section -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Shop by Gear"
-            android:textColor="?attr/colorOnSurface"
-            android:textStyle="bold"
-            android:textSize="18sp"
-            android:padding="16dp"
-            android:layout_marginTop="16dp"/>
+            <View
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_marginEnd="12dp"
+                android:background="@color/shimmer_background" />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/gearRecycler"
+            <View
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_marginEnd="12dp"
+                android:background="@color/shimmer_background" />
+
+            <View
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:background="@color/shimmer_background" />
+
+        </LinearLayout>
+
+        <!-- Shop by Gear shimmer -->
+        <View
+            android:layout_width="150dp"
+            android:layout_height="24dp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp"
+            android:background="@color/shimmer_background" />
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="80dp"
-            android:nestedScrollingEnabled="false"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp" />
+            android:orientation="horizontal">
 
-        <!-- All Sport Items Section -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="All Sport Items"
-            android:textColor="?attr/colorOnSurface"
-            android:textStyle="bold"
-            android:textSize="18sp"
-            android:padding="16dp"
-            android:layout_marginTop="16dp"/>
+            <View
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_marginEnd="12dp"
+                android:background="@color/shimmer_background" />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/productsRecycler"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="12dp"
-            android:nestedScrollingEnabled="false"/>
+            <View
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_marginEnd="12dp"
+                android:background="@color/shimmer_background" />
+
+            <View
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:background="@color/shimmer_background" />
+
+        </LinearLayout>
+
+        <!-- All Sport Items shimmer -->
+        <View
+            android:layout_width="150dp"
+            android:layout_height="24dp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="12dp"
+            android:background="@color/shimmer_background" />
+
+        <include layout="@layout/shimmer_grid" />
 
     </LinearLayout>
 
-</androidx.core.widget.NestedScrollView>
+    <!-- Error Layout -->
+    <LinearLayout
+        android:id="@+id/errorLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:padding="32dp">
+
+        <ImageView
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:src="@drawable/ic_error_placeholder" />
+
+        <TextView
+            android:id="@+id/errorMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Failed to load sports"
+            android:textSize="16sp"
+            android:textColor="#666"
+            android:layout_marginTop="16dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/retryButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Retry"
+            android:layout_marginTop="24dp" />
+
+    </LinearLayout>
+
+    <!-- Main Content (shows when data loaded) -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/scrollView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:visibility="gone"
+        android:background="?android:attr/colorBackground">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Featured Sports Section -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Featured Sports"
+                android:textColor="?attr/colorOnSurface"
+                android:textStyle="bold"
+                android:textSize="18sp"
+                android:padding="16dp"/>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/featuredSportsRecycler"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:nestedScrollingEnabled="false"/>
+
+            <!-- More Sports Section -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="More Sports"
+                android:textColor="?attr/colorOnSurface"
+                android:textStyle="bold"
+                android:textSize="18sp"
+                android:padding="16dp"
+                android:layout_marginTop="16dp"/>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/moreSportsRecycler"
+                android:layout_width="match_parent"
+                android:layout_height="80dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:nestedScrollingEnabled="false"/>
+
+            <!-- Shop by Gear Section -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Shop by Gear"
+                android:textColor="?attr/colorOnSurface"
+                android:textStyle="bold"
+                android:textSize="18sp"
+                android:padding="16dp"
+                android:layout_marginTop="16dp"/>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/gearRecycler"
+                android:layout_width="match_parent"
+                android:layout_height="80dp"
+                android:nestedScrollingEnabled="false"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp" />
+
+            <!-- All Sport Items Section -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="All Sport Items"
+                android:textColor="?attr/colorOnSurface"
+                android:textStyle="bold"
+                android:textSize="18sp"
+                android:padding="16dp"
+                android:layout_marginTop="16dp"/>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/productsRecycler"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="12dp"
+                android:nestedScrollingEnabled="false"/>
+
+        </LinearLayout>
+
+    </androidx.core.widget.NestedScrollView>
+
+</FrameLayout>

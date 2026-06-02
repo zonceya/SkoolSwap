@@ -333,7 +333,15 @@ class ProductsViewModel @Inject constructor(
     }
 
     fun updatePriceRange(min: Float, max: Float) {
-        _appliedFilters.value = _appliedFilters.value.copy(minPrice = min, maxPrice = max)
+        val newFilters = _appliedFilters.value.copy(
+            minPrice = if (min > 0f) min else null,
+            maxPrice = if (max < 100000f) max else null
+        )
+        _appliedFilters.value = newFilters
+
+        Timber.tag("ProductsViewModel").d("📊 Price filter updated → R${min.toInt()} - R${max.toInt()}")
+
+        // Re-load data with new price filter
         if (currentSearchQuery != null) {
             searchInCurrentSection(currentSearchQuery!!)
         } else {
@@ -341,7 +349,10 @@ class ProductsViewModel @Inject constructor(
         }
     }
 
+
     fun applyFilters() {
+        Timber.tag("ProductsViewModel").d("Applying all filters including price")
+
         if (currentSearchQuery != null) {
             searchInCurrentSection(currentSearchQuery!!)
         } else {
@@ -350,12 +361,8 @@ class ProductsViewModel @Inject constructor(
     }
 
     fun resetFilters() {
-        _appliedFilters.value = AppliedFilters()
-        lastLoadedCategoryId = null
-        preSelectedSportTypeId = null
-        preSelectedGearType = null
+        _appliedFilters.value = AppliedFilters()   // This should clear minPrice/maxPrice
         clearSavedCategory()
-        loadFilterConfigIfNeeded(null)
 
         if (currentSearchQuery != null) {
             searchInCurrentSection(currentSearchQuery!!)

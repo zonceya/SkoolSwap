@@ -5,8 +5,10 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -16,6 +18,8 @@ import com.example.skoolswap.domain.model.GearItem
 import com.example.skoolswap.domain.model.SportItem
 import com.example.skoolswap.ui.products.adapter.ProductsAdapter
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
+import timber.log.Timber
 
 @AndroidEntryPoint
 class SportFragment : Fragment() {
@@ -27,7 +31,8 @@ class SportFragment : Fragment() {
     private lateinit var featuredSportsAdapter: FeaturedSportsAdapter
     private lateinit var moreSportsAdapter: MoreSportsAdapter
     private lateinit var gearAdapter: GearAdapter
-    private lateinit var productsAdapter: ProductsAdapter  // ← ADD THIS
+    private lateinit var productsAdapter: ProductsAdapter
+    private var isFirstLoad = true
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -40,8 +45,10 @@ class SportFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        Log.d("SportFragment", "✅ onViewCreated - START")
+        Timber.tag("SportFragment").d("✅ onViewCreated - START")
+
         setupRecyclerViews()
+        setupRetryButton()
         observeViewModel()
         viewModel.loadSportData()
     }
@@ -74,9 +81,8 @@ class SportFragment : Fragment() {
             adapter = gearAdapter
         }
 
-        // ← ADD PRODUCTS GRID (All Sport Items)
+        // Products Grid (All Sport Items)
         productsAdapter = ProductsAdapter { item ->
-            // Navigate to product detail
             val bundle = Bundle().apply {
                 putString("itemId", item.id)
             }
@@ -88,23 +94,73 @@ class SportFragment : Fragment() {
         }
     }
 
+    private fun setupRetryButton() {
+        binding.retryButton.setOnClickListener {
+            binding.errorLayout.visibility = View.GONE
+            viewModel.loadSportData()
+        }
+    }
+
     private fun observeViewModel() {
+        // Loading state - show shimmer
+        viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
+            Timber.tag("SportFragment")
+                .d("isLoading: $isLoading, isFirstLoad: $isFirstLoad, items empty: ${viewModel.allSportItems.value.isNullOrEmpty()}")
+            if (isLoading && isFirstLoad && viewModel.allSportItems.value.isNullOrEmpty()) {
+                binding.shimmerLayout.visibility = View.VISIBLE
+                binding.scrollView.visibility = View.GONE
+                binding.errorLayout.visibility = View.GONE
+            } else {
+                binding.shimmerLayout.visibility = View.GONE
+            }
+        }
+
+        // Error state
+        lifecycleScope.launch {
+            viewModel.error.collect { errorMsg ->
+                if (errorMsg != null && viewModel.allSportItems.value.isNullOrEmpty()) {
+                    binding.errorLayout.visibility = View.VISIBLE
+                    binding.errorMessage.text = errorMsg
+                    binding.scrollView.visibility = View.GONE
+                    binding.shimmerLayout.visibility = View.GONE
+                } else {
+                    binding.errorLayout.visibility = View.GONE
+                }
+            }
+        }
+
+        // Featured Sports
         viewModel.featuredSports.observe(viewLifecycleOwner) { sports ->
-            featuredSportsAdapter.submitList(sports)
+            if (sports.isNotEmpty()) {
+                featuredSportsAdapter.submitList(sports)
+            }
         }
 
+        // More Sports
         viewModel.moreSports.observe(viewLifecycleOwner) { sports ->
-            moreSportsAdapter.submitList(sports)
+            if (sports.isNotEmpty()) {
+                moreSportsAdapter.submitList(sports)
+            }
         }
 
+        // Gear Items
         viewModel.gearItems.observe(viewLifecycleOwner) { gear ->
-            gearAdapter.submitList(gear)
+            if (gear.isNotEmpty()) {
+                gearAdapter.submitList(gear)
+            }
         }
 
+        // All Sport Items - hide shimmer when data arrives
         viewModel.allSportItems.observe(viewLifecycleOwner) { items ->
-            Log.d("SportFragment", "All sport items received: ${items.size}")
+            Timber.tag("SportFragment")
+                .d("All sport items received: ${items.size}, isFirstLoad: $isFirstLoad")
+            isFirstLoad = false
+            binding.shimmerLayout.visibility = View.GONE
+            binding.scrollView.visibility = View.VISIBLE
+            binding.errorLayout.visibility = View.GONE
             productsAdapter.submitList(items)
         }
+
     }
 
     private fun navigateToSportProducts(sport: SportItem) {

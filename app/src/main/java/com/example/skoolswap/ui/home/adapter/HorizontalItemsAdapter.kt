@@ -8,7 +8,8 @@ import com.bumptech.glide.Glide
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemHomeProductBinding
 import com.example.skoolswap.domain.model.Item
-import com.example.skoolswap.utils.extensions.formatViewCount
+import java.text.NumberFormat
+import java.util.Locale
 
 class HorizontalItemsAdapter(
     private val items: List<Item>,
@@ -43,30 +44,46 @@ class HorizontalItemsAdapter(
         }
 
         fun bind(item: Item) {
-            // FIXED: Changed from productName to productTitle
+            // Set product title
             binding.productTitle.text = item.name
-            binding.productPrice.text = "R${item.price}"
 
+            // Format price properly (e.g., "R1,104.00" instead of "R1104.0")
+            binding.productPrice.text = formatPrice(item.price)
 
-            // ✅ ADD SOLD BADGE
-            if (item.status == "sold" || item.quantity <= 0) {
+            // ✅ USE THE EXISTING resolveImageUrl() METHOD
+            val imageUrl = item.resolveImageUrl()
+
+            if (!imageUrl.isNullOrEmpty()) {
+                Glide.with(binding.root.context)
+                    .load(imageUrl)
+                    .placeholder(R.drawable.ic_create_item_placeholder)
+                    .error(R.drawable.ic_create_item_placeholder)
+                    .centerCrop()
+                    .into(binding.productImage)
+            } else {
+                binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
+            }
+
+            // Handle SOLD badge (using availableQuantity from your model)
+            val isSold = item.status == "sold" || item.availableQuantity <= 0
+            if (isSold) {
                 binding.soldBadge.visibility = View.VISIBLE
-                binding.productTitle.alpha = 0.5f
-                binding.productPrice.alpha = 0.5f
+                binding.productTitle.alpha = 0.6f
+                binding.productPrice.alpha = 0.6f
             } else {
                 binding.soldBadge.visibility = View.GONE
                 binding.productTitle.alpha = 1f
                 binding.productPrice.alpha = 1f
-                if (!item.images.isNullOrEmpty()) {
-                    Glide.with(binding.root.context)
-                        .load(item.images.first().url)
-                        .placeholder(R.drawable.ic_create_item_placeholder)
-                        .error(R.drawable.ic_create_item_placeholder)
-                        .centerCrop()
-                        .into(binding.productImage)
-                } else {
-                    binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
-                }
+            }
+        }
+
+        private fun formatPrice(price: Double): String {
+            return try {
+                val formatter = NumberFormat.getCurrencyInstance(Locale("en", "ZA"))
+                formatter.currency = java.util.Currency.getInstance("ZAR")
+                formatter.format(price)
+            } catch (e: Exception) {
+                "R${String.format("%.2f", price)}"
             }
         }
     }

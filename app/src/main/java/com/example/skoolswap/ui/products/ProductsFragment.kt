@@ -1,5 +1,6 @@
 package com.example.skoolswap.ui.products
 
+import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -28,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.core.content.ContextCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import timber.log.Timber
 
 @AndroidEntryPoint
 class ProductsFragment : Fragment() {
@@ -68,7 +70,7 @@ class ProductsFragment : Fragment() {
         (requireActivity() as AppCompatActivity).supportActionBar?.show()
         (requireActivity() as AppCompatActivity).supportActionBar?.title = sectionTitle
         (requireActivity() as AppCompatActivity).supportActionBar?.setDisplayHomeAsUpEnabled(true)
-
+        isFirstLoad = true
         if (sectionType == "sport") {
             viewModel.clearSavedCategory()
         }
@@ -122,6 +124,7 @@ class ProductsFragment : Fragment() {
 
     fun exitSearchMode() {
         isInSearchMode = false
+        isFirstLoad = true
         binding.searchResultsContainer.visibility = View.GONE
         binding.productsRecycler.visibility = View.VISIBLE
         binding.emptySearchResults.visibility = View.GONE
@@ -146,7 +149,7 @@ class ProductsFragment : Fragment() {
                 ContextCompat.getColor(requireContext(), R.color.teal_200)
             )
             setOnRefreshListener {
-                // Refresh with CURRENT filters (don't reset anything)
+                isFirstLoad = true
                 viewModel.reloadCurrentSection()
                 isRefreshing = false
             }
@@ -202,6 +205,9 @@ class ProductsFragment : Fragment() {
             )
             updatePriceDisplay()
             binding.drawerLayout.closeDrawers()
+
+            // Refresh the filter drawer display
+            viewModel.filterConfig.value?.let { rebuildFilterDrawer(it) }
         }
 
         binding.applyFilters.setOnClickListener {
@@ -211,38 +217,63 @@ class ProductsFragment : Fragment() {
             }
             viewModel.applyFilters()
             binding.drawerLayout.closeDrawers()
+
+            // Refresh the filter drawer display
+            viewModel.filterConfig.value?.let { rebuildFilterDrawer(it) }
         }
     }
+    private fun showPriceDialog() {
+        val priceGroup = viewModel.filterConfig.value?.filterGroups?.find { it.id == "price" }
+        val globalMin = priceGroup?.min ?: 0f
+        val globalMax = priceGroup?.max ?: 1000f
 
+        Log.d("ProductsFragment", "Opening price dialog → bounds=[$globalMin, $globalMax], " +
+                "applied=[${viewModel.appliedFilters.value.minPrice}, ${viewModel.appliedFilters.value.maxPrice}]")
+
+        val dialog = PriceRangeDialogFragment.newInstance(
+            min = globalMin,                                              // ← Was missing
+            max = globalMax,                                              // ← Was missing
+            currentMin = viewModel.appliedFilters.value.minPrice ?: globalMin,
+            currentMax = viewModel.appliedFilters.value.maxPrice ?: globalMax
+        )
+
+        dialog.setOnPriceRangeAppliedListener { min, max ->
+            Log.d("ProductsFragment", "Price range applied → R$min - R$max")
+            viewModel.updatePriceRange(min, max)
+            viewModel.applyFilters()                                      // ← Was missing!
+        }
+
+        dialog.show(parentFragmentManager, PriceRangeDialogFragment.TAG)
+    }
     private fun setupPriceSlider() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.filterConfig.collect { filterConfig ->
-                    if (filterConfig == null) return@collect
-                    val priceGroup = filterConfig.filterGroups.find { it.id == "price" } ?: return@collect
-
-                    if (_binding == null) return@collect
+                    val priceGroup = filterConfig?.filterGroups?.find { it.id == "price" } ?: return@collect
 
                     binding.priceSlider.apply {
-                        clearOnChangeListeners()
                         valueFrom = priceGroup.min ?: 0f
                         valueTo = priceGroup.max ?: 1000f
+
+                        // Set current applied values
+                        val applied = viewModel.appliedFilters.value
                         setValues(
-                            viewModel.appliedFilters.value.minPrice ?: (priceGroup.min ?: 0f),
-                            viewModel.appliedFilters.value.maxPrice ?: (priceGroup.max ?: 1000f)
+                            applied.minPrice ?: (priceGroup.min ?: 0f),
+                            applied.maxPrice ?: (priceGroup.max ?: 1000f)
                         )
-                        addOnChangeListener { slider, _, _ ->
-                            val values = slider.values
+
+                        addOnChangeListener { _, _, _ ->
+                            val values = values
                             if (values.size >= 2) {
                                 binding.selectedPriceRange.text = "R${values[0].toInt()} - R${values[1].toInt()}"
                             }
                         }
                     }
-                    updatePriceDisplay()
                 }
             }
         }
     }
+
 
     private fun updatePriceDisplay() {
         if (_binding == null) return
@@ -272,6 +303,17 @@ class ProductsFragment : Fragment() {
 
         binding.dynamicFilterContainer.removeAllViews()
 
+        // ========== ADD PRICE FILTER FIRST ==========
+        val applied = viewModel.appliedFilters.value
+        val priceDisplay = if (applied.minPrice != null && applied.maxPrice != null)
+            "R${applied.minPrice?.toInt() ?: 0} - R${applied.maxPrice?.toInt() ?: 1000}"
+        else null
+
+        addFilterItem("Price", priceDisplay) {
+            showPriceDialog()
+        }
+
+        // Add category filter if selected
         val selectedCategoryId = viewModel.appliedFilters.value.categoryId ?: viewModel.getSavedCategoryId()
         if (selectedCategoryId != null) {
             val categoryGroup = viewModel.getGlobalFilterGroupById("category")
@@ -283,8 +325,9 @@ class ProductsFragment : Fragment() {
             }
         }
 
+        // Add other filter groups
         filterConfig.filterGroups.forEach { group ->
-            if (group.id == "price") return@forEach
+            if (group.id == "price") return@forEach  // Skip price since we added it manually
             if (group.options.isEmpty()) return@forEach
 
             val selectedValue = getSelectedValueDisplay(group.id)
@@ -338,7 +381,8 @@ class ProductsFragment : Fragment() {
 
         // Log dark mode status
         val nightMode = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK
-        Log.d("ProductsFragment", "Dark mode active: ${nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES}")
+        Timber.tag("ProductsFragment")
+            .d("Dark mode active: ${nightMode == Configuration.UI_MODE_NIGHT_YES}")
     }
     private fun showOptionsDrawer(groupId: String, groupName: String, options: List<FilterOption>, filterType: String) {
         if (_binding == null) return
@@ -431,11 +475,14 @@ class ProductsFragment : Fragment() {
     }
 
     private fun observeViewModel() {
+        // ========== LOADING STATE (SHIMMER) ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.isLoading.collect { isLoading ->
-                    if (isLoading && isFirstLoad && viewModel.products.value.isEmpty()) {
-                        // Show shimmer only on first load
+                    Log.d("ProductsFragment", "🔥 isLoading: $isLoading, isFirstLoad: $isFirstLoad")
+
+                    if (isLoading && isFirstLoad) {
+                        // Show shimmer whenever loading a NEW section
                         binding.shimmerLayout.visibility = View.VISIBLE
                         binding.productsRecycler.visibility = View.GONE
                         binding.errorLayout.visibility = View.GONE
@@ -446,6 +493,8 @@ class ProductsFragment : Fragment() {
                 }
             }
         }
+
+        // ========== ERROR STATE ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.error.collect { error ->
@@ -461,6 +510,8 @@ class ProductsFragment : Fragment() {
                 }
             }
         }
+
+        // ========== PRODUCTS DATA (NORMAL MODE) ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.products.collect { products ->
@@ -476,6 +527,8 @@ class ProductsFragment : Fragment() {
                 }
             }
         }
+
+        // ========== SEARCH RESULTS (SEARCH MODE) ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.searchResults.collect { results ->
@@ -491,56 +544,6 @@ class ProductsFragment : Fragment() {
                             binding.productsRecycler.visibility = View.VISIBLE
                             productsAdapter.submitList(results)
                         }
-                    }
-                }
-            }
-        }
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.error.collect { error ->
-                    if (error != null && _binding != null) {
-                        Log.e(TAG, "Error: $error")
-                    }
-                }
-            }
-        }
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.products.collect { products ->
-                    if (_binding != null && !isInSearchMode) {
-                        productsAdapter.submitList(products)
-                    }
-                }
-            }
-        }
-
-        // Observe search results (search mode)
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.searchResults.collect { results ->
-                    if (isInSearchMode) {
-                        if (results.isEmpty()) {
-                            binding.searchResultsContainer.visibility = View.VISIBLE
-                            binding.emptySearchResults.visibility = View.VISIBLE
-                            binding.productsRecycler.visibility = View.GONE
-                            productsAdapter.submitList(emptyList())
-                        } else {
-                            binding.searchResultsContainer.visibility = View.VISIBLE
-                            binding.emptySearchResults.visibility = View.GONE
-                            binding.productsRecycler.visibility = View.VISIBLE
-                            productsAdapter.submitList(results)
-                        }
-                    }
-                }
-            }
-        }
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.error.collect { error ->
-                    if (error != null && _binding != null) {
-                        Log.e(TAG, "Error: $error")
                     }
                 }
             }

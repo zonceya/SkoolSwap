@@ -12,13 +12,15 @@ import com.example.skoolswap.domain.model.SportItem
 import com.example.skoolswap.domain.repository.ProductsRepositoryInterface
 import com.example.skoolswap.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
-class SportViewModel @Inject constructor(
-    private val productsRepository: ProductsRepositoryInterface  // ← ADD THIS
+class SportViewModel @Inject constructor(  // ← MUST have @Inject constructor
+    private val productsRepository: ProductsRepositoryInterface
 ) : ViewModel() {
 
     private val _featuredSports = MutableLiveData<List<SportItem>>()
@@ -36,30 +38,30 @@ class SportViewModel @Inject constructor(
     private val _isLoading = MutableLiveData(false)
     val isLoading: LiveData<Boolean> = _isLoading
 
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
     fun loadSportData() {
         viewModelScope.launch {
             _isLoading.value = true
-            Timber.tag("SportViewModel").d("loadSportData - START")
+            _error.value = null
+            Log.d("SportViewModel", "loadSportData - START")
 
-            // Featured Sports (Grid)
+            // Static data
             _featuredSports.value = listOf(
                 SportItem(6, "Rugby", R.drawable.ic_rugby),
                 SportItem(10, "Soccer", R.drawable.ic_soccer),
                 SportItem(7, "Cricket", R.drawable.ic_cricket),
                 SportItem(8, "Hockey", R.drawable.ic_hockey)
             )
-            Timber.tag("SportViewModel").d("Featured sports set: ${_featuredSports.value?.size}")
 
-            // More Sports (Horizontal scroll - white chips)
             _moreSports.value = listOf(
                 SportItem(36, "Tennis", R.drawable.ic_tennis),
                 SportItem(35, "Swimming", R.drawable.ic_swimming),
                 SportItem(9, "Netball", R.drawable.ic_netball),
                 SportItem(37, "Basketball", R.drawable.ic_basketball)
             )
-            Timber.tag("SportViewModel").d("More sports set: ${_moreSports.value?.size}")
 
-            // Shop by Gear (Horizontal scroll - black chips)
             _gearItems.value = listOf(
                 GearItem(1, "Boots", "boots"),
                 GearItem(2, "Jerseys", "jersey"),
@@ -68,54 +70,18 @@ class SportViewModel @Inject constructor(
                 GearItem(5, "Equipment", "equipment")
             )
 
-            // ← ADD THIS: Load all sport items from API
+            // Load API data
             loadAllSportItems()
-
-            _isLoading.value = false
         }
     }
 
-    // Add this function to ShopViewModel
-    private fun getSampleItems(): List<Item> {
-        return listOf(
-            createSampleItem("1", "School Bag", 59.00, 4, "Medium", "Good"),      // Accessories
-            createSampleItem("2", "Acer Laptop", 900.00, 4, "15 inch", "Used"),   // Accessories
-            createSampleItem("3", "History Book", 200.00, 5, "Paperback", "Good"), // Books
-            createSampleItem("4", "Math Textbook", 150.00, 5, "Hardcover", "Like New"), // Books
-            createSampleItem("5", "Soccer Ball", 25.00, 2, "Size 5", "Good"),      // Sport
-            createSampleItem("6", "Notebook", 45.00, 3, "A4", "New"),              // Stationary
-            createSampleItem("7", "Uniform Shirt", 85.00, 1, "Large", "Excellent") // Uniform
-        )
-    }
-
-    private fun createSampleItem(
-        id: String,
-        name: String,
-        price: Double,
-        typeId: Int,
-        size: String,
-        condition: String
-    ): Item {
-        return Item(
-            id = id,
-            shopId = 1L,
-            name = name,
-            description = "$size, Condition: $condition",
-            price = price,
-            quantity = 1,
-            status = "active",
-            createdAt = "",
-            itemTypeId = typeId,  // This is key for category filtering!
-            images = emptyList()
-        )
-    }
     private fun loadAllSportItems() {
         viewModelScope.launch {
-            Timber.tag("SportViewModel").d("Loading all sport items from API")
+            Log.d("SportViewModel", "Loading all sport items from API")
 
             val result = productsRepository.getRecommendedAll(
                 page = 1,
-                categoryId = 2,  // Sport category ID
+                categoryId = 2,
                 conditionId = null,
                 minPrice = null,
                 maxPrice = null
@@ -124,15 +90,16 @@ class SportViewModel @Inject constructor(
             when (result) {
                 is Result.Success -> {
                     _allSportItems.value = result.data.items
-                    Timber.tag("SportViewModel")
-                        .d("All sport items loaded: ${result.data.items.size}")
+                    Log.d("SportViewModel", "All sport items loaded: ${result.data.items.size}")
                 }
                 is Result.Error -> {
-                    Timber.tag("SportViewModel")
-                        .e("Failed to load sport items: ${result.exception.message}")
+                    _error.value = result.exception.message
                     _allSportItems.value = emptyList()
+                    Log.e("SportViewModel", "Failed to load sport items: ${result.exception.message}")
                 }
             }
+
+            _isLoading.value = false
         }
     }
 }
