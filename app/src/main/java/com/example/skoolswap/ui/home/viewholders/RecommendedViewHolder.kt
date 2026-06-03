@@ -18,7 +18,19 @@ class RecommendedViewHolder(
 ) : RecyclerView.ViewHolder(binding.root) {
 
     fun bind(section: Section.Recommended) {
-        // Find views manually if needed
+        // Log what data we received
+        android.util.Log.d("RecommendedViewHolder", "========== RECOMMENDED SECTION ==========")
+        android.util.Log.d("RecommendedViewHolder", "Title: ${section.title}")
+        android.util.Log.d("RecommendedViewHolder", "Items count: ${section.items.size}")
+
+        section.items.forEachIndexed { index, item ->
+            android.util.Log.d("RecommendedViewHolder", "Item $index: ${item.name}")
+            android.util.Log.d("RecommendedViewHolder", "  coverImage: ${item.coverImage}")
+            android.util.Log.d("RecommendedViewHolder", "  images size: ${item.images.size}")
+            item.images.forEach { image ->
+                android.util.Log.d("RecommendedViewHolder", "    image url: ${image.url}")
+            }
+        }
         val sectionTitle = binding.root.findViewById<TextView>(R.id.sectionTitle)
         val viewAll = binding.root.findViewById<TextView>(R.id.viewAll)
 

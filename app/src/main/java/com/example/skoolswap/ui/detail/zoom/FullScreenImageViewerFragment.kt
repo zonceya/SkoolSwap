@@ -7,6 +7,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updateLayoutParams
 import androidx.fragment.app.DialogFragment
 import androidx.viewpager2.widget.ViewPager2
 import com.example.skoolswap.R
@@ -65,7 +67,9 @@ class FullScreenImageViewerDialogFragment : DialogFragment() {
             return
         }
 
-        val adapter = FullScreenImagePagerAdapter(imageUrls)
+        val adapter = FullScreenImagePagerAdapter(imageUrls) {
+            dismiss()   // single tap anywhere on image dismisses the viewer
+        }
         binding.viewPager.adapter = adapter
         binding.viewPager.setCurrentItem(startingPosition, false)
 
@@ -76,7 +80,13 @@ class FullScreenImageViewerDialogFragment : DialogFragment() {
                 updatePositionText(position + 1, imageUrls.size)
             }
         })
-
+        ViewCompat.setOnApplyWindowInsetsListener(binding.btnBackContainer) { view, insets ->
+            val statusBar = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+            view.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                topMargin = statusBar + 8
+            }
+            insets
+        }
         // Single click listener on the container — ImageView has clickable=false so it won't intercept
         binding.btnBackContainer.setOnClickListener {
             dismiss()

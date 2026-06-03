@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
-
 @HiltViewModel
 class ItemDetailViewModel @Inject constructor(
     private val itemRepository: ItemRepositoryInterface,
@@ -39,7 +38,6 @@ class ItemDetailViewModel @Inject constructor(
     private val _similarItems = MutableStateFlow<List<Item>>(emptyList())
     val similarItems: StateFlow<List<Item>> = _similarItems.asStateFlow()
 
-    // Add these for fallback UI
     private val _similarSectionTitle = MutableStateFlow("Similar Items")
     val similarSectionTitle: StateFlow<String> = _similarSectionTitle.asStateFlow()
 
@@ -48,23 +46,33 @@ class ItemDetailViewModel @Inject constructor(
 
     private val _sizeName = MutableStateFlow<String?>(null)
     val sizeName: StateFlow<String?> = _sizeName.asStateFlow()
-    private var cachedItem: Item? = null
+
     private val _schoolName = MutableStateFlow<String?>(null)
     val schoolName: StateFlow<String?> = _schoolName.asStateFlow()
+
     private val _colorName = MutableStateFlow<String?>(null)
     val colorName: StateFlow<String?> = _colorName.asStateFlow()
+
     private val _brandName = MutableStateFlow<String?>(null)
     val brandName: StateFlow<String?> = _brandName.asStateFlow()
+
     private val _conditionName = MutableStateFlow<String?>(null)
     val conditionName: StateFlow<String?> = _conditionName.asStateFlow()
-    private var currentItemId: String? = null
+
     private val _imageUrls = MutableStateFlow<List<String>>(emptyList())
     val imageUrls: StateFlow<List<String>> = _imageUrls.asStateFlow()
+
     private val _isFavorite = MutableStateFlow(false)
     val isFavorite: StateFlow<Boolean> = _isFavorite.asStateFlow()
 
     private val _sellerMobile = MutableStateFlow<String?>(null)
     val sellerMobile: StateFlow<String?> = _sellerMobile.asStateFlow()
+
+    private var cachedItem: Item? = null
+    private var currentItemId: String? = null
+
+    // In-memory cache: survives config changes, cleared when ViewModel dies
+    private val similarItemsCache = mutableMapOf<String, List<Item>>()
 
     private val TAG = "ItemDetailVM"
 
@@ -73,12 +81,84 @@ class ItemDetailViewModel @Inject constructor(
             currentItemId = itemId
             _itemState.value = ItemDetailState.Loading
             checkFavoriteStatus(itemId)
-            trackView(itemId, source)
-            fetchItem(itemId)
+
+            // Fire similar items and main item fetch IN PARALLEL
+            // Similar items uses cache if available — shows instantly on repeat visit
+            val similarJob = launch { loadSimilarItemsEarly(itemId) }
+            val itemJob = launch { fetchItem(itemId) }
+
+            // trackView fires independently — doesn't block anything
+            launch { productsRepository.trackClick(itemId, source, 0) }
         }
     }
 
-    // This MUST be suspend because favoriteRepository.isFavorite() is suspend
+    // Loads similar items as early as possible, using cache when available
+    private suspend fun loadSimilarItemsEarly(itemId: String) {
+        // Serve from cache immediately if we have it
+        similarItemsCache[itemId]?.let { cached ->
+            Timber.tag(TAG).d("Similar items served from cache: ${cached.size} items")
+            _similarItems.value = cached
+            return
+        }
+
+        _isLoadingSimilar.value = true
+
+        // We don't have the item yet (it's loading in parallel), so we can only
+        // try non-category fallbacks immediately. Category-based load happens
+        // in loadSimilarItems(item) once the item arrives.
+        val items = fetchTrendingItems(excludeItemId = itemId, period = "today")
+            .ifEmpty { fetchRecentItems(excludeItemId = itemId, period = "week") }
+            .ifEmpty { fetchAnyPopularItems(excludeItemId = itemId) }
+
+        if (items.isNotEmpty()) {
+            _similarSectionTitle.value = "Trending Today"
+            val result = items.take(6)
+            similarItemsCache[itemId] = result
+            _similarItems.value = result
+        }
+
+        _isLoadingSimilar.value = false
+    }
+
+    private suspend fun fetchItem(itemId: String) {
+        val result = itemRepository.getItem(itemId)
+
+        if (result.isSuccess) {
+            val item = result.getOrNull() ?: return
+            cachedItem = item
+            _itemState.value = ItemDetailState.Success(item)
+            _sellerMobile.value = item.shop?.sellerMobile
+            Timber.tag(TAG).d("Seller mobile: ${_sellerMobile.value}")
+
+            loadReferenceData(item)
+
+            // Now try category-based similar items — may improve on what early load found
+            // Only runs if we have a category to search by
+            if (item.mainCategoryId != null) {
+                loadSimilarItemsWithCategory(item)
+            }
+        } else {
+            _itemState.value = ItemDetailState.Error(
+                result.exceptionOrNull()?.message ?: "Unknown error"
+            )
+        }
+    }
+
+    // Runs after item loads — upgrades similar items to category-matched ones if possible
+    private suspend fun loadSimilarItemsWithCategory(item: Item) {
+        val cacheKey = item.id
+        val categoryItems = fetchItemsByCategory(item.mainCategoryId!!, item.id)
+
+        if (categoryItems.isNotEmpty()) {
+            Timber.tag(TAG).d("Upgraded similar items to category-matched: ${categoryItems.size}")
+            _similarSectionTitle.value = "Similar Items"
+            val result = categoryItems.take(6)
+            similarItemsCache[cacheKey] = result  // overwrite cache with better results
+            _similarItems.value = result
+        }
+        // If category fetch fails, early-loaded trending items remain — no blank state
+    }
+
     private suspend fun checkFavoriteStatus(itemId: String) {
         _isFavorite.value = favoriteRepository.isFavorite(itemId)
         Timber.tag(TAG).d("Favorite status for $itemId: ${_isFavorite.value}")
@@ -89,117 +169,29 @@ class ItemDetailViewModel @Inject constructor(
             currentItemId?.let { itemId ->
                 val newStatus = favoriteRepository.toggleFavorite(itemId)
                 _isFavorite.value = newStatus
-                Log.d(TAG, "Toggled favorite for $itemId: $newStatus")
+                Timber.tag(TAG).d("Toggled favorite for $itemId: $newStatus")
             }
         }
     }
 
-    // This MUST be suspend because authRepository.getUserById() is suspend
-    private suspend fun loadSellerContact(sellerUserId: Long) {
-        val result = authRepository.getUserById(sellerUserId)
-        if (result.isSuccess) {
-            val seller = result.getOrNull()
-            _sellerMobile.value = seller?.mobile
-            Log.d(TAG, "Loaded seller mobile: ${_sellerMobile.value}")
-        } else {
-            Log.e(TAG, "Failed to load seller contact: ${result.exceptionOrNull()?.message}")
-        }
-    }
-
-    // This MUST be suspend because itemRepository.getItem() is suspend
-    private suspend fun fetchItem(itemId: String) {
-        val result = itemRepository.getItem(itemId)
-
-        if (result.isSuccess) {
-            val item = result.getOrNull()
-            if (item != null) {
-                cachedItem = item
-                _itemState.value = ItemDetailState.Success(item)
-                loadReferenceData(item)
-                loadSimilarItems(item) // This calls suspend function
-
-                _sellerMobile.value = item.shop?.sellerMobile
-                Log.d(TAG, "Seller mobile: ${_sellerMobile.value}")
-            }
-        } else {
-            _itemState.value = ItemDetailState.Error(result.exceptionOrNull()?.message ?: "Unknown error")
-        }
-    }
-
-    // This MUST be suspend because database operations are suspend
     private suspend fun loadReferenceData(item: Item) {
-        Timber.tag("ItemDetailVM").d("Images count: ${item.images.size}")
+        Timber.tag(TAG).d("Images count: ${item.images.size}")
         item.images.forEachIndexed { index, image ->
-            Timber.tag("ItemDetailVM").d("Image $index: ${image.url}")
+            Timber.tag(TAG).d("Image $index: ${image.url}")
         }
 
         _imageUrls.value = item.images.map { it.url }
-
         _sizeName.value = item.sizeName
         _colorName.value = item.colorName
         _brandName.value = item.brandName
         _conditionName.value = item.conditionName
 
-        // Load school name from Room (suspend)
         item.schoolId?.let { schoolId ->
             val school = schoolDao.getById(schoolId)
             _schoolName.value = school?.name
         }
     }
 
-    // UPDATED: This now has multiple fallback strategies
-    private suspend fun loadSimilarItems(currentItem: Item) {
-        Log.d(TAG, "========== LOAD SIMILAR ITEMS START ==========")
-        _isLoadingSimilar.value = true
-
-        var items = emptyList<Item>()
-        var fallbackLevel = 0
-
-        // Try 1: Same category — always exclude current item
-        if (currentItem.mainCategoryId != null) {
-            items = fetchItemsByCategory(currentItem.mainCategoryId, currentItem.id)
-            if (items.isNotEmpty()) {
-                _similarSectionTitle.value = "Similar Items"
-                fallbackLevel = 1
-            }
-        }
-
-        // Try 2: Trending — exclude current item
-        if (items.isEmpty()) {
-            items = fetchTrendingItems(excludeItemId = currentItem.id, period = "today")
-            if (items.isNotEmpty()) {
-                _similarSectionTitle.value = "Trending Today"
-                fallbackLevel = 2
-            }
-        }
-
-        // Try 3: Recent — exclude current item
-        if (items.isEmpty()) {
-            items = fetchRecentItems(excludeItemId = currentItem.id, period = "week")
-            if (items.isNotEmpty()) {
-                _similarSectionTitle.value = "Just Added"
-                fallbackLevel = 3
-            }
-        }
-
-        // Try 4: Any popular — exclude current item
-        if (items.isEmpty()) {
-            items = fetchAnyPopularItems(excludeItemId = currentItem.id)
-            if (items.isNotEmpty()) {
-                _similarSectionTitle.value = "Popular Items"
-                fallbackLevel = 4
-            }
-        }
-
-        Log.d(TAG, "Fallback level $fallbackLevel used, found ${items.size} items")
-        // ✅ Double-filter at the end as safety net
-        _similarItems.value = items
-            .filter { it.id != currentItem.id }
-            .take(6)
-        _isLoadingSimilar.value = false
-    }
-
-    // Helper suspend functions for each fallback
     private suspend fun fetchItemsByCategory(categoryId: Int, excludeItemId: String): List<Item> {
         return try {
             val result = productsRepository.getRecommendedAll(
@@ -252,6 +244,7 @@ class ItemDetailViewModel @Inject constructor(
         } catch (e: Exception) { emptyList() }
     }
 
+    // Keep this public for the fragment's direct call, but loadItem now handles it internally
     fun trackView(itemId: String, source: String) {
         viewModelScope.launch {
             productsRepository.trackClick(itemId, source, 0)
@@ -260,7 +253,7 @@ class ItemDetailViewModel @Inject constructor(
 
     fun getImageUrls(): List<String> {
         val urls = _imageUrls.value
-        Timber.tag("ItemDetailVM").d("getImageUrls returning ${urls.size} URLs")
+        Timber.tag(TAG).d("getImageUrls returning ${urls.size} URLs")
         return urls
     }
 
@@ -276,7 +269,7 @@ class ItemDetailViewModel @Inject constructor(
         _conditionName.value = null
         _isFavorite.value = false
         _sellerMobile.value = null
-        Timber.tag("ItemDetailVM").d("State cleared - ready for fresh load")
+        Timber.tag(TAG).d("State cleared")
     }
 
     sealed class ItemDetailState {

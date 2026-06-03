@@ -58,8 +58,9 @@ fun ItemDto.toDomain(): Item {
         createdAt = createdAt,
         updatedAt = updatedAt,
         shop = shop?.toDomain(),
-        images = allImages,  // ✅ Now has all images!
+        images = allImages,
         coverImage = coverPhotoUrl,
+        schoolName = school?.name,
         brandId = brand?.id,
         sizeId = size?.id,
         colorId = color?.id,
@@ -361,6 +362,7 @@ fun RecommendationItemDto.toDomain(): com.example.skoolswap.domain.model.Item {
         brandName = brandName,
         gender = gender,
         viewCount = viewCount,
+        schoolName = school,
         shop = shop?.let {
             com.example.skoolswap.domain.model.Shop(
                 id = it.id,

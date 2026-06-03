@@ -55,7 +55,7 @@ class RecentItemsAdapter(
 
         fun bind(item: Item) {
             binding.recentTitle.text = item.name
-            binding.recentSchool.text = item.schoolName ?: "School Item"
+            binding.recentSchool.text = item.schoolName  ?: "School Item"
 
                // ✅ ADD SOLD BADGE
             if (item.status == "sold" || item.quantity <= 0) {

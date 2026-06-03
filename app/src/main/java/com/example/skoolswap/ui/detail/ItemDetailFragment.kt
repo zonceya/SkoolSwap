@@ -23,6 +23,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import androidx.core.view.isVisible
+import androidx.fragment.app.DialogFragment
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.utils.extensions.formatViewCount
 import com.example.skoolswap.utils.ColorUtils
@@ -45,7 +46,6 @@ class ItemDetailFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        (requireActivity() as AppCompatActivity).supportActionBar?.hide()
         Timber.tag(TAG).d("onCreateView called")
         _binding = FragmentItemDetailBinding.inflate(inflater, container, false)
         (requireActivity() as AppCompatActivity).supportActionBar?.hide()
@@ -96,7 +96,8 @@ class ItemDetailFragment : Fragment() {
             navigateToDetail(item.id)
         }
         binding.similarRecycler.apply {
-            layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
+            layoutManager =
+                LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
             adapter = similarItemsAdapter
         }
         binding.imageSlider.apply {
@@ -126,7 +127,7 @@ class ItemDetailFragment : Fragment() {
             viewModel.toggleFavorite()  // Call ViewModel method directly
         }
 
-      /*  binding.contactSeller.setOnClickListener {
+        /*  binding.contactSeller.setOnClickListener {
             Timber.tag(TAG).d("Contact seller button clicked")
             contactSeller()
         }*/
@@ -171,6 +172,7 @@ class ItemDetailFragment : Fragment() {
                         Timber.tag(TAG).d("State: Loading...")
                         showLoading(true)
                     }
+
                     is ItemDetailViewModel.ItemDetailState.Success -> {
                         Timber.tag(TAG)
                             .d("State: Success! Item: ${state.item.name}, ID: ${state.item.id}")
@@ -181,6 +183,7 @@ class ItemDetailFragment : Fragment() {
                         showLoading(false)
                         bindItem(state.item)
                     }
+
                     is ItemDetailViewModel.ItemDetailState.Error -> {
                         Timber.tag(TAG).e("State: Error: ${state.message}")
                         showLoading(false)
@@ -192,8 +195,13 @@ class ItemDetailFragment : Fragment() {
 
         lifecycleScope.launch {
             viewModel.similarItems.collect { items ->
-                Log.d(TAG, "Similar items received: ${items.size}")
-                items.forEach { Log.d(TAG, "  - ${it.name}, cover: ${it.coverImage}, images: ${it.images.size}") }
+                if (items.isEmpty()) {
+                    // Still loading or truly empty — keep shimmer visible
+                    return@collect
+                }
+                // Items arrived — hide shimmer, show recycler
+                binding.similarShimmer.visibility = View.GONE
+                binding.similarRecycler.visibility = View.VISIBLE
                 similarItemsAdapter.submitList(items)
             }
         }
@@ -224,7 +232,7 @@ class ItemDetailFragment : Fragment() {
             }
         }
 
-       lifecycleScope.launch {
+        lifecycleScope.launch {
             viewModel.colorName.collect { colorName ->
                 Timber.tag(TAG).d("Color name updated: $colorName")
                 if (!colorName.isNullOrEmpty()) {
@@ -234,7 +242,12 @@ class ItemDetailFragment : Fragment() {
                     // Make sure to apply the color correctly
                     binding.productColor.setTextColor(colorInt)
                     // Also add a small color circle indicator if you want
-                    binding.productColor.setCompoundDrawablesWithIntrinsicBounds(null, null, null, null)
+                    binding.productColor.setCompoundDrawablesWithIntrinsicBounds(
+                        null,
+                        null,
+                        null,
+                        null
+                    )
 
                     binding.productColor.visibility = View.VISIBLE
                     Log.d(TAG, "Color set to: $colorName with color int: $colorInt")
@@ -392,7 +405,14 @@ class ItemDetailFragment : Fragment() {
                 Timber.tag(TAG).d("Contacting seller via mobile: $sellerMobile")
                 // Open WhatsApp or dialer
                 val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-                    data = android.net.Uri.parse("https://wa.me/${sellerMobile.replace(Regex("[^0-9]"), "")}")
+                    data = android.net.Uri.parse(
+                        "https://wa.me/${
+                            sellerMobile.replace(
+                                Regex("[^0-9]"),
+                                ""
+                            )
+                        }"
+                    )
                 }
                 startActivity(intent)
             } else {
@@ -410,9 +430,11 @@ class ItemDetailFragment : Fragment() {
             val sellerMobile = viewModel.sellerMobile.value  // Get from ViewModel
 
             if (sellerMobile.isNullOrBlank()) {
-                Toast.makeText(requireContext(),
+                Toast.makeText(
+                    requireContext(),
                     "Seller contact information not available",
-                    Toast.LENGTH_SHORT).show()
+                    Toast.LENGTH_SHORT
+                ).show()
                 return
             }
 
@@ -449,6 +471,7 @@ class ItemDetailFragment : Fragment() {
 
     private fun showError(message: String) {
         Timber.tag(TAG).e("showError: $message")
+        binding.similarShimmer.visibility = View.GONE
         binding.shimmerLayout.visibility = View.GONE
         binding.progressBar.visibility = View.GONE
         binding.scrollView.visibility = View.GONE
@@ -458,31 +481,42 @@ class ItemDetailFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        backPressedCallback.remove()
+        // Do NOT show action bar here — it triggers a synchronous layout pass
+        // during fragment teardown, causing 30+ frame skips. Show it in the
+        // destination fragment's onResume instead, or use a shared ViewModel flag.
         Timber.tag(TAG).d("onDestroyView called")
-        (requireActivity() as AppCompatActivity).supportActionBar?.show()
         _binding = null
+        // backPressedCallback auto-removes via viewLifecycleOwner — explicit remove not needed
     }
 
     override fun onResume() {
         super.onResume()
         Timber.tag(TAG).d("onResume called - currentItemId: $currentItemId")
+        // Hide action bar here instead of onCreateView (called twice currently)
+        (requireActivity() as AppCompatActivity).supportActionBar?.hide()
     }
 
     override fun onPause() {
         super.onPause()
         Timber.tag(TAG).d("onPause called")
     }
+
+    override fun onStop() {
+        super.onStop()
+        // Show action bar here — fires after the transition is complete,
+        // not during the layout pass that causes jank
+        (requireActivity() as AppCompatActivity).supportActionBar?.show()
+    }
+
     private val backPressedCallback = object : OnBackPressedCallback(true) {
         override fun handleOnBackPressed() {
-            // If full screen dialog is open, let it handle back press
-            if (parentFragmentManager.findFragmentByTag("full_screen_viewer") != null) {
-                Timber.tag(TAG).d("Full screen dialog is open - letting it handle back")
+            val fullScreenDialog = parentFragmentManager.findFragmentByTag("full_screen_viewer")
+            if (fullScreenDialog is DialogFragment) {
+                fullScreenDialog.dismiss()
                 return
             }
-
-            Timber.tag(TAG).d("Back pressed - popping ItemDetailFragment")
-            isEnabled = false // Prevent infinite loop
+            // Disable before navigating — prevents double-fire
+            isEnabled = false
             findNavController().popBackStack()
         }
     }
