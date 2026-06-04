@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemHomeProductBinding
+import com.example.skoolswap.databinding.ItemProductGridBinding
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.utils.extensions.formatViewCount
 import timber.log.Timber
@@ -26,7 +27,7 @@ class ProductsAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val binding = ItemHomeProductBinding.inflate(
+        val binding = ItemProductGridBinding.inflate(
             LayoutInflater.from(parent.context), parent, false
         )
         return ViewHolder(binding)
@@ -39,7 +40,7 @@ class ProductsAdapter(
     override fun getItemCount() = items.size
 
     inner class ViewHolder(
-        private val binding: ItemHomeProductBinding
+        private val binding: ItemProductGridBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
         init {

@@ -6,27 +6,30 @@
     android:layout_height="wrap_content"
     android:layout_marginEnd="12dp"
     app:cardCornerRadius="12dp"
-    app:cardElevation="2dp"
-    app:strokeWidth="0.5dp"
-    app:strokeColor="@color/darker_grey_light">
+    android:layout_margin="6dp"
+    app:cardElevation="4dp"
+    app:strokeWidth="0dp"
+    app:cardBackgroundColor="?attr/colorSurface">
 
     <LinearLayout
         android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <!-- Image -->
+        <!-- Image Container -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="148dp"
-            android:background="?attr/colorSurfaceVariant">
+            android:background="?attr/colorSurfaceVariant"
+            android:padding="10dp">
 
             <ImageView
                 android:id="@+id/productImage"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:scaleType="centerCrop"
+                android:scaleType="fitCenter"
                 android:adjustViewBounds="true"
+                android:background="#F5F5F5"
                 android:src="@drawable/ic_create_item_placeholder"/>
 
             <!-- SOLD Badge -->
@@ -57,10 +60,10 @@
                 android:id="@+id/productTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Product Name"
-                android:textSize="14sp"
+                android:text="Soccer Boots"
+                android:textSize="13sp"
                 android:textColor="?attr/colorOnSurface"
-                android:maxLines="2"
+                android:maxLines="1"
                 android:ellipsize="end"
                 android:lineSpacingExtra="2dp"/>
 
@@ -68,8 +71,8 @@
                 android:id="@+id/productPrice"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="R0.00"
-                android:textSize="16sp"
+                android:text="R1,060.00"
+                android:textSize="15sp"
                 android:textStyle="bold"
                 android:textColor="?attr/colorOnSurface"
                 android:layout_marginTop="6dp"/>

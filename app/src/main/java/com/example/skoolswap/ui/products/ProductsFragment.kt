@@ -39,10 +39,10 @@ class ProductsFragment : Fragment() {
     private val viewModel: ProductsViewModel by activityViewModels()
     private lateinit var productsAdapter: ProductsAdapter
 
-    // Search state - NEEDED!
+    // Search state
     private var isInSearchMode = false
     private var searchJob: Job? = null
-    private var isFirstLoad = true
+
     companion object {
         private const val TAG = "ProductsFragment"
     }
@@ -59,6 +59,11 @@ class ProductsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // ✅ SHOW SHIMMER IMMEDIATELY - before any async work
+        binding.shimmerLayout.visibility = View.VISIBLE
+        binding.productsRecycler.visibility = View.GONE
+        binding.errorLayout.visibility = View.GONE
+
         val sectionType = arguments?.getString("SECTION_TYPE") ?: "all"
         val sectionTitle = arguments?.getString("SECTION_TITLE") ?: "All Items"
         val period = arguments?.getString("PERIOD")
@@ -66,11 +71,15 @@ class ProductsFragment : Fragment() {
         val sportTypeId = arguments?.getInt("SPORT_TYPE_ID", -1)
         val gearType = arguments?.getString("GEAR_TYPE")
 
-        // Show ActionBar (like HomeFragment)
+        // Show ActionBar
         (requireActivity() as AppCompatActivity).supportActionBar?.show()
         (requireActivity() as AppCompatActivity).supportActionBar?.title = sectionTitle
         (requireActivity() as AppCompatActivity).supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        isFirstLoad = true
+
+        // ✅ Reset first load flag BEFORE loading new section
+        // (Even though we're not using it in shimmer condition anymore, keep for other logic)
+        viewModel.resetFirstLoadFlag()
+
         if (sectionType == "sport") {
             viewModel.clearSavedCategory()
         }
@@ -78,17 +87,12 @@ class ProductsFragment : Fragment() {
         viewModel.setSectionType(sectionType, period, categoryId)
 
         // Show/hide sort/filter bar
-        when (sectionType) {
-            "recommended", "trending" -> {
-                binding.sortFilterBar.visibility = View.VISIBLE
-            }
-            else -> {
-                binding.sortFilterBar.visibility = View.VISIBLE
-            }
-        }
+        binding.sortFilterBar.visibility = View.VISIBLE
+
         binding.retryButton.setOnClickListener {
             viewModel.reloadCurrentSection()
         }
+
         setupRecyclerView()
         setupSortFilterBar()
         setupDrawer()
@@ -97,10 +101,11 @@ class ProductsFragment : Fragment() {
         observeFilterConfig()
         debugThemeColors()
         setupSwipeRefresh()
+
         viewModel.loadProducts(sectionType, period, categoryId, sportTypeId, gearType)
     }
 
-    // ==================== SEARCH METHODS (Called from MainActivity) ====================
+    // ==================== SEARCH METHODS ====================
 
     fun performLiveSearch(query: String) {
         Log.d(TAG, "🔍 performLiveSearch called with: $query")
@@ -109,10 +114,7 @@ class ProductsFragment : Fragment() {
             isInSearchMode = true
             enterSearchMode()
 
-            // Cancel previous search
             searchJob?.cancel()
-
-            // Debounce 300ms
             searchJob = viewLifecycleOwner.lifecycleScope.launch {
                 delay(300)
                 viewModel.searchInCurrentSection(query)
@@ -124,15 +126,11 @@ class ProductsFragment : Fragment() {
 
     fun exitSearchMode() {
         isInSearchMode = false
-        isFirstLoad = true
         binding.searchResultsContainer.visibility = View.GONE
         binding.productsRecycler.visibility = View.VISIBLE
         binding.emptySearchResults.visibility = View.GONE
 
-        // Clear search results
         viewModel.clearSearchResults()
-
-        // Reload original products
         viewModel.reloadCurrentSection()
     }
 
@@ -142,19 +140,20 @@ class ProductsFragment : Fragment() {
         binding.emptySearchResults.visibility = View.GONE
     }
 
-    // ==================== END SEARCH METHODS ====================
+    // ==================== SETUP METHODS ====================
+
     private fun setupSwipeRefresh() {
         binding.swipeRefreshLayout.apply {
             setColorSchemeColors(
                 ContextCompat.getColor(requireContext(), R.color.teal_200)
             )
             setOnRefreshListener {
-                isFirstLoad = true
                 viewModel.reloadCurrentSection()
                 isRefreshing = false
             }
         }
     }
+
     private fun setupRecyclerView() {
         productsAdapter = ProductsAdapter { item ->
             viewModel.trackClick(item.id, arguments?.getString("SECTION_TYPE") ?: "all", 0)
@@ -170,7 +169,6 @@ class ProductsFragment : Fragment() {
     }
 
     private fun setupSortFilterBar() {
-        // If using sortText and filterText TextViews
         binding.sortContainer.setOnClickListener { showSortMenu() }
         binding.filterContainer.setOnClickListener {
             binding.drawerLayout.openDrawer(GravityCompat.END)
@@ -178,7 +176,7 @@ class ProductsFragment : Fragment() {
     }
 
     private fun showSortMenu() {
-        val popup = PopupMenu(requireContext(), binding.sortContainer)  // Use sortContainer
+        val popup = PopupMenu(requireContext(), binding.sortContainer)
         popup.menuInflater.inflate(R.menu.menu_sort, popup.menu)
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
@@ -205,8 +203,6 @@ class ProductsFragment : Fragment() {
             )
             updatePriceDisplay()
             binding.drawerLayout.closeDrawers()
-
-            // Refresh the filter drawer display
             viewModel.filterConfig.value?.let { rebuildFilterDrawer(it) }
         }
 
@@ -217,34 +213,10 @@ class ProductsFragment : Fragment() {
             }
             viewModel.applyFilters()
             binding.drawerLayout.closeDrawers()
-
-            // Refresh the filter drawer display
             viewModel.filterConfig.value?.let { rebuildFilterDrawer(it) }
         }
     }
-    private fun showPriceDialog() {
-        val priceGroup = viewModel.filterConfig.value?.filterGroups?.find { it.id == "price" }
-        val globalMin = priceGroup?.min ?: 0f
-        val globalMax = priceGroup?.max ?: 1000f
 
-        Log.d("ProductsFragment", "Opening price dialog → bounds=[$globalMin, $globalMax], " +
-                "applied=[${viewModel.appliedFilters.value.minPrice}, ${viewModel.appliedFilters.value.maxPrice}]")
-
-        val dialog = PriceRangeDialogFragment.newInstance(
-            min = globalMin,                                              // ← Was missing
-            max = globalMax,                                              // ← Was missing
-            currentMin = viewModel.appliedFilters.value.minPrice ?: globalMin,
-            currentMax = viewModel.appliedFilters.value.maxPrice ?: globalMax
-        )
-
-        dialog.setOnPriceRangeAppliedListener { min, max ->
-            Log.d("ProductsFragment", "Price range applied → R$min - R$max")
-            viewModel.updatePriceRange(min, max)
-            viewModel.applyFilters()                                      // ← Was missing!
-        }
-
-        dialog.show(parentFragmentManager, PriceRangeDialogFragment.TAG)
-    }
     private fun setupPriceSlider() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -255,7 +227,6 @@ class ProductsFragment : Fragment() {
                         valueFrom = priceGroup.min ?: 0f
                         valueTo = priceGroup.max ?: 1000f
 
-                        // Set current applied values
                         val applied = viewModel.appliedFilters.value
                         setValues(
                             applied.minPrice ?: (priceGroup.min ?: 0f),
@@ -273,7 +244,6 @@ class ProductsFragment : Fragment() {
             }
         }
     }
-
 
     private fun updatePriceDisplay() {
         if (_binding == null) return
@@ -303,7 +273,6 @@ class ProductsFragment : Fragment() {
 
         binding.dynamicFilterContainer.removeAllViews()
 
-        // ========== ADD PRICE FILTER FIRST ==========
         val applied = viewModel.appliedFilters.value
         val priceDisplay = if (applied.minPrice != null && applied.maxPrice != null)
             "R${applied.minPrice?.toInt() ?: 0} - R${applied.maxPrice?.toInt() ?: 1000}"
@@ -313,7 +282,6 @@ class ProductsFragment : Fragment() {
             showPriceDialog()
         }
 
-        // Add category filter if selected
         val selectedCategoryId = viewModel.appliedFilters.value.categoryId ?: viewModel.getSavedCategoryId()
         if (selectedCategoryId != null) {
             val categoryGroup = viewModel.getGlobalFilterGroupById("category")
@@ -325,9 +293,8 @@ class ProductsFragment : Fragment() {
             }
         }
 
-        // Add other filter groups
         filterConfig.filterGroups.forEach { group ->
-            if (group.id == "price") return@forEach  // Skip price since we added it manually
+            if (group.id == "price") return@forEach
             if (group.options.isEmpty()) return@forEach
 
             val selectedValue = getSelectedValueDisplay(group.id)
@@ -346,12 +313,9 @@ class ProductsFragment : Fragment() {
 
         titleView.text = title
 
-        // Ensure text colors are correct
         val typedValue = android.util.TypedValue()
         requireContext().theme.resolveAttribute(com.google.android.material.R.attr.colorOnSurface, typedValue, true)
         val textColor = typedValue.data
-
-        Log.d("ProductsFragment", "addFilterItem: $title, textColor: #${Integer.toHexString(textColor)}")
 
         titleView.setTextColor(textColor)
 
@@ -371,19 +335,16 @@ class ProductsFragment : Fragment() {
     private fun debugThemeColors() {
         val typedValue = android.util.TypedValue()
 
-        // Log colorSurface
         requireContext().theme.resolveAttribute(com.google.android.material.R.attr.colorSurface, typedValue, true)
         Log.d("ProductsFragment", "colorSurface = #${Integer.toHexString(typedValue.data)}")
 
-        // Log colorOnSurface
         requireContext().theme.resolveAttribute(com.google.android.material.R.attr.colorOnSurface, typedValue, true)
         Log.d("ProductsFragment", "colorOnSurface = #${Integer.toHexString(typedValue.data)}")
 
-        // Log dark mode status
         val nightMode = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK
-        Timber.tag("ProductsFragment")
-            .d("Dark mode active: ${nightMode == Configuration.UI_MODE_NIGHT_YES}")
+        Timber.tag("ProductsFragment").d("Dark mode active: ${nightMode == Configuration.UI_MODE_NIGHT_YES}")
     }
+
     private fun showOptionsDrawer(groupId: String, groupName: String, options: List<FilterOption>, filterType: String) {
         if (_binding == null) return
 
@@ -393,12 +354,9 @@ class ProductsFragment : Fragment() {
         binding.dynamicFilterContainer.visibility = View.GONE
         binding.optionsContainer.visibility = View.VISIBLE
 
-        // REMOVE the manual setBackgroundColor block entirely - XML handles it
-
         val container = binding.optionsContainer
         container.removeAllViews()
 
-        // Resolve once, reuse for all options
         val typedValue = android.util.TypedValue()
         requireContext().theme.resolveAttribute(
             com.google.android.material.R.attr.colorOnSurface, typedValue, true
@@ -416,7 +374,6 @@ class ProductsFragment : Fragment() {
             val isSelected = isOptionSelected(groupId, option.id)
             checkIcon.visibility = if (isSelected) View.VISIBLE else View.GONE
             if (isSelected) {
-                // FIX: was incorrectly passing a color int as a resource ID
                 checkIcon.imageTintList = android.content.res.ColorStateList.valueOf(textColor)
             }
 
@@ -433,6 +390,7 @@ class ProductsFragment : Fragment() {
             container.addView(optionView)
         }
     }
+
     private fun setupBackButton() {
         binding.backToMain.setOnClickListener {
             binding.filterHeaderTitle.visibility = View.VISIBLE
@@ -440,6 +398,26 @@ class ProductsFragment : Fragment() {
             binding.dynamicFilterContainer.visibility = View.VISIBLE
             binding.optionsContainer.visibility = View.GONE
         }
+    }
+
+    private fun showPriceDialog() {
+        val priceGroup = viewModel.filterConfig.value?.filterGroups?.find { it.id == "price" }
+        val globalMin = priceGroup?.min ?: 0f
+        val globalMax = priceGroup?.max ?: 1000f
+
+        val dialog = PriceRangeDialogFragment.newInstance(
+            min = globalMin,
+            max = globalMax,
+            currentMin = viewModel.appliedFilters.value.minPrice ?: globalMin,
+            currentMax = viewModel.appliedFilters.value.maxPrice ?: globalMax
+        )
+
+        dialog.setOnPriceRangeAppliedListener { min, max ->
+            viewModel.updatePriceRange(min, max)
+            viewModel.applyFilters()
+        }
+
+        dialog.show(parentFragmentManager, PriceRangeDialogFragment.TAG)
     }
 
     private fun isOptionSelected(groupId: String, optionId: Int): Boolean {
@@ -474,21 +452,51 @@ class ProductsFragment : Fragment() {
         }
     }
 
+    // ==================== OBSERVE VIEWMODEL ====================
+
     private fun observeViewModel() {
-        // ========== LOADING STATE (SHIMMER) ==========
+        // ========== COMBINED LOADING STATE - Controls Shimmer ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // Collect both loading states and combine them
                 viewModel.isLoading.collect { isLoading ->
-                    Log.d("ProductsFragment", "🔥 isLoading: $isLoading, isFirstLoad: $isFirstLoad")
+                    val isNewLoading = viewModel.isNewSectionLoading.value
+                    val shouldShowShimmer = isLoading || isNewLoading
 
-                    if (isLoading && isFirstLoad) {
-                        // Show shimmer whenever loading a NEW section
+                    Log.d("ProductsFragment", "✨ Shimmer state - isLoading: $isLoading, isNewLoading: $isNewLoading, showShimmer: $shouldShowShimmer")
+
+                    if (shouldShowShimmer) {
                         binding.shimmerLayout.visibility = View.VISIBLE
                         binding.productsRecycler.visibility = View.GONE
                         binding.errorLayout.visibility = View.GONE
                     } else {
                         binding.shimmerLayout.visibility = View.GONE
                         binding.swipeRefreshLayout.isRefreshing = false
+
+                        // Show products if we have them
+                        val products = viewModel.products.value
+                        if (products.isNotEmpty() && !isInSearchMode) {
+                            binding.productsRecycler.visibility = View.VISIBLE
+                            productsAdapter.submitList(products)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ========== NEW SECTION LOADING STATE - Only for manual trigger ==========
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.isNewSectionLoading.collect { isLoading ->
+                    Log.d("ProductsFragment", "📦 isNewSectionLoading: $isLoading")
+                    if (!isLoading && !viewModel.isLoading.value) {
+                        // Section loading complete AND main loading is done
+                        val products = viewModel.products.value
+                        if (products.isNotEmpty() && !isInSearchMode) {
+                            Log.d("ProductsFragment", "✅ Manually showing ${products.size} products")
+                            binding.productsRecycler.visibility = View.VISIBLE
+                            productsAdapter.submitList(products)
+                        }
                     }
                 }
             }
@@ -511,45 +519,48 @@ class ProductsFragment : Fragment() {
             }
         }
 
-        // ========== PRODUCTS DATA (NORMAL MODE) ==========
+        // ========== PRODUCTS DATA ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.products.collect { products ->
-                    if (_binding != null && !isInSearchMode) {
-                        // Data arrived - hide shimmer and show content
-                        isFirstLoad = false
-                        binding.shimmerLayout.visibility = View.GONE
-                        binding.productsRecycler.visibility = View.VISIBLE
-                        binding.errorLayout.visibility = View.GONE
-                        binding.swipeRefreshLayout.isRefreshing = false
-                        productsAdapter.submitList(products)
-                    }
-                }
-            }
-        }
+                    if (_binding == null || isInSearchMode) return@collect
 
-        // ========== SEARCH RESULTS (SEARCH MODE) ==========
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.searchResults.collect { results ->
-                    if (isInSearchMode) {
-                        if (results.isEmpty()) {
-                            binding.searchResultsContainer.visibility = View.VISIBLE
-                            binding.emptySearchResults.visibility = View.VISIBLE
-                            binding.productsRecycler.visibility = View.GONE
-                            productsAdapter.submitList(emptyList())
-                        } else {
-                            binding.searchResultsContainer.visibility = View.VISIBLE
-                            binding.emptySearchResults.visibility = View.GONE
+                    Log.d("ProductsFragment", "📦 Products collected: ${products.size} items, isLoading: ${viewModel.isLoading.value}, isNewLoading: ${viewModel.isNewSectionLoading.value}")
+
+                    // Only show products if not loading
+                    if (!viewModel.isLoading.value && !viewModel.isNewSectionLoading.value) {
+                        if (products.isNotEmpty()) {
                             binding.productsRecycler.visibility = View.VISIBLE
-                            productsAdapter.submitList(results)
+                            binding.errorLayout.visibility = View.GONE
+                            productsAdapter.submitList(products)
+                            Log.d("ProductsFragment", "✅ Products displayed: ${products.size}")
                         }
                     }
                 }
             }
         }
-    }
 
+        // ========== SEARCH RESULTS ==========
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.searchResults.collect { results ->
+                    if (!isInSearchMode) return@collect
+
+                    if (results.isEmpty()) {
+                        binding.searchResultsContainer.visibility = View.VISIBLE
+                        binding.emptySearchResults.visibility = View.VISIBLE
+                        binding.productsRecycler.visibility = View.GONE
+                        productsAdapter.submitList(emptyList())
+                    } else {
+                        binding.searchResultsContainer.visibility = View.VISIBLE
+                        binding.emptySearchResults.visibility = View.GONE
+                        binding.productsRecycler.visibility = View.VISIBLE
+                        productsAdapter.submitList(results)
+                    }
+                }
+            }
+        }
+    }
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null

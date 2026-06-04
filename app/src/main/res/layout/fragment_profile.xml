@@ -143,12 +143,12 @@
                 app:hintTextColor="?attr/colorOnSurface">
 
                 <AutoCompleteTextView
-                    android:paddingEnd="45dp"
-                    android:paddingStart="45dp"
                     android:id="@+id/provinceSpinner"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="none"
+                    android:paddingStart="45dp"
+                    android:paddingEnd="45dp"
                     android:textColor="?attr/colorOnSurface" />
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -169,11 +169,11 @@
                 app:boxCornerRadiusTopStart="12dp"
                 app:boxStrokeColor="?attr/colorOnSurface"
                 app:endIconMode="clear_text"
-                app:startIconDrawable="@drawable/ic_search"
-                app:startIconTint="?attr/colorOnSurface"
                 app:endIconTint="?attr/colorOnSurface"
                 app:placeholderText="@string/select_province_first"
                 app:placeholderTextColor="?attr/colorOnSurface"
+                app:startIconDrawable="@drawable/ic_search"
+                app:startIconTint="?attr/colorOnSurface"
                 app:hintTextColor="?attr/colorOnSurface">
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -182,10 +182,10 @@
                     android:layout_height="wrap_content"
                     android:enabled="false"
                     android:inputType="text"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textColorHint="?attr/colorOnSurface"
+                    android:paddingStart="8dp"
                     android:paddingEnd="8dp"
-                    android:paddingStart="8dp" />
+                    android:textColor="?attr/colorOnSurface"
+                    android:textColorHint="?attr/colorOnSurface" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Selected School Display -->
@@ -197,9 +197,9 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp"
+                android:alpha="0.7"
                 android:text="@string/no_school_selected"
                 android:textColor="?attr/colorOnSurface"
-                android:alpha="0.7"
                 android:textSize="14sp"
                 android:visibility="gone" />
 
@@ -212,10 +212,10 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp"
-                android:maxHeight="200dp"
-                android:visibility="gone"
                 android:background="?attr/colorSurface"
-                android:elevation="4dp" />
+                android:elevation="4dp"
+                android:maxHeight="200dp"
+                android:visibility="gone" />
 
             <!-- No Results Message -->
             <TextView
@@ -226,34 +226,53 @@
                 android:layout_marginTop="16dp"
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp"
+                android:alpha="0.7"
                 android:text="@string/no_schools_found"
                 android:textAlignment="center"
                 android:textColor="?attr/colorOnSurface"
-                android:alpha="0.7"
                 android:visibility="gone" />
 
-            <!-- Submit Button - KEEP ORIGINAL STYLE -->
+            <!-- Submit Button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/submitButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_below="@id/schoolResultsRecyclerView"
                 android:layout_marginTop="32dp"
-                android:layout_marginEnd="8dp"
                 android:layout_marginStart="8dp"
-                android:background="@drawable/ic_rounded"
+                android:layout_marginEnd="8dp"
+                android:backgroundTint="@color/black"
                 android:enabled="true"
                 android:text="@string/submit"
                 android:textColor="@color/white"
-                android:textStyle="bold"
-                app:backgroundTint="@null" />
+                android:textStyle="bold" />
+
+            <!-- UNSAVED CHANGES BADGE - Updated: No orange, theme-aware -->
+            <TextView
+                android:id="@+id/unsavedBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/submitButton"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/badge_background"
+                android:drawableStart="@drawable/ic_warning"
+                android:drawablePadding="8dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:text="Unsaved changes"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="13sp"
+                android:visibility="gone" />
 
             <!-- Delete Profile Warning -->
             <TextView
                 android:id="@+id/deleteWarningTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_below="@id/submitButton"
+                android:layout_below="@id/unsavedBadge"
                 android:layout_marginTop="48dp"
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp"
@@ -271,28 +290,27 @@
                 android:layout_marginTop="8dp"
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp"
+                android:alpha="0.7"
+                android:lineSpacingExtra="4dp"
                 android:text="@string/deleting_your_account_is_permanent_and_cannot_be_undone_all_your_data_will_be_permanently_lost"
                 android:textColor="?attr/colorOnSurface"
-                android:alpha="0.7"
                 android:textSize="14sp"
-                android:lineSpacingExtra="4dp"
                 android:visibility="visible" />
 
-            <!-- Delete Button - KEEP ORIGINAL STYLE (RED) -->
+            <!-- Delete Button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/deleteButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_below="@id/deleteWarningText"
                 android:layout_marginTop="24dp"
-                android:layout_marginEnd="8dp"
                 android:layout_marginStart="8dp"
-                android:background="@drawable/ic_rounded"
+                android:layout_marginEnd="8dp"
+                android:backgroundTint="@color/black"
                 android:text="@string/delete_profile"
                 android:textColor="@color/white"
                 android:textStyle="bold"
-                android:visibility="visible"
-                app:backgroundTint="@null" />
+                android:visibility="visible" />
 
         </RelativeLayout>
 

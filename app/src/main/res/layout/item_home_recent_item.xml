@@ -17,28 +17,32 @@
         android:orientation="horizontal"
         android:padding="12dp">
 
+        <!-- Image Container - Fixed aspect ratio -->
         <FrameLayout
-            android:layout_width="120dp"
+            android:layout_width="100dp"
             android:layout_height="100dp"
+            android:background="#F5F5F5"
             android:foreground="?attr/selectableItemBackground">
 
             <ImageView
                 android:id="@+id/recentImage"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:scaleType="centerCrop"
-                android:padding="4dp"
+                android:scaleType="fitCenter"
+                android:adjustViewBounds="true"
+                android:padding="8dp"
                 android:src="@drawable/ic_create_item_placeholder" />
 
-            <!-- SOLD BADGE (stays on image) -->
+            <!-- SOLD BADGE -->
             <TextView
                 android:id="@+id/soldBadge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="SOLD"
                 android:textColor="@android:color/white"
-                android:background="@android:color/holo_red_dark"
-                android:padding="4dp"
+                android:background="@drawable/badge_sold_background"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="4dp"
                 android:textSize="10sp"
                 android:textStyle="bold"
                 android:layout_gravity="top|end"
@@ -49,13 +53,13 @@
 
         <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="12dp"
             android:orientation="vertical"
             android:gravity="center_vertical">
 
-            <!-- Title Row with View Count -->
+            <!-- Title Row -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -74,7 +78,6 @@
                     android:ellipsize="end"
                     android:textColor="?attr/colorOnSurface" />
 
-
             </LinearLayout>
 
             <TextView
@@ -82,7 +85,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="School Item"
+                android:text="Springfield Primary School"
                 android:textSize="13sp"
                 android:textColor="?attr/colorOnSurface"
                 android:alpha="0.7"
@@ -94,12 +97,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="R1060.0"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="16sp" />
+                android:text="R1,060"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="?attr/colorOnSurface" />
 
         </LinearLayout>
-
     </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView>

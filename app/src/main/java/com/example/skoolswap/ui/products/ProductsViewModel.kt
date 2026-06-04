@@ -25,7 +25,9 @@ class ProductsViewModel @Inject constructor(
     private val productsRepository: ProductsRepositoryInterface,
     private val filterRepository: FilterRepositoryInterface
 ) : ViewModel() {
-
+    // Add this flag to block stale data replay
+    private val _isNewSectionLoading = MutableStateFlow(false)
+    val isNewSectionLoading: StateFlow<Boolean> = _isNewSectionLoading.asStateFlow()
     private val _products = MutableStateFlow<List<Item>>(emptyList())
     val products: StateFlow<List<Item>> = _products
 
@@ -194,6 +196,11 @@ class ProductsViewModel @Inject constructor(
         val categoryId = currentCategoryId ?: _appliedFilters.value.categoryId
         // Convert -1 or 0 to null (meaning "all categories")
         return if (categoryId == null || categoryId <= 0) null else categoryId
+    }
+    fun resetFirstLoadFlag() {
+        // This helps reset any stale state
+        _error.value = null
+        // Don't reset products here - let loading handle it
     }
     private fun searchLocalCache(query: String, categoryId: Int?): List<Item> {
         val currentProducts = _products.value
@@ -458,18 +465,18 @@ class ProductsViewModel @Inject constructor(
     private fun loadProductsInternal(categoryId: Int?, searchQuery: String? = null) {
         loadProductsJob?.cancel()
         loadProductsJob = viewModelScope.launch {
+            // ✅ BLOCK products observer IMMEDIATELY (synchronously)
+            _isNewSectionLoading.value = true
             _isLoading.value = true
             _error.value = null
+            _products.value = emptyList()  // Clear stale data
 
             val query = searchQuery ?: currentSearchQuery
-
             val effectiveCategoryId = getValidCategoryId()
 
             val result = if (!query.isNullOrBlank()) {
-                // SEARCH with filters - searches within current category/section
-                Timber.tag("ProductsViewModel")
-                    .d("🔍 Searching: '$query' in category: $effectiveCategoryId")
-
+                // SEARCH with filters
+                Timber.tag("ProductsViewModel").d("🔍 Searching: '$query' in category: $effectiveCategoryId")
                 productsRepository.searchItems(
                     query = query,
                     categoryId = effectiveCategoryId,
@@ -485,7 +492,7 @@ class ProductsViewModel @Inject constructor(
                     perPage = 30
                 )
             } else {
-                // NO search - regular section loading
+                // Regular section loading
                 when (currentSectionType) {
                     "recommended" -> productsRepository.getRecommendedAll(
                         page = 1,
@@ -510,13 +517,6 @@ class ProductsViewModel @Inject constructor(
                         minPrice = _appliedFilters.value.minPrice,
                         maxPrice = _appliedFilters.value.maxPrice
                     )
-                    "essentials", "uniform", "sport" -> productsRepository.getRecommendedAll(
-                        page = 1,
-                        categoryId = effectiveCategoryId,
-                        conditionId = _appliedFilters.value.condition,
-                        minPrice = _appliedFilters.value.minPrice,
-                        maxPrice = _appliedFilters.value.maxPrice
-                    )
                     else -> productsRepository.getRecommendedAll(
                         page = 1,
                         categoryId = effectiveCategoryId,
@@ -531,6 +531,7 @@ class ProductsViewModel @Inject constructor(
                 is Result.Success -> {
                     _products.value = result.data.items
                     Timber.tag("ProductsViewModel").d("✅ Loaded ${result.data.items.size} items")
+                    Log.d("ProductsViewModel", "Products value now has ${_products.value.size} items")
                     if (!query.isNullOrBlank() && result.data.items.isEmpty()) {
                         _error.value = "No results found for '$query'"
                     } else {
@@ -542,10 +543,11 @@ class ProductsViewModel @Inject constructor(
                     Timber.tag("ProductsViewModel").e("❌ Error: ${result.exception.message}")
                 }
             }
+
             _isLoading.value = false
+            _isNewSectionLoading.value = false  // ✅ UNBLOCK after data is set
         }
     }
-
     override fun onCleared() {
         loadProductsJob?.cancel()
         loadFilterJob?.cancel()

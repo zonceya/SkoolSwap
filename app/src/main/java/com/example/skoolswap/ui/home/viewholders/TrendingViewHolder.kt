@@ -47,8 +47,6 @@ class TrendingViewHolder(
             )
             this.adapter = adapter
         }
-
-        // View all click (from included header)
         binding.header.viewAll.setOnClickListener {
             onViewAllClick(section.type)
         }

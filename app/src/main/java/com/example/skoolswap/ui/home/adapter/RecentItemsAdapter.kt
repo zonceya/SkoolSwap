@@ -11,13 +11,26 @@ import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemHomeRecentItemBinding
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.utils.extensions.formatViewCount
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
+import java.text.NumberFormat
+import java.util.Locale
 
 class RecentItemsAdapter(
     private val onItemClick: (Item) -> Unit,
     private val maxItems: Int = 4
-) : RecyclerView.Adapter<RecentItemsAdapter.ViewHolder>() {
+) : ListAdapter<Item, RecentItemsAdapter.ViewHolder>(DIFF_CALLBACK) {
 
-    private var displayItems: List<Item> = emptyList()
+    companion object {
+        private val DIFF_CALLBACK = object : DiffUtil.ItemCallback<Item>() {
+            override fun areItemsTheSame(old: Item, new: Item) = old.id == new.id
+            override fun areContentsTheSame(old: Item, new: Item) = old == new
+        }
+    }
+
+    fun updateItems(newItems: List<Item>) {
+        submitList(newItems.take(maxItems))
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ItemHomeRecentItemBinding.inflate(
@@ -27,17 +40,7 @@ class RecentItemsAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(displayItems[position])
-    }
-
-    override fun getItemCount() = displayItems.size
-
-    fun updateItems(newItems: List<Item>) {
-        val newDisplayItems = newItems.take(maxItems)
-        if (displayItems != newDisplayItems) {
-            displayItems = newDisplayItems
-            notifyDataSetChanged()
-        }
+        holder.bind(getItem(position))
     }
 
     inner class ViewHolder(
@@ -47,44 +50,72 @@ class RecentItemsAdapter(
         init {
             binding.root.setOnClickListener {
                 val position = adapterPosition
-                if (position != RecyclerView.NO_POSITION && position < displayItems.size) {
-                    onItemClick(displayItems[position])
+                if (position != RecyclerView.NO_POSITION) {
+                    onItemClick(getItem(position))
                 }
             }
         }
 
         fun bind(item: Item) {
             binding.recentTitle.text = item.name
-            binding.recentSchool.text = item.schoolName  ?: "School Item"
 
-               // ✅ ADD SOLD BADGE
-            if (item.status == "sold" || item.quantity <= 0) {
-                binding.soldBadge.visibility = View.VISIBLE
-            } else {
-                binding.soldBadge.visibility = View.GONE
+            // Use schoolName, fall back to brandName, then generic label
+            binding.recentSchool.text = when {
+                !item.schoolName.isNullOrBlank() -> item.schoolName
+                !item.brandName.isNullOrBlank() -> item.brandName
+                else -> "School Item"
             }
+
+            // Format price - NO trailing .00
             val price = item.price
-            if (price != null && price > 0) {
-                binding.recentPrice.text = "R${price}"
-                binding.recentPrice.visibility = android.view.View.VISIBLE
+            if (price > 0) {
+                binding.recentPrice.text = formatPrice(price)
+                binding.recentPrice.visibility = View.VISIBLE
             } else {
-                binding.recentPrice.visibility = android.view.View.GONE
+                binding.recentPrice.visibility = View.GONE
             }
 
-            val imageUrl = item.images?.firstOrNull()?.url
-            if (!imageUrl.isNullOrEmpty()) {
-                Glide.with(binding.root.context)
-                    .load(imageUrl)
-                    .apply(RequestOptions()
+            // Sold badge
+            binding.soldBadge.visibility = if (item.status == "sold" || item.quantity <= 0) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
+
+            // Image - fitCenter to show full image
+            val imageUrl = item.coverImage
+                ?: item.images?.firstOrNull()?.url
+
+            Glide.with(binding.root.context)
+                .load(imageUrl)
+                .apply(
+                    RequestOptions()
                         .placeholder(R.drawable.ic_create_item_placeholder)
                         .error(R.drawable.ic_create_item_placeholder)
                         .fitCenter()
-                    )
-                    .transition(DrawableTransitionOptions.withCrossFade())
-                    .into(binding.recentImage)
-            } else {
-                binding.recentImage.setImageResource(R.drawable.ic_create_item_placeholder)
-                binding.recentImage.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                )
+                .transition(DrawableTransitionOptions.withCrossFade())
+                .into(binding.recentImage)
+        }
+
+        private fun formatPrice(price: Double): String {
+            return try {
+                val formatter = NumberFormat.getCurrencyInstance(Locale("en", "ZA"))
+                formatter.currency = java.util.Currency.getInstance("ZAR")
+                val formatted = formatter.format(price)
+                // Remove the trailing .00 if present
+                if (formatted.endsWith(".00")) {
+                    formatted.replace(".00", "")
+                } else {
+                    formatted
+                }
+            } catch (e: Exception) {
+                // Fallback formatting
+                if (price % 1.0 == 0.0) {
+                    "R${String.format("%,d", price.toInt())}"
+                } else {
+                    "R${String.format("%,.2f", price)}"
+                }
             }
         }
     }

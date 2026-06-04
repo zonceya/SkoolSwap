@@ -1,8 +1,9 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:background="?attr/colorSurface">
+    android:background="?attr/colorSurface"
+    android:layout_height="wrap_content">
 
     <include
         layout="@layout/item_section_header"
@@ -12,10 +13,10 @@
         android:id="@+id/recentRecycler"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:minHeight="190dp"
+        android:layout_marginTop="10dp"
+        android:orientation="vertical"
         android:clipToPadding="false"
-        android:paddingStart="16dp"
-        android:paddingEnd="4dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="16dp"/>
+        android:paddingBottom="8dp"
+        android:nestedScrollingEnabled="false"/>
+
 </LinearLayout>

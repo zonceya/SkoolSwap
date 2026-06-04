@@ -64,7 +64,21 @@ class ProfileViewModel @Inject constructor(
 
     private val _isSearchActive = MutableStateFlow(false)
     val isSearchActive: StateFlow<Boolean> = _isSearchActive.asStateFlow()
+    private val _originalMobile = MutableStateFlow<String?>(null)
+    private val _originalSchool = MutableStateFlow<School?>(null)
 
+    // Track pending changes (not yet saved)
+    private val _pendingMobile = MutableStateFlow<String?>(null)
+    private val _pendingSchool = MutableStateFlow<School?>(null)
+
+    // UI state for confirmation dialog
+    private val _showConfirmationDialog = MutableStateFlow(false)
+    val showConfirmationDialog: StateFlow<Boolean> = _showConfirmationDialog.asStateFlow()
+    val pendingSchool: StateFlow<School?> = _pendingSchool.asStateFlow()
+    private val _changesSummary = MutableStateFlow<String?>(null)
+    val changesSummary: StateFlow<String?> = _changesSummary.asStateFlow()
+    private val _isNewSectionLoading = MutableStateFlow(false)
+    val isNewSectionLoading: StateFlow<Boolean> = _isNewSectionLoading.asStateFlow()
     init {
         loadProvinces()
         checkExistingSchoolMapping()
@@ -92,6 +106,85 @@ class ProfileViewModel @Inject constructor(
         _selectedSchool.value = null
     }
 
+    fun initializeProfile(mobile: String?, school: School?) {
+        _originalMobile.value = mobile
+        _originalSchool.value = school
+        _pendingMobile.value = mobile
+        _pendingSchool.value = school
+        _selectedSchool.value = school
+    }
+    fun previewSchool(school: School) {
+        _pendingSchool.value = school
+        _selectedSchool.value = school
+    }
+    fun previewMobile(mobile: String) {
+        _pendingMobile.value = mobile
+    }
+    fun checkForChanges(): Boolean {
+        val mobileChanged = _pendingMobile.value != _originalMobile.value
+        val schoolChanged = _pendingSchool.value?.id != _originalSchool.value?.id
+
+        return mobileChanged || schoolChanged
+    }
+    fun prepareConfirmationDialog() {
+        val changes = mutableListOf<String>()
+
+        if (_pendingMobile.value != _originalMobile.value) {
+            changes.add("• Mobile: ${_originalMobile.value} → ${_pendingMobile.value}")
+        }
+
+        if (_pendingSchool.value?.id != _originalSchool.value?.id) {
+            changes.add("• School: ${_originalSchool.value?.name} → ${_pendingSchool.value?.name}")
+        }
+
+        _changesSummary.value = changes.joinToString("\n")
+        _showConfirmationDialog.value = true
+    }
+    fun confirmAndSave() {
+        viewModelScope.launch {
+            _isLoading.value = true
+
+            // Save mobile if changed
+            _pendingMobile.value?.let { mobile ->
+                if (mobile != _originalMobile.value && mobile.isNotBlank()) {
+                    authRepository.updateMobile(mobile)
+                }
+            }
+
+            // Save school if changed
+            _pendingSchool.value?.let { school ->
+                if (school.id != _originalSchool.value?.id) {
+                    if (_hasExistingSchool.value && _currentSchoolMapping.value != null) {
+                        userSchoolRepository.updateSchoolMapping(
+                            _currentSchoolMapping.value!!.mappingId,
+                            school.id
+                        )
+                    } else {
+                        userSchoolRepository.assignSchool(school.id)
+                    }
+                }
+            }
+
+            // Update originals after save
+            _originalMobile.value = _pendingMobile.value
+            _originalSchool.value = _pendingSchool.value
+
+            _isLoading.value = false
+            _showConfirmationDialog.value = false
+            _updateSuccess.value = true
+            _profileComplete.value = true
+        }
+    }
+    fun cancelConfirmation() {
+        // Revert to original values
+        _pendingMobile.value = _originalMobile.value
+        _pendingSchool.value = _originalSchool.value
+        _selectedSchool.value = _originalSchool.value
+        _showConfirmationDialog.value = false
+
+        // Update UI
+        _error.value = "Update cancelled"
+    }
     fun checkExistingSchoolMapping() {
         viewModelScope.launch {
             Log.d("ProfileViewModel", "🔍 Checking existing school mapping")
@@ -197,12 +290,10 @@ class ProfileViewModel @Inject constructor(
         _isSearchActive.value = false
         _schools.value = emptyList()
 
-        // 🚨🚨🚨 REMOVE THE PROVINCE AUTO-SETTING COMPLETELY 🚨🚨🚨
-        // Let the user select province manually or keep the existing one
-
         Log.d("ProfileViewModel", "✅ Final check - school is: ${_selectedSchool.value?.name}")
         Log.d("ProfileViewModel", "✅ School selected: ${school.name} (waiting for submit)")
     }
+
     fun submitSchoolSelection() {
         viewModelScope.launch {
             val school = _selectedSchool.value ?: return@launch
