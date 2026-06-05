@@ -14,7 +14,6 @@
         android:orientation="vertical"
         android:gravity="center_horizontal">
 
-        <!-- Round Logo from mipmap -->
         <ImageView
             android:id="@+id/logoImage"
             android:layout_width="80dp"
@@ -24,8 +23,9 @@
 
     </LinearLayout>
 
-    <!-- Title - Uses theme colors -->
+    <!-- Title -->
     <TextView
+        android:id="@+id/dialogTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="24dp"
@@ -36,8 +36,9 @@
         android:textColor="?attr/colorOnSurface"
         android:letterSpacing="0.1" />
 
-    <!-- Message - Uses theme colors -->
+    <!-- Message -->
     <TextView
+        android:id="@+id/dialogMessage"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
@@ -46,7 +47,7 @@
         android:textColor="?attr/colorOnSurfaceVariant"
         android:gravity="center" />
 
-    <!-- Buttons Section -->
+    <!-- Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -54,7 +55,6 @@
         android:orientation="horizontal"
         android:gravity="center">
 
-        <!-- Cancel Button - Theme aware outline -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnCancel"
             style="@style/Widget.Material3.Button.OutlinedButton"
@@ -69,7 +69,6 @@
             app:strokeWidth="1.5dp"
             app:cornerRadius="8dp" />
 
-        <!-- Logout Button - Uses black in light mode, white in dark mode -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnLogout"
             style="@style/Widget.Material3.Button"
@@ -85,7 +84,5 @@
             app:backgroundTint="@color/logout_button_bg" />
 
     </LinearLayout>
-
-
 
 </LinearLayout>

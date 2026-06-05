@@ -52,7 +52,12 @@ class UniformFragment : Fragment() {
             this.adapter = adapter
         }
     }
-
+    private fun setupSwipeRefresh() {
+        binding.swipeRefreshLayout.setOnRefreshListener {
+            viewModel.loadUniformCategories()
+            binding.swipeRefreshLayout.isRefreshing = false
+        }
+    }
     private fun observeViewModel() {
         // Loading state - show shimmer
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->

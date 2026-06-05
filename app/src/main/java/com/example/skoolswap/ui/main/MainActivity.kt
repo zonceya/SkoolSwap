@@ -14,6 +14,7 @@ import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
@@ -44,6 +45,8 @@ import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.ui.home.HomeViewModel
 import com.example.skoolswap.ui.products.ProductsFragment
+import com.example.skoolswap.utils.DialogAction
+import com.example.skoolswap.utils.DialogHelper
 import jakarta.inject.Inject
 import timber.log.Timber
 import kotlinx.coroutines.flow.first
@@ -64,6 +67,7 @@ class MainActivity : AppCompatActivity() {
     lateinit var authRepository: AuthRepositoryInterface
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
         super.onCreate(savedInstanceState)
 
         val nightMode = resources.configuration.uiMode and
@@ -400,51 +404,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showLogoutConfirmationDialog() {
-        // Inflate your custom dialog layout
-        val dialogView = layoutInflater.inflate(R.layout.dialog_logout, null)
-
-        val dialog = AlertDialog.Builder(this)
-            .setView(dialogView)
-            .setCancelable(true)
-            .create()
-
-        // Make background transparent to show rounded corners
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
-
-        // Optional: Add animation
-        dialog.window?.attributes?.windowAnimations = R.style.DialogAnimation
-
-        // Get buttons from the custom layout
-        val btnCancel = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnCancel)
-        val btnLogout = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnLogout)
-
-        // Check current theme for proper button colors
-        val isDarkMode = (resources.configuration.uiMode and
-                android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                android.content.res.Configuration.UI_MODE_NIGHT_YES
-
-        // Style the logout button based on theme
-        if (isDarkMode) {
-            // Dark mode: White button with black text
-            btnLogout.backgroundTintList = ContextCompat.getColorStateList(this, R.color.white)
-            btnLogout.setTextColor(ContextCompat.getColor(this, R.color.black))
-        } else {
-            // Light mode: Black button with white text
-            btnLogout.backgroundTintList = ContextCompat.getColorStateList(this, R.color.black)
-            btnLogout.setTextColor(ContextCompat.getColor(this, R.color.white))
-        }
-
-        // Set click listeners
-        btnCancel.setOnClickListener {
-            dialog.dismiss()
-        }
-
-        btnLogout.setOnClickListener {
-            dialog.dismiss()
-            performLogout()
-        }
-
-        dialog.show()
+        DialogHelper.showConfirmationDialog(
+            context = this,
+            action = DialogAction.Logout,
+            onConfirm = {
+                performLogout()
+            }
+        )
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
@@ -660,6 +626,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         Timber.tag("MainActivity").e("🔥 onResume at ${System.currentTimeMillis()}")
+        navHeaderViewModel.refresh()
     }
 
     override fun onPause() {

@@ -58,13 +58,21 @@
     </LinearLayout>
 
     <!-- RecyclerView (shows when data loaded) -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/uniformTabRecycler"
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefreshLayout"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:paddingTop="12dp"
-        android:paddingHorizontal="8dp"
-        android:clipToPadding="false"
-        android:visibility="gone" />
+        android:layout_height="match_parent">
+
+        <!-- RecyclerView (shows when data loaded) -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/uniformTabRecycler"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:paddingTop="12dp"
+            android:paddingHorizontal="8dp"
+            android:clipToPadding="false"
+            android:visibility="gone" />
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
 </FrameLayout>

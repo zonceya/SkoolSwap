@@ -64,7 +64,7 @@ class ProfileViewModel @Inject constructor(
 
     private val _isSearchActive = MutableStateFlow(false)
     val isSearchActive: StateFlow<Boolean> = _isSearchActive.asStateFlow()
-    private val _originalMobile = MutableStateFlow<String?>(null)
+    val _originalMobile = MutableStateFlow<String?>(null)
     private val _originalSchool = MutableStateFlow<School?>(null)
 
     // Track pending changes (not yet saved)
@@ -107,11 +107,19 @@ class ProfileViewModel @Inject constructor(
     }
 
     fun initializeProfile(mobile: String?, school: School?) {
-        _originalMobile.value = mobile
-        _originalSchool.value = school
-        _pendingMobile.value = mobile
-        _pendingSchool.value = school
-        _selectedSchool.value = school
+        Log.d("ProfileViewModel", "initializeProfile - mobile: $mobile, school: ${school?.name}")
+
+        // Only set if they are different to avoid unnecessary "changes" flag
+        if (_originalMobile.value != mobile) {
+            _originalMobile.value = mobile
+            _pendingMobile.value = mobile
+        }
+
+        if (_originalSchool.value?.id != school?.id) {
+            _originalSchool.value = school
+            _pendingSchool.value = school
+            _selectedSchool.value = school
+        }
     }
     fun previewSchool(school: School) {
         _pendingSchool.value = school
@@ -122,7 +130,11 @@ class ProfileViewModel @Inject constructor(
     }
     fun checkForChanges(): Boolean {
         val mobileChanged = _pendingMobile.value != _originalMobile.value
-        val schoolChanged = _pendingSchool.value?.id != _originalSchool.value?.id
+        val schoolChanged = (_pendingSchool.value?.id ?: -1) != (_originalSchool.value?.id ?: -1)
+
+        Log.d("ProfileViewModel", "checkForChanges - mobileChanged: $mobileChanged, schoolChanged: $schoolChanged")
+        Log.d("ProfileViewModel", "  pendingMobile: ${_pendingMobile.value}, originalMobile: ${_originalMobile.value}")
+        Log.d("ProfileViewModel", "  pendingSchool: ${_pendingSchool.value?.id}, originalSchool: ${_originalSchool.value?.id}")
 
         return mobileChanged || schoolChanged
     }
@@ -148,6 +160,7 @@ class ProfileViewModel @Inject constructor(
             _pendingMobile.value?.let { mobile ->
                 if (mobile != _originalMobile.value && mobile.isNotBlank()) {
                     authRepository.updateMobile(mobile)
+                    _originalMobile.value = mobile  // ✅ Update original after save
                 }
             }
 
@@ -162,12 +175,9 @@ class ProfileViewModel @Inject constructor(
                     } else {
                         userSchoolRepository.assignSchool(school.id)
                     }
+                    _originalSchool.value = school  // ✅ Update original after save
                 }
             }
-
-            // Update originals after save
-            _originalMobile.value = _pendingMobile.value
-            _originalSchool.value = _pendingSchool.value
 
             _isLoading.value = false
             _showConfirmationDialog.value = false

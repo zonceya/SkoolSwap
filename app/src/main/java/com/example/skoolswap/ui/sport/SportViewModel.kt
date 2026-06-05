@@ -6,6 +6,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.SportConstants
 import com.example.skoolswap.domain.model.GearItem
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.SportItem
@@ -17,9 +18,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.random.Random
 
 @HiltViewModel
-class SportViewModel @Inject constructor(  // ← MUST have @Inject constructor
+class SportViewModel @Inject constructor(
     private val productsRepository: ProductsRepositoryInterface
 ) : ViewModel() {
 
@@ -47,31 +49,40 @@ class SportViewModel @Inject constructor(  // ← MUST have @Inject constructor
             _error.value = null
             Log.d("SportViewModel", "loadSportData - START")
 
-            // Static data
-            _featuredSports.value = listOf(
-                SportItem(6, "Rugby", R.drawable.ic_rugby),
-                SportItem(10, "Soccer", R.drawable.ic_soccer),
-                SportItem(7, "Cricket", R.drawable.ic_cricket),
-                SportItem(8, "Hockey", R.drawable.ic_hockey)
-            )
+            // ✅ Randomly choose between Set 1 and Set 2
+            val useSet1 = Random.nextBoolean()
 
-            _moreSports.value = listOf(
-                SportItem(36, "Tennis", R.drawable.ic_tennis),
-                SportItem(35, "Swimming", R.drawable.ic_swimming),
-                SportItem(9, "Netball", R.drawable.ic_netball),
-                SportItem(37, "Basketball", R.drawable.ic_basketball)
-            )
+            if (useSet1) {
+                _featuredSports.value = SportConstants.FEATURED_SET_1
+                _moreSports.value = SportConstants.MORE_SET_1
+                Log.d("SportViewModel", "Using SET 1")
+            } else {
+                _featuredSports.value = SportConstants.FEATURED_SET_2
+                _moreSports.value = SportConstants.MORE_SET_2
+                Log.d("SportViewModel", "Using SET 2")
+            }
 
-            _gearItems.value = listOf(
-                GearItem(1, "Boots", "boots"),
-                GearItem(2, "Jerseys", "jersey"),
-                GearItem(3, "Balls", "ball"),
-                GearItem(4, "Bats", "bat"),
-                GearItem(5, "Equipment", "equipment")
-            )
+            // ✅ Gear items from constants
+            _gearItems.value = SportConstants.GEAR_ITEMS
 
-            // Load API data
             loadAllSportItems()
+        }
+    }
+
+    fun refreshSports() {
+        viewModelScope.launch {
+            // ✅ Randomly switch between sets on refresh
+            val useSet1 = Random.nextBoolean()
+
+            if (useSet1) {
+                _featuredSports.value = SportConstants.FEATURED_SET_1
+                _moreSports.value = SportConstants.MORE_SET_1
+                Log.d("SportViewModel", "REFRESH - Using SET 1")
+            } else {
+                _featuredSports.value = SportConstants.FEATURED_SET_2
+                _moreSports.value = SportConstants.MORE_SET_2
+                Log.d("SportViewModel", "REFRESH - Using SET 2")
+            }
         }
     }
 

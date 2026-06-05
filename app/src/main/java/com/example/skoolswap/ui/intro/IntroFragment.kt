@@ -81,7 +81,6 @@ class IntroFragment : Fragment() {
         lifecycleScope.launch {
             try {
                 val isOnboardingFinished = appPreferences.isOnboardingFinished.first()
-
                 if (!isOnboardingFinished) {
                     onDestinationDetermined(R.id.viewPagerFragment)
                     return@launch
@@ -97,28 +96,21 @@ class IntroFragment : Fragment() {
                     return@launch
                 }
 
-                // ✅ FORCE refresh to get latest data
+                // ✅ Treat 401 as expired session → send to login
                 val refreshResult = authRepository.refreshUserProfile()
-                val user = if (refreshResult.isSuccess) {
-                    authRepository.getServerUser().first()
-                } else {
-                    // If refresh fails, try cached
-                    authRepository.getServerUser().first()
+                if (refreshResult.isFailure) {
+                    Timber.tag(TAG).e("Token rejected by server (401?) — clearing session")
+                    appPreferences.clearUserData()           // ← wipe the stale token
+                    onDestinationDetermined(R.id.loginFragment)
+                    return@launch
                 }
 
-                Timber.tag(TAG).e("User retrieved after refresh: ${user?.email}, schoolMapped: ${user?.schoolMapped}")
-
+                val user = authRepository.getServerUser().first()
                 if (user != null) {
-                    // ✅ Use the correct condition
-                    val destination = if (user.schoolMapped == true) {
-                        Timber.tag(TAG).e("User HAS school mapped - going to HOME")
-                        R.id.nav_home
-                    } else {
-                        Timber.tag(TAG).e("User NEEDS school mapping - going to PROFILE")
-                        R.id.nav_profile
-                    }
+                    val destination = if (user.schoolMapped == true) R.id.nav_home else R.id.nav_profile
                     onDestinationDetermined(destination)
                 } else {
+                    appPreferences.clearUserData()
                     onDestinationDetermined(R.id.loginFragment)
                 }
             } catch (e: Exception) {

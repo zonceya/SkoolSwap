@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -211,7 +212,7 @@ class ItemDetailFragment : Fragment() {
                 Timber.tag(TAG).d("Size name updated: $sizeName")
                 if (!sizeName.isNullOrEmpty()) {
                     val displaySize = sizeName.replace("Adult", "UK")
-                    binding.productSize.text = "$displaySize"
+                    binding.productSize.text = displaySize
                     binding.productSize.visibility = View.VISIBLE
                     Timber.tag(TAG).d("Size displayed: $displaySize")
                 } else {

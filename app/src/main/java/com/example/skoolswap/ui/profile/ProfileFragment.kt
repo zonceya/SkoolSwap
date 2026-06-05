@@ -34,6 +34,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import androidx.activity.OnBackPressedCallback
+import com.example.skoolswap.utils.DialogAction
+import com.example.skoolswap.utils.DialogHelper
 
 @AndroidEntryPoint
 class ProfileFragment : Fragment() {
@@ -113,10 +115,12 @@ class ProfileFragment : Fragment() {
             override fun afterTextChanged(s: Editable?) {
                 val mobile = s.toString().trim()
 
-                // Only validate - NO API calls
-                validateMobileNumber(mobile)
-                viewModel.previewMobile(mobile) // Just store pending
-                showUnsavedIndicator()
+                // Only process if different from original
+                if (mobile != viewModel._originalMobile.value) {
+                    validateMobileNumber(mobile)
+                    viewModel.previewMobile(mobile)
+                    showUnsavedIndicator()
+                }
             }
         })
     }
@@ -435,18 +439,13 @@ class ProfileFragment : Fragment() {
     }
 
     private fun showUpdateConfirmationDialog(changes: String) {
-        AlertDialog.Builder(requireContext())
-            .setTitle("Confirm Profile Update")
-            .setMessage("You are about to update:\n\n$changes\n\nDo you want to continue?")
-            .setPositiveButton("Update") { _, _ ->
+        DialogHelper.showConfirmationDialog(
+            context = requireContext(),
+            action = DialogAction.SaveChanges(changes),
+            onConfirm = {
                 viewModel.confirmAndSave()
             }
-            .setNegativeButton("Cancel") { _, _ ->
-                viewModel.cancelConfirmation()
-                // Reload original data to revert UI
-                loadUserData()
-            }
-            .show()
+        )
     }
 
     private fun loadUserData() {
@@ -520,16 +519,13 @@ class ProfileFragment : Fragment() {
     }
 
     private fun showDeleteConfirmationDialog() {
-        AlertDialog.Builder(requireContext())
-            .setTitle("Delete Account")
-            .setMessage("Are you sure you want to delete your account? This action cannot be undone.")
-            .setPositiveButton("Delete") { _, _ ->
+        DialogHelper.showConfirmationDialog(
+            context = requireContext(),
+            action = DialogAction.DeleteAccount,
+            onConfirm = {
                 deleteProfile()
             }
-            .setNegativeButton("Cancel") { _, _ ->
-                Snackbar.make(binding.root, "Account deletion cancelled", Snackbar.LENGTH_SHORT).show()
-            }
-            .show()
+        )
     }
 
     private fun deleteProfile() {

@@ -36,7 +36,6 @@
         <!-- Control colors -->
         <item name="colorControlNormal">@color/white</item>
         <item name="colorControlActivated">@color/white</item>
-        <item name="colorControlActivated">@color/teal_200</item>
         <item name="colorControlHighlight">@color/white_transparent_20</item>
         <item name="colorAccent">@color/teal_200</item>
         <item name="elevationOverlayEnabled">false</item>
@@ -49,9 +48,13 @@
         <item name="android:textColor">@color/black</item>
     </style>
     <style name="SizeBadgeStyle" parent="Widget.Material3.Button">
-        <item name="android:backgroundTint">@color/white</item>
-        <item name="android:textColor">@color/black</item>
+        <item name="android:backgroundTint">@color/badge_background</item>
+        <item name="android:textColor">@color/badge_text</item>
         <item name="cornerRadius">6dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">6dp</item>
     </style>
     <!-- Dialog Animation -->
     <style name="DialogAnimation" parent="android:Animation">

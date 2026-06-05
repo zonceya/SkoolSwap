@@ -46,4 +46,6 @@
     <color name="pink">#FFC0CB</color>
     <color name="white_20">#33FFFFFF</color>
     <color name="logout_button_bg">#000000</color>
+    <color name="badge_background">@color/white</color>
+    <color name="badge_text">@color/black</color>
 </resources>

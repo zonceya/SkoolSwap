@@ -265,16 +265,11 @@
                     android:layout_marginTop="8dp"/>
 
                 <!-- Size -->
-                <TextView
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/productSize"
                     style="@style/SizeBadgeStyle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textStyle="bold"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
-                    android:paddingTop="6dp"
-                    android:paddingBottom="6dp"
                     android:layout_marginTop="12dp"
                     android:visibility="gone"/>
 

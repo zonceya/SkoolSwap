@@ -1,11 +1,9 @@
 package com.example.skoolswap.ui.sport
 
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -29,7 +27,7 @@ class SportFragment : Fragment() {
     private val viewModel: SportViewModel by viewModels()
 
     private lateinit var featuredSportsAdapter: FeaturedSportsAdapter
-    private lateinit var moreSportsAdapter: MoreSportsAdapter
+    private lateinit var moreSportsAdapter: MoreSportsAdapter  // ✅ Fixed name
     private lateinit var gearAdapter: GearAdapter
     private lateinit var productsAdapter: ProductsAdapter
     private var isFirstLoad = true
@@ -49,12 +47,13 @@ class SportFragment : Fragment() {
 
         setupRecyclerViews()
         setupRetryButton()
+        setupSwipeRefresh()
         observeViewModel()
         viewModel.loadSportData()
     }
 
     private fun setupRecyclerViews() {
-        // Featured Sports Grid (2 columns)
+        // ✅ Featured Sports - Always images
         featuredSportsAdapter = FeaturedSportsAdapter { sport ->
             navigateToSportProducts(sport)
         }
@@ -63,8 +62,8 @@ class SportFragment : Fragment() {
             adapter = featuredSportsAdapter
         }
 
-        // More Sports (Horizontal)
-        moreSportsAdapter = MoreSportsAdapter { sport ->
+        // ✅ More Sports - Always text chips
+        moreSportsAdapter = MoreSportsAdapter { sport ->  // ✅ Fixed
             navigateToSportProducts(sport)
         }
         binding.moreSportsRecycler.apply {
@@ -72,7 +71,7 @@ class SportFragment : Fragment() {
             adapter = moreSportsAdapter
         }
 
-        // Shop by Gear (Horizontal)
+        // Gear adapter
         gearAdapter = GearAdapter { gear ->
             navigateToGearProducts(gear)
         }
@@ -81,7 +80,7 @@ class SportFragment : Fragment() {
             adapter = gearAdapter
         }
 
-        // Products Grid (All Sport Items)
+        // Products Grid
         productsAdapter = ProductsAdapter { item ->
             val bundle = Bundle().apply {
                 putString("itemId", item.id)
@@ -94,6 +93,13 @@ class SportFragment : Fragment() {
         }
     }
 
+    private fun setupSwipeRefresh() {
+        binding.swipeRefreshLayout.setOnRefreshListener {
+            viewModel.refreshSports()
+            binding.swipeRefreshLayout.isRefreshing = false
+        }
+    }
+
     private fun setupRetryButton() {
         binding.retryButton.setOnClickListener {
             binding.errorLayout.visibility = View.GONE
@@ -102,10 +108,8 @@ class SportFragment : Fragment() {
     }
 
     private fun observeViewModel() {
-        // Loading state - show shimmer
+        // Loading state
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
-            Timber.tag("SportFragment")
-                .d("isLoading: $isLoading, isFirstLoad: $isFirstLoad, items empty: ${viewModel.allSportItems.value.isNullOrEmpty()}")
             if (isLoading && isFirstLoad && viewModel.allSportItems.value.isNullOrEmpty()) {
                 binding.shimmerLayout.visibility = View.VISIBLE
                 binding.scrollView.visibility = View.GONE
@@ -129,14 +133,14 @@ class SportFragment : Fragment() {
             }
         }
 
-        // Featured Sports
+        // ✅ Featured Sports - Images that change randomly
         viewModel.featuredSports.observe(viewLifecycleOwner) { sports ->
             if (sports.isNotEmpty()) {
                 featuredSportsAdapter.submitList(sports)
             }
         }
 
-        // More Sports
+        // ✅ More Sports - Text chips that change randomly
         viewModel.moreSports.observe(viewLifecycleOwner) { sports ->
             if (sports.isNotEmpty()) {
                 moreSportsAdapter.submitList(sports)
@@ -150,17 +154,14 @@ class SportFragment : Fragment() {
             }
         }
 
-        // All Sport Items - hide shimmer when data arrives
+        // All Sport Items
         viewModel.allSportItems.observe(viewLifecycleOwner) { items ->
-            Timber.tag("SportFragment")
-                .d("All sport items received: ${items.size}, isFirstLoad: $isFirstLoad")
             isFirstLoad = false
             binding.shimmerLayout.visibility = View.GONE
             binding.scrollView.visibility = View.VISIBLE
             binding.errorLayout.visibility = View.GONE
             productsAdapter.submitList(items)
         }
-
     }
 
     private fun navigateToSportProducts(sport: SportItem) {
