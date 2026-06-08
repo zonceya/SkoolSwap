@@ -71,7 +71,9 @@ class ProfileViewModel @Inject constructor(
     private val _pendingMobile = MutableStateFlow<String?>(null)
     private val _pendingSchool = MutableStateFlow<School?>(null)
 
-    // UI state for confirmation dialog
+    // Add this with the other StateFlow declarations
+    private val _isInitialized = MutableStateFlow(false)
+    val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
     private val _showConfirmationDialog = MutableStateFlow(false)
     val showConfirmationDialog: StateFlow<Boolean> = _showConfirmationDialog.asStateFlow()
     val pendingSchool: StateFlow<School?> = _pendingSchool.asStateFlow()
@@ -104,22 +106,20 @@ class ProfileViewModel @Inject constructor(
     fun clearSchoolSelection() {
         Log.d("ProfileViewModel", "⚠️⚠️⚠️ clearSchoolSelection() called! Previous school: ${_selectedSchool.value?.name}")
         _selectedSchool.value = null
+        _pendingSchool.value = null
     }
 
     fun initializeProfile(mobile: String?, school: School?) {
-        Log.d("ProfileViewModel", "initializeProfile - mobile: $mobile, school: ${school?.name}")
+        val normalizedMobile = mobile?.takeIf { it.isNotBlank() } ?: ""
 
-        // Only set if they are different to avoid unnecessary "changes" flag
-        if (_originalMobile.value != mobile) {
-            _originalMobile.value = mobile
-            _pendingMobile.value = mobile
+        // Only set mobile once, preserve school from checkExistingSchoolMapping
+        if (_originalMobile.value == null) {
+            _originalMobile.value = normalizedMobile
+            _pendingMobile.value = normalizedMobile
         }
 
-        if (_originalSchool.value?.id != school?.id) {
-            _originalSchool.value = school
-            _pendingSchool.value = school
-            _selectedSchool.value = school
-        }
+        // School is intentionally ignored here — checkExistingSchoolMapping() owns it
+        Log.d("ProfileViewModel", "initializeProfile - mobile: $normalizedMobile, school ignored")
     }
     fun previewSchool(school: School) {
         _pendingSchool.value = school
@@ -129,11 +129,17 @@ class ProfileViewModel @Inject constructor(
         _pendingMobile.value = mobile
     }
     fun checkForChanges(): Boolean {
-        val mobileChanged = _pendingMobile.value != _originalMobile.value
-        val schoolChanged = (_pendingSchool.value?.id ?: -1) != (_originalSchool.value?.id ?: -1)
+        val originalMobileNormalized = _originalMobile.value ?: ""
+        val pendingMobileNormalized = _pendingMobile.value ?: ""
+
+        val mobileChanged = pendingMobileNormalized != originalMobileNormalized
+
+        val originalSchoolId = _originalSchool.value?.id ?: -1
+        val pendingSchoolId = _pendingSchool.value?.id ?: -1
+        val schoolChanged = pendingSchoolId != originalSchoolId
 
         Log.d("ProfileViewModel", "checkForChanges - mobileChanged: $mobileChanged, schoolChanged: $schoolChanged")
-        Log.d("ProfileViewModel", "  pendingMobile: ${_pendingMobile.value}, originalMobile: ${_originalMobile.value}")
+        Log.d("ProfileViewModel", "  pendingMobile: '$pendingMobileNormalized', originalMobile: '$originalMobileNormalized'")
         Log.d("ProfileViewModel", "  pendingSchool: ${_pendingSchool.value?.id}, originalSchool: ${_originalSchool.value?.id}")
 
         return mobileChanged || schoolChanged
@@ -217,8 +223,10 @@ class ProfileViewModel @Inject constructor(
                             schoolType = result.data.schoolType
                         )
 
-                        // Set selected school
+                        // Set ALL three school states consistently
                         _selectedSchool.value = school
+                        _originalSchool.value = school
+                        _pendingSchool.value = school
 
                         // Find and set the province
                         result.data.provinceId?.let { provinceId ->
@@ -232,21 +240,23 @@ class ProfileViewModel @Inject constructor(
                         _hasExistingSchool.value = false
                         Log.d("ProfileViewModel", "ℹ️ No existing school found")
                     }
+                    // ✅ Mark as initialized AFTER everything is set
+                    _isInitialized.value = true
                 }
                 is Result.Error -> {
                     _error.value = "Failed to check school status"
                     _hasExistingSchool.value = false
                     Log.e("ProfileViewModel", "❌ Error checking school: ${result.exception.message}")
+                    // ✅ Also mark as initialized on error so UI isn't blocked
+                    _isInitialized.value = true
                 }
             }
         }
     }
 
-    // In ProfileViewModel.kt - modify selectProvince()
     fun selectProvince(province: Province, shouldClearSchool: Boolean = false) {
         Log.d("ProfileViewModel", "📍 selectProvince: ${province.name}, clearSchool: $shouldClearSchool")
 
-        // ✅ Don't clear if we already have a school and it matches this province
         val currentSchool = _selectedSchool.value
         if (currentSchool != null && currentSchool.provinceId == province.id) {
             Log.d("ProfileViewModel", "✅ Keeping school because it matches province: ${currentSchool.name}")
@@ -259,6 +269,7 @@ class ProfileViewModel @Inject constructor(
         if (shouldClearSchool) {
             Log.d("ProfileViewModel", "🗑️ Clearing school selection")
             _selectedSchool.value = null
+            _pendingSchool.value = null  // Also clear pending
             _schools.value = emptyList()
         }
     }

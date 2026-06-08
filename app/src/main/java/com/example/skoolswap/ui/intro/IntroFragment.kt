@@ -43,7 +43,7 @@ class IntroFragment : Fragment() {
     // Track video start time for minimum display time
     private var videoStartTime: Long = 0
     private val MIN_DISPLAY_MS = 3000L // 3 seconds minimum
-
+    private val FORCE_SCHOOL_ONBOARDING = false
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -76,10 +76,17 @@ class IntroFragment : Fragment() {
         setupVideo()
     }
 
-    // In IntroFragment.kt - modify determineDestination()
     private fun determineDestination() {
         lifecycleScope.launch {
             try {
+                // 🔴 Remove force testing flag
+                val forceOnboarding = false  // Set to false!
+
+                if (forceOnboarding) {
+                    onDestinationDetermined(R.id.schoolOnboardingFragment)
+                    return@launch
+                }
+
                 val isOnboardingFinished = appPreferences.isOnboardingFinished.first()
                 if (!isOnboardingFinished) {
                     onDestinationDetermined(R.id.viewPagerFragment)
@@ -92,29 +99,32 @@ class IntroFragment : Fragment() {
                 val isValidSession = isLoggedIn && !authToken.isNullOrEmpty() && userId != null
 
                 if (!isValidSession) {
+                    // Not logged in - go to login
                     onDestinationDetermined(R.id.loginFragment)
                     return@launch
                 }
 
-                // ✅ Treat 401 as expired session → send to login
+                // User is logged in, check session validity
                 val refreshResult = authRepository.refreshUserProfile()
                 if (refreshResult.isFailure) {
-                    Timber.tag(TAG).e("Token rejected by server (401?) — clearing session")
-                    appPreferences.clearUserData()           // ← wipe the stale token
+                    appPreferences.clearUserData()
                     onDestinationDetermined(R.id.loginFragment)
                     return@launch
                 }
 
                 val user = authRepository.getServerUser().first()
                 if (user != null) {
-                    val destination = if (user.schoolMapped == true) R.id.nav_home else R.id.nav_profile
+                    val destination = if (user.schoolMapped == true) {
+                        R.id.nav_home
+                    } else {
+                        R.id.schoolOnboardingFragment  // Only if logged in AND no school
+                    }
                     onDestinationDetermined(destination)
                 } else {
                     appPreferences.clearUserData()
                     onDestinationDetermined(R.id.loginFragment)
                 }
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Error in determineDestination")
                 onDestinationDetermined(R.id.loginFragment)
             }
         }
@@ -257,6 +267,7 @@ class IntroFragment : Fragment() {
         val destName = when (destination) {
             R.id.loginFragment -> "loginFragment"
             R.id.viewPagerFragment -> "viewPagerFragment (onboarding)"
+            R.id.schoolOnboardingFragment -> "schoolOnboardingFragment"
             R.id.nav_home -> "nav_home"
             R.id.nav_profile -> "nav_profile"
             else -> "unknown"
@@ -267,7 +278,6 @@ class IntroFragment : Fragment() {
             when (destination) {
                 R.id.loginFragment -> {
                     Timber.tag(TAG).e("Navigating to loginFragment")
-                    // Create bundle with from_intro flag
                     val bundle = Bundle().apply {
                         putBoolean("from_intro", true)
                     }
@@ -276,6 +286,11 @@ class IntroFragment : Fragment() {
                 R.id.viewPagerFragment -> {
                     Timber.tag(TAG).e("Navigating to onboarding")
                     findNavController().navigate(R.id.action_introFragment_to_onboarding)
+                }
+                R.id.schoolOnboardingFragment -> {
+                    Timber.tag(TAG).e("🔴 Navigating to school onboarding")
+                    // You need to add this action to nav_graph.xml
+                    findNavController().navigate(R.id.action_introFragment_to_schoolOnboardingFragment)
                 }
                 R.id.nav_home -> {
                     Timber.tag(TAG).e("Navigating to home")

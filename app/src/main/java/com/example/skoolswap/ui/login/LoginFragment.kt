@@ -214,10 +214,20 @@ class LoginFragment : Fragment() {
         if (!isAdded || isDetached) return
 
         try {
+            // 🔴 TEMPORARY: Force test the school onboarding screen
+            // Comment this out when done testing
+            val forceOnboarding = true  // Change to false when done
+
+            if (forceOnboarding) {
+                findNavController().navigate(R.id.action_loginFragment_to_schoolOnboardingFragment)
+                return
+            }
+
+            // Original logic
             if (user.schoolMapped) {
                 findNavController().navigate(R.id.action_loginFragment_to_nav_home)
             } else {
-                findNavController().navigate(R.id.action_loginFragment_to_profileFragment)
+                findNavController().navigate(R.id.action_loginFragment_to_schoolOnboardingFragment)
             }
         } catch (e: Exception) {
             Timber.tag("LoginFragment").e("Navigation failed: ${e.message}")

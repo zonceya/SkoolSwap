@@ -177,7 +177,8 @@ class ProfileFragment : Fragment() {
                 if (viewModel.selectedSchool.value != null) {
                     Log.d("ProfileFragment", "User typing - clearing school selection")
                     viewModel.clearSchoolSelection()
-                    binding.selectedSchoolText.visibility = View.GONE
+                    binding.selectedSchoolCard.visibility = View.GONE  // Hide the card
+                    binding.selectedSchoolText.visibility = View.VISIBLE  // Show fallback text
                     showUnsavedIndicator()
                 }
 
@@ -202,15 +203,14 @@ class ProfileFragment : Fragment() {
 
     private fun setupSchoolResults() {
         schoolAdapter = SchoolAdapter { school ->
-            // Just preview - don't save yet
+            // Preview the school
             viewModel.previewSchool(school)
 
-            // Show visual feedback
-            binding.selectedSchoolText.text = "Selected: ${school.name}"
-            binding.selectedSchoolText.visibility = View.VISIBLE
-            binding.selectedSchoolText.setTextColor(
-                ContextCompat.getColor(requireContext(), R.color.orange)
-            )
+            // Show the card instead of TextView
+            binding.selectedSchoolCard.visibility = View.VISIBLE
+            binding.selectedSchoolName.text = school.name
+            binding.selectedSchoolLocation.text = school.provinceName ?: "Selected School"
+            binding.selectedSchoolText.visibility = View.GONE
 
             // Clear search results
             binding.schoolResultsRecyclerView.visibility = View.GONE
@@ -229,13 +229,13 @@ class ProfileFragment : Fragment() {
     }
     private fun showUnsavedIndicator() {
         if (_binding == null) return
+        if (!viewModel.isInitialized.value) return  // ← GUARD - don't show until initialized
 
         if (viewModel.checkForChanges()) {
             binding.submitButton.text = "Save Changes*"
             binding.submitButton.setBackgroundTintList(ContextCompat.getColorStateList(requireContext(), R.color.black))
             binding.unsavedBadge.visibility = View.VISIBLE
 
-            // Set correct warning icon based on theme
             val isNightMode = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
             val warningIcon = if (isNightMode) {
                 R.drawable.ic_warning_night
@@ -284,7 +284,8 @@ class ProfileFragment : Fragment() {
                                 val matchingProvince = provinces.find { it.id == school.provinceId }
                                 matchingProvince?.let {
                                     setText(it.name, false)
-                                    viewModel.selectProvince(it)
+                                    // ✅ Only set province, don't call selectProvince here
+                                    // viewModel.selectProvince(it)  // REMOVED - causes issues
                                 }
                             }
                         }
@@ -326,25 +327,27 @@ class ProfileFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.selectedSchool.collectLatest { school ->
                 if (school != null) {
-                    binding.selectedSchoolText.text = "Selected: ${school.name}"
-                    binding.selectedSchoolText.visibility = View.VISIBLE
-                    binding.selectedSchoolText.setTextColor(
-                        ContextCompat.getColor(requireContext(), R.color.red)
-                    )
+                    // Show the MaterialCardView instead of TextView
+                    binding.selectedSchoolCard.visibility = View.VISIBLE
+                    binding.selectedSchoolName.text = school.name
+                    binding.selectedSchoolLocation.text = school.provinceName ?: "School"
+                    binding.selectedSchoolText.visibility = View.GONE
 
                     isSettingTextProgrammatically = true
                     binding.schoolSearch.setText(school.name)
                     binding.schoolResultsRecyclerView.visibility = View.GONE
                     binding.schoolSearchLayout.error = null
 
-                    if (viewModel.provinces.value.isNotEmpty() && school.provinceId != null) {
-                        val matchingProvince = viewModel.provinces.value.find { it.id == school.provinceId }
-                        matchingProvince?.let {
-                            viewModel.selectProvince(it)
-                        }
-                    }
+                    // ✅ REMOVE THIS ENTIRE BLOCK - causes unnecessary state changes
+                    // if (viewModel.provinces.value.isNotEmpty() && school.provinceId != null) {
+                    //     val matchingProvince = viewModel.provinces.value.find { it.id == school.provinceId }
+                    //     matchingProvince?.let {
+                    //         viewModel.selectProvince(it)
+                    //     }
+                    // }
                 } else {
-                    binding.selectedSchoolText.visibility = View.GONE
+                    binding.selectedSchoolCard.visibility = View.GONE
+                    binding.selectedSchoolText.visibility = View.VISIBLE
                 }
             }
         }
@@ -465,9 +468,8 @@ class ProfileFragment : Fragment() {
                     binding.contactNumber.setText(displayMobile)
                     loadProfilePicture(it.profilePictureUrl)
 
-                    // Initialize ViewModel with original values
-                    val school = viewModel.selectedSchool.value
-                    viewModel.initializeProfile(displayMobile, school)
+                    // ✅ Only pass mobile — school is handled by checkExistingSchoolMapping()
+                    viewModel.initializeProfile(displayMobile, null)
                 }
             }
         }

@@ -25,8 +25,6 @@ class SchoolRepository @Inject constructor(
     private val appPreferences: AppPreferences
 ) {
 
-    // In SchoolRepository.kt
-// In SchoolRepository.kt - update getProvinces()
     suspend fun getProvinces(): Result<List<Province>> {
         return try {
             // STEP 1: Check cache with count

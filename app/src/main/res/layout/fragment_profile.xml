@@ -182,18 +182,63 @@
                     android:layout_height="wrap_content"
                     android:enabled="false"
                     android:inputType="text"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
+                    android:paddingStart="48dp"
+                    android:paddingEnd="48dp"
                     android:textColor="?attr/colorOnSurface"
                     android:textColorHint="?attr/colorOnSurface" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Selected School Display -->
+            <!-- Selected School Card (similar to onboarding) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/selectedSchoolCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/schoolSearchLayout"
+                android:layout_marginTop="16dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:visibility="gone"
+                app:cardElevation="2dp"
+                app:cardCornerRadius="8dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="✓ Selected School"
+                        android:textSize="12sp"
+                        android:textColor="#4CAF50" />
+
+                    <TextView
+                        android:id="@+id/selectedSchoolName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="#000000"
+                        android:layout_marginTop="4dp" />
+
+                    <TextView
+                        android:id="@+id/selectedSchoolLocation"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="12sp"
+                        android:textColor="#666666"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Selected School Display (fallback text) -->
             <TextView
                 android:id="@+id/selectedSchoolText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_below="@id/schoolSearchLayout"
+                android:layout_below="@id/selectedSchoolCard"
                 android:layout_marginTop="8dp"
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp"
@@ -222,7 +267,7 @@
                 android:id="@+id/noResultsText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_below="@id/selectedSchoolText"
+                android:layout_below="@id/schoolResultsRecyclerView"
                 android:layout_marginTop="16dp"
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp"
@@ -237,7 +282,7 @@
                 android:id="@+id/submitButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_below="@id/schoolResultsRecyclerView"
+                android:layout_below="@id/noResultsText"
                 android:layout_marginTop="32dp"
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp"
@@ -247,7 +292,7 @@
                 android:textColor="@color/white"
                 android:textStyle="bold" />
 
-            <!-- UNSAVED CHANGES BADGE - Updated: No orange, theme-aware -->
+            <!-- UNSAVED CHANGES BADGE -->
             <TextView
                 android:id="@+id/unsavedBadge"
                 android:layout_width="wrap_content"

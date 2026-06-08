@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/mobile_navigation"
-    app:startDestination="@id/introFragment">  <!-- CHANGED: Now starts with IntroFragment -->
+    app:startDestination="@id/introFragment">
 
     <!-- INTRO FRAGMENT - First screen, plays video -->
     <fragment
@@ -15,6 +15,11 @@
         <action
             android:id="@+id/action_introFragment_to_loginFragment"
             app:destination="@id/loginFragment"
+            app:popUpTo="@id/introFragment"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_introFragment_to_schoolOnboardingFragment"
+            app:destination="@id/schoolOnboardingFragment"
             app:popUpTo="@id/introFragment"
             app:popUpToInclusive="true" />
 
@@ -35,6 +40,29 @@
             app:destination="@id/nav_profile"
             app:popUpTo="@id/introFragment"
             app:popUpToInclusive="true" />
+
+        <!-- ❌ REMOVE THIS FROM HERE - It's in the wrong fragment -->
+        <!-- <action
+            android:id="@+id/action_loginFragment_to_schoolOnboardingFragment"
+            app:destination="@id/schoolOnboardingFragment"
+            app:popUpTo="@id/loginFragment"
+            app:popUpToInclusive="true" /> -->
+
+    </fragment>
+
+    <!-- School Onboarding Fragment -->
+    <fragment
+        android:id="@+id/schoolOnboardingFragment"
+        android:name="com.example.skoolswap.ui.schoolonboarding.SchoolOnboardingFragment"
+        android:label="School Selection"
+        tools:layout="@layout/fragment_school_onboarding">
+
+        <action
+            android:id="@+id/action_schoolOnboardingFragment_to_nav_home"
+            app:destination="@id/nav_home"
+            app:popUpTo="@id/nav_home"
+            app:popUpToInclusive="true" />
+
     </fragment>
 
     <!-- Onboarding Flow -->
@@ -43,11 +71,13 @@
         android:name="com.example.skoolswap.ui.onboarding.ViewPagerFragment"
         android:label="Onboarding"
         tools:layout="@layout/fragment_view_pager">
+
         <action
             android:id="@+id/action_viewPagerFragment_to_loginFragment"
             app:destination="@id/loginFragment"
             app:popUpTo="@id/viewPagerFragment"
             app:popUpToInclusive="true" />
+
     </fragment>
 
     <!-- Login Flow -->
@@ -91,6 +121,13 @@
             android:id="@+id/action_global_logout"
             app:destination="@id/loginFragment"
             app:popUpTo="@id/mobile_navigation"
+            app:popUpToInclusive="true" />
+
+        <!-- ✅ ADD THE ACTION HERE - Inside loginFragment -->
+        <action
+            android:id="@+id/action_loginFragment_to_schoolOnboardingFragment"
+            app:destination="@id/schoolOnboardingFragment"
+            app:popUpTo="@id/loginFragment"
             app:popUpToInclusive="true" />
 
     </fragment>
@@ -221,6 +258,7 @@
         android:name="com.example.skoolswap.ui.profile.ProfileFragment"
         android:label="Profile"
         tools:layout="@layout/fragment_profile">
+
         <action
             android:id="@+id/action_profile_to_home"
             app:destination="@id/nav_home"
@@ -254,6 +292,7 @@
         android:name="com.example.skoolswap.ui.item.CreateItemFragment"
         android:label="Create Item"
         tools:layout="@layout/fragment_create_item">
+
         <action
             android:id="@+id/action_createItemFragment_to_mainFragment"
             app:destination="@id/nav_home"
@@ -268,9 +307,11 @@
         android:name="com.example.skoolswap.ui.item.edititem.EditItemFragment"
         android:label="Edit Item"
         tools:layout="@layout/fragment_edit_item">
+
         <argument
             android:name="itemId"
             app:argType="string" />
+
     </fragment>
 
     <!-- Products Fragment -->
