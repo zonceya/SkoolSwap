@@ -2,6 +2,7 @@ package com.example.skoolswap.data.repository
 
 import android.app.Activity
 import android.util.Log
+import android.util.Log.*
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
@@ -42,6 +43,17 @@ import javax.inject.Singleton
 import com.example.skoolswap.data.remote.models.response.profile.DeleteProfileResponse
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.remote.api.UserSchoolApiService
+import com.example.skoolswap.data.remote.models.request.SignUpRequest
+import com.example.skoolswap.data.remote.models.request.VerifyLoginRequest
+import com.example.skoolswap.data.remote.models.request.VerifySignUpRequest
+import kotlinx.coroutines.flow.first
+import timber.log.Timber
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.auth.FirebaseAuthWeakPasswordException
+import com.google.firebase.auth.UserProfileChangeRequest
+import com.example.skoolswap.data.remote.models.response.user.FirebaseAuthResponse
 
 
 @Singleton
@@ -80,6 +92,133 @@ class AuthRepository @Inject constructor(
 
     private val _error = MutableStateFlow<String?>(null)
     override val error: StateFlow<String?> = _error.asStateFlow()
+    override suspend fun signInWithEmail(email: String, password: String): Result<User> {
+        return try {
+            _loading.value = true
+            _error.value = null
+
+            Log.i(TAG, "🔐 Signing in with email: $email")
+
+            // 1. Sign in with Firebase
+            val authResult = firebaseAuth.signInWithEmailAndPassword(email, password).await()
+            val firebaseUser = authResult.user ?: throw Exception("Firebase user is null")
+
+            // 2. Get Firebase ID token
+            val idToken = firebaseUser.getIdToken(false).await().token
+                ?: throw Exception("Failed to get ID token")
+
+            // 3. Sync with Rails API
+            val user = syncWithRailsApi(idToken, firebaseUser, email)
+
+            // 4. Cache the user
+            cacheUserAfterFirebaseAuth(user, user.token)
+
+            Log.i(TAG, "✅ Email sign-in successful for: $email")
+            Result.success(user)
+
+        } catch (e: FirebaseAuthInvalidUserException) {
+            val error = "No account found with this email"
+            _error.value = error
+            Result.failure(Exception(error))
+        } catch (e: FirebaseAuthInvalidCredentialsException) {
+            val error = "Invalid password"
+            _error.value = error
+            Result.failure(Exception(error))
+        } catch (e: Exception) {
+            _error.value = e.message ?: "Sign in failed"
+            Result.failure(e)
+        } finally {
+            _loading.value = false
+        }
+    }
+
+    override suspend fun signUpWithEmail(
+        name: String,
+        email: String,
+        password: String,
+        passwordConfirmation: String
+    ): Result<User> {
+        return try {
+            _loading.value = true
+            _error.value = null
+
+            // Validate passwords match
+            if (password != passwordConfirmation) {
+                throw Exception("Passwords do not match")
+            }
+
+            // Validate password length
+            if (password.length < 6) {
+                throw Exception("Password must be at least 6 characters")
+            }
+
+            Timber.tag(TAG).i("📝 Creating new account: $email")
+
+            // 1. Create user in Firebase
+            val authResult = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
+            val firebaseUser = authResult.user ?: throw Exception("Firebase user creation failed")
+
+            // 2. Update profile with name
+            val profileUpdates = UserProfileChangeRequest.Builder()
+                .setDisplayName(name)
+                .build()
+            firebaseUser.updateProfile(profileUpdates).await()
+
+            // 3. Get Firebase ID token
+            val idToken = firebaseUser.getIdToken(false).await().token
+                ?: throw Exception("Failed to get ID token")
+
+            // 4. Sync with Rails API (pass name for new user)
+            val user = syncWithRailsApi(idToken, firebaseUser, email, name)
+
+            // 5. Cache the user
+            cacheUserAfterFirebaseAuth(user, user.token)
+
+            Timber.tag(TAG).i("✅ Account created successfully for: $email")
+            Result.success(user)
+
+        } catch (e: FirebaseAuthWeakPasswordException) {
+            val error = "Password is too weak. Use at least 6 characters with letters and numbers"
+            _error.value = error
+            Result.failure(Exception(error))
+        } catch (e: FirebaseAuthUserCollisionException) {
+            val error = "An account with this email already exists"
+            _error.value = error
+            Result.failure(Exception(error))
+        } catch (e: FirebaseAuthInvalidCredentialsException) {
+            val error = "Invalid email format"
+            _error.value = error
+            Result.failure(Exception(error))
+        } catch (e: Exception) {
+            _error.value = e.message ?: "Sign up failed"
+            Result.failure(e)
+        } finally {
+            _loading.value = false
+        }
+    }
+
+
+    override suspend fun sendPasswordResetEmail(email: String): Result<Unit> {
+        return try {
+            _loading.value = true
+            _error.value = null
+
+            firebaseAuth.sendPasswordResetEmail(email).await()
+
+            Timber.tag(TAG).i("📧 Password reset email sent to: $email")
+            Result.success(Unit)
+
+        } catch (e: FirebaseAuthInvalidUserException) {
+            val error = "No account found with this email"
+            _error.value = error
+            Result.failure(Exception(error))
+        } catch (e: Exception) {
+            _error.value = e.message ?: "Failed to send reset email"
+            Result.failure(e)
+        } finally {
+            _loading.value = false
+        }
+    }
 
     init {
         // Load cached user on initialization
@@ -87,7 +226,81 @@ class AuthRepository @Inject constructor(
             loadCachedUser()
         }
     }
+    private suspend fun syncWithRailsApi(
+        idToken: String,
+        firebaseUser: com.google.firebase.auth.FirebaseUser,
+        email: String,
+        name: String? = null
+    ): User {
+        // Call your Rails firebase_auth endpoint
+        val requestBody = mapOf(
+            "id_token" to idToken,
+            "email" to email.lowercase(),
+            "name" to (name ?: firebaseUser.displayName ?: email.split("@")[0]),
+            "profile_picture_url" to (firebaseUser.photoUrl?.toString() ?: "")
+        )
 
+        val response = userApiService.firebaseAuth(requestBody)
+
+        if (!response.isSuccessful) {
+            val errorMsg = response.errorBody()?.string() ?: "Failed to sync with server"
+            throw Exception(errorMsg)
+        }
+
+        val body = response.body()
+        if (body?.success != true) {
+            throw Exception(body?.message ?: "Server sync failed")
+        }
+
+        // Convert to your User model - map snake_case to camelCase
+        return User(
+            id = body.user.id,
+            name = body.user.name,
+            email = body.user.email,
+            mobile = body.user.mobile,
+            username = body.user.username,
+            profilePictureUrl = body.user.profilePictureUrl,
+            authMode = body.user.authMode,
+            role = body.user.role,
+            token = body.token,
+            createdAt = body.user.createdAt,
+            updatedAt = body.user.updatedAt,
+            schoolMapped = body.user.schoolMapped ?: false,
+            schoolId = body.user.schoolId,
+            schoolName = body.user.schoolName
+        )
+    }
+    private suspend fun cacheUserAfterFirebaseAuth(user: User, token: String) {
+        try {
+            val userEntity = user.toEntity()
+            userDao.insertUser(userEntity)
+
+            _serverUser.value = user
+            _authToken.value = token
+
+            appPreferences.setAuthToken(token)
+            appPreferences.setLoggedIn(true)
+            appPreferences.setFirstTimeLogin(false)
+            appPreferences.setUserId(user.id.toString())
+            appPreferences.setUserName(user.name)
+            appPreferences.setUserEmail(user.email)
+
+            if (user.profilePictureUrl != null) {
+                appPreferences.setUserProfileImage(user.profilePictureUrl)
+            }
+
+            if (user.schoolMapped && user.schoolId != null) {
+                appPreferences.setSchoolMapped(true)
+                appPreferences.setSchoolInfo(user.schoolId, user.schoolName ?: "")
+            } else {
+                appPreferences.setSchoolMapped(false)
+            }
+
+            Log.i(TAG, "✅ User cached after Firebase auth: ${user.name}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error caching user after Firebase auth", e)
+        }
+    }
     private suspend fun loadCachedUser() {
         try {
             val cachedUser = userDao.getCurrentUser()
@@ -96,7 +309,7 @@ class AuthRepository @Inject constructor(
                 _authToken.value = it.token
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error loading cached user", e)
+            e(TAG, "Error loading cached user", e)
         }
     }
 
@@ -122,7 +335,7 @@ class AuthRepository @Inject constructor(
 
         } catch (e: Exception) {
             _error.value = "Sign-in failed: ${e.localizedMessage}"
-            Log.e(TAG, "Google sign-in failed", e)
+            e(TAG, "Google sign-in failed", e)
             Result.failure(e)
         } finally {
             _loading.value = false
@@ -135,6 +348,87 @@ class AuthRepository @Inject constructor(
         return authResult.user ?: throw IllegalStateException("Firebase user is null")
     }
 
+
+    override suspend fun restoreSession(): Boolean {
+        return try {
+            val token = appPreferences.authToken.first()
+            Log.e(TAG, "🔐 restoreSession - Token found: ${token != null && token.isNotEmpty()}")
+
+            if (!token.isNullOrEmpty()) {
+                val isValid = validateToken(token)
+
+                if (isValid) {
+                    _authToken.value = token  // ✅ set token in memory
+
+                    // Try Room first
+                    loadCachedUser()
+
+                    // If Room had nothing, rebuild from appPreferences
+                    if (_serverUser.value == null) {
+                        Log.e(TAG, "🔐 Room empty - rebuilding user from appPreferences")
+                        val userId = appPreferences.getUserId() ?: 0
+                        val userName = appPreferences.userName.first() ?: ""
+                        val userEmail = appPreferences.userEmail.first() ?: ""
+                        val userProfileImage = appPreferences.userProfileImage.first()
+                        val schoolMapped = appPreferences.hasSchoolMapped()
+                        val schoolId = if (schoolMapped) appPreferences.schoolId.first() else null
+                        val schoolName = if (schoolMapped) appPreferences.schoolName.first() else null
+
+                        val restoredUser = User(
+                            id = userId,
+                            name = userName,
+                            email = userEmail,
+                            mobile = null,
+                            username = userName,
+                            profilePictureUrl = userProfileImage,
+                            authMode = "google",
+                            role = "user",
+                            token = token,
+                            createdAt = "",
+                            updatedAt = "",
+                            schoolMapped = schoolMapped,
+                            schoolId = schoolId,
+                            schoolName = schoolName
+                        )
+
+                        _serverUser.value = restoredUser
+                        // Also persist to Room so next launch works from cache
+                        userDao.insertUser(restoredUser.toEntity())
+                    }
+
+                    Timber.tag(TAG)
+                        .e("🔐 restoreSession - User loaded: ${_serverUser.value != null}")
+                    return _serverUser.value != null
+
+                } else {
+                    Timber.tag(TAG).e("🔐 Token is invalid, clearing session")
+                    clearUserData()
+                    appPreferences.clearUserData()
+                    return false
+                }
+            } else {
+                Log.e(TAG, "🔐 restoreSession - No token found")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to restore session", e)
+            false
+        }
+    }
+
+    override suspend fun getCurrentToken(): String? {
+        return _authToken.value ?: appPreferences.authToken.first()
+    }
+
+    // In AuthRepository.kt
+    override suspend fun validateToken(token: String): Boolean {
+        return try {
+            val response = userApiService.getProfile("Bearer $token")
+            response.isSuccessful
+        } catch (e: Exception) {
+            false
+        }
+    }
     private suspend fun handleSignInResponse(
         response: Response<SignInResponse>,
         firebaseUser: com.google.firebase.auth.FirebaseUser
@@ -162,12 +456,27 @@ class AuthRepository @Inject constructor(
                 Result.failure(Exception(errorMsg))
             }
         } else {
-            val errorMsg = "Server error: ${response.code()}"
+            // Handle specific HTTP error codes with user-friendly messages
+            val errorMsg = when (response.code()) {
+                530 -> "Service temporarily unavailable. Please try again later."
+                500, 502, 503, 504 -> "Server is currently busy. Please try again in a few moments."
+                401 -> "Authentication failed. Please try again."
+                403 -> "Access denied. Please contact support."
+                404 -> "Service not found. Please update the app."
+                408, 504 -> "Request timed out. Please check your connection and try again."
+                429 -> "Too many attempts. Please wait a moment before trying again."
+                in 400..499 -> "Something went wrong. Please try again."
+                in 500..599 -> "Server error. Our team has been notified. Please try again later."
+                else -> "Unable to connect to server. Please check your internet connection."
+            }
+
+            // Log the actual error for debugging
+            Log.e(TAG, "Sign in failed with code: ${response.code()}, error body: ${response.errorBody()?.string()}")
+
             _error.value = errorMsg
             Result.failure(Exception(errorMsg))
         }
     }
-
     // In AuthRepository.kt - update cacheUser method
     private suspend fun cacheUser(user: User, firebaseUser: com.google.firebase.auth.FirebaseUser) {
         try {
@@ -192,7 +501,7 @@ class AuthRepository @Inject constructor(
                         updatedAt = null
                     )
                     userSchoolDao.insert(tempEntity)
-                    Log.i(TAG, "✅ Cached school in database: ${user.schoolName}")
+                    i(TAG, "✅ Cached school in database: ${user.schoolName}")
 
                     // Trigger background refresh to get real mapping_id
                     CoroutineScope(Dispatchers.IO).launch {
@@ -202,12 +511,52 @@ class AuthRepository @Inject constructor(
 
                 // You'll need userSchoolDao here - inject it in AuthRepository
                 // userSchoolDao.insert(tempEntity)
-                Log.i(TAG, "Cached school from sign-in: ${user.schoolName}")
+                i(TAG, "Cached school from sign-in: ${user.schoolName}")
             }
 
-            Log.i(TAG, "User data cached successfully: ${user.name}")
+            i(TAG, "User data cached successfully: ${user.name}")
         } catch (e: Exception) {
-            Log.e(TAG, "Error caching user data", e)
+            e(TAG, "Error caching user data", e)
+        }
+    }
+    // In AuthRepository.kt
+    override suspend fun getUserById(userId: Long): Result<User> {
+        return try {
+            val token = _authToken.value
+            if (token == null) {
+                return Result.failure(Exception("Not authenticated"))
+            }
+
+            val response = userApiService.getUserById("Bearer $token", userId)
+
+            if (response.isSuccessful) {
+                val userResponse = response.body()
+                if (userResponse != null) {
+                    val user = User(
+                        id = userResponse.id,
+                        name = userResponse.name,
+                        email = userResponse.email,
+                        mobile = userResponse.mobile,
+                        username = userResponse.username,
+                        profilePictureUrl = userResponse.profilePictureUrl,
+                        authMode = userResponse.authMode,
+                        role = userResponse.role,
+                        token = token,
+                        createdAt = userResponse.createdAt,
+                        updatedAt = userResponse.updatedAt,
+                        schoolMapped = userResponse.schoolMapped ?: false,
+                        schoolId = userResponse.schoolId,
+                        schoolName = userResponse.schoolName
+                    )
+                    Result.success(user)
+                } else {
+                    Result.failure(Exception("User not found"))
+                }
+            } else {
+                Result.failure(Exception("Failed to get user: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
     private suspend fun refreshSchoolMapping(userId: Int) {
@@ -231,11 +580,11 @@ class AuthRepository @Inject constructor(
                     )
                     userSchoolDao.insert(entity)
 
-                    Log.i(TAG, "🔄 Refreshed school mapping: ${school.mapping_id}")
+                    i(TAG, "🔄 Refreshed school mapping: ${school.mapping_id}")
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Background refresh failed", e)
+            e(TAG, "Background refresh failed", e)
         }
     }
 
@@ -271,7 +620,7 @@ class AuthRepository @Inject constructor(
                     val updatedUser = currentUser.copy(mobile = formattedMobile)
                     _serverUser.value = updatedUser
                     userDao.insertUser(updatedUser.toEntity())
-                    Log.i(TAG, "Mobile updated locally")
+                    i(TAG, "Mobile updated locally")
                 }
 
                 // Optionally refresh from server if needed
@@ -280,7 +629,7 @@ class AuthRepository @Inject constructor(
                     val updatedUser = updateResponse.user.toDomain(token)
                     _serverUser.value = updatedUser
                     userDao.insertUser(updatedUser.toEntity())
-                    Log.i(TAG, "Mobile updated with server response")
+                    i(TAG, "Mobile updated with server response")
                 }
 
                 Result.success(true)
@@ -291,7 +640,7 @@ class AuthRepository @Inject constructor(
             }
         } catch (e: Exception) {
             _error.value = "Update mobile failed: ${e.localizedMessage}"
-            Log.e(TAG, "Update mobile failed", e)
+            e(TAG, "Update mobile failed", e)
             Result.failure(e)
         } finally {
             _loading.value = false
@@ -323,13 +672,19 @@ class AuthRepository @Inject constructor(
                         role = profileResponse.user.role,
                         token = token,
                         createdAt = profileResponse.user.createdAt,
-                        updatedAt = profileResponse.user.updatedAt
+                        updatedAt = profileResponse.user.updatedAt,
+                        schoolMapped = profileResponse.user.schoolMapped ?: false,
+                        schoolId = profileResponse.user.schoolId,
+                        schoolName = profileResponse.user.schoolName
                     )
 
                     // Update local cache
                     _serverUser.value = updatedUser
                     userDao.insertUser(updatedUser.toEntity())
-
+                    appPreferences.setSchoolMapped(updatedUser.schoolMapped)
+                    if (updatedUser.schoolMapped && updatedUser.schoolId != null) {
+                        appPreferences.setSchoolInfo(updatedUser.schoolId, updatedUser.schoolName ?: "")
+                    }
                     Result.success(updatedUser)
                 } else {
                     Result.failure(Exception("Empty profile response"))
@@ -359,9 +714,9 @@ class AuthRepository @Inject constructor(
             appPreferences.setLoggedIn(false)
             appPreferences.clearUserData()
 
-            Log.i(TAG, "User signed out successfully after deletion")
+            i(TAG, "User signed out successfully after deletion")
         } catch (e: Exception) {
-            Log.e(TAG, "Error during sign out after deletion", e)
+            e(TAG, "Error during sign out after deletion", e)
             // Even if there's an error, we should continue with deletion
         }
     }
@@ -399,12 +754,26 @@ class AuthRepository @Inject constructor(
             .addCredentialOption(googleIdOption)
             .build()
 
-        return try {
-            val response = credentialManager.getCredential(activity, request)
-            parseGoogleIdToken(response)
-        } catch (e: GetCredentialException) {
-            handleCredentialException(e)
+        // Retry up to 3 times for transient failures
+        var lastException: GetCredentialException? = null
+        repeat(3) { attempt ->
+            try {
+                val response = credentialManager.getCredential(activity, request)
+                return parseGoogleIdToken(response)
+            } catch (e: androidx.credentials.exceptions.GetCredentialCancellationException) {
+                // User cancelled — don't retry
+                handleCredentialException(e)
+            } catch (e: GetCredentialException) {
+                lastException = e
+                Log.w(TAG, "Credential attempt ${attempt + 1} failed: ${e.javaClass.simpleName}")
+                if (attempt < 2) {
+                    // Wait before retrying: 500ms, then 1500ms
+                    kotlinx.coroutines.delay(500L * (attempt + 1))
+                }
+            }
         }
+
+        handleCredentialException(lastException!!)
     }
 
     private fun handleCredentialException(e: GetCredentialException): Nothing {
@@ -415,21 +784,24 @@ class AuthRepository @Inject constructor(
                 if (!isNetworkAvailable()) {
                     throw IllegalStateException(ErrorConstants.Auth.NO_INTERNET)
                 }
-                if (!NetworkUtils.isNetworkStable(context)) {
-                    throw IllegalStateException(ErrorConstants.Auth.UNSTABLE_CONNECTION)
-                }
-                throw IllegalStateException(ErrorConstants.Auth.NO_GOOGLE_ACCOUNTS)
+                // Network is available but credential failed — likely a transient
+                // Credential Manager issue, NOT necessarily missing accounts
+                throw IllegalStateException(ErrorConstants.Auth.GOOGLE_SIGN_IN_FAILED.let {
+                    "Sign-in failed. Please try again."
+                })
             }
             is androidx.credentials.exceptions.GetCredentialCancellationException -> {
                 throw IllegalStateException(ErrorConstants.Auth.SIGN_IN_CANCELLED)
             }
             else -> {
-                val errorMessage = ErrorConstants.format(ErrorConstants.Auth.GOOGLE_SIGN_IN_FAILED, e.message ?: "Unknown error")
+                val errorMessage = ErrorConstants.format(
+                    ErrorConstants.Auth.GOOGLE_SIGN_IN_FAILED,
+                    e.message ?: "Unknown error"
+                )
                 throw IllegalStateException(errorMessage)
             }
         }
     }
-
     private fun parseGoogleIdToken(response: GetCredentialResponse): String {
         val credential = response.credential
         return when (credential) {
@@ -459,12 +831,12 @@ class AuthRepository @Inject constructor(
     private fun logNetworkStatus() {
         if (isNetworkAvailable()) {
             val networkType = NetworkUtils.getNetworkType(context)
-            Log.d(TAG, "Network is available. Type: $networkType")
+            d(TAG, "Network is available. Type: $networkType")
 
             val isStable = NetworkUtils.isNetworkStable(context)
-            Log.d(TAG, "Network stability: ${if (isStable) "Stable" else "Unstable"}")
+            d(TAG, "Network stability: ${if (isStable) "Stable" else "Unstable"}")
         } else {
-            Log.w(TAG, "Network is NOT available")
+            w(TAG, "Network is NOT available")
         }
     }
 
@@ -479,23 +851,23 @@ class AuthRepository @Inject constructor(
                 return Result.failure(Exception("Not authenticated"))
             }
 
-            Log.d(TAG, "Calling delete profile API...")
+            d(TAG, "Calling delete profile API...")
             val response = userApiService.deleteProfile("Bearer $token")
 
-            Log.d(TAG, "Delete profile response code: ${response.code()}")
+            d(TAG, "Delete profile response code: ${response.code()}")
 
             if (response.isSuccessful) {
                 val deleteResponse: DeleteProfileResponse? = response.body()
 
                 if (deleteResponse != null) {
-                    Log.i(TAG, "Profile disabled successfully: ${deleteResponse.message}")
+                    i(TAG, "Profile disabled successfully: ${deleteResponse.message}")
 
                     // Clear all user data and sign out
                     signOut()
 
                     Result.success(true)
                 } else {
-                    Log.e(TAG, "Delete profile response body is null")
+                    e(TAG, "Delete profile response body is null")
                     _error.value = "Server returned empty response"
                     Result.failure(Exception("Server returned empty response"))
                 }
@@ -515,17 +887,50 @@ class AuthRepository @Inject constructor(
                     "Delete failed with code: ${response.code()}"
                 }
 
-                Log.e(TAG, "Delete profile failed: $errorMessage")
+                e(TAG, "Delete profile failed: $errorMessage")
                 _error.value = errorMessage
                 Result.failure(Exception(errorMessage))
             }
         } catch (e: Exception) {
             val errorMsg = "Delete profile failed: ${e.message}"
-            Log.e(TAG, errorMsg, e)
+            e(TAG, errorMsg, e)
             _error.value = errorMsg
             Result.failure(e)
         } finally {
             _loading.value = false
+        }
+    }
+
+    private suspend fun cacheUserAfterOtp(user: User, token: String) {
+        try {
+            val userEntity = user.toEntity()
+            userDao.insertUser(userEntity)
+
+            _serverUser.value = user
+            _authToken.value = token
+            appPreferences.setAuthToken(token)
+            appPreferences.setLoggedIn(true)
+            appPreferences.setFirstTimeLogin(false)
+            appPreferences.setUserId(user.id.toString())
+            appPreferences.setUserName(user.name)
+            appPreferences.setUserEmail(user.email)
+
+            if (user.profilePictureUrl != null) {
+                appPreferences.setUserProfileImage(user.profilePictureUrl)
+            }
+
+            if (user.schoolMapped && user.schoolId != null) {
+                appPreferences.setSchoolMapped(true)
+                user.schoolId?.let { schoolId ->
+                    appPreferences.setSchoolInfo(schoolId, user.schoolName ?: "")
+                }
+            } else {
+                appPreferences.setSchoolMapped(false)
+            }
+
+            Log.i(TAG, "✅ User cached after OTP verification: ${user.name}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error caching user after OTP", e)
         }
     }
 

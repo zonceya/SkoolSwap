@@ -19,6 +19,8 @@
         android:id="@+id/viewAll"
         android:text="Show all"
         android:textSize="14sp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
         android:textColor="@color/black"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>

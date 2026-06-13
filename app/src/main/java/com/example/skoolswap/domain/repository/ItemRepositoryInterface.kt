@@ -118,7 +118,7 @@ interface ItemRepositoryInterface {
     suspend fun getShopItemForEdit(itemId: String): Result<Item>
     // Get active items
     suspend fun getActiveItems(limit: Int = 50): Result<List<Item>>
-
+    suspend fun getItemWithRefresh(itemId: String): Result<Item>
     // Get shop items
     suspend fun getShopItems(shopId: Long): Result<List<Item>>
 

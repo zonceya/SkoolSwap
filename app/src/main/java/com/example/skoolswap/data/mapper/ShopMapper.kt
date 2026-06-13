@@ -1,10 +1,11 @@
 package com.example.skoolswap.data.mapper
 
+
 import com.example.skoolswap.data.local.database.entities.ShopEntity
 import com.example.skoolswap.data.remote.models.response.shop.ShopDto
 import com.example.skoolswap.domain.model.Shop
 
-// Domain to Entity - SIMPLE!
+// Domain to Entity
 fun Shop.toEntity(): ShopEntity {
     return ShopEntity(
         id = id,
@@ -12,13 +13,14 @@ fun Shop.toEntity(): ShopEntity {
         displayName = displayName,
         userId = userId,
         sellerName = sellerName,
+        sellerMobile = sellerMobile,
         profilePictureUrl = profilePictureUrl,
-        createdAt = createdAt, // Just copy the String
+        createdAt = createdAt,
         itemsCount = itemsCount
     )
 }
 
-// Entity to Domain - SIMPLE!
+// Entity to Domain
 fun ShopEntity.toDomain(): Shop {
     return Shop(
         id = id,
@@ -26,13 +28,14 @@ fun ShopEntity.toDomain(): Shop {
         displayName = displayName,
         userId = userId,
         sellerName = sellerName,
+        sellerMobile = sellerMobile,
         profilePictureUrl = profilePictureUrl,
-        createdAt = createdAt, // Just copy the String
+        createdAt = createdAt,
         itemsCount = itemsCount
     )
 }
 
-// DTO to Domain - SIMPLE!
+// DTO to Domain
 fun ShopDto.toDomain(profilePictureUrl: String): Shop {
     return Shop(
         id = id,
@@ -40,13 +43,14 @@ fun ShopDto.toDomain(profilePictureUrl: String): Shop {
         displayName = display_name,
         userId = user_id,
         sellerName = seller_name,
+        sellerMobile = seller_mobile,  // ← ADDED sellerMobile from DTO
         profilePictureUrl = profilePictureUrl,
-        createdAt = created_at, // Just copy the String
+        createdAt = created_at,
         itemsCount = items_count
     )
 }
 
-// DTO to Entity - SIMPLE!
+// DTO to Entity
 fun ShopDto.toEntity(profilePictureUrl: String): ShopEntity {
     return ShopEntity(
         id = id,
@@ -54,8 +58,9 @@ fun ShopDto.toEntity(profilePictureUrl: String): ShopEntity {
         displayName = display_name,
         userId = user_id,
         sellerName = seller_name,
+        sellerMobile = seller_mobile,  // ← ADDED sellerMobile from DTO
         profilePictureUrl = profilePictureUrl,
-        createdAt = created_at, // Just copy the String
+        createdAt = created_at,
         itemsCount = items_count
     )
 }

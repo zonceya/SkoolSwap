@@ -4,6 +4,7 @@ import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
 import com.example.skoolswap.data.local.database.dao.ShopDao
+import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.mapper.toDomain
 import com.example.skoolswap.data.mapper.toEntity
 import com.example.skoolswap.data.remote.api.ShopApiService
@@ -29,7 +30,8 @@ class ShopRepository @Inject constructor(
     private val shopApiService: ShopApiService,
     private val shopDao: ShopDao,
     private val authRepository: AuthRepositoryInterface,
-    private val itemRepository: ItemRepositoryInterface  // Add this dependency
+    private val itemRepository: ItemRepositoryInterface,
+    private val appPreferences: AppPreferences
 ) : ShopRepositoryInterface {
 
     companion object {
@@ -207,8 +209,9 @@ class ShopRepository @Inject constructor(
                         displayName = "",
                         userId = publicResponse.shop.seller.id,
                         sellerName = publicResponse.shop.seller.name,
+                        sellerMobile = null,
                         profilePictureUrl = "",
-                        createdAt = publicResponse.shop.created_at,
+                        createdAt = publicResponse.shop.createdAt,
                         itemsCount = publicResponse.shop.stats.totalItems
                     )
 

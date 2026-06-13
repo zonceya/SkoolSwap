@@ -12,9 +12,12 @@ import com.example.skoolswap.domain.repository.ProductsRepositoryInterface
 import com.example.skoolswap.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -22,9 +25,18 @@ class ProductsViewModel @Inject constructor(
     private val productsRepository: ProductsRepositoryInterface,
     private val filterRepository: FilterRepositoryInterface
 ) : ViewModel() {
-
+    // Add this flag to block stale data replay
+    private val _isNewSectionLoading = MutableStateFlow(false)
+    val isNewSectionLoading: StateFlow<Boolean> = _isNewSectionLoading.asStateFlow()
     private val _products = MutableStateFlow<List<Item>>(emptyList())
     val products: StateFlow<List<Item>> = _products
+
+    // ADDED: Search results state (like HomeViewModel)
+    private val _searchResults = MutableStateFlow<List<Item>>(emptyList())
+    val searchResults: StateFlow<List<Item>> = _searchResults.asStateFlow()
+
+    private val _isSearching = MutableStateFlow(false)
+    val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
 
     private val _filterConfig = MutableStateFlow<FilterConfig?>(null)
     val filterConfig: StateFlow<FilterConfig?> = _filterConfig
@@ -57,21 +69,169 @@ class ProductsViewModel @Inject constructor(
     private var loadProductsJob: Job? = null
     private var loadFilterJob: Job? = null
 
-    // ==================== Public Methods ====================
+    // Search state
+    private var currentSearchQuery: String? = null
+    private var currentCategoryId: Int? = null
+    private var searchJob: Job? = null
 
+    // Sort state
+    private var _currentSortType: String? = null
+
+    // ==================== Public Methods ====================
+// ProductsViewModel.kt - Add these with other state variables
+
+    private val _isShowingLocalResults = MutableStateFlow(false)
+    val isShowingLocalResults: StateFlow<Boolean> = _isShowingLocalResults.asStateFlow()
+
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
+    private val _serverItemsCount = MutableStateFlow(0)
+    val serverItemsCount: StateFlow<Int> = _serverItemsCount.asStateFlow()
+
+    private val _searchQuery = MutableStateFlow<String?>(null)
+    val searchQuery: StateFlow<String?> = _searchQuery.asStateFlow()
     fun getSavedCategoryId(): Int? = savedCategoryId
     fun getSavedCategoryName(): String? = savedCategoryName
 
     fun setSavedCategory(categoryId: Int, categoryName: String) {
         savedCategoryId = categoryId
         savedCategoryName = categoryName
-        Log.d("ProductsViewModel", "Saved category: $categoryName (ID: $categoryId)")
+        Timber.tag("ProductsViewModel").d("Saved category: $categoryName (ID: $categoryId)")
+    }
+
+    fun setSectionType(sectionType: String, period: String? = null, categoryId: Int? = null) {
+        currentSectionType = sectionType
+        currentPeriod = period
+        currentCategoryId = categoryId
+    }
+
+    // UPDATED: Search with debounce like HomeViewModel
+    fun searchInCurrentSection(query: String) {
+        searchJob?.cancel()
+
+        _searchQuery.value = query
+
+        if (query.length < 2) {
+            Timber.tag("ProductsViewModel").d("Query too short, clearing results")
+            _searchResults.value = emptyList()
+            _isShowingLocalResults.value = false
+            _serverItemsCount.value = 0
+            return
+        }
+
+        searchJob = viewModelScope.launch {
+            delay(300)
+
+            Timber.tag("ProductsViewModel").d("🔍 Searching for: $query")
+
+            _serverItemsCount.value = 0
+
+
+            val localResults = searchLocalCache(query, getValidCategoryId())
+
+            if (localResults.isNotEmpty()) {
+                Timber.tag("ProductsViewModel").d("⚡ ${localResults.size} results from LOCAL CACHE")
+                _searchResults.value = localResults
+                _isShowingLocalResults.value = true
+            } else {
+                _searchResults.value = emptyList()
+                _isShowingLocalResults.value = false
+            }
+
+            // STEP 2: Search server in background
+            _isLoadingMore.value = true
+
+            // ✅ FIX: Convert -1 to null, and ensure we don't send invalid category IDs
+            val validCategoryId = getValidCategoryId()
+
+            val result = productsRepository.searchItems(
+                query = query,
+                categoryId = validCategoryId,  // ← Now properly null for "all categories"
+                genderId = _appliedFilters.value.gender,
+                brandId = _appliedFilters.value.brand?.firstOrNull(),
+                sizeId = _appliedFilters.value.size,
+                colorId = _appliedFilters.value.color?.firstOrNull(),
+                conditionId = _appliedFilters.value.condition,
+                minPrice = _appliedFilters.value.minPrice,
+                maxPrice = _appliedFilters.value.maxPrice,
+                sort = _currentSortType,
+                page = 1,
+                perPage = 30
+            )
+
+            _isLoadingMore.value = false
+
+            when (result) {
+                is Result.Success -> {
+                    val serverItems = result.data.items
+                    _serverItemsCount.value = serverItems.size
+                    Timber.tag("ProductsViewModel").d("✅ Server returned ${serverItems.size} results")
+
+                    if (serverItems.isNotEmpty()) {
+                        val currentResults = _searchResults.value.toMutableList()
+                        val existingIds = currentResults.map { it.id }.toSet()
+                        val newItems = serverItems.filter { it.id !in existingIds }
+
+                        if (newItems.isNotEmpty()) {
+                            val merged = currentResults + newItems
+                            _searchResults.value = merged
+                            Timber.tag("ProductsViewModel").d("📦 Added ${newItems.size} new items")
+                        }
+                        _isShowingLocalResults.value = false
+                    } else if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
+                        _searchResults.value = emptyList()
+                    }
+                }
+                is Result.Error -> {
+                    Timber.tag("ProductsViewModel").e("❌ Server search failed: ${result.exception.message}")
+                    if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
+                        _error.value = "Failed to load results"
+                    }
+                }
+            }
+        }
+    }
+    private fun getValidCategoryId(): Int? {
+        val categoryId = currentCategoryId ?: _appliedFilters.value.categoryId
+        // Convert -1 or 0 to null (meaning "all categories")
+        return if (categoryId == null || categoryId <= 0) null else categoryId
+    }
+    fun resetFirstLoadFlag() {
+        // This helps reset any stale state
+        _error.value = null
+        // Don't reset products here - let loading handle it
+    }
+    private fun searchLocalCache(query: String, categoryId: Int?): List<Item> {
+        val currentProducts = _products.value
+        if (currentProducts.isEmpty()) {
+            Timber.tag("ProductsViewModel").d("No cached products available")
+            return emptyList()
+        }
+
+        val filteredByCategory = if (categoryId != null && categoryId > 0) {
+            currentProducts.filter { it.mainCategoryId == categoryId }
+        } else {
+            currentProducts
+        }
+
+        val searchLower = query.lowercase()
+        val results = filteredByCategory
+            .filter { item ->
+                item.name.lowercase().contains(searchLower) ||
+                        item.description.lowercase().contains(searchLower)
+            }
+            .distinctBy { it.id }
+            .take(30)
+
+        Timber.tag("ProductsViewModel").d("🔍 Local search found ${results.size} matches from ${currentProducts.size} cached items")
+        return results
     }
 
     fun clearSavedCategory() {
         savedCategoryId = null
         savedCategoryName = null
-        Log.d("ProductsViewModel", "Cleared saved category")
+        Timber.tag("ProductsViewModel").d("Cleared saved category")
     }
 
     fun loadProducts(
@@ -81,6 +241,10 @@ class ProductsViewModel @Inject constructor(
         preSelectedSportTypeId: Int? = null,
         preSelectedGearType: String? = null
     ) {
+        // Reset search when loading new section
+        currentSearchQuery = null
+        _searchResults.value = emptyList()
+
         // Store pre-selected filters
         this.preSelectedSportTypeId = preSelectedSportTypeId
         this.preSelectedGearType = preSelectedGearType
@@ -94,10 +258,8 @@ class ProductsViewModel @Inject constructor(
 
         // FOR SPORT SECTION: Always use the passed category ID, don't use saved category
         val effectiveCategoryId = if (sectionType == "sport") {
-            // For sport tab, always use the passed category ID (2)
             incomingCategoryId ?: 2
         } else {
-            // For other sections, use saved priority
             savedCategoryId
                 ?: _appliedFilters.value.categoryId
                 ?: lastLoadedCategoryId
@@ -110,7 +272,8 @@ class ProductsViewModel @Inject constructor(
             lastLoadedCategoryId = effectiveCategoryId
         }
 
-        Log.d("ProductsViewModel", "loadProducts → sectionType=$sectionType, effectiveCategoryId=$effectiveCategoryId, preSelectedSportTypeId=$preSelectedSportTypeId")
+        Timber.tag("ProductsViewModel")
+            .d("loadProducts → sectionType=$sectionType, effectiveCategoryId=$effectiveCategoryId")
 
         loadFilterConfigIfNeeded(effectiveCategoryId)
         loadProductsInternal(effectiveCategoryId)
@@ -128,10 +291,12 @@ class ProductsViewModel @Inject constructor(
                 is Result.Success -> {
                     globalFilterConfig = result.data
                     _filterConfig.value = result.data
-                    Log.d("ProductsViewModel", "Loaded global filter config: ${result.data.filterGroups.size} groups")
+                    Timber.tag("ProductsViewModel")
+                        .d("Loaded global filter config: ${result.data.filterGroups.size} groups")
                 }
                 is Result.Error -> {
-                    Log.e("ProductsViewModel", "Failed to load global filter config: ${result.exception.message}")
+                    Timber.tag("ProductsViewModel")
+                        .e("Failed to load global filter config: ${result.exception.message}")
                 }
             }
         }
@@ -166,36 +331,74 @@ class ProductsViewModel @Inject constructor(
             loadFilterConfigIfNeeded(value as? Int)
         }
 
-        loadProductsInternal(updated.categoryId)
+        // If we're in search mode, re-run search with new filters
+        if (currentSearchQuery != null) {
+            searchInCurrentSection(currentSearchQuery!!)
+        } else {
+            loadProductsInternal(updated.categoryId)
+        }
     }
 
     fun updatePriceRange(min: Float, max: Float) {
-        _appliedFilters.value = _appliedFilters.value.copy(minPrice = min, maxPrice = max)
-        loadProductsInternal(_appliedFilters.value.categoryId)
+        val newFilters = _appliedFilters.value.copy(
+            minPrice = if (min > 0f) min else null,
+            maxPrice = if (max < 100000f) max else null
+        )
+        _appliedFilters.value = newFilters
+
+        Timber.tag("ProductsViewModel").d("📊 Price filter updated → R${min.toInt()} - R${max.toInt()}")
+
+        // Re-load data with new price filter
+        if (currentSearchQuery != null) {
+            searchInCurrentSection(currentSearchQuery!!)
+        } else {
+            loadProductsInternal(_appliedFilters.value.categoryId)
+        }
     }
 
+
     fun applyFilters() {
-        loadProductsInternal(_appliedFilters.value.categoryId)
+        Timber.tag("ProductsViewModel").d("Applying all filters including price")
+
+        if (currentSearchQuery != null) {
+            searchInCurrentSection(currentSearchQuery!!)
+        } else {
+            loadProductsInternal(_appliedFilters.value.categoryId)
+        }
     }
 
     fun resetFilters() {
-        _appliedFilters.value = AppliedFilters()
-        lastLoadedCategoryId = null
-        preSelectedSportTypeId = null
-        preSelectedGearType = null
+        _appliedFilters.value = AppliedFilters()   // This should clear minPrice/maxPrice
         clearSavedCategory()
-        loadFilterConfigIfNeeded(null)
-        loadProductsInternal(null)
+
+        if (currentSearchQuery != null) {
+            searchInCurrentSection(currentSearchQuery!!)
+        } else {
+            loadProductsInternal(null)
+        }
     }
 
     fun sortBy(sortType: String) {
-        val sorted = when (sortType) {
-            "price_low" -> _products.value.sortedBy { it.price }
-            "price_high" -> _products.value.sortedByDescending { it.price }
-            "newest" -> _products.value.sortedByDescending { it.createdAt }
-            else -> _products.value
+        _currentSortType = when (sortType) {
+            "price_low" -> "price_low"
+            "price_high" -> "price_high"
+            "newest" -> "newest"
+            else -> null
         }
-        _products.value = sorted
+
+        if (currentSearchQuery != null) {
+            // Re-run search with new sort
+            searchInCurrentSection(currentSearchQuery!!)
+        } else {
+            // Regular sorting on current products
+            val sorted = when (sortType) {
+                "price_low" -> _products.value.sortedBy { it.price }
+                "price_high" -> _products.value.sortedByDescending { it.price }
+                "newest" -> _products.value.sortedByDescending { it.createdAt }
+                else -> _products.value
+            }
+            _products.value = sorted
+        }
     }
 
     fun getFilterGroupById(groupId: String): FilterGroup? {
@@ -218,21 +421,23 @@ class ProductsViewModel @Inject constructor(
         val currentConfig = _filterConfig.value
         if (categoryId != null && categoryId > 0 &&
             currentConfig?.categoryId == categoryId) {
-            Log.d("ProductsViewModel", "Filter config already loaded for category $categoryId")
+            Timber.tag("ProductsViewModel")
+                .d("Filter config already loaded for category $categoryId")
             return
         }
         if (categoryId == null && currentConfig?.categoryId == null && currentConfig != null) {
-            Log.d("ProductsViewModel", "Global filter config already loaded")
+            Timber.tag("ProductsViewModel").d("Global filter config already loaded")
             return
         }
 
         loadFilterJob?.cancel()
         loadFilterJob = viewModelScope.launch {
             val result = if (categoryId != null && categoryId > 0) {
-                Log.d("ProductsViewModel", "Loading CATEGORY-SPECIFIC filters for ID: $categoryId")
+                Timber.tag("ProductsViewModel")
+                    .d("Loading CATEGORY-SPECIFIC filters for ID: $categoryId")
                 filterRepository.getFilterConfig(categoryId)
             } else {
-                Log.d("ProductsViewModel", "Loading GLOBAL filters")
+                Timber.tag("ProductsViewModel").d("Loading GLOBAL filters")
                 filterRepository.getGlobalFilterConfig()
             }
 
@@ -242,77 +447,128 @@ class ProductsViewModel @Inject constructor(
                     if (categoryId == null) {
                         globalFilterConfig = result.data
                     }
-                    Log.d("ProductsViewModel", "Filter config loaded: ${result.data.filterGroups.size} groups")
+                    Timber.tag("ProductsViewModel")
+                        .d("Filter config loaded: ${result.data.filterGroups.size} groups")
                     result.data.filterGroups.forEach { group ->
-                        Log.d("ProductsViewModel", "  - ${group.name}: ${group.options.size} options")
+                        Timber.tag("ProductsViewModel")
+                            .d("  - ${group.name}: ${group.options.size} options")
                     }
                 }
                 is Result.Error -> {
-                    Log.e("ProductsViewModel", "Filter config failed: ${result.exception.message}")
+                    Timber.tag("ProductsViewModel")
+                        .e("Filter config failed: ${result.exception.message}")
                 }
             }
         }
     }
 
-    private fun loadProductsInternal(categoryId: Int?) {
+    private fun loadProductsInternal(categoryId: Int?, searchQuery: String? = null) {
         loadProductsJob?.cancel()
         loadProductsJob = viewModelScope.launch {
+            // ✅ BLOCK products observer IMMEDIATELY (synchronously)
+            _isNewSectionLoading.value = true
             _isLoading.value = true
             _error.value = null
+            _products.value = emptyList()  // Clear stale data
 
-            val effectiveCategoryId = categoryId ?: _appliedFilters.value.categoryId
+            val query = searchQuery ?: currentSearchQuery
+            val effectiveCategoryId = getValidCategoryId()
 
-            // Use the same repository methods as UNIFORM - just with different categoryId
-            val result = when (currentSectionType) {
-                "recommended", "sport" -> productsRepository.getRecommendedAll(
-                    page = 1,
+            val result = if (!query.isNullOrBlank()) {
+                // SEARCH with filters
+                Timber.tag("ProductsViewModel").d("🔍 Searching: '$query' in category: $effectiveCategoryId")
+                productsRepository.searchItems(
+                    query = query,
                     categoryId = effectiveCategoryId,
+                    genderId = _appliedFilters.value.gender,
+                    brandId = _appliedFilters.value.brand?.firstOrNull(),
+                    sizeId = _appliedFilters.value.size,
+                    colorId = _appliedFilters.value.color?.firstOrNull(),
                     conditionId = _appliedFilters.value.condition,
                     minPrice = _appliedFilters.value.minPrice,
-                    maxPrice = _appliedFilters.value.maxPrice
-                )
-                "trending" -> productsRepository.getTrendingAll(
-                    period = currentPeriod ?: "today",
+                    maxPrice = _appliedFilters.value.maxPrice,
+                    sort = _currentSortType,
                     page = 1,
-                    categoryId = effectiveCategoryId,
-                    conditionId = _appliedFilters.value.condition,
-                    minPrice = _appliedFilters.value.minPrice,
-                    maxPrice = _appliedFilters.value.maxPrice
+                    perPage = 30
                 )
-                "recent" -> productsRepository.getRecentAll(
-                    period = currentPeriod ?: "all",
-                    page = 1,
-                    categoryId = effectiveCategoryId,
-                    conditionId = _appliedFilters.value.condition,
-                    minPrice = _appliedFilters.value.minPrice,
-                    maxPrice = _appliedFilters.value.maxPrice
-                )
-                else -> productsRepository.getRecommendedAll(
-                    page = 1,
-                    categoryId = effectiveCategoryId,
-                    conditionId = _appliedFilters.value.condition,
-                    minPrice = _appliedFilters.value.minPrice,
-                    maxPrice = _appliedFilters.value.maxPrice
-                )
+            } else {
+                // Regular section loading
+                when (currentSectionType) {
+                    "recommended" -> productsRepository.getRecommendedAll(
+                        page = 1,
+                        categoryId = effectiveCategoryId,
+                        conditionId = _appliedFilters.value.condition,
+                        minPrice = _appliedFilters.value.minPrice,
+                        maxPrice = _appliedFilters.value.maxPrice
+                    )
+                    "trending" -> productsRepository.getTrendingAll(
+                        period = currentPeriod ?: "today",
+                        page = 1,
+                        categoryId = effectiveCategoryId,
+                        conditionId = _appliedFilters.value.condition,
+                        minPrice = _appliedFilters.value.minPrice,
+                        maxPrice = _appliedFilters.value.maxPrice
+                    )
+                    "recent" -> productsRepository.getRecentAll(
+                        period = currentPeriod ?: "all",
+                        page = 1,
+                        categoryId = effectiveCategoryId,
+                        conditionId = _appliedFilters.value.condition,
+                        minPrice = _appliedFilters.value.minPrice,
+                        maxPrice = _appliedFilters.value.maxPrice
+                    )
+                    else -> productsRepository.getRecommendedAll(
+                        page = 1,
+                        categoryId = effectiveCategoryId,
+                        conditionId = _appliedFilters.value.condition,
+                        minPrice = _appliedFilters.value.minPrice,
+                        maxPrice = _appliedFilters.value.maxPrice
+                    )
+                }
             }
 
             when (result) {
                 is Result.Success -> {
                     _products.value = result.data.items
-                    Log.d("ProductsViewModel", "Loaded ${result.data.items.size} items for sectionType=$currentSectionType, categoryId=$effectiveCategoryId")
+                    Timber.tag("ProductsViewModel").d("✅ Loaded ${result.data.items.size} items")
+                    Log.d("ProductsViewModel", "Products value now has ${_products.value.size} items")
+                    if (!query.isNullOrBlank() && result.data.items.isEmpty()) {
+                        _error.value = "No results found for '$query'"
+                    } else {
+                        _error.value = null
+                    }
                 }
                 is Result.Error -> {
                     _error.value = result.exception.message
-                    Log.e("ProductsViewModel", "Error loading products: ${result.exception.message}")
+                    Timber.tag("ProductsViewModel").e("❌ Error: ${result.exception.message}")
                 }
             }
+
             _isLoading.value = false
+            _isNewSectionLoading.value = false  // ✅ UNBLOCK after data is set
         }
     }
-
     override fun onCleared() {
         loadProductsJob?.cancel()
         loadFilterJob?.cancel()
+        searchJob?.cancel()
         super.onCleared()
+    }
+    fun clearSearchResults() {
+        _searchResults.value = emptyList()
+        currentSearchQuery = null
+    }
+
+    fun reloadCurrentSection() {
+        currentSearchQuery = null
+        _searchResults.value = emptyList()
+        loadProductsInternal(_appliedFilters.value.categoryId)
+    }
+
+    // Add items cache
+    private val itemsCache = mutableMapOf<String, List<Item>>()
+
+    private fun getCacheKey(): String {
+        return "${currentSectionType}_${currentCategoryId}_${_appliedFilters.value}"
     }
 }

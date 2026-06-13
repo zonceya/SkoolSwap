@@ -6,7 +6,7 @@
     android:text="Tennis"
     android:textSize="20sp"
     android:textStyle="bold"
-    android:textColor="@android:color/black"
+    android:textColor="?attr/colorOnSurface"
     android:background="@drawable/bg_chip_white"
     android:paddingStart="24dp"
     android:paddingEnd="24dp"

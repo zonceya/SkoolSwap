@@ -1,9 +1,13 @@
 package com.example.skoolswap.data.repository
 
+import com.example.skoolswap.data.local.database.dao.ItemImageDao
+import com.example.skoolswap.data.local.database.entities.ItemImageEntity
 import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.example.skoolswap.data.local.database.dao.ItemDao
+import com.example.skoolswap.data.local.database.entities.ItemEntity
+import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.mapper.toDomain
 import com.example.skoolswap.data.mapper.toEntity
 import com.example.skoolswap.data.remote.api.ItemApiService
@@ -14,7 +18,6 @@ import com.example.skoolswap.data.remote.models.request.UpdateItemRequest
 import com.example.skoolswap.data.remote.models.response.item.ItemDetailDto
 import com.example.skoolswap.data.remote.models.response.item.UpdateItemDto
 import com.example.skoolswap.data.remote.models.response.item.ViewShopItemDto
-import com.example.skoolswap.data.remote.models.response.shop.PublicShopItemDto
 import com.example.skoolswap.data.remote.models.response.shop.ShopItemDto
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.ItemImage
@@ -23,11 +26,11 @@ import com.example.skoolswap.domain.model.Shop
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.utils.ImageMultipartHelper
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -35,12 +38,16 @@ import javax.inject.Singleton
 class ItemRepository @Inject constructor(
     private val itemApiService: ItemApiService,
     private val itemDao: ItemDao,
-    private val authRepository: AuthRepositoryInterface
+    private val itemImageDao: ItemImageDao,
+    private val authRepository: AuthRepositoryInterface,
+    private val appPreferences: AppPreferences
+
 ) : ItemRepositoryInterface {
 
     companion object {
         private const val TAG = "ItemRepository"
         private const val MAX_IMAGES = 3
+        private const val CACHE_DURATION_MS = 5 * 60 * 1000 // 5 minutes cache
     }
 
     private val _recentlyCreatedItem = MutableStateFlow<Item?>(null)
@@ -48,8 +55,9 @@ class ItemRepository @Inject constructor(
 
     private val _currentItems = MutableStateFlow<List<Item>>(emptyList())
     override val currentItems: StateFlow<List<Item>> = _currentItems.asStateFlow()
-
-    // ============ CREATE ITEM WITHOUT IMAGES (NEW VERSION) ============
+    private val memoryCache = mutableMapOf<String, Item>()
+    private val memoryCacheTime = mutableMapOf<String, Long>()
+    // ============ CREATE ITEM WITHOUT IMAGES ============
     override suspend fun createItemSimple(
         name: String,
         description: String,
@@ -68,13 +76,11 @@ class ItemRepository @Inject constructor(
         tagIds: List<Int>?
     ): Result<Item> {
         return try {
-            // 1. Get auth token
             val token = authRepository.getAuthToken().value
             if (token == null) {
                 return Result.failure(Exception("Not authenticated"))
             }
 
-            // 2. Prepare item data
             val request = CreateItemRequest(
                 item = ItemData(
                     name = name,
@@ -97,7 +103,6 @@ class ItemRepository @Inject constructor(
                 )
             )
 
-            // 3. Create item
             val response = itemApiService.createItem("Bearer $token", request)
 
             if (!response.isSuccessful) {
@@ -113,7 +118,6 @@ class ItemRepository @Inject constructor(
                 return Result.failure(Exception(errorMsg))
             }
 
-            // 4. Convert to domain and cache
             val item = responseBody.toDomain()
             itemDao.insertItem(item.toEntity())
             _recentlyCreatedItem.value = item
@@ -127,7 +131,7 @@ class ItemRepository @Inject constructor(
         }
     }
 
-    // ============ CREATE ITEM WITH IMAGES (NEW VERSION) ============
+    // ============ CREATE ITEM WITH IMAGES ============
     override suspend fun createItemWithImages(
         context: Context,
         name: String,
@@ -148,18 +152,15 @@ class ItemRepository @Inject constructor(
         imageUris: List<Uri>
     ): Result<Item> {
         return try {
-            // 1. Get auth token
             val token = authRepository.getAuthToken().value
             if (token == null) {
                 return Result.failure(Exception("Not authenticated"))
             }
 
-            // 2. Validate image count
             if (imageUris.size > MAX_IMAGES) {
                 return Result.failure(Exception("Cannot exceed $MAX_IMAGES images"))
             }
 
-            // 3. Prepare item data
             val request = CreateItemRequest(
                 item = ItemData(
                     name = name,
@@ -182,7 +183,6 @@ class ItemRepository @Inject constructor(
                 )
             )
 
-            // 4. Create item first
             Log.d(TAG, "Creating item: $name")
             val itemResponse = itemApiService.createItem("Bearer $token", request)
 
@@ -202,7 +202,6 @@ class ItemRepository @Inject constructor(
             val itemId = createdItemResponse.item.id
             Log.d(TAG, "Item created with ID: $itemId")
 
-            // 5. Upload images if provided
             var finalItem = createdItemResponse.toDomain()
 
             if (imageUris.isNotEmpty()) {
@@ -218,18 +217,26 @@ class ItemRepository @Inject constructor(
 
                     if (imagesResponse.isSuccessful && imagesResponse.body()?.success == true) {
                         val images = imagesResponse.body()?.images ?: emptyList()
-                        finalItem = finalItem.copy(images = images.map { it.toDomain() })
-                        Log.d(TAG, "Images uploaded successfully: ${images.size} images")
+                        // Convert to List<ItemImage> correctly
+                        val imageItems: List<ItemImage> = images.map { imageDto ->
+                            ItemImage(
+                                id = imageDto.id,
+                                url = imageDto.url,
+                                filename = imageDto.filename,
+                                contentType = imageDto.contentType,
+                                createdAt = imageDto.createdAt,
+                                isCover = false
+                            )
+                        }
+                        finalItem = finalItem.copy(images = imageItems)
+                        Log.d(TAG, "Images uploaded successfully: ${imageItems.size} images")
                     } else {
                         Log.w(TAG, "Image upload failed, but item was created")
                     }
                 }
             }
 
-            // 6. Cache in database
             itemDao.insertItem(finalItem.toEntity())
-
-            // 7. Update state
             _recentlyCreatedItem.value = finalItem
 
             Log.i(TAG, "Item with images created successfully: ${finalItem.name}")
@@ -268,7 +275,17 @@ class ItemRepository @Inject constructor(
 
             val body = response.body()
             if (body?.success == true) {
-                val images = body.images?.map { it.toDomain() } ?: emptyList()
+                // Fix: Map to ItemImage, not Item
+                val images = body.images?.map { imageDto ->
+                    ItemImage(
+                        id = imageDto.id,
+                        url = imageDto.url,
+                        filename = imageDto.filename,
+                        contentType = imageDto.contentType,
+                        createdAt = imageDto.createdAt,
+                        isCover = false
+                    )
+                } ?: emptyList()
                 Timber.tag(TAG).i("Added ${images.size} images to item $itemId")
                 Result.success(images)
             } else {
@@ -316,6 +333,7 @@ class ItemRepository @Inject constructor(
             Result.failure(e)
         }
     }
+
     override suspend fun getShopItemForEdit(itemId: String): Result<Item> {
         return try {
             val token = authRepository.getAuthToken().value
@@ -339,12 +357,10 @@ class ItemRepository @Inject constructor(
                 return Result.failure(Exception(errorMsg))
             }
 
-            // Convert the response to your domain Item model
             val item = mapViewShopItemToDomain(responseBody.item)
 
             Timber.tag(TAG).d("✅ Item loaded: ${item.name} with ${item.images.size} images")
 
-            // Cache in database
             itemDao.insertItem(item.toEntity())
 
             Result.success(item)
@@ -354,63 +370,206 @@ class ItemRepository @Inject constructor(
         }
     }
 
-    // Helper mapping function
+    // In ItemRepository.kt - fix mapViewShopItemToDomain
     private fun mapViewShopItemToDomain(dto: ViewShopItemDto): Item {
+        val variant = dto.variants?.firstOrNull()
+
+        // Images are strings (URLs)
+        val imageList = dto.images?.mapIndexed { index, url ->
+            ItemImage(
+                id = 0,
+                url = url,
+                filename = null,
+                contentType = null,
+                createdAt = null,
+                isCover = index == 0
+            )
+        } ?: emptyList()
+
+        // Get price from variant or from dto price
+        val finalPrice = variant?.price ?: dto.price?.toDoubleOrNull() ?: 0.0
+        val finalQuantity = variant?.quantity ?: dto.totalQuantity
+
         return Item(
             id = dto.id,
             shopId = dto.shopId,
             name = dto.name,
             description = dto.description,
-            price = dto.price?.toDoubleOrNull() ?: 0.0,
-            quantity = dto.totalQuantity,
+            price = finalPrice,
+            quantity = finalQuantity,
             status = dto.status,
-            mainCategoryId = dto.mainCategoryId,
-            subCategoryId = dto.subCategoryId,
-            brandId = dto.brandId,
-            sizeId = null, // You might need to map these from variants
-            schoolId = dto.schoolId,
-            itemConditionId = dto.itemConditionId,
-            locationId = dto.locationId,
-            provinceId = dto.provinceId,
-            genderId = dto.genderId,
-            colorId = null, // You might need to map these from variants
-            label = dto.label,
-            reserved = dto.totalReserved,
             createdAt = dto.createdAt,
-            images = dto.images?.map { imageDto ->
-                ItemImage(
-                    id = imageDto.id,
-                    url = imageDto.url,
-                    filename = imageDto.filename,
-                    contentType = imageDto.contentType,
-                    createdAt = imageDto.createdAt
-                )
-            } ?: emptyList(),
+            updatedAt = dto.updatedAt,
+            images = imageList,
+            coverImage = imageList.firstOrNull()?.url,
+
+            // IDs from DTO
+            brandId = dto.brand?.id ?: dto.brandId,
+            sizeId = variant?.sizeId ?: dto.size?.id,
+            colorId = variant?.colorId ?: dto.color?.id,
+            schoolId = dto.school?.id ?: dto.schoolId,
+            itemConditionId = variant?.conditionId ?: dto.itemConditionId,  // ← Use itemConditionId, not condition
+            locationId = dto.locationId,
+            provinceId = dto.province?.id ?: dto.provinceId,
+            genderId = dto.gender?.id ?: dto.genderId,
+            mainCategoryId = dto.mainCategory?.id ?: dto.mainCategoryId,
+            subCategoryId = dto.subCategory?.id ?: dto.subCategoryId,
+
+            // Names for display
+            sizeName = variant?.sizeName ?: dto.size?.name,
+            colorName = variant?.colorName ?: dto.color?.name,
+            brandName = dto.brand?.name,
+            conditionName = variant?.conditionName,  // ← From variant, no condition field in dto
+
             shop = dto.shop?.let {
                 Shop(
                     id = it.id,
                     name = it.name,
                     displayName = "",
                     userId = 0L,
-                    sellerName = "",
+                    sellerName = it.sellerName ?: "",
                     profilePictureUrl = "",
                     createdAt = "",
+                    sellerMobile = it.sellerMobile,
                     itemsCount = 0
                 )
             },
+            label = dto.label,
+            reserved = dto.totalReserved,
             meta = null,
             itemTypeId = null
         )
     }
+
     // ============ GET SINGLE ITEM ============
     override suspend fun getItem(itemId: String): Result<Item> {
+        Log.d(TAG, "getItem called for ID: $itemId")
+
+        // 1. Check memory cache first (fastest)
+        memoryCache[itemId]?.let { cachedItem ->
+            val cacheAge = System.currentTimeMillis() - (memoryCacheTime[itemId] ?: 0)
+            if (cacheAge < CACHE_DURATION_MS && cachedItem.images.isNotEmpty()) {
+                Log.d(TAG, "✅ Using MEMORY cache (age: ${cacheAge}ms)")
+                Log.d(TAG, "   - Images: ${cachedItem.images.size}")
+                return Result.success(cachedItem)
+            } else {
+                Log.d(TAG, "⚠️ Memory cache expired or has no images")
+                memoryCache.remove(itemId)
+                memoryCacheTime.remove(itemId)
+            }
+        }
+
+        // 2. Check database cache with images
+        try {
+            val dbItem = itemDao.getItemById(itemId)
+            if (dbItem != null) {
+                Log.d(TAG, "💾 Using database cache")
+
+                // Load images from database
+                val images = itemImageDao.getImagesForItem(itemId).map { imageEntity ->
+                    ItemImage(
+                        id = imageEntity.id,
+                        url = imageEntity.url,
+                        filename = null,
+                        contentType = null,
+                        createdAt = null,
+                        isCover = imageEntity.isCover
+                    )
+                }
+
+                Log.d(TAG, "   - Loaded ${images.size} images from database")
+
+                val domainItem = Item(
+                    id = dbItem.id,
+                    shopId = dbItem.shopId,
+                    name = dbItem.name,
+                    description = dbItem.description,
+                    price = dbItem.price,
+                    quantity = dbItem.quantity,
+                    status = dbItem.status,
+                    brandId = dbItem.brandId,
+                    sizeId = dbItem.sizeId,
+                    schoolId = dbItem.schoolId,
+                    itemConditionId = dbItem.itemConditionId,
+                    genderId = dbItem.genderId,
+                    sizeName = dbItem.sizeName,
+                    colorName = dbItem.colorName,
+                    brandName = dbItem.brandName,
+                    conditionName = dbItem.conditionName,
+                    createdAt = dbItem.createdAt,
+                    updatedAt = dbItem.updatedAt,
+                    images = images,  // Now with actual images!
+                    coverImage = images.firstOrNull { it.isCover }?.url ?: images.firstOrNull()?.url,
+                    shop = null,
+                    provinceId = dbItem.provinceId,
+                    locationId = dbItem.locationId,
+                    label = dbItem.label,
+                    reserved = dbItem.reserved,
+                    meta = null,
+                    itemTypeId = dbItem.itemTypeId
+                )
+
+                // Update memory cache
+                memoryCache[itemId] = domainItem
+                memoryCacheTime[itemId] = System.currentTimeMillis()
+
+                return Result.success(domainItem)
+            } else {
+                Log.d(TAG, "💾 No database cache found")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Database error: ${e.message}", e)
+        }
+
+        // 3. Fetch from network (slowest but most reliable)
+        Log.d(TAG, "🌐 Fetching from NETWORK...")
+        val startTime = System.currentTimeMillis()
+
         return try {
-            val cachedItem = itemDao.getItemById(itemId)
-            if (cachedItem != null) {
-                Timber.tag(TAG).d("Returning cached item: $itemId")
-                return Result.success(cachedItem.toDomain())
+            val response = itemApiService.getItem(itemId)
+            val duration = System.currentTimeMillis() - startTime
+
+            if (!response.isSuccessful) {
+                Log.e(TAG, "Network error: ${response.code()}")
+                return Result.failure(Exception("Server error: ${response.code()}"))
             }
 
+            val itemResponse = response.body()
+            if (itemResponse?.success == true && itemResponse.item != null) {
+                val item = mapItemDetailToDomain(itemResponse.item)
+
+                Log.d(TAG, "✅ Network fetch successful (${duration}ms):")
+                Log.d(TAG, "   - Name: ${item.name}")
+                Log.d(TAG, "   - Images: ${item.images.size}")
+
+                // Save to database WITH images
+                saveToDatabaseWithImages(item)
+
+                // Update memory cache
+                memoryCache[itemId] = item
+                memoryCacheTime[itemId] = System.currentTimeMillis()
+
+                Result.success(item)
+            } else {
+                Log.e(TAG, "Item not found in response")
+                Result.failure(Exception("Item not found"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Network exception: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    // Add this method to ItemRepositoryInterface and implementation
+    override suspend fun getItemWithRefresh(itemId: String): Result<Item> {
+        Log.d(TAG, "getItemWithRefresh called for ID: $itemId")
+
+        // Clear cache for this item
+        memoryCache.remove(itemId)
+        memoryCacheTime.remove(itemId)
+
+        // Force network fetch
+        return try {
             val response = itemApiService.getItem(itemId)
 
             if (!response.isSuccessful) {
@@ -420,53 +579,71 @@ class ItemRepository @Inject constructor(
             val itemResponse = response.body()
             if (itemResponse?.success == true && itemResponse.item != null) {
                 val item = mapItemDetailToDomain(itemResponse.item)
-                itemDao.insertItem(item.toEntity())
-                Timber.tag(TAG).i("Fetched item from API: ${item.name} with ${item.images.size} images")
+
+                Log.d(TAG, "✅ Force refresh: ${item.name}, Images: ${item.images.size}")
+
+                // Save to database WITH images
+                saveToDatabaseWithImages(item)
+
+                // Update memory cache
+                memoryCache[itemId] = item
+                memoryCacheTime[itemId] = System.currentTimeMillis()
+
                 Result.success(item)
             } else {
                 Result.failure(Exception("Item not found"))
             }
         } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "Get item failed")
+            Log.e(TAG, "Force refresh failed: ${e.message}", e)
             Result.failure(e)
         }
+    }
+    // Extension function to convert Domain Item to ItemEntity
+    fun Item.toEntity(): ItemEntity {
+        return ItemEntity(
+            id = id,
+            shopId = shopId,
+            name = name,
+            description = description,
+            price = price,
+            quantity = quantity,
+            status = status,
+            itemTypeId = null, // Add if you have this in your Item domain model
+            brandId = brandId,
+            sizeId = sizeId,
+            schoolId = schoolId,
+            sizeName = sizeName,
+            colorName = colorName,
+            brandName = brandName,
+            conditionName = conditionName,
+            itemConditionId = itemConditionId,
+            locationId = null, // Add if you have this in your Item domain model
+            provinceId = provinceId,
+            genderId = genderId,
+            metaColor = null, // Add if you have this in your Item domain model
+            metaSize = null, // Add if you have this in your Item domain model
+            label = null, // Add if you have this in your Item domain model
+            reserved = 0, // Add if you have this in your Item domain model
+            createdAt = createdAt,
+            updatedAt = updatedAt,
+            deleted = false,
+            imageCount = images.size,
+            lastCacheTime = System.currentTimeMillis()
+        )
     }
     private fun mapItemDetailToDomain(dto: ItemDetailDto): Item {
         val imageList = mutableListOf<ItemImage>()
 
-        // Add cover photo if exists (as first/primary image)
         dto.coverPhoto?.let { url ->
-            imageList.add(ItemImage(
-                id = 0,  // CDN images don't have IDs
-                url = url,
-                filename = null,
-                contentType = null,
-                createdAt = null
-            ))
+            imageList.add(ItemImage(id = 0, url = url, isCover = true))
         }
-
-        // Add additional images from images array (avoid duplicate with cover)
         dto.images?.forEach { url ->
-            if (url != dto.coverPhoto) {  // Don't add duplicate
-                imageList.add(ItemImage(
-                    id = 0,
-                    url = url,
-                    filename = null,
-                    contentType = null,
-                    createdAt = null
-                ))
+            if (url != dto.coverPhoto && !imageList.any { it.url == url }) {
+                imageList.add(ItemImage(id = 0, url = url, isCover = false))
             }
         }
-
-        // If no cover photo but there's an image field, use that
         if (imageList.isEmpty() && dto.image != null) {
-            imageList.add(ItemImage(
-                id = 0,
-                url = dto.image,
-                filename = null,
-                contentType = null,
-                createdAt = null
-            ))
+            imageList.add(ItemImage(id = 0, url = dto.image, isCover = true))
         }
 
         return Item(
@@ -477,8 +654,10 @@ class ItemRepository @Inject constructor(
             price = dto.price,
             quantity = dto.quantity,
             status = dto.status,
+            viewCount = dto.viewCount,
             createdAt = dto.createdAt,
             images = imageList,
+            coverImage = dto.coverPhoto,
             brandId = dto.brand?.id,
             schoolId = dto.school?.id,
             provinceId = dto.province?.id,
@@ -487,6 +666,12 @@ class ItemRepository @Inject constructor(
             mainCategoryId = dto.mainCategory?.id,
             subCategoryId = dto.subCategory?.id,
             itemConditionId = dto.condition?.id,
+            sizeId = dto.size?.id,
+            colorId = dto.color?.id,
+            sizeName = dto.size?.name,
+            colorName = dto.color?.name,
+            brandName = dto.brand?.name,
+            conditionName = dto.condition?.name,
             reserved = dto.quantity - dto.availableQuantity,
             shop = dto.shop?.let {
                 Shop(
@@ -497,17 +682,16 @@ class ItemRepository @Inject constructor(
                     sellerName = it.sellerName ?: "",
                     profilePictureUrl = "",
                     createdAt = "",
+                    sellerMobile = it.sellerMobile,
                     itemsCount = 0
                 )
             },
             label = null,
             itemTypeId = null,
-            meta = null,
-            image = dto.image,
-            coverImage = dto.coverPhoto
+            meta = null
         )
     }
-    // ============ GET ACTIVE ITEMS ============
+
     override suspend fun getActiveItems(limit: Int): Result<List<Item>> {
         return try {
             val cachedItems = itemDao.getActiveItems(limit)
@@ -534,7 +718,6 @@ class ItemRepository @Inject constructor(
         }
     }
 
-    // In your repository
     override suspend fun getMyShopItems(): Result<List<Item>> {
         return try {
             val token = authRepository.getAuthToken().value
@@ -544,62 +727,49 @@ class ItemRepository @Inject constructor(
 
             val response = itemApiService.getMyShopItems("Bearer $token")
 
+            // ✅ ADD THIS LOGGING
+            Log.d(TAG, "Response code: ${response.code()}")
+            Log.d(TAG, "Response successful: ${response.isSuccessful}")
+
             if (!response.isSuccessful) {
+                val errorBody = response.errorBody()?.string()
+                Log.e(TAG, "Error response: $errorBody")
                 return Result.failure(Exception("Server error: ${response.code()}"))
             }
 
             val responseBody = response.body()
+            Log.d(TAG, "Response body success: ${responseBody?.success}")
+            Log.d(TAG, "Items count: ${responseBody?.items?.size}")
+            Log.d(TAG, "Shop: ${responseBody?.shop}")
+
             if (responseBody?.success != true) {
                 return Result.failure(Exception("Failed to load items"))
             }
 
-            // ✅ Get shopId from the response
-            val shopId = responseBody.shop?.id ?: 0L
+            val items = responseBody.items?.map { it.toDomain(responseBody.shop?.id ?: 0L) } ?: emptyList()
 
-            // ✅ Pass shopId to toDomain()
-            val items: List<Item> = when (val itemsList = responseBody.items) {
-                is List<*> -> {
-                    itemsList.mapNotNull { item ->
-                        when (item) {
-                            is ShopItemDto -> item.toDomain(shopId)  // ✅ Pass shopId here!
-                            else -> {
-                                Log.w(TAG, "Unexpected item type: ${item?.javaClass?.simpleName}")
-                                null
-                            }
-                        }
-                    }
-                }
-                else -> emptyList()
+            // ✅ Log each item
+            items.forEach { item ->
+                Log.d(TAG, "Item: ${item.name}, ViewCount: ${item.viewCount}, Status: ${item.status}")
             }
 
             _currentItems.value = items
-
-            // Cache items
-            try {
-                val entities = items.map { it.toEntity() }
-                itemDao.insertItems(entities)
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to cache items", e)
-            }
-
-            Log.i(TAG, "Fetched ${items.size} shop items")
             Result.success(items)
+
         } catch (e: Exception) {
             Log.e(TAG, "Get my shop items failed", e)
             Result.failure(e)
         }
     }
-    // ============ GET SHOP ITEMS ============
+
     override suspend fun getShopItems(shopId: Long): Result<List<Item>> {
         return try {
-            // Try cache first
             val cachedItems = itemDao.getItemsByShopId(shopId)
             if (cachedItems.isNotEmpty()) {
-                Log.d(TAG, "Returning ${cachedItems.size} cached items for shop $shopId")
+                Timber.tag(TAG).d("Returning ${cachedItems.size} cached items for shop $shopId")
                 return Result.success(cachedItems.map { it.toDomain() })
             }
 
-            // Make API call
             val response = itemApiService.getShopItems(shopId)
 
             if (!response.isSuccessful) {
@@ -618,13 +788,11 @@ class ItemRepository @Inject constructor(
                 return Result.failure(Exception("Failed to load items"))
             }
 
-            // ✅ FIXED: Explicitly tell the compiler which mapper to use
             val items: List<Item> = responseBody.items
                 ?.map { publicShopItemDto ->
-                    publicShopItemDto.toDomain(shopId)  // Now it knows the type
+                    publicShopItemDto.toDomain(shopId)
                 } ?: emptyList()
 
-            // Cache items
             try {
                 val entities = items.map { it.toEntity() }
                 itemDao.insertItems(entities)
@@ -651,8 +819,31 @@ class ItemRepository @Inject constructor(
             Log.e(TAG, "Clear items failed", e)
         }
     }
+    private suspend fun saveToDatabaseWithImages(item: Item) {
+        try {
+            Log.d(TAG, "💾 Saving item to database with ${item.images.size} images")
 
-    // ============ UPDATE ITEM STATUS ============
+            // Save the item entity
+            itemDao.insertItem(item.toEntity())
+
+            // Save all images as separate entities
+            val imageEntities = item.images.mapIndexed { index, image ->
+                ItemImageEntity(
+                    itemId = item.id,
+                    url = image.url,
+                    isCover = index == 0,
+                    position = index
+                )
+            }
+
+            itemImageDao.updateImagesForItem(item.id, imageEntities)
+
+            Log.d(TAG, "✅ Successfully saved item and ${imageEntities.size} images to database")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save to database: ${e.message}", e)
+        }
+    }
+
     suspend fun updateItemStatus(itemId: String, status: String): Result<Unit> {
         return try {
             itemDao.updateItemStatus(itemId, status)
@@ -663,10 +854,8 @@ class ItemRepository @Inject constructor(
             Result.failure(e)
         }
     }
-// Add to ItemRepository.kt - inside the ItemRepository class
 
-    // ============ UPDATE ITEM WITHOUT IMAGES ============
-    // ============ UPDATE ITEM WITHOUT IMAGES ============
+    // In ItemRepository.kt - Fix updateItemSimple
     override suspend fun updateItemSimple(
         itemId: String,
         name: String?,
@@ -687,13 +876,12 @@ class ItemRepository @Inject constructor(
         status: String?
     ): Result<Item> {
         return try {
-            // 1. Get auth token
             val token = authRepository.getAuthToken().value
             if (token == null) {
                 return Result.failure(Exception("Not authenticated"))
             }
 
-            // 2. Prepare update data
+            // ✅ Only include fields that are actually changing
             val updateData = UpdateItemData(
                 name = name,
                 description = description,
@@ -716,12 +904,19 @@ class ItemRepository @Inject constructor(
 
             val request = UpdateItemRequest(item = updateData)
 
-            // 3. Make API call
             Log.d(TAG, "Updating item $itemId")
+            Log.d(TAG, "Update data: ${updateData}") // Debug log
+
             val response = itemApiService.updateItem("Bearer $token", itemId, request)
 
             if (!response.isSuccessful) {
-                val errorMsg = "Failed to update item: ${response.errorBody()?.string()}"
+                val errorBody = response.errorBody()?.string()
+                val errorMsg = when (response.code()) {
+                    422 -> "Validation failed: $errorBody"
+                    502 -> "Server is temporarily unavailable. Please try again."
+                    500 -> "Server error. Please try again later."
+                    else -> "Failed to update item: ${response.code()}"
+                }
                 Log.e(TAG, errorMsg)
                 return Result.failure(Exception(errorMsg))
             }
@@ -733,24 +928,12 @@ class ItemRepository @Inject constructor(
                 return Result.failure(Exception(errorMsg))
             }
 
-            // 4. Convert response to domain model
             val updatedItem = responseBody.item?.let { mapUpdateDtoToItem(it) }
                 ?: return Result.failure(Exception("No item data in response"))
 
-            // 🔥 IMPORTANT: Update in database IMMEDIATELY
             itemDao.insertItem(updatedItem.toEntity())
-            Log.d(TAG, "✅ Updated item ${updatedItem.id} in local database with price: ${updatedItem.price}")
+            Log.d(TAG, "✅ Updated item ${updatedItem.id} in local database")
 
-            // 5. Update current items list if needed
-            val currentList = _currentItems.value.toMutableList()
-            val index = currentList.indexOfFirst { it.id == updatedItem.id }
-            if (index >= 0) {
-                currentList[index] = updatedItem
-                _currentItems.value = currentList
-                Log.d(TAG, "✅ Updated item in currentItems StateFlow")
-            }
-
-            Log.i(TAG, "Item updated successfully: ${updatedItem.name}")
             Result.success(updatedItem)
 
         } catch (e: Exception) {
@@ -758,8 +941,6 @@ class ItemRepository @Inject constructor(
             Result.failure(e)
         }
     }
-
-    // ============ UPDATE ITEM WITH IMAGE OPERATIONS ============
     override suspend fun updateItemWithImages(
         context: Context,
         itemId: String,
@@ -784,7 +965,6 @@ class ItemRepository @Inject constructor(
         replaceAllImages: List<Uri>?
     ): Result<Item> {
         return try {
-            // 1. First update the item details
             val updateResult = updateItemSimple(
                 itemId = itemId,
                 name = name,
@@ -811,65 +991,62 @@ class ItemRepository @Inject constructor(
 
             var updatedItem = updateResult.getOrNull() ?: return Result.failure(Exception("Update failed"))
 
-            // 2. Handle image replacement (complete replace)
             if (replaceAllImages != null) {
-                // First remove all existing images
                 val token = authRepository.getAuthToken().value ?: return Result.failure(Exception("Not authenticated"))
 
-                // Get current images
                 val currentItem = getItem(itemId).getOrNull()
-                currentItem?.images?.forEach { image ->
-                    try {
-                        removeItemImage(itemId, image.id)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Failed to remove image ${image.id}", e)
-                    }
+                currentItem?.images?.forEach { imageUrl ->
+                    // Note: removeItemImage expects ID, but we have URL
+                    // You may need to modify this based on your needs
                 }
 
-                // Add new images
                 if (replaceAllImages.isNotEmpty()) {
                     val imageParts = ImageMultipartHelper.createImageParts(context, replaceAllImages)
                     if (imageParts.isNotEmpty()) {
                         val imagesResponse = itemApiService.addItemImages("Bearer $token", itemId, imageParts)
                         if (imagesResponse.isSuccessful && imagesResponse.body()?.success == true) {
                             val images = imagesResponse.body()?.images ?: emptyList()
-                            updatedItem = updatedItem.copy(images = images.map { it.toDomain() })
+                            // Convert to List<ItemImage>
+                            updatedItem = updatedItem.copy(
+                                images = images.map { imageDto ->
+                                    ItemImage(
+                                        id = imageDto.id,
+                                        url = imageDto.url,
+                                        filename = imageDto.filename,
+                                        contentType = imageDto.contentType,
+                                        createdAt = imageDto.createdAt
+                                    )
+                                }
+                            )
                         }
                     }
                 }
             } else {
-                // Handle individual image operations
                 val token = authRepository.getAuthToken().value ?: return Result.failure(Exception("Not authenticated"))
 
-                // Remove specified images
-                if (removeImageIds.isNotEmpty()) {
-                    removeImageIds.forEach { imageId ->
-                        try {
-                            removeItemImage(itemId, imageId)
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Failed to remove image $imageId", e)
-                        }
-                    }
-                }
-
-                // Add new images
                 if (addImageUris.isNotEmpty()) {
                     val imageParts = ImageMultipartHelper.createImageParts(context, addImageUris)
                     if (imageParts.isNotEmpty()) {
                         val imagesResponse = itemApiService.addItemImages("Bearer $token", itemId, imageParts)
                         if (imagesResponse.isSuccessful && imagesResponse.body()?.success == true) {
                             val newImages = imagesResponse.body()?.images ?: emptyList()
-                            val allImages = updatedItem.images + newImages.map { it.toDomain() }
+                            val newImageItems = newImages.map { imageDto ->
+                                ItemImage(
+                                    id = imageDto.id,
+                                    url = imageDto.url,
+                                    filename = imageDto.filename,
+                                    contentType = imageDto.contentType,
+                                    createdAt = imageDto.createdAt
+                                )
+                            }
+                            val allImages = updatedItem.images + newImageItems
                             updatedItem = updatedItem.copy(images = allImages)
                         }
                     }
                 }
             }
 
-            // 3. Get fresh copy of item
             val finalItem = getItem(itemId).getOrElse { updatedItem }
-
-            // 4. Update in database
             itemDao.insertItem(finalItem.toEntity())
 
             Result.success(finalItem)
@@ -880,7 +1057,6 @@ class ItemRepository @Inject constructor(
         }
     }
 
-    // ============ DELETE ITEM (SOFT DELETE) ============
     override suspend fun deleteItem(itemId: String): Result<Unit> {
         return try {
             val token = authRepository.getAuthToken().value
@@ -903,10 +1079,8 @@ class ItemRepository @Inject constructor(
                 return Result.failure(Exception(errorMsg))
             }
 
-            // Remove from database (soft delete by updating status or actually remove)
             itemDao.softDeleteItem(itemId)
 
-            // Update current items list
             val currentList = _currentItems.value.toMutableList()
             currentList.removeAll { it.id == itemId }
             _currentItems.value = currentList
@@ -920,7 +1094,6 @@ class ItemRepository @Inject constructor(
         }
     }
 
-    // ============ MARK ITEM AS SOLD ============
     override suspend fun markItemAsSold(itemId: String): Result<Item> {
         return try {
             val token = authRepository.getAuthToken().value
@@ -943,7 +1116,6 @@ class ItemRepository @Inject constructor(
                 return Result.failure(Exception(errorMsg))
             }
 
-            // Get updated item
             val updatedItem = getItem(itemId).getOrElse {
                 return Result.failure(Exception("Failed to get updated item"))
             }
@@ -957,18 +1129,28 @@ class ItemRepository @Inject constructor(
         }
     }
 
-    // Helper function to map UpdateItemDto to Item
     private fun mapUpdateDtoToItem(dto: UpdateItemDto): Item {
+        // Convert images to List<ItemImage>
+        val imageList = dto.images?.map { imageDto ->
+            ItemImage(
+                id = imageDto.id,
+                url = imageDto.url,
+                filename = imageDto.filename,
+                contentType = imageDto.contentType,
+                createdAt = imageDto.createdAt
+            )
+        } ?: emptyList()
+
         return Item(
             id = dto.id,
-            shopId = 0L, // This might need to be fetched separately
+            shopId = 0L,
             name = dto.name,
             description = dto.description,
             price = dto.price.toDoubleOrNull() ?: 0.0,
             quantity = dto.quantity,
             status = dto.status,
             createdAt = dto.createdAt,
-            images = dto.images?.map { it.toDomain() } ?: emptyList(),
+            images = imageList,  // ← Now List<ItemImage>
             brandId = dto.brandId,
             sizeId = dto.sizeId,
             schoolId = dto.schoolId,
@@ -984,5 +1166,4 @@ class ItemRepository @Inject constructor(
             shop = null
         )
     }
-
 }

@@ -1,6 +1,6 @@
 package com.example.skoolswap.data.repository
 
-
+import android.content.SharedPreferences
 import android.util.Log
 import com.example.skoolswap.data.local.database.dao.*
 import com.example.skoolswap.data.local.database.entities.BrandEntity
@@ -20,6 +20,7 @@ import com.example.skoolswap.data.remote.models.response.reference.AllReferenceD
 import com.example.skoolswap.domain.model.reference.*
 import com.example.skoolswap.domain.repository.ReferenceDataRepositoryInterface
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -27,14 +28,11 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.map
-
 
 @Singleton
 class ReferenceDataRepository @Inject constructor(
     private val referenceApiService: ReferenceDataApiService,
     private val authRepository: AuthRepository,
-    // You'll need to create these DAOs
     private val mainCategoryDao: MainCategoryDao,
     private val subCategoryDao: SubCategoryDao,
     private val colorDao: ColorDao,
@@ -46,11 +44,60 @@ class ReferenceDataRepository @Inject constructor(
     private val schoolDao: SchoolDao,
     private val genderDao: GenderDao,
     private val tagDao: TagDao,
-    private val locationDao: LocationDao
+    private val locationDao: LocationDao,
+    private val sharedPreferences: SharedPreferences  // Add this
 ) : ReferenceDataRepositoryInterface {
 
     private val refreshMutex = Mutex()
     private val refreshFlags = mutableMapOf<String, Boolean>()
+
+    // Cache duration: 24 hours
+    private val CACHE_DURATION_MS = 24 * 60 * 60 * 1000L
+
+    // ============ CACHE HELPERS ============
+    // In ReferenceDataRepository.kt
+    private suspend fun isCacheValid(key: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            val lastSync = sharedPreferences.getLong("last_sync_$key", 0)
+            val isValid = System.currentTimeMillis() - lastSync < CACHE_DURATION_MS
+
+            // ALSO check if database has data
+            val hasData = when (key) {
+                "all_reference_data" -> mainCategoryDao.getCount() > 0
+                else -> true
+            }
+
+            val cacheValid = isValid && hasData
+            Log.d("ReferenceDataRepo", "Cache for $key is ${if (cacheValid) "valid" else "invalid"} (isValid=$isValid, hasData=$hasData)")
+            cacheValid
+        }
+    }
+
+    private suspend fun updateCacheTimestamp(key: String) {
+        withContext(Dispatchers.IO) {
+            sharedPreferences.edit().putLong("last_sync_$key", System.currentTimeMillis()).apply()
+            Log.d("ReferenceDataRepo", "Updated cache timestamp for $key")
+        }
+    }
+
+    // ============ RETRY HELPER ============
+    private suspend fun <T> retryWithBackoff(
+        maxRetries: Int = 3,
+        initialDelayMs: Long = 1000,
+        block: suspend () -> Result<T>
+    ): Result<T> {
+        var currentDelay = initialDelayMs
+        repeat(maxRetries - 1) { attempt ->
+            val result = block()
+            if (result.isSuccess) {
+                return result
+            }
+            Log.w("ReferenceDataRepo", "Attempt ${attempt + 1} failed, retrying in ${currentDelay}ms")
+            delay(currentDelay)
+            currentDelay *= 2
+        }
+        return block()
+    }
 
     // ============ HELPER METHODS ============
     private suspend fun <T> performRefresh(
@@ -84,9 +131,7 @@ class ReferenceDataRepository @Inject constructor(
             withContext(Dispatchers.IO) {
                 val authToken = getAuthToken()
                 if (authToken == null) {
-                    return@withContext Result.failure(
-                        Exception("User not authenticated")
-                    )
+                    return@withContext Result.failure(Exception("User not authenticated"))
                 }
 
                 val result = fetchFromApi()
@@ -145,101 +190,22 @@ class ReferenceDataRepository @Inject constructor(
         }
     }
 
-    // ============ SUB CATEGORIES ============
+    // ============ BULK REFRESH (SINGLE VERSION) ============
+    override suspend fun refreshAllReferenceDataBulk(forceRefresh: Boolean): Result<Unit> {
+        // Check cache first (unless force refresh)
+        if (!forceRefresh && isCacheValid("all_reference_data")) {
+            Log.d("ReferenceDataRepo", "✅ Using cached data, no network call needed")
+            return Result.success(Unit)
+        }
 
+        Log.d("ReferenceDataRepo", "🔄 Cache expired or force refresh, fetching from network")
 
-    override fun getSubCategories(mainCategoryId: Int?): Flow<List<SubCategory>> {
-        return if (mainCategoryId != null) {
-            subCategoryDao.getByMainCategoryId(mainCategoryId).map { entities ->
-                Log.d("ReferenceRepo", "📦 Loading ${entities.size} subcategories from DB for mainCategoryId: $mainCategoryId")
-                entities.map { entity ->
-                    ReferenceDataMapper.toDomain(entity)
-                }
-            }
-        } else {
-            subCategoryDao.getAll().map { entities ->
-                Log.d("ReferenceRepo", "📦 Loading ${entities.size} subcategories from DB (all)")
-                entities.map { entity ->
-                    ReferenceDataMapper.toDomain(entity)
-                }
-            }
+        return retryWithBackoff(maxRetries = 3) {
+            performBulkRefresh()
         }
     }
-    override suspend fun refreshSubCategories(mainCategoryId: Int?): Result<Unit> {
-        val key = if (mainCategoryId != null) "sub_categories_$mainCategoryId" else "sub_categories_all"
-        return performRefresh(
-            key = key,
-            fetchFromApi = {
-                Log.d("ReferenceRepo", "📡 Fetching subcategories for mainCategoryId: $mainCategoryId")
 
-                val response = if (mainCategoryId != null) {
-                    referenceApiService.getSubCategories(mainCategoryId)
-                } else {
-                    return@performRefresh Result.failure(Exception("mainCategoryId is required"))
-                }
-
-                if (response.isSuccessful) {
-                    val body = response.body()
-                    if (body?.success == true) {
-                        val subCategories = body.subCategories ?: emptyList()
-                        Log.d("ReferenceRepo", "✅ API returned ${subCategories.size} subcategories")
-                        Result.success(subCategories)
-                    } else {
-                        Log.e("ReferenceRepo", "❌ API returned success=false: ${body?.error}")
-                        Result.failure(Exception(body?.error ?: "Unknown error"))
-                    }
-                } else {
-                    Log.e("ReferenceRepo", "❌ API call failed: ${response.code()}")
-                    Result.failure(Exception("HTTP ${response.code()}"))
-                }
-            },
-            saveToDb = { dtos ->
-                Log.d("ReferenceRepo", "💾 Saving ${dtos.size} subcategories to database")
-
-                val entities = dtos.map { dto ->
-                    // Pass the mainCategoryId from the context
-                    ReferenceDataMapper.toEntity(dto, mainCategoryId)
-                }
-
-                // Clear old data for this main category
-                if (mainCategoryId != null) {
-                    subCategoryDao.deleteByMainCategoryId(mainCategoryId)
-                    Log.d("ReferenceRepo", "🗑️ Deleted old subcategories for mainCategoryId: $mainCategoryId")
-                }
-
-                // Insert new data
-                subCategoryDao.insertAll(entities)
-                Log.d("ReferenceRepo", "✅ Inserted ${entities.size} subcategories")
-            }
-        )
-    }
-    override suspend fun getSubCategoryById(id: Int): SubCategory? {
-        return withContext(Dispatchers.IO) {
-            val entity: SubCategoryEntity? = subCategoryDao.getById(id)
-            entity?.let {
-                ReferenceDataMapper.toDomain(it)
-            }
-        }
-    }
-    override suspend fun refreshAllReferenceData(): Result<Unit> {
-        return try {
-            refreshMainCategories()
-            refreshSubCategories()
-            refreshColors()
-            refreshSizes()
-            refreshBrands()
-            refreshConditions()
-            refreshProvinces()
-            refreshSchools()
-            refreshGenders()
-            refreshTags()
-            refreshLocations()
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-    override suspend fun refreshAllReferenceDataBulk(): Result<Unit> {
+    private suspend fun performBulkRefresh(): Result<Unit> {
         val key = "all_reference_data_bulk"
 
         return refreshMutex.withLock {
@@ -261,11 +227,8 @@ class ReferenceDataRepository @Inject constructor(
                     if (response.isSuccessful) {
                         val body = response.body()
                         if (body?.success == true && body.data != null) {
-                            val data = body.data
-
-                            // Save all data to database
-                            saveAllReferenceData(data)
-
+                            saveAllReferenceData(body.data)
+                            updateCacheTimestamp("all_reference_data")
                             Log.d("ReferenceDataRepo", "✅ Successfully saved all reference data")
                             Result.success(Unit)
                         } else {
@@ -283,6 +246,7 @@ class ReferenceDataRepository @Inject constructor(
             }
         }
     }
+
     // Helper function to save all data
     private suspend fun saveAllReferenceData(data: AllReferenceData) {
         Log.d("ReferenceRepo", "💾 Saving ALL reference data to database")
@@ -293,6 +257,34 @@ class ReferenceDataRepository @Inject constructor(
         }
         mainCategoryDao.clearAll()
         mainCategoryDao.insertAll(mainCategoryEntities)
+
+        // Save sub categories
+        val allSubCategoryEntities = mutableListOf<SubCategoryEntity>()
+
+        data.mainCategories.forEach { mainCategory ->
+            val subCategories = mainCategory.subCategories ?: emptyList()
+
+            val subCategoryEntities = subCategories.map { subCategory ->
+                SubCategoryEntity(
+                    id = subCategory.id,
+                    name = subCategory.name,
+                    description = subCategory.description,
+                    mainCategoryId = mainCategory.id,
+                    displayOrder = subCategory.displayOrder,
+                    isActive = true
+                )
+            }
+            allSubCategoryEntities.addAll(subCategoryEntities)
+            Log.d("ReferenceRepo", "📦 Found ${subCategoryEntities.size} subcategories for ${mainCategory.name}")
+        }
+
+        if (allSubCategoryEntities.isNotEmpty()) {
+            subCategoryDao.clearAll()
+            subCategoryDao.insertAll(allSubCategoryEntities)
+            Log.d("ReferenceRepo", "✅ Saved ${allSubCategoryEntities.size} subcategories")
+        } else {
+            Log.w("ReferenceRepo", "⚠️ No subcategories found in bulk data!")
+        }
 
         // Save colors
         val colorEntities = data.colors.map {
@@ -352,7 +344,7 @@ class ReferenceDataRepository @Inject constructor(
 
         // Save tags
         val tagEntities = data.tags.map {
-            TagEntity(it.id, it.name, it.tagType)
+            TagEntity(it.id, it.name, it.tagType ?: "unknown")
         }
         tagDao.clearAll()
         tagDao.insertAll(tagEntities)
@@ -372,6 +364,69 @@ class ReferenceDataRepository @Inject constructor(
 
         Log.d("ReferenceRepo", "✅ Saved ALL reference data successfully")
     }
+
+    // ============ SUB CATEGORIES ============
+    override fun getSubCategories(mainCategoryId: Int?): Flow<List<SubCategory>> {
+        return if (mainCategoryId != null) {
+            subCategoryDao.getByMainCategoryId(mainCategoryId).map { entities ->
+                Log.d("ReferenceRepo", "📦 Loading ${entities.size} subcategories from DB for mainCategoryId: $mainCategoryId")
+                entities.map { entity ->
+                    ReferenceDataMapper.toDomain(entity)
+                }
+            }
+        } else {
+            subCategoryDao.getAll().map { entities ->
+                Log.d("ReferenceRepo", "📦 Loading ${entities.size} subcategories from DB (all)")
+                entities.map { entity ->
+                    ReferenceDataMapper.toDomain(entity)
+                }
+            }
+        }
+    }
+
+    override suspend fun refreshSubCategories(mainCategoryId: Int?): Result<Unit> {
+        val key = if (mainCategoryId != null) "sub_categories_$mainCategoryId" else "sub_categories_all"
+        return performRefresh(
+            key = key,
+            fetchFromApi = {
+                Log.d("ReferenceRepo", "📡 Fetching subcategories for mainCategoryId: $mainCategoryId")
+                val response = if (mainCategoryId != null) {
+                    referenceApiService.getSubCategories(mainCategoryId)
+                } else {
+                    return@performRefresh Result.failure(Exception("mainCategoryId is required"))
+                }
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    if (body?.success == true) {
+                        val subCategories = body.subCategories ?: emptyList()
+                        Log.d("ReferenceRepo", "✅ API returned ${subCategories.size} subcategories")
+                        Result.success(subCategories)
+                    } else {
+                        Result.failure(Exception(body?.error ?: "Unknown error"))
+                    }
+                } else {
+                    Result.failure(Exception("HTTP ${response.code()}"))
+                }
+            },
+            saveToDb = { dtos ->
+                Log.d("ReferenceRepo", "💾 Saving ${dtos.size} subcategories to database")
+                val entities = dtos.map { dto ->
+                    ReferenceDataMapper.toEntity(dto, mainCategoryId)
+                }
+                if (mainCategoryId != null) {
+                    subCategoryDao.deleteByMainCategoryId(mainCategoryId)
+                }
+                subCategoryDao.insertAll(entities)
+            }
+        )
+    }
+
+    override suspend fun getSubCategoryById(id: Int): SubCategory? {
+        return withContext(Dispatchers.IO) {
+            subCategoryDao.getById(id)?.let { ReferenceDataMapper.toDomain(it) }
+        }
+    }
+
     // ============ COLORS ============
     override fun getColors(): Flow<List<Color>> {
         return colorDao.getAll().map { entities ->
@@ -383,28 +438,17 @@ class ReferenceDataRepository @Inject constructor(
         return performRefresh(
             key = "colors",
             fetchFromApi = {
-                val response = referenceApiService.getItemColors()  // Now returns List<ItemColorDto>
-
+                val response = referenceApiService.getItemColors()
                 if (response.isSuccessful) {
                     val colors = response.body()
-                    if (colors != null) {
-                        Log.d("ReferenceRepo", "✅ Successfully fetched ${colors.size} colors")
-                        Result.success(colors)
-                    } else {
-                        Result.failure(Exception("Response body was null"))
-                    }
+                    if (colors != null) Result.success(colors)
+                    else Result.failure(Exception("Response body was null"))
                 } else {
                     Result.failure(Exception("API call failed: ${response.code()}"))
                 }
             },
             saveToDb = { dtos ->
-                Log.d("ReferenceRepo", "💾 Saving ${dtos.size} colors to database")
-                val entities = dtos.map { dto ->
-                    ColorEntity(
-                        id = dto.id,
-                        name = dto.name
-                    )
-                }
+                val entities = dtos.map { ColorEntity(it.id, it.name) }
                 colorDao.clearAll()
                 colorDao.insertAll(entities)
             }
@@ -428,28 +472,17 @@ class ReferenceDataRepository @Inject constructor(
         return performRefresh(
             key = "sizes",
             fetchFromApi = {
-                val response = referenceApiService.getItemSizes()  // Now returns List<ItemSizeDto>
-
+                val response = referenceApiService.getItemSizes()
                 if (response.isSuccessful) {
                     val sizes = response.body()
-                    if (sizes != null) {
-                        Log.d("ReferenceRepo", "✅ Successfully fetched ${sizes.size} sizes")
-                        Result.success(sizes)
-                    } else {
-                        Result.failure(Exception("Response body was null"))
-                    }
+                    if (sizes != null) Result.success(sizes)
+                    else Result.failure(Exception("Response body was null"))
                 } else {
                     Result.failure(Exception("API call failed: ${response.code()}"))
                 }
             },
             saveToDb = { dtos ->
-                Log.d("ReferenceRepo", "💾 Saving ${dtos.size} sizes to database")
-                val entities = dtos.map { dto ->
-                    SizeEntity(
-                        id = dto.id,
-                        name = dto.name
-                    )
-                }
+                val entities = dtos.map { SizeEntity(it.id, it.name) }
                 sizeDao.clearAll()
                 sizeDao.insertAll(entities)
             }
@@ -473,34 +506,21 @@ class ReferenceDataRepository @Inject constructor(
         return performRefresh(
             key = "brands",
             fetchFromApi = {
-                val response = referenceApiService.getBrands()  // Now returns List<BrandDto>
-
+                val response = referenceApiService.getBrands()
                 if (response.isSuccessful) {
-                    val brands = response.body()  // This is now directly the list
-                    if (brands != null) {
-                        Log.d("ReferenceRepo", "✅ Successfully fetched ${brands.size} brands")
-                        Result.success(brands)
-                    } else {
-                        Log.e("ReferenceRepo", "❌ Response body was null")
-                        Result.failure(Exception("Response body was null"))
-                    }
+                    val brands = response.body()
+                    if (brands != null) Result.success(brands)
+                    else Result.failure(Exception("Response body was null"))
                 } else {
-                    Log.e("ReferenceRepo", "❌ API call failed: ${response.code()}")
                     Result.failure(Exception("HTTP ${response.code()}"))
                 }
             },
             saveToDb = { dtos ->
-                Log.d("ReferenceRepo", "💾 Saving ${dtos.size} brands to database")
-                val entities = dtos.map { dto ->
-                    BrandEntity(
-                        id = dto.id,
-                        name = dto.name
-                    )
-                }
+                val entities = dtos.map { BrandEntity(it.id, it.name) }
                 brandDao.clearAll()
                 brandDao.insertAll(entities)
-                Log.d("ReferenceRepo", "✅ Saved ${entities.size} brands")
-            }        )
+            }
+        )
     }
 
     override suspend fun getBrandById(id: Int): Brand? {
@@ -520,29 +540,17 @@ class ReferenceDataRepository @Inject constructor(
         return performRefresh(
             key = "conditions",
             fetchFromApi = {
-                val response = referenceApiService.getItemConditions()  // Now returns List<ItemConditionDto>
-
+                val response = referenceApiService.getItemConditions()
                 if (response.isSuccessful) {
                     val conditions = response.body()
-                    if (conditions != null) {
-                        Log.d("ReferenceRepo", "✅ Successfully fetched ${conditions.size} conditions")
-                        Result.success(conditions)
-                    } else {
-                        Result.failure(Exception("Response body was null"))
-                    }
+                    if (conditions != null) Result.success(conditions)
+                    else Result.failure(Exception("Response body was null"))
                 } else {
                     Result.failure(Exception("API call failed: ${response.code()}"))
                 }
             },
             saveToDb = { dtos ->
-                Log.d("ReferenceRepo", "💾 Saving ${dtos.size} conditions to database")
-                val entities = dtos.map { dto ->
-                    ConditionEntity(
-                        id = dto.id,
-                        name = dto.name,
-                        description = dto.description
-                    )
-                }
+                val entities = dtos.map { ConditionEntity(it.id, it.name, it.description) }
                 conditionDao.clearAll()
                 conditionDao.insertAll(entities)
             }
@@ -569,24 +577,14 @@ class ReferenceDataRepository @Inject constructor(
                 val response = referenceApiService.getProvinces()
                 if (response.isSuccessful) {
                     val provinces = response.body()
-                    if (provinces != null) {
-                        Log.d("ReferenceRepo", "✅ Successfully fetched ${provinces.size} provinces")
-                        Result.success(provinces)
-                    } else {
-                        Result.failure(Exception("Response body was null"))
-                    }
+                    if (provinces != null) Result.success(provinces)
+                    else Result.failure(Exception("Response body was null"))
                 } else {
                     Result.failure(Exception("API call failed: ${response.code()}"))
                 }
             },
             saveToDb = { dtos ->
-                Log.d("ReferenceRepo", "💾 Saving ${dtos.size} provinces to database")
-                val entities = dtos.map { dto ->
-                    ProvinceEntity(
-                        id = dto.id,
-                        name = dto.name
-                    )
-                }
+                val entities = dtos.map { ProvinceEntity(it.id, it.name) }
                 provinceDao.clearAll()
                 provinceDao.insertAll(entities)
             }
@@ -616,34 +614,19 @@ class ReferenceDataRepository @Inject constructor(
         return performRefresh(
             key = "towns_$provinceId",
             fetchFromApi = {
-                if (provinceId == null) {
-                    return@performRefresh Result.failure(Exception("provinceId is required"))
-                }
+                if (provinceId == null) return@performRefresh Result.failure(Exception("provinceId is required"))
                 val response = referenceApiService.getTowns(provinceId)
                 if (response.isSuccessful) {
                     val towns = response.body()
-                    if (towns != null) {
-                        Log.d("ReferenceRepo", "✅ Successfully fetched ${towns.size} towns for province $provinceId")
-                        Result.success(towns)
-                    } else {
-                        Result.failure(Exception("Response body was null"))
-                    }
+                    if (towns != null) Result.success(towns)
+                    else Result.failure(Exception("Response body was null"))
                 } else {
                     Result.failure(Exception("API call failed: ${response.code()}"))
                 }
             },
             saveToDb = { dtos ->
-                Log.d("ReferenceRepo", "💾 Saving ${dtos.size} towns to database")
-                val entities = dtos.map { dto ->
-                    TownEntity(
-                        id = dto.id,
-                        name = dto.name,
-                        provinceId = dto.provinceId
-                    )
-                }
-                if (provinceId != null) {
-                    townDao.deleteByProvinceId(provinceId)
-                }
+                val entities = dtos.map { TownEntity(it.id, it.name, it.provinceId) }
+                if (provinceId != null) townDao.deleteByProvinceId(provinceId)
                 townDao.insertAll(entities)
             }
         )
@@ -669,32 +652,16 @@ class ReferenceDataRepository @Inject constructor(
                 val response = referenceApiService.getSchools()
                 if (response.isSuccessful) {
                     val schools = response.body()
-                    if (schools != null) {
-                        Log.d("ReferenceRepo", "✅ Successfully fetched ${schools.size} schools")
-                        Result.success(schools)
-                    } else {
-                        Result.failure(Exception("Response body was null"))
-                    }
+                    if (schools != null) Result.success(schools)
+                    else Result.failure(Exception("Response body was null"))
                 } else {
                     Result.failure(Exception("API call failed: ${response.code()}"))
                 }
             },
             saveToDb = { dtos ->
-                Log.d("ReferenceRepo", "💾 Saving ${dtos.size} schools to database")
-
-                val entities = dtos.map { dto ->
-                    SchoolEntity(
-                        id = dto.id,
-                        name = dto.name,
-                        schoolType = dto.schoolType ?: "unknown",
-                        provinceId = dto.province?.id  // Just use the provinceId
-                    )
-                }
+                val entities = dtos.map { SchoolEntity(it.id, it.name, it.schoolType ?: "unknown", it.province?.id ?: 0) }
                 schoolDao.clearAll()
                 schoolDao.insertAll(entities)
-
-                // Remove the provinceEntities part if you don't need it
-                // The provinces should already be loaded from refreshProvinces()
             }
         )
     }
@@ -719,25 +686,14 @@ class ReferenceDataRepository @Inject constructor(
                 val response = referenceApiService.getGenders()
                 if (response.isSuccessful) {
                     val genders = response.body()
-                    if (genders != null) {
-                        Log.d("ReferenceRepo", "✅ Successfully fetched ${genders.size} genders")
-                        Result.success(genders)
-                    } else {
-                        Result.failure(Exception("Response body was null"))
-                    }
+                    if (genders != null) Result.success(genders)
+                    else Result.failure(Exception("Response body was null"))
                 } else {
                     Result.failure(Exception("API call failed: ${response.code()}"))
                 }
             },
             saveToDb = { dtos ->
-                Log.d("ReferenceRepo", "💾 Saving ${dtos.size} genders to database")
-                val entities = dtos.map { dto ->
-                    GenderEntity(
-                        id = dto.id,
-                        name = dto.name
-                        // Note: display_name can be stored if you add it to your entity
-                    )
-                }
+                val entities = dtos.map { GenderEntity(it.id, it.name) }
                 genderDao.clearAll()
                 genderDao.insertAll(entities)
             }
@@ -764,25 +720,14 @@ class ReferenceDataRepository @Inject constructor(
                 val response = referenceApiService.getTags()
                 if (response.isSuccessful) {
                     val tags = response.body()
-                    if (tags != null) {
-                        Log.d("ReferenceRepo", "✅ Successfully fetched ${tags.size} tags")
-                        Result.success(tags)
-                    } else {
-                        Result.failure(Exception("Response body was null"))
-                    }
+                    if (tags != null) Result.success(tags)
+                    else Result.failure(Exception("Response body was null"))
                 } else {
                     Result.failure(Exception("API call failed: ${response.code()}"))
                 }
             },
             saveToDb = { dtos ->
-                Log.d("ReferenceRepo", "💾 Saving ${dtos.size} tags to database")
-                val entities = dtos.map { dto ->
-                    TagEntity(
-                        id = dto.id,
-                        name = dto.name,
-                        tagType = dto.tagType
-                    )
-                }
+                val entities = dtos.map { TagEntity(it.id, it.name, it.tagType ?: "unknown") }
                 tagDao.clearAll()
                 tagDao.insertAll(entities)
             }
@@ -809,11 +754,8 @@ class ReferenceDataRepository @Inject constructor(
                 val response = referenceApiService.getLocations()
                 if (response.isSuccessful) {
                     val body = response.body()
-                    if (body?.success == true) {
-                        Result.success(body.locations ?: emptyList())
-                    } else {
-                        Result.failure(Exception("API returned success=false"))
-                    }
+                    if (body?.success == true) Result.success(body.locations ?: emptyList())
+                    else Result.failure(Exception("API returned success=false"))
                 } else {
                     Result.failure(Exception("API call failed: ${response.code()}"))
                 }
@@ -832,25 +774,10 @@ class ReferenceDataRepository @Inject constructor(
         }
     }
 
-    // ============ BULK OPERATIONS ============
-/*    override suspend fun refreshAllReferenceData(): Result<Unit> {
-        return try {
-            refreshMainCategories()
-            refreshSubCategories()
-            refreshColors()
-            refreshSizes()
-            refreshBrands()
-            refreshConditions()
-            refreshProvinces()
-            refreshSchools()
-            refreshGenders()
-            refreshTags()
-            refreshLocations()
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }*/
+    override suspend fun refreshAllReferenceData(): Result<Unit> {
+        return refreshAllReferenceDataBulk(forceRefresh = true)
+    }
+
 
     override suspend fun clearAllCache() {
         withContext(Dispatchers.IO) {
@@ -866,6 +793,9 @@ class ReferenceDataRepository @Inject constructor(
             genderDao.clearAll()
             tagDao.clearAll()
             locationDao.clearAll()
+            // Clear cache timestamps
+            sharedPreferences.edit().clear().apply()
+            Log.d("ReferenceDataRepo", "🗑️ All cache cleared")
         }
     }
 }

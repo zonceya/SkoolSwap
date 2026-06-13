@@ -22,7 +22,7 @@ interface RepositoryModule {
     @Singleton
     fun bindAuthRepository(authRepository: AuthRepository): AuthRepositoryInterface
 
-    // ✅ REPLACED ItemTypeRepository with ReferenceDataRepository
+
     @Binds
     @Singleton
     fun bindReferenceDataRepository(impl: ReferenceDataRepository): ReferenceDataRepositoryInterface

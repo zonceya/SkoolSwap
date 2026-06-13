@@ -15,6 +15,7 @@ data class Item(
     val mainCategoryId: Int? = null,
     val subCategoryId: Int? = null,
     val schoolId: Int? = null,
+    val schoolName: String? = null,
     val itemConditionId: Int? = null,
     val locationId: Int? = null,
     val provinceId: Int? = null,
@@ -22,12 +23,43 @@ data class Item(
     val meta: ItemMeta? = null,
     val label: String? = null,
     val reserved: Int = 0,
+    val updatedAt: String? = null,
+    val gender: String? = null,
     val createdAt: String,
     val shop: Shop? = null,
-    val image: String? = null,  // For backward compatibility
-    val coverImage: String? = null,  // Explicit cover photo
-    val images: List<ItemImage> = emptyList()
-)
+    val images: List<ItemImage> = emptyList(), // For backward compatibility
+    val coverImage: String? = null,
+    val sizeName: String? = null,
+    val colorName: String? = null,
+    val brandName: String? = null,
+    val conditionName: String? = null,
+    val viewCount: Int = 0,
+) {
+
+        val availableQuantity: Int
+            get() = quantity - reserved
+
+        fun resolveImageUrl(): String? =
+            coverImage?.takeIf { it.isNotBlank() && it.startsWith("http") }
+                ?: images.firstOrNull { !it.url.isNullOrBlank() && it.url.startsWith("http") }?.url
+
+        fun resolveAllImageUrls(): List<String> {
+            val result = mutableListOf<String>()
+
+            coverImage?.takeIf { it.isNotBlank() && it.startsWith("http") }?.let {
+                result.add(it)
+            }
+
+            images
+                .mapNotNull { it.url }
+                .filter { it.startsWith("http") && it != coverImage }
+                .forEach { result.add(it) }
+
+            return result
+        }
+    }
+
+
 
 data class ItemMeta(
     val color: String?,
@@ -40,5 +72,5 @@ data class ItemImage(
     val filename: String? = null,
     val contentType: String? = null,
     val createdAt: String? = null,
-    val isCover: Boolean = false  // ← Add this to identify cover image
+    val isCover: Boolean = false
 )

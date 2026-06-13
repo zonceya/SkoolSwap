@@ -1,19 +1,21 @@
 package com.example.skoolswap.ui.shop
 
+import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemProductBinding
-import com.example.skoolswap.domain.model.Item  // Import domain model
+import com.example.skoolswap.domain.model.Item
+import com.example.skoolswap.utils.extensions.formatViewCount
 
 class ProductAdapter(
     private val onItemClick: (String) -> Unit
 ) : RecyclerView.Adapter<ProductAdapter.ProductViewHolder>() {
 
-    private val items = mutableListOf<Item>()  // Use domain Item
+    private val items = mutableListOf<Item>()
 
     fun submitList(newItems: List<Item>) {
         items.clear()
@@ -45,30 +47,50 @@ class ProductAdapter(
         private val binding: ItemProductBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(item: Item) {  // Now accepts domain Item
+        fun bind(item: Item) {
             binding.apply {
+                // ✅ ADD LOGGING
+                Log.d("ProductAdapter", "Binding item: ${item.name}, viewCount: ${item.viewCount}, status: ${item.status}")
+
                 productName.text = item.name
-                productPrice.text = "R${item.price}"  // Format price
+                productPrice.text = "R${item.price}"
 
-                // Get first image URL or empty string
+                // Show view count badge
+                if (item.viewCount > 0) {
+                    Log.d("ProductAdapter", "  ✅ Showing view count: ${item.viewCount}")
+                    viewCountContainer.visibility = View.VISIBLE
+                    viewCount.text = item.viewCount.formatViewCount()
+                } else {
+                    Log.d("ProductAdapter", "  ❌ Hiding view count (value: ${item.viewCount})")
+                    viewCountContainer.visibility = View.GONE
+                }
+
+                // Show sold badge
+                if (item.status == "sold" || item.quantity <= 0) {
+                    Log.d("ProductAdapter", "  ✅ Showing SOLD badge")
+                    soldBadge.visibility = View.VISIBLE
+                    productName.alpha = 0.5f
+                    productPrice.alpha = 0.5f
+                } else {
+                    soldBadge.visibility = View.GONE
+                    productName.alpha = 1f
+                    productPrice.alpha = 1f
+                }
+
+                // Load image
                 val imageUrl = item.images.firstOrNull()?.url ?: ""
-
-                // In HorizontalItemsAdapter.kt
-                if (!item.images.isNullOrEmpty()) {
-                    Glide.with(binding.root.context)
-                        .load(item.images.first().url)
+                if (imageUrl.isNotEmpty()) {
+                    Glide.with(root.context)
+                        .load(imageUrl)
                         .placeholder(R.drawable.ic_create_item_placeholder)
                         .error(R.drawable.ic_create_item_placeholder)
                         .centerCrop()
-                        .into(binding.productImage)
+                        .into(productImage)
                 } else {
-                    // Always use placeholder when no images
-                    binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
+                    productImage.setImageResource(R.drawable.ic_create_item_placeholder)
                 }
 
-                root.setOnClickListener {
-                    onItemClick(item.id)  // Pass item ID for editing
-                }
+                root.setOnClickListener { onItemClick(item.id) }
             }
         }
     }

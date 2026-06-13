@@ -5,6 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?android:colorBackground"
     tools:context=".ui.main.MainActivity">
 
     <com.google.android.material.appbar.AppBarLayout
@@ -14,12 +15,16 @@
         android:elevation="0dp"
         app:elevation="0dp">
 
-        <androidx.appcompat.widget.Toolbar
+        <!-- Changed to MaterialToolbar -->
+        <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="@color/white"
+            android:background="?attr/colorSurface"
             android:elevation="0dp"
+            app:titleTextColor="?attr/colorOnSurface"
+            app:subtitleTextColor="?attr/colorOnSurface"
+            app:navigationIconTint="?attr/colorOnSurface"
             app:popupTheme="@style/Theme.SkoolSwap.PopupOverlay" />
 
     </com.google.android.material.appbar.AppBarLayout>
@@ -33,7 +38,9 @@
         android:layout_gravity="bottom|end"
         android:layout_marginEnd="@dimen/fab_margin"
         app:maxImageSize="56dp"
-        android:backgroundTint="@color/white"
+        android:backgroundTint="?attr/colorSurface"
+        app:tint="?attr/colorOnSurface"
+        android:visibility="gone"
         android:layout_marginBottom="16dp"
         app:srcCompat="@drawable/ic_plus_fab" />
 

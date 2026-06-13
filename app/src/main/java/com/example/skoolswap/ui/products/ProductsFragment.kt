@@ -1,5 +1,6 @@
 package com.example.skoolswap.ui.products
 
+import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -23,7 +24,12 @@ import com.example.skoolswap.domain.model.FilterConfig
 import com.example.skoolswap.domain.model.FilterOption
 import com.example.skoolswap.ui.products.adapter.ProductsAdapter
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.core.content.ContextCompat
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import timber.log.Timber
 
 @AndroidEntryPoint
 class ProductsFragment : Fragment() {
@@ -32,6 +38,10 @@ class ProductsFragment : Fragment() {
     private val binding get() = _binding!!
     private val viewModel: ProductsViewModel by activityViewModels()
     private lateinit var productsAdapter: ProductsAdapter
+
+    // Search state
+    private var isInSearchMode = false
+    private var searchJob: Job? = null
 
     companion object {
         private const val TAG = "ProductsFragment"
@@ -49,46 +59,108 @@ class ProductsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // ✅ SHOW SHIMMER IMMEDIATELY - before any async work
+        binding.shimmerLayout.visibility = View.VISIBLE
+        binding.productsRecycler.visibility = View.GONE
+        binding.errorLayout.visibility = View.GONE
+
         val sectionType = arguments?.getString("SECTION_TYPE") ?: "all"
         val sectionTitle = arguments?.getString("SECTION_TITLE") ?: "All Items"
         val period = arguments?.getString("PERIOD")
         val categoryId = arguments?.getInt("CATEGORY_ID")
         val sportTypeId = arguments?.getInt("SPORT_TYPE_ID", -1)
         val gearType = arguments?.getString("GEAR_TYPE")
-        (requireActivity() as AppCompatActivity).supportActionBar?.hide()
+
+        // Show ActionBar
+        (requireActivity() as AppCompatActivity).supportActionBar?.show()
+        (requireActivity() as AppCompatActivity).supportActionBar?.title = sectionTitle
+        (requireActivity() as AppCompatActivity).supportActionBar?.setDisplayHomeAsUpEnabled(true)
+
+        // ✅ Reset first load flag BEFORE loading new section
+        // (Even though we're not using it in shimmer condition anymore, keep for other logic)
+        viewModel.resetFirstLoadFlag()
+
         if (sectionType == "sport") {
             viewModel.clearSavedCategory()
         }
-        when (sectionType) {
-            "recommended", "trending" -> {
-                binding.sortFilterBar.visibility = View.GONE  // No filter needed
-                binding.topBar.visibility = View.VISIBLE
-            }
-            else -> {
-                binding.sortFilterBar.visibility = View.VISIBLE  // Show filter for all others
-                binding.topBar.visibility = View.VISIBLE
-            }
+
+        viewModel.setSectionType(sectionType, period, categoryId)
+
+        // Show/hide sort/filter bar
+        binding.sortFilterBar.visibility = View.VISIBLE
+
+        binding.retryButton.setOnClickListener {
+            viewModel.reloadCurrentSection()
         }
-        setupToolbar(sectionTitle)
+
         setupRecyclerView()
         setupSortFilterBar()
         setupDrawer()
         setupBackButton()
         observeViewModel()
         observeFilterConfig()
+        debugThemeColors()
+        setupSwipeRefresh()
 
         viewModel.loadProducts(sectionType, period, categoryId, sportTypeId, gearType)
     }
 
-    private fun setupToolbar(title: String) {
-        binding.sectionTitle.text = title
-        binding.backBtn.setOnClickListener { findNavController().popBackStack() }
-        binding.searchBtn.setOnClickListener { }
+    // ==================== SEARCH METHODS ====================
+
+    fun performLiveSearch(query: String) {
+        Log.d(TAG, "🔍 performLiveSearch called with: $query")
+
+        if (query.length >= 2) {
+            isInSearchMode = true
+            enterSearchMode()
+
+            searchJob?.cancel()
+            searchJob = viewLifecycleOwner.lifecycleScope.launch {
+                delay(300)
+                viewModel.searchInCurrentSection(query)
+            }
+        } else if (query.isEmpty()) {
+            exitSearchMode()
+        }
+    }
+
+    fun exitSearchMode() {
+        isInSearchMode = false
+        binding.searchResultsContainer.visibility = View.GONE
+        binding.productsRecycler.visibility = View.VISIBLE
+        binding.emptySearchResults.visibility = View.GONE
+
+        viewModel.clearSearchResults()
+        viewModel.reloadCurrentSection()
+    }
+
+    private fun enterSearchMode() {
+        binding.searchResultsContainer.visibility = View.VISIBLE
+        binding.productsRecycler.visibility = View.GONE
+        binding.emptySearchResults.visibility = View.GONE
+    }
+
+    // ==================== SETUP METHODS ====================
+
+    private fun setupSwipeRefresh() {
+        binding.swipeRefreshLayout.apply {
+            setColorSchemeColors(
+                ContextCompat.getColor(requireContext(), R.color.teal_200)
+            )
+            setOnRefreshListener {
+                viewModel.reloadCurrentSection()
+                isRefreshing = false
+            }
+        }
     }
 
     private fun setupRecyclerView() {
         productsAdapter = ProductsAdapter { item ->
             viewModel.trackClick(item.id, arguments?.getString("SECTION_TYPE") ?: "all", 0)
+            val bundle = Bundle().apply {
+                putString("itemId", item.id)
+            }
+            findNavController().navigate(R.id.itemDetailFragment, bundle)
         }
         binding.productsRecycler.apply {
             layoutManager = GridLayoutManager(requireContext(), 2)
@@ -97,14 +169,14 @@ class ProductsFragment : Fragment() {
     }
 
     private fun setupSortFilterBar() {
-        binding.sortBtn.setOnClickListener { showSortMenu() }
-        binding.filterBtn.setOnClickListener {
+        binding.sortContainer.setOnClickListener { showSortMenu() }
+        binding.filterContainer.setOnClickListener {
             binding.drawerLayout.openDrawer(GravityCompat.END)
         }
     }
 
     private fun showSortMenu() {
-        val popup = PopupMenu(requireContext(), binding.sortBtn)
+        val popup = PopupMenu(requireContext(), binding.sortContainer)
         popup.menuInflater.inflate(R.menu.menu_sort, popup.menu)
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
@@ -131,6 +203,7 @@ class ProductsFragment : Fragment() {
             )
             updatePriceDisplay()
             binding.drawerLayout.closeDrawers()
+            viewModel.filterConfig.value?.let { rebuildFilterDrawer(it) }
         }
 
         binding.applyFilters.setOnClickListener {
@@ -140,6 +213,7 @@ class ProductsFragment : Fragment() {
             }
             viewModel.applyFilters()
             binding.drawerLayout.closeDrawers()
+            viewModel.filterConfig.value?.let { rebuildFilterDrawer(it) }
         }
     }
 
@@ -147,28 +221,25 @@ class ProductsFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.filterConfig.collect { filterConfig ->
-                    if (filterConfig == null) return@collect
-                    val priceGroup = filterConfig.filterGroups.find { it.id == "price" } ?: return@collect
-
-                    // Check if binding is still valid
-                    if (_binding == null) return@collect
+                    val priceGroup = filterConfig?.filterGroups?.find { it.id == "price" } ?: return@collect
 
                     binding.priceSlider.apply {
-                        clearOnChangeListeners()
                         valueFrom = priceGroup.min ?: 0f
                         valueTo = priceGroup.max ?: 1000f
+
+                        val applied = viewModel.appliedFilters.value
                         setValues(
-                            viewModel.appliedFilters.value.minPrice ?: (priceGroup.min ?: 0f),
-                            viewModel.appliedFilters.value.maxPrice ?: (priceGroup.max ?: 1000f)
+                            applied.minPrice ?: (priceGroup.min ?: 0f),
+                            applied.maxPrice ?: (priceGroup.max ?: 1000f)
                         )
-                        addOnChangeListener { slider, _, _ ->
-                            val values = slider.values
+
+                        addOnChangeListener { _, _, _ ->
+                            val values = values
                             if (values.size >= 2) {
                                 binding.selectedPriceRange.text = "R${values[0].toInt()} - R${values[1].toInt()}"
                             }
                         }
                     }
-                    updatePriceDisplay()
                 }
             }
         }
@@ -196,9 +267,21 @@ class ProductsFragment : Fragment() {
 
     private fun rebuildFilterDrawer(filterConfig: FilterConfig) {
         if (_binding == null) return
+
+        Log.d("ProductsFragment", "=== rebuildFilterDrawer ===")
+        Log.d("ProductsFragment", "filterConfig groups: ${filterConfig.filterGroups.size}")
+
         binding.dynamicFilterContainer.removeAllViews()
 
-        // Add Category if we have a selected category
+        val applied = viewModel.appliedFilters.value
+        val priceDisplay = if (applied.minPrice != null && applied.maxPrice != null)
+            "R${applied.minPrice?.toInt() ?: 0} - R${applied.maxPrice?.toInt() ?: 1000}"
+        else null
+
+        addFilterItem("Price", priceDisplay) {
+            showPriceDialog()
+        }
+
         val selectedCategoryId = viewModel.appliedFilters.value.categoryId ?: viewModel.getSavedCategoryId()
         if (selectedCategoryId != null) {
             val categoryGroup = viewModel.getGlobalFilterGroupById("category")
@@ -210,12 +293,12 @@ class ProductsFragment : Fragment() {
             }
         }
 
-        // Add all other filters
         filterConfig.filterGroups.forEach { group ->
             if (group.id == "price") return@forEach
             if (group.options.isEmpty()) return@forEach
 
             val selectedValue = getSelectedValueDisplay(group.id)
+            Log.d("ProductsFragment", "Adding filter: ${group.name}, selected: $selectedValue")
             addFilterItem(group.name, selectedValue) {
                 showOptionsDrawer(group.id, group.name, group.options, group.filterType)
             }
@@ -230,9 +313,17 @@ class ProductsFragment : Fragment() {
 
         titleView.text = title
 
+        val typedValue = android.util.TypedValue()
+        requireContext().theme.resolveAttribute(com.google.android.material.R.attr.colorOnSurface, typedValue, true)
+        val textColor = typedValue.data
+
+        titleView.setTextColor(textColor)
+
         if (!selectedValue.isNullOrEmpty()) {
             valueView.text = selectedValue
             valueView.visibility = View.VISIBLE
+            valueView.setTextColor(textColor)
+            valueView.alpha = 0.7f
         } else {
             valueView.visibility = View.GONE
         }
@@ -241,10 +332,22 @@ class ProductsFragment : Fragment() {
         binding.dynamicFilterContainer.addView(itemView)
     }
 
+    private fun debugThemeColors() {
+        val typedValue = android.util.TypedValue()
+
+        requireContext().theme.resolveAttribute(com.google.android.material.R.attr.colorSurface, typedValue, true)
+        Log.d("ProductsFragment", "colorSurface = #${Integer.toHexString(typedValue.data)}")
+
+        requireContext().theme.resolveAttribute(com.google.android.material.R.attr.colorOnSurface, typedValue, true)
+        Log.d("ProductsFragment", "colorOnSurface = #${Integer.toHexString(typedValue.data)}")
+
+        val nightMode = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK
+        Timber.tag("ProductsFragment").d("Dark mode active: ${nightMode == Configuration.UI_MODE_NIGHT_YES}")
+    }
+
     private fun showOptionsDrawer(groupId: String, groupName: String, options: List<FilterOption>, filterType: String) {
         if (_binding == null) return
 
-        // Switch to options view
         binding.filterHeaderTitle.visibility = View.GONE
         binding.optionsHeader.visibility = View.VISIBLE
         binding.optionsTitle.text = groupName
@@ -254,28 +357,33 @@ class ProductsFragment : Fragment() {
         val container = binding.optionsContainer
         container.removeAllViews()
 
+        val typedValue = android.util.TypedValue()
+        requireContext().theme.resolveAttribute(
+            com.google.android.material.R.attr.colorOnSurface, typedValue, true
+        )
+        val textColor = typedValue.data
+
         options.forEach { option ->
             val optionView = layoutInflater.inflate(R.layout.item_filter_option, container, false)
             val textView = optionView.findViewById<TextView>(R.id.optionName)
             val checkIcon = optionView.findViewById<ImageView>(R.id.checkIcon)
 
             textView.text = option.name
+            textView.setTextColor(textColor)
 
             val isSelected = isOptionSelected(groupId, option.id)
             checkIcon.visibility = if (isSelected) View.VISIBLE else View.GONE
+            if (isSelected) {
+                checkIcon.imageTintList = android.content.res.ColorStateList.valueOf(textColor)
+            }
 
             optionView.setOnClickListener {
-                // Update filter
                 viewModel.updateFilter(groupId, option.id)
                 viewModel.applyFilters()
-
-                // Switch back to main filter view
                 binding.filterHeaderTitle.visibility = View.VISIBLE
                 binding.optionsHeader.visibility = View.GONE
                 binding.dynamicFilterContainer.visibility = View.VISIBLE
                 binding.optionsContainer.visibility = View.GONE
-
-                // Rebuild main drawer to show updated value
                 viewModel.filterConfig.value?.let { rebuildFilterDrawer(it) }
             }
 
@@ -285,12 +393,31 @@ class ProductsFragment : Fragment() {
 
     private fun setupBackButton() {
         binding.backToMain.setOnClickListener {
-            // Switch back to main filter view
             binding.filterHeaderTitle.visibility = View.VISIBLE
             binding.optionsHeader.visibility = View.GONE
             binding.dynamicFilterContainer.visibility = View.VISIBLE
             binding.optionsContainer.visibility = View.GONE
         }
+    }
+
+    private fun showPriceDialog() {
+        val priceGroup = viewModel.filterConfig.value?.filterGroups?.find { it.id == "price" }
+        val globalMin = priceGroup?.min ?: 0f
+        val globalMax = priceGroup?.max ?: 1000f
+
+        val dialog = PriceRangeDialogFragment.newInstance(
+            min = globalMin,
+            max = globalMax,
+            currentMin = viewModel.appliedFilters.value.minPrice ?: globalMin,
+            currentMax = viewModel.appliedFilters.value.maxPrice ?: globalMax
+        )
+
+        dialog.setOnPriceRangeAppliedListener { min, max ->
+            viewModel.updatePriceRange(min, max)
+            viewModel.applyFilters()
+        }
+
+        dialog.show(parentFragmentManager, PriceRangeDialogFragment.TAG)
     }
 
     private fun isOptionSelected(groupId: String, optionId: Int): Boolean {
@@ -325,30 +452,117 @@ class ProductsFragment : Fragment() {
         }
     }
 
+    // ==================== OBSERVE VIEWMODEL ====================
+
     private fun observeViewModel() {
+        // ========== COMBINED LOADING STATE - Controls Shimmer ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.products.collect { products ->
-                    if (_binding != null) {
-                        productsAdapter.submitList(products)
+                // Collect both loading states and combine them
+                viewModel.isLoading.collect { isLoading ->
+                    val isNewLoading = viewModel.isNewSectionLoading.value
+                    val shouldShowShimmer = isLoading || isNewLoading
+
+                    Log.d("ProductsFragment", "✨ Shimmer state - isLoading: $isLoading, isNewLoading: $isNewLoading, showShimmer: $shouldShowShimmer")
+
+                    if (shouldShowShimmer) {
+                        binding.shimmerLayout.visibility = View.VISIBLE
+                        binding.productsRecycler.visibility = View.GONE
+                        binding.errorLayout.visibility = View.GONE
+                    } else {
+                        binding.shimmerLayout.visibility = View.GONE
+                        binding.swipeRefreshLayout.isRefreshing = false
+
+                        // Show products if we have them
+                        val products = viewModel.products.value
+                        if (products.isNotEmpty() && !isInSearchMode) {
+                            binding.productsRecycler.visibility = View.VISIBLE
+                            productsAdapter.submitList(products)
+                        }
                     }
                 }
             }
         }
+
+        // ========== NEW SECTION LOADING STATE - Only for manual trigger ==========
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.isNewSectionLoading.collect { isLoading ->
+                    Log.d("ProductsFragment", "📦 isNewSectionLoading: $isLoading")
+                    if (!isLoading && !viewModel.isLoading.value) {
+                        // Section loading complete AND main loading is done
+                        val products = viewModel.products.value
+                        if (products.isNotEmpty() && !isInSearchMode) {
+                            Log.d("ProductsFragment", "✅ Manually showing ${products.size} products")
+                            binding.productsRecycler.visibility = View.VISIBLE
+                            productsAdapter.submitList(products)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ========== ERROR STATE ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.error.collect { error ->
-                    if (error != null && _binding != null) {
-                        Log.e(TAG, "Error: $error")
+                    if (error != null && viewModel.products.value.isEmpty()) {
+                        binding.errorLayout.visibility = View.VISIBLE
+                        binding.errorMessage.text = error
+                        binding.productsRecycler.visibility = View.GONE
+                        binding.shimmerLayout.visibility = View.GONE
+                        binding.swipeRefreshLayout.isRefreshing = false
+                    } else {
+                        binding.errorLayout.visibility = View.GONE
+                    }
+                }
+            }
+        }
+
+        // ========== PRODUCTS DATA ==========
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.products.collect { products ->
+                    if (_binding == null || isInSearchMode) return@collect
+
+                    Log.d("ProductsFragment", "📦 Products collected: ${products.size} items, isLoading: ${viewModel.isLoading.value}, isNewLoading: ${viewModel.isNewSectionLoading.value}")
+
+                    // Only show products if not loading
+                    if (!viewModel.isLoading.value && !viewModel.isNewSectionLoading.value) {
+                        if (products.isNotEmpty()) {
+                            binding.productsRecycler.visibility = View.VISIBLE
+                            binding.errorLayout.visibility = View.GONE
+                            productsAdapter.submitList(products)
+                            Log.d("ProductsFragment", "✅ Products displayed: ${products.size}")
+                        }
+                    }
+                }
+            }
+        }
+
+        // ========== SEARCH RESULTS ==========
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.searchResults.collect { results ->
+                    if (!isInSearchMode) return@collect
+
+                    if (results.isEmpty()) {
+                        binding.searchResultsContainer.visibility = View.VISIBLE
+                        binding.emptySearchResults.visibility = View.VISIBLE
+                        binding.productsRecycler.visibility = View.GONE
+                        productsAdapter.submitList(emptyList())
+                    } else {
+                        binding.searchResultsContainer.visibility = View.VISIBLE
+                        binding.emptySearchResults.visibility = View.GONE
+                        binding.productsRecycler.visibility = View.VISIBLE
+                        productsAdapter.submitList(results)
                     }
                 }
             }
         }
     }
-
     override fun onDestroyView() {
         super.onDestroyView()
-        (requireActivity() as AppCompatActivity).supportActionBar?.show()
         _binding = null
     }
 }

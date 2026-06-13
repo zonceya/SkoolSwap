@@ -2,6 +2,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
     android:layout_width="match_parent"
+    android:background="?attr/colorSurface"
     android:layout_height="wrap_content">
 
     <include
@@ -11,9 +12,10 @@
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/trendingRecycler"
         android:layout_width="match_parent"
-        android:layout_height="170dp"
+        android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:clipToPadding="false"
+        android:nestedScrollingEnabled="false"
         android:paddingEnd="8dp"/>
 
 </LinearLayout>

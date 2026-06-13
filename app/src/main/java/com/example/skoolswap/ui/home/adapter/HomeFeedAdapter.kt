@@ -1,5 +1,6 @@
 package com.example.skoolswap.ui.home.adapter
 
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
@@ -7,6 +8,7 @@ import com.example.skoolswap.databinding.*
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.homefeed.Section
 import com.example.skoolswap.ui.home.viewholders.*
+import timber.log.Timber
 
 class HomeFeedAdapter(
     private val onItemClick: (Item, String) -> Unit,
@@ -63,7 +65,7 @@ class HomeFeedAdapter(
                 val binding = ItemRecentRowBinding.inflate(
                     LayoutInflater.from(parent.context), parent, false
                 )
-                RecentViewHolder(binding, onItemClick)
+                RecentViewHolder(binding, onItemClick, onViewAllClick)
             }
             else -> throw IllegalArgumentException("Unknown view type: $viewType")
         }
@@ -71,10 +73,22 @@ class HomeFeedAdapter(
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (holder) {
-            is RecommendedViewHolder -> holder.bind(sections[position] as Section.Recommended)
-            is EssentialsViewHolder -> holder.bind(sections[position] as Section.Essentials)
-            is TrendingViewHolder -> holder.bind(sections[position] as Section.Trending)
-            is RecentViewHolder -> holder.bind(sections[position] as Section.Recent)
+            is RecommendedViewHolder -> {
+                Timber.tag("HomeFeedAdapter").d("Binding Recommended at position $position")
+                holder.bind(sections[position] as Section.Recommended)
+            }
+            is EssentialsViewHolder -> {
+                Timber.tag("HomeFeedAdapter").d("Binding Essentials at position $position")
+                holder.bind(sections[position] as Section.Essentials)
+            }
+            is TrendingViewHolder -> {
+                Timber.tag("HomeFeedAdapter").d("Binding Trending at position $position")
+                holder.bind(sections[position] as Section.Trending)
+            }
+            is RecentViewHolder -> {
+                Timber.tag("HomeFeedAdapter").d("Binding Recent at position $position")
+                holder.bind(sections[position] as Section.Recent)
+            }
         }
     }
 

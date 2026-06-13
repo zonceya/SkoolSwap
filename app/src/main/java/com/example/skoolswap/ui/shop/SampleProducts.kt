@@ -3,7 +3,6 @@ package com.example.skoolswap.ui.shop
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.ItemImage
 
-// Sample items for preview/development
 val sampleItems = listOf(
     Item(
         id = "sample1",
@@ -24,6 +23,7 @@ val sampleItems = listOf(
         schoolId = null,
         itemConditionId = 1,
         createdAt = "",
+        itemTypeId = 2,  // ✅ ADD THIS - maps to "Sport" category
         images = listOf(
             ItemImage(
                 id = 1,
@@ -37,8 +37,8 @@ val sampleItems = listOf(
         name = "Adidas Ultraboost 22",
         description = "Premium running shoes",
         price = 2299.00,
-        quantity = 1,
-        status = "active",
+        quantity = 0,
+        status = "sold",
         mainCategoryId = 1,
         subCategoryId = 2,
         brandId = 2,
@@ -50,6 +50,7 @@ val sampleItems = listOf(
         schoolId = null,
         itemConditionId = 1,
         createdAt = "",
+        itemTypeId = 2,  // ✅ ADD THIS
         images = listOf(
             ItemImage(
                 id = 2,
@@ -57,4 +58,5 @@ val sampleItems = listOf(
             )
         )
     ),
+    // Add itemTypeId = 2 to sample3 and sample4 as well
 )

@@ -1,18 +1,21 @@
-// di/AppModule.kt
 package com.example.skoolswap.di
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.credentials.CredentialManager
 import com.example.skoolswap.data.local.database.SkoolSwapDatabase
+import com.example.skoolswap.data.local.database.dao.FavoriteDao
 import com.example.skoolswap.data.local.database.dao.ItemDao
+import com.example.skoolswap.data.local.database.dao.ItemImageDao
 import com.example.skoolswap.data.local.database.dao.ProvinceDao
 import com.example.skoolswap.data.local.database.dao.SchoolDao
 import com.example.skoolswap.data.local.database.dao.ShopDao
 import com.example.skoolswap.data.local.database.dao.UserDao
 import com.example.skoolswap.data.local.database.dao.UserSchoolDao
 import com.example.skoolswap.data.local.datastore.AppPreferences
+import com.example.skoolswap.data.remote.api.FilterApiService
 import com.example.skoolswap.data.remote.api.ItemApiService
 import com.example.skoolswap.data.remote.api.ProvinceApiService
 import com.example.skoolswap.data.remote.api.RecommendationsApiService
@@ -23,17 +26,22 @@ import com.example.skoolswap.data.remote.api.ShopApiService
 import com.example.skoolswap.data.remote.api.UserApiService
 import com.example.skoolswap.data.remote.api.UserSchoolApiService
 import com.example.skoolswap.data.repository.AuthRepository
+import com.example.skoolswap.data.repository.FavoriteRepository
+import com.example.skoolswap.data.repository.FilterRepository
 import com.example.skoolswap.data.repository.HomeRepository
 import com.example.skoolswap.data.repository.ItemRepository
 import com.example.skoolswap.data.repository.SchoolRepository
 import com.example.skoolswap.data.repository.ShopRepository
 import com.example.skoolswap.data.repository.UserSchoolRepository
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
+import com.example.skoolswap.domain.repository.FavoriteRepositoryInterface
+import com.example.skoolswap.domain.repository.FilterRepositoryInterface
 import com.example.skoolswap.domain.repository.HomeRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.domain.repository.ShopRepositoryInterface
-import com.example.skoolswap.domain.repository.UserSchoolRepositoryInterface
 import com.google.firebase.auth.FirebaseAuth
+import com.google.gson.Gson
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -51,8 +59,14 @@ object AppModule {
     fun provideDatabase(@ApplicationContext context: Context): SkoolSwapDatabase {
         return SkoolSwapDatabase.getInstance(context)
     }
-
-    // ========== DAO PROVIDERS (User/School/Shop related) ==========
+    @Provides
+    @Singleton
+    fun provideSharedPreferences(
+        @ApplicationContext context: Context
+    ): SharedPreferences {
+        return context.getSharedPreferences("skoolswap_prefs", Context.MODE_PRIVATE)
+    }
+    // ========== DAO PROVIDERS ==========
     @Provides
     @Singleton
     fun provideUserDao(database: SkoolSwapDatabase): UserDao {
@@ -70,16 +84,36 @@ object AppModule {
     fun provideUserSchoolDao(database: SkoolSwapDatabase): UserSchoolDao {
         return database.userSchoolDao()
     }
+
     @Provides
     @Singleton
-    fun provideProvinceDao(database: SkoolSwapDatabase): ProvinceDao {  // ADD THIS
+    fun provideProvinceDao(database: SkoolSwapDatabase): ProvinceDao {
         return database.provinceDao()
     }
+
     @Provides
     @Singleton
     fun provideShopDao(database: SkoolSwapDatabase): ShopDao {
         return database.shopDao()
     }
+
+    @Provides
+    @Singleton
+    fun provideFavoriteDao(database: SkoolSwapDatabase): FavoriteDao {
+        return database.favoriteDao()
+    }
+
+ /*   @Provides
+    @Singleton
+    fun provideItemDao(database: SkoolSwapDatabase): ItemDao {
+        return database.itemDao()
+    }*/
+
+//    @Provides
+//    @Singleton
+//    fun provideItemImageDao(database: SkoolSwapDatabase): ItemImageDao {
+//        return database.itemImageDao()
+//    }
 
     // ========== API SERVICES ==========
     @Provides
@@ -87,14 +121,16 @@ object AppModule {
     fun provideUserApiService(retrofit: Retrofit): UserApiService {
         return retrofit.create(UserApiService::class.java)
     }
+
     @Provides
     @Singleton
     fun provideShopApiService(retrofit: Retrofit): ShopApiService {
         return retrofit.create(ShopApiService::class.java)
     }
+
     @Provides
     @Singleton
-    fun provideItemApiService(retrofit: Retrofit): ItemApiService {  // ← Inject Retrofit
+    fun provideItemApiService(retrofit: Retrofit): ItemApiService {
         return retrofit.create(ItemApiService::class.java)
     }
 
@@ -116,6 +152,18 @@ object AppModule {
         return RetrofitClient.instance.create(ReferenceDataApiService::class.java)
     }
 
+    @Provides
+    @Singleton
+    fun provideRecommendationsApiService(retrofit: Retrofit): RecommendationsApiService {
+        return retrofit.create(RecommendationsApiService::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideFilterApiService(retrofit: Retrofit): FilterApiService {
+        return retrofit.create(FilterApiService::class.java)
+    }
+
     // ========== OTHER DEPENDENCIES ==========
     @Provides
     @Singleton
@@ -130,20 +178,14 @@ object AppModule {
     @Singleton
     fun provideAppPreferences(@ApplicationContext context: Context): AppPreferences =
         AppPreferences(context)
-// Add to AppModule.kt inside the API SERVICES section
 
-    @Provides
-    @Singleton
-    fun provideRecommendationsApiService(retrofit: Retrofit): RecommendationsApiService {
-        return retrofit.create(RecommendationsApiService::class.java)
-    }
     // ========== REPOSITORY PROVIDERS ==========
     @Provides
     @Singleton
     fun provideSchoolRepository(
         schoolApiService: SchoolApiService,
         provinceApiService: ProvinceApiService,
-        provinceDao : ProvinceDao,
+        provinceDao: ProvinceDao,
         appPreferences: AppPreferences
     ): SchoolRepository {
         return SchoolRepository(
@@ -179,13 +221,15 @@ object AppModule {
         shopApiService: ShopApiService,
         shopDao: ShopDao,
         authRepository: AuthRepositoryInterface,
-        itemRepository: ItemRepositoryInterface
+        itemRepository: ItemRepositoryInterface,
+        appPreferences: AppPreferences
     ): ShopRepositoryInterface {
         return ShopRepository(
             shopApiService = shopApiService,
             shopDao = shopDao,
             authRepository = authRepository as AuthRepository,
-            itemRepository = itemRepository
+            itemRepository = itemRepository,
+            appPreferences= appPreferences
         )
     }
 
@@ -193,26 +237,55 @@ object AppModule {
     @Singleton
     fun provideItemRepository(
         itemApiService: ItemApiService,
-        itemDao: ItemDao,  // This comes from ItemModule
-        authRepository: AuthRepositoryInterface
+        itemDao: ItemDao,
+        itemImageDao: ItemImageDao,
+        authRepository: AuthRepositoryInterface,
+        appPreferences: AppPreferences
     ): ItemRepositoryInterface {
         return ItemRepository(
             itemApiService = itemApiService,
             itemDao = itemDao,
-            authRepository = authRepository
+            itemImageDao = itemImageDao,
+            authRepository = authRepository,
+            appPreferences = appPreferences
         )
     }
 
-    // In AppModule.kt, update the provideHomeRepository method:
     @Provides
     @Singleton
     fun provideHomeRepository(
         recommendationsApiService: RecommendationsApiService,
-        authRepository: AuthRepositoryInterface
+        authRepository: AuthRepositoryInterface,
+        appPreferences: AppPreferences
     ): HomeRepositoryInterface {
         return HomeRepository(
             recommendationsApiService = recommendationsApiService,
-            authRepository = authRepository
+            authRepository = authRepository,
+            appPreferences = appPreferences
         )
+    }
+
+    @Provides
+    @Singleton
+    fun provideFilterRepository(
+        filterApiService: FilterApiService,
+        authRepository: AuthRepositoryInterface,
+        appPreferences: AppPreferences,
+        gson: Gson
+    ): FilterRepositoryInterface {
+        return FilterRepository(
+            api = filterApiService,
+            authRepository = authRepository,
+            appPreferences = appPreferences
+        )
+    }
+
+    // FIXED: @Binds method must be ABSTRACT and have NO BODY
+    @Provides
+    @Singleton
+    fun provideFavoriteRepository(
+        favoriteRepository: FavoriteRepository
+    ): FavoriteRepositoryInterface {
+        return favoriteRepository
     }
 }

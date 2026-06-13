@@ -1,20 +1,26 @@
 package com.example.skoolswap.ui.detail.adapter
 
+import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemSimilarProductBinding
 import com.example.skoolswap.domain.model.Item
+import com.example.skoolswap.utils.extensions.formatViewCount
+import timber.log.Timber
 
 class SimilarItemsAdapter(
     private val onItemClick: (Item) -> Unit
 ) : RecyclerView.Adapter<SimilarItemsAdapter.ViewHolder>() {
 
     private var items: List<Item> = emptyList()
+    private val TAG = "SimilarItemsAdapter"
 
     fun submitList(newItems: List<Item>) {
+        Timber.tag(TAG).d("submitList called with ${newItems.size} items")
         items = newItems
         notifyDataSetChanged()
     }
@@ -31,6 +37,7 @@ class SimilarItemsAdapter(
     }
 
     override fun getItemCount(): Int = items.size
+
 
     inner class ViewHolder(
         private val binding: ItemSimilarProductBinding
@@ -49,14 +56,42 @@ class SimilarItemsAdapter(
             binding.productTitle.text = item.name
             binding.productPrice.text = "R${String.format("%.2f", item.price)}"
 
-            if (item.images.isNotEmpty()) {
+            // Sold badge
+            if (item.status == "sold" || item.quantity <= 0) {
+                binding.soldBadge.visibility = View.VISIBLE
+            } else {
+                binding.soldBadge.visibility = View.GONE
+            }
+
+            // ✅ Mirror the same image-picking logic as setupImageSlider in the fragment
+            val imageUrl: String? = when {
+                !item.coverImage.isNullOrBlank() -> item.coverImage
+                item.images.isNotEmpty() -> item.images.firstOrNull {
+                    !it.url.isNullOrBlank() && it.url.startsWith("http")
+                }?.url
+                else -> null
+            }
+
+            if (!imageUrl.isNullOrBlank()) {
                 Glide.with(binding.root.context)
-                    .load(item.images.first().url)
+                    .load(imageUrl)
                     .placeholder(R.drawable.ic_create_item_placeholder)
                     .error(R.drawable.ic_create_item_placeholder)
                     .centerCrop()
                     .into(binding.productImage)
+            } else {
+                binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
             }
+
+            // Size
+            if (!item.sizeName.isNullOrBlank()) {
+                binding.productSize.text = item.sizeName.replace("Adult", "UK")
+                binding.productSize.visibility = View.VISIBLE
+            } else {
+                binding.productSize.visibility = View.GONE
+            }
+
+            Log.d(TAG, "Binding item: ${item.name}, imageUrl: $imageUrl, images: ${item.images.size}, cover: ${item.coverImage}")
         }
     }
 }

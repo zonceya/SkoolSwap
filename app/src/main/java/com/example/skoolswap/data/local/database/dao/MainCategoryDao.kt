@@ -15,7 +15,8 @@ interface MainCategoryDao {
 
     @Query("SELECT * FROM main_categories WHERE id = :id")
     suspend fun getById(id: Int): MainCategoryEntity?
-
+    @Query("SELECT COUNT(*) FROM main_categories")
+    suspend fun getCount(): Int
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(categories: List<MainCategoryEntity>)
 

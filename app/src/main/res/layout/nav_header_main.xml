@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="@color/white">
+    android:background="?attr/colorSurface">
 
     <!-- Header row -->
     <LinearLayout
@@ -16,10 +16,9 @@
         android:paddingLeft="@dimen/activity_horizontal_margin"
         android:paddingTop="@dimen/activity_vertical_margin"
         android:paddingRight="@dimen/activity_horizontal_margin"
-        android:paddingBottom="@dimen/activity_vertical_margin"
-        android:theme="@style/ThemeOverlay.AppCompat.Dark">
+        android:paddingBottom="@dimen/activity_vertical_margin">
 
-        <!-- Option 1: With circular background (Recommended) -->
+        <!-- Circular avatar background -->
         <FrameLayout
             android:layout_width="72dp"
             android:layout_height="72dp"
@@ -28,24 +27,13 @@
 
             <ImageView
                 android:id="@+id/profileImageView"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
                 android:layout_gravity="center"
+                android:scaleType="centerCrop"
                 android:contentDescription="Profile image"
                 android:src="@drawable/ic_user" />
         </FrameLayout>
-
-        <!-- Option 2: Simple ImageView without background -->
-        <!--
-        <ImageView
-            android:id="@+id/profileImageView"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:layout_marginEnd="16dp"
-            android:contentDescription="Profile image"
-            android:scaleType="center"
-            android:src="@drawable/ic_user" />
-        -->
 
         <LinearLayout
             android:layout_width="0dp"
@@ -58,7 +46,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Welcome"
-                android:textColor="@android:color/black"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="18sp"
                 android:textStyle="bold"
                 tools:text="John Doe" />
@@ -69,18 +57,19 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:text="Sign in to continue"
-                android:textColor="@android:color/darker_gray"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="14sp"
                 tools:text="john@example.com" />
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Divider underneath the header row -->
+    <!-- Divider -->
     <View
         android:id="@+id/divider"
         android:layout_width="match_parent"
         android:layout_height="0.5dp"
         android:layout_marginTop="8dp"
-        android:background="@color/lightgray" />
+        android:background="?attr/colorOnSurface"
+        android:alpha="0.12" />
 
 </LinearLayout>

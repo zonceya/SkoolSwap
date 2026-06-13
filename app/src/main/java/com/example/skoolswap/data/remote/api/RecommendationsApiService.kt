@@ -5,14 +5,13 @@ import com.example.skoolswap.data.remote.models.response.home.RecentRecommendati
 import com.example.skoolswap.data.remote.models.response.home.SportRecommendationResponse
 import com.example.skoolswap.data.remote.models.response.home.UniformRecommendationResponse
 import com.example.skoolswap.data.remote.models.response.home.PaginatedItemsResponse
+import com.example.skoolswap.data.remote.models.response.home.RecommendedItemsResponse
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
 
 interface RecommendationsApiService {
-
-    // ============ HOME SCREEN ENDPOINTS ============
 
     @GET("api/v1/recommendations/home")
     suspend fun getHomeFeed(
@@ -43,7 +42,11 @@ interface RecommendationsApiService {
     suspend fun getRecommendedAll(
         @Query("school_id") schoolId: Int,
         @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 20
+        @Query("per_page") perPage: Int = 20,
+        @Query("category_id") categoryId: Int? = null,
+        @Query("condition_id") conditionId: Int? = null,
+        @Query("min_price") minPrice: Float? = null,
+        @Query("max_price") maxPrice: Float? = null
     ): Response<PaginatedItemsResponse>
 
     @GET("api/v1/recommendations/essentials/all")
@@ -51,7 +54,10 @@ interface RecommendationsApiService {
         @Query("school_id") schoolId: Int,
         @Query("category") category: String? = null,
         @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 20
+        @Query("per_page") perPage: Int = 20,
+        @Query("condition_id") conditionId: Int? = null,
+        @Query("min_price") minPrice: Float? = null,
+        @Query("max_price") maxPrice: Float? = null
     ): Response<PaginatedItemsResponse>
 
     @GET("api/v1/recommendations/trending/all")
@@ -59,7 +65,11 @@ interface RecommendationsApiService {
         @Query("school_id") schoolId: Int,
         @Query("period") period: String = "today",
         @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 20
+        @Query("per_page") perPage: Int = 20,
+        @Query("category_id") categoryId: Int? = null,
+        @Query("condition_id") conditionId: Int? = null,
+        @Query("min_price") minPrice: Float? = null,
+        @Query("max_price") maxPrice: Float? = null
     ): Response<PaginatedItemsResponse>
 
     @GET("api/v1/recommendations/recent/all")
@@ -67,7 +77,11 @@ interface RecommendationsApiService {
         @Query("school_id") schoolId: Int,
         @Query("period") period: String = "all",
         @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 20
+        @Query("per_page") perPage: Int = 20,
+        @Query("category_id") categoryId: Int? = null,
+        @Query("condition_id") conditionId: Int? = null,
+        @Query("min_price") minPrice: Float? = null,
+        @Query("max_price") maxPrice: Float? = null
     ): Response<PaginatedItemsResponse>
 
     // ============ TRACKING ENDPOINTS ============
@@ -84,4 +98,21 @@ interface RecommendationsApiService {
         @Query("source") source: String,
         @Query("position") position: Int
     ): Response<Unit>
+    // RecommendationsApiService.kt
+    @GET("api/v1/items")
+    suspend fun searchItems(
+        @Query("school_id") schoolId: Int,
+        @Query("q") query: String,
+        @Query("main_category_id") categoryId: Int? = null,
+        @Query("gender_id") genderId: Int? = null,
+        @Query("brand_id") brandId: Int? = null,
+        @Query("size_id") sizeId: Int? = null,
+        @Query("color_id") colorId: Int? = null,
+        @Query("condition_id") conditionId: Int? = null,
+        @Query("min_price") minPrice: Float? = null,
+        @Query("max_price") maxPrice: Float? = null,
+        @Query("sort") sort: String? = null,
+        @Query("page") page: Int = 1,
+        @Query("per_page") perPage: Int = 30
+    ): Response<RecommendedItemsResponse>
 }

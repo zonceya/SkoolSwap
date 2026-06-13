@@ -5,11 +5,89 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/white">
+    android:background="?android:attr/colorBackground">
 
-    <!-- ========================= -->
-    <!-- SCROLL CONTENT -->
-    <!-- ========================= -->
+    <LinearLayout
+        android:id="@+id/shimmerLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:padding="16dp">
+
+        <!-- Image placeholder shimmer -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
+            android:background="@color/shimmer_background" />
+
+        <!-- Title shimmer -->
+        <View
+            android:layout_width="200dp"
+            android:layout_height="24dp"
+            android:layout_marginTop="16dp"
+            android:background="@color/shimmer_background" />
+
+        <!-- Price shimmer -->
+        <View
+            android:layout_width="100dp"
+            android:layout_height="32dp"
+            android:layout_marginTop="8dp"
+            android:background="@color/shimmer_background" />
+
+        <!-- Divider shimmer -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="16dp"
+            android:background="@color/shimmer_background" />
+
+        <!-- Description shimmer lines -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="16dp"
+            android:layout_marginTop="12dp"
+            android:background="@color/shimmer_background" />
+
+        <View
+            android:layout_width="250dp"
+            android:layout_height="16dp"
+            android:layout_marginTop="8dp"
+            android:background="@color/shimmer_background" />
+
+    </LinearLayout>
+    <LinearLayout
+        android:id="@+id/errorLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:padding="32dp">
+
+        <ImageView
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:src="@drawable/ic_error_placeholder" />
+
+        <TextView
+            android:id="@+id/errorMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Failed to load item"
+            android:textSize="16sp"
+            android:textColor="#666"
+            android:layout_marginTop="16dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/retryButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Retry"
+            android:layout_marginTop="24dp" />
+
+    </LinearLayout>
+
     <ProgressBar
         android:id="@+id/progressBar"
         android:layout_width="wrap_content"
@@ -21,7 +99,9 @@
         android:id="@+id/scrollView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:paddingBottom="80dp">
+        android:paddingBottom="80dp"
+        android:visibility="gone"
+        android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -53,7 +133,9 @@
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:src="@drawable/ic_back"
-                        app:tint="@android:color/black" />
+                        android:background="?attr/selectableItemBackground"
+                        android:padding="4dp"
+                        app:tint="?attr/colorOnSurface" />
 
                     <View
                         android:layout_width="0dp"
@@ -66,14 +148,14 @@
                         android:layout_height="24dp"
                         android:layout_marginEnd="16dp"
                         android:src="@drawable/ic_favorite"
-                        app:tint="@android:color/black" />
+                        app:tint="?attr/colorOnSurface" />
 
                     <ImageView
                         android:id="@+id/shareBtn"
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:src="@drawable/ic_share"
-                        app:tint="@android:color/black" />
+                        app:tint="?attr/colorOnSurface" />
 
                 </LinearLayout>
 
@@ -101,70 +183,123 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <!-- Title - NO hardcoded text -->
-                <TextView
-                    android:id="@+id/productTitle"
+                <!-- Title Row with View Count -->
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="18sp"
-                    android:textStyle="bold"/>
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
-                <!-- Brand - NO hardcoded text -->
+                    <TextView
+                        android:id="@+id/productTitle"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:textColor="?attr/colorOnSurface" />
+
+                    <LinearLayout
+                        android:id="@+id/viewCountContainer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/badge_rounded"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:paddingTop="3dp"
+                        android:paddingBottom="3dp"
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:layout_width="12dp"
+                            android:layout_height="12dp"
+                            android:src="@drawable/ic_eye"
+                            app:tint="?attr/colorOnSurface" />
+
+                        <TextView
+                            android:id="@+id/viewCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="12sp"
+                            android:layout_marginStart="4dp" />
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- Brand -->
                 <TextView
                     android:id="@+id/productBrand"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textSize="14sp"
-                    android:textColor="#666666"
+                    android:textStyle="italic"
+                    android:textColor="?attr/colorOnSurface"
+                    android:alpha="0.7"
                     android:layout_marginTop="4dp"
                     android:visibility="gone"/>
 
-                <!-- Color - NO hardcoded text -->
+                <!-- Color -->
                 <TextView
                     android:id="@+id/productColor"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textSize="14sp"
-                    android:textColor="#666666"
+                    android:textColor="?attr/colorOnSurface"
+                    android:alpha="0.7"
                     android:layout_marginTop="4dp"
                     android:visibility="gone"/>
 
-                <!-- Price - NO hardcoded text -->
+                <!-- Price -->
                 <TextView
                     android:id="@+id/productPrice"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textSize="18sp"
+                    android:textSize="24sp"
                     android:textStyle="bold"
+                    android:textColor="?attr/colorOnSurface"
                     android:layout_marginTop="8dp"/>
 
-                <!-- Size - NO hardcoded text -->
-                <TextView
+                <!-- Size -->
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/productSize"
+                    style="@style/SizeBadgeStyle"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="@android:color/white"
-                    android:background="@android:color/black"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
-                    android:paddingTop="6dp"
-                    android:paddingBottom="6dp"
                     android:layout_marginTop="12dp"
+                    android:visibility="gone"/>
+
+                <!-- Condition -->
+                <TextView
+                    android:id="@+id/productCondition"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textColor="?attr/colorOnSurface"
+                    android:alpha="0.7"
+                    android:layout_marginTop="4dp"
                     android:visibility="gone"/>
 
                 <!-- Divider -->
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:background="#EEEEEE"
+                    android:background="?attr/colorOnSurface"
+                    android:alpha="0.12"
                     android:layout_marginTop="16dp"/>
 
-                <!-- School - NO hardcoded text -->
+                <!-- School -->
                 <TextView
                     android:id="@+id/productSchool"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textSize="14sp"
+                    android:textColor="?attr/colorOnSurface"
+                    android:alpha="0.7"
                     android:layout_marginTop="12dp"
                     android:visibility="gone"/>
 
@@ -172,15 +307,18 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:background="#EEEEEE"
+                    android:background="?attr/colorOnSurface"
+                    android:alpha="0.12"
                     android:layout_marginTop="16dp"/>
 
-                <!-- Description - NO hardcoded text -->
+                <!-- Description -->
                 <TextView
                     android:id="@+id/productDescription"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textSize="14sp"
+                    android:textColor="?attr/colorOnSurface"
+                    android:alpha="0.7"
                     android:layout_marginTop="12dp"
                     android:visibility="gone"/>
 
@@ -188,88 +326,43 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:background="#EEEEEE"
+                    android:background="?attr/colorOnSurface"
+                    android:alpha="0.12"
                     android:layout_marginTop="16dp"/>
 
-                <!-- Contact Seller -->
-                <LinearLayout
-                    android:id="@+id/contactSeller"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Contact Seller"
-                        android:textSize="16sp"/>
-
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/ic_chevron_right"/>
-                </LinearLayout>
-
-                <!-- Divider -->
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="#EEEEEE"/>
-
                 <!-- ========================= -->
-                <!-- SIMILAR ITEMS -->
+                <!-- SHIPPING SECTION (FIRST) -->
                 <!-- ========================= -->
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Similar Items"
-                    android:textStyle="bold"
-                    android:textSize="16sp"
-                    android:layout_marginTop="16dp"/>
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/similarRecycler"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"/>
-
-                <!-- ========================= -->
-                <!-- SHIPPING -->
-                <!-- ========================= -->
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="#EEEEEE"
-                    android:layout_marginTop="16dp"/>
 
                 <LinearLayout
                     android:id="@+id/shippingHeader"
                     android:layout_width="match_parent"
-                    android:layout_height="48dp"
+                    android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="12dp"
+                    android:background="?attr/selectableItemBackground"
                     android:clickable="true"
-                    android:focusable="true"
-                    android:background="?attr/selectableItemBackground">
+                    android:focusable="true">
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="Shipping &amp; Returns"
-                        android:textSize="16sp"/>
+                        android:textSize="16sp"
+                        android:textColor="?attr/colorOnSurface"
+                        android:alpha="0.7"/>
 
                     <TextView
                         android:id="@+id/shippingToggle"
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:text="+"
-                        android:textSize="18sp"
-                        android:textAlignment="center"/>
+                        android:textSize="20sp"
+                        android:textAlignment="center"
+                        android:textColor="?attr/colorOnSurface"/>
                 </LinearLayout>
 
                 <LinearLayout
@@ -278,19 +371,94 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:visibility="gone"
-                    tools:visibility="visible">
+                    android:layout_marginBottom="16dp">
 
+                    <!-- Lottie Animation -->
+                    <com.airbnb.lottie.LottieAnimationView
+                        android:id="@+id/shippingAnimation"
+                        android:layout_width="120dp"
+                        android:layout_height="120dp"
+                        android:layout_gravity="center"
+                        app:lottie_rawRes="@raw/sad_animation"
+                        app:lottie_autoPlay="true"
+                        app:lottie_loop="true"/>
+
+                    <!-- Sad Text -->
                     <TextView
                         android:id="@+id/shippingText"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="We are working with partners to secure shipping."
+                        android:text="We are working with our partners to bring you the best courier service"
                         android:textSize="14sp"
-                        android:textColor="#666666"
+                        android:textColor="?attr/colorOnSurface"
+                        android:alpha="0.7"
                         android:layout_marginTop="8dp"
-                        android:layout_marginBottom="8dp"/>
+                        android:layout_marginBottom="16dp"
+                        android:gravity="center"
+                        android:lineSpacingExtra="4dp"/>
 
                 </LinearLayout>
+
+                <!-- ========================= -->
+                <!-- SIMILAR ITEMS (BELOW SHIPPING) -->
+                <!-- ========================= -->
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?attr/colorOnSurface"
+                    android:alpha="0.12"
+                    android:layout_marginTop="16dp"/>
+
+                <TextView
+                    android:id="@+id/similarSectionTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Similar Items"
+                    android:textSize="16sp"
+                    android:textColor="?attr/colorOnSurface"
+                    android:layout_marginTop="16dp"/>
+
+                <ProgressBar
+                    android:id="@+id/similarProgressBar"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone"/>
+                <LinearLayout
+                    android:id="@+id/similarShimmer"
+                    android:layout_width="match_parent"
+                    android:layout_height="180dp"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal"
+                    android:visibility="visible">
+
+                    <!-- Repeat this block 3 times for fake cards -->
+                    <View
+                        android:layout_width="120dp"
+                        android:layout_height="160dp"
+                        android:layout_marginEnd="8dp"
+                        android:background="@color/shimmer_background"/>
+
+                    <View
+                        android:layout_width="120dp"
+                        android:layout_height="160dp"
+                        android:layout_marginEnd="8dp"
+                        android:background="@color/shimmer_background"/>
+
+                    <View
+                        android:layout_width="120dp"
+                        android:layout_height="160dp"
+                        android:background="@color/shimmer_background"/>
+
+                </LinearLayout>
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/similarRecycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="180dp"
+                    android:layout_marginTop="12dp"
+                    android:nestedScrollingEnabled="false"/>
 
             </LinearLayout>
 
@@ -298,14 +466,16 @@
 
     </ScrollView>
 
+    <!-- Buy Button - Light mode: black background with white text, Dark mode: white background with black text -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/buyButton"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:text="BUY"
-        android:textColor="@android:color/white"
-        android:backgroundTint="@android:color/black"
+        android:text="I'm Interested"
+        android:textColor="@color/white"
+        android:backgroundTint="?attr/colorOnSurface"
         android:layout_margin="16dp"
-        android:layout_gravity="bottom"/>
+        android:layout_gravity="bottom"
+        app:cornerRadius="12dp"/>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

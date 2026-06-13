@@ -1,4 +1,4 @@
-package com.example.skoolswap.data.local.database.dao
+﻿package com.example.skoolswap.data.local.database.dao
 
 import androidx.room.Dao
 import androidx.room.Insert

@@ -5,6 +5,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.example.skoolswap.databinding.ItemChipWhiteBinding
 import com.example.skoolswap.domain.model.SportItem
+import com.example.skoolswap.utils.extensions.dpToPx
 
 class MoreSportsAdapter(
     private val onItemClick: (SportItem) -> Unit
@@ -36,9 +37,29 @@ class MoreSportsAdapter(
 
         fun bind(sport: SportItem) {
             binding.chipText.text = sport.name
-            binding.root.setOnClickListener {
-                onItemClick(sport)
+
+            val typedValue = android.util.TypedValue()
+
+            itemView.context.theme.resolveAttribute(
+                com.google.android.material.R.attr.colorSurface, typedValue, true
+            )
+            val bgColor = typedValue.data
+
+            itemView.context.theme.resolveAttribute(
+                com.google.android.material.R.attr.colorOnSurface, typedValue, true
+            )
+            val textAndBorderColor = typedValue.data
+
+            val drawable = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                setColor(bgColor)
+                setStroke(6, textAndBorderColor)
+                cornerRadius = 16f.dpToPx(itemView.context)
             }
+            binding.root.background = drawable
+            binding.chipText.setTextColor(textAndBorderColor)
+
+            binding.root.setOnClickListener { onItemClick(sport) }
         }
     }
 }

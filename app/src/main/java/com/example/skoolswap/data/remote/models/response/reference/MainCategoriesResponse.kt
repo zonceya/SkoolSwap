@@ -30,5 +30,15 @@ data class MainCategoryDto(
     val displayOrder: Int,
 
     @SerializedName("is_active")
-    val isActive: Boolean
+    val isActive: Boolean,
+
+    @SerializedName("sub_categories")
+    val subCategories: List<SubCategoryDto>? = null
+)
+
+data class SubCategoryDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("description") val description: String?,
+    @SerializedName("display_order") val displayOrder: Int = 0
 )

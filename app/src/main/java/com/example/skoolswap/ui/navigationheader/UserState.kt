@@ -6,7 +6,8 @@ sealed class UserState {
     data class Success(
         val name: String?,
         val email: String?,
-        val profileImageUrl: String?
+        val profileImageUrl: String?,
+        val localImagePath: String? = null
     ) : UserState()
     data class Error(val message: String) : UserState()
 }

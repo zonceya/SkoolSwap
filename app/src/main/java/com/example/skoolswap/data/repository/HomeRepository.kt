@@ -1,6 +1,7 @@
 package com.example.skoolswap.data.repository
 
 import android.util.Log
+import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.mapper.toDomain
 import com.example.skoolswap.data.remote.api.RecommendationsApiService
 import com.example.skoolswap.domain.model.homefeed.HomeFeed
@@ -25,7 +26,8 @@ import javax.inject.Singleton
 @Singleton
 class HomeRepository @Inject constructor(
     private val recommendationsApiService: RecommendationsApiService,
-    private val authRepository: AuthRepositoryInterface
+    private val authRepository: AuthRepositoryInterface,
+    private val appPreferences: AppPreferences
 ) : HomeRepositoryInterface {
 
     private companion object {
@@ -109,8 +111,9 @@ class HomeRepository @Inject constructor(
         onSuccess: (T) -> Result<R>
     ): Result<R> {
         return try {
-            // Check authentication
+       
             val token = authRepository.getAuthToken().first()
+                ?: appPreferences.authToken.first()
             if (token.isNullOrBlank()) {
                 Log.e(TAG, "No auth token available")
                 return Result.Error(Exception("Authentication required. Please sign in again."))

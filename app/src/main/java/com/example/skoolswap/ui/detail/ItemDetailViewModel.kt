@@ -1,5 +1,6 @@
 package com.example.skoolswap.ui.detail
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.skoolswap.data.local.database.dao.BrandDao
@@ -7,24 +8,28 @@ import com.example.skoolswap.data.local.database.dao.ColorDao
 import com.example.skoolswap.data.local.database.dao.SchoolDao
 import com.example.skoolswap.data.local.database.dao.SizeDao
 import com.example.skoolswap.domain.model.Item
+import com.example.skoolswap.domain.repository.AuthRepositoryInterface
+import com.example.skoolswap.domain.repository.FavoriteRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.domain.repository.ProductsRepositoryInterface
+import com.example.skoolswap.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
-
 @HiltViewModel
 class ItemDetailViewModel @Inject constructor(
     private val itemRepository: ItemRepositoryInterface,
     private val productsRepository: ProductsRepositoryInterface,
     private val sizeDao: SizeDao,
+    private val favoriteRepository: FavoriteRepositoryInterface,
+    private val authRepository: AuthRepositoryInterface,
     private val schoolDao: SchoolDao,
     private val colorDao: ColorDao,
     private val brandDao: BrandDao
-
 ) : ViewModel() {
 
     private val _itemState = MutableStateFlow<ItemDetailState>(ItemDetailState.Loading)
@@ -33,94 +38,238 @@ class ItemDetailViewModel @Inject constructor(
     private val _similarItems = MutableStateFlow<List<Item>>(emptyList())
     val similarItems: StateFlow<List<Item>> = _similarItems.asStateFlow()
 
+    private val _similarSectionTitle = MutableStateFlow("Similar Items")
+    val similarSectionTitle: StateFlow<String> = _similarSectionTitle.asStateFlow()
+
+    private val _isLoadingSimilar = MutableStateFlow(false)
+    val isLoadingSimilar: StateFlow<Boolean> = _isLoadingSimilar.asStateFlow()
+
     private val _sizeName = MutableStateFlow<String?>(null)
     val sizeName: StateFlow<String?> = _sizeName.asStateFlow()
 
     private val _schoolName = MutableStateFlow<String?>(null)
     val schoolName: StateFlow<String?> = _schoolName.asStateFlow()
+
     private val _colorName = MutableStateFlow<String?>(null)
     val colorName: StateFlow<String?> = _colorName.asStateFlow()
+
     private val _brandName = MutableStateFlow<String?>(null)
     val brandName: StateFlow<String?> = _brandName.asStateFlow()
+
+    private val _conditionName = MutableStateFlow<String?>(null)
+    val conditionName: StateFlow<String?> = _conditionName.asStateFlow()
+
+    private val _imageUrls = MutableStateFlow<List<String>>(emptyList())
+    val imageUrls: StateFlow<List<String>> = _imageUrls.asStateFlow()
+
+    private val _isFavorite = MutableStateFlow(false)
+    val isFavorite: StateFlow<Boolean> = _isFavorite.asStateFlow()
+
+    private val _sellerMobile = MutableStateFlow<String?>(null)
+    val sellerMobile: StateFlow<String?> = _sellerMobile.asStateFlow()
+
+    private var cachedItem: Item? = null
+    private var currentItemId: String? = null
+
+    // In-memory cache: survives config changes, cleared when ViewModel dies
+    private val similarItemsCache = mutableMapOf<String, List<Item>>()
+
+    private val TAG = "ItemDetailVM"
+
     fun loadItem(itemId: String, source: String) {
         viewModelScope.launch {
+            currentItemId = itemId
             _itemState.value = ItemDetailState.Loading
-            trackView(itemId, source)
+            checkFavoriteStatus(itemId)
 
-            val result = itemRepository.getItem(itemId)
+            // Fire similar items and main item fetch IN PARALLEL
+            // Similar items uses cache if available — shows instantly on repeat visit
+            val similarJob = launch { loadSimilarItemsEarly(itemId) }
+            val itemJob = launch { fetchItem(itemId) }
 
-            // ADD THESE LOGS
-            android.util.Log.d("ItemDetailVM", "Result isSuccess: ${result.isSuccess}")
+            // trackView fires independently — doesn't block anything
+            launch { productsRepository.trackClick(itemId, source, 0) }
+        }
+    }
 
-            if (result.isSuccess) {
-                val item = result.getOrNull()
-                android.util.Log.d("ItemDetailVM", "Item name: ${item?.name}")
-                android.util.Log.d("ItemDetailVM", "Item price: ${item?.price}")
-                android.util.Log.d("ItemDetailVM", "Item brandId: ${item?.brandId}")
-                android.util.Log.d("ItemDetailVM", "Item colorId: ${item?.colorId}")
-                android.util.Log.d("ItemDetailVM", "Item schoolId: ${item?.schoolId}")
+    // Loads similar items as early as possible, using cache when available
+    private suspend fun loadSimilarItemsEarly(itemId: String) {
+        // Serve from cache immediately if we have it
+        similarItemsCache[itemId]?.let { cached ->
+            Timber.tag(TAG).d("Similar items served from cache: ${cached.size} items")
+            _similarItems.value = cached
+            return
+        }
 
-                if (item != null) {
-                    _itemState.value = ItemDetailState.Success(item)
-                    loadReferenceData(item)
-                    loadSimilarItems(item)
-                } else {
-                    _itemState.value = ItemDetailState.Error("Item data is null")
-                }
-            } else {
-                val exception = result.exceptionOrNull()
-                android.util.Log.e("ItemDetailVM", "Error: ${exception?.message}")
-                _itemState.value = ItemDetailState.Error(exception?.message ?: "Failed to load item")
+        _isLoadingSimilar.value = true
+
+        // We don't have the item yet (it's loading in parallel), so we can only
+        // try non-category fallbacks immediately. Category-based load happens
+        // in loadSimilarItems(item) once the item arrives.
+        val items = fetchTrendingItems(excludeItemId = itemId, period = "today")
+            .ifEmpty { fetchRecentItems(excludeItemId = itemId, period = "week") }
+            .ifEmpty { fetchAnyPopularItems(excludeItemId = itemId) }
+
+        if (items.isNotEmpty()) {
+            _similarSectionTitle.value = "Trending Today"
+            val result = items.take(6)
+            similarItemsCache[itemId] = result
+            _similarItems.value = result
+        }
+
+        _isLoadingSimilar.value = false
+    }
+
+    private suspend fun fetchItem(itemId: String) {
+        val result = itemRepository.getItem(itemId)
+
+        if (result.isSuccess) {
+            val item = result.getOrNull() ?: return
+            cachedItem = item
+            _itemState.value = ItemDetailState.Success(item)
+            _sellerMobile.value = item.shop?.sellerMobile
+            Timber.tag(TAG).d("Seller mobile: ${_sellerMobile.value}")
+
+            loadReferenceData(item)
+
+            // Now try category-based similar items — may improve on what early load found
+            // Only runs if we have a category to search by
+            if (item.mainCategoryId != null) {
+                loadSimilarItemsWithCategory(item)
+            }
+        } else {
+            _itemState.value = ItemDetailState.Error(
+                result.exceptionOrNull()?.message ?: "Unknown error"
+            )
+        }
+    }
+
+    // Runs after item loads — upgrades similar items to category-matched ones if possible
+    private suspend fun loadSimilarItemsWithCategory(item: Item) {
+        val cacheKey = item.id
+        val categoryItems = fetchItemsByCategory(item.mainCategoryId!!, item.id)
+
+        if (categoryItems.isNotEmpty()) {
+            Timber.tag(TAG).d("Upgraded similar items to category-matched: ${categoryItems.size}")
+            _similarSectionTitle.value = "Similar Items"
+            val result = categoryItems.take(6)
+            similarItemsCache[cacheKey] = result  // overwrite cache with better results
+            _similarItems.value = result
+        }
+        // If category fetch fails, early-loaded trending items remain — no blank state
+    }
+
+    private suspend fun checkFavoriteStatus(itemId: String) {
+        _isFavorite.value = favoriteRepository.isFavorite(itemId)
+        Timber.tag(TAG).d("Favorite status for $itemId: ${_isFavorite.value}")
+    }
+
+    fun toggleFavorite() {
+        viewModelScope.launch {
+            currentItemId?.let { itemId ->
+                val newStatus = favoriteRepository.toggleFavorite(itemId)
+                _isFavorite.value = newStatus
+                Timber.tag(TAG).d("Toggled favorite for $itemId: $newStatus")
             }
         }
     }
 
     private suspend fun loadReferenceData(item: Item) {
-        // Load size name from Room
-        item.sizeId?.let { sizeId ->
-            val size = sizeDao.getById(sizeId)
-            _sizeName.value = size?.name
+        Timber.tag(TAG).d("Images count: ${item.images.size}")
+        item.images.forEachIndexed { index, image ->
+            Timber.tag(TAG).d("Image $index: ${image.url}")
         }
-        item.brandId?.let { brandId ->
-            val brand = brandDao.getById(brandId)
-            _brandName.value = brand?.name
-        }
-        // Load school name from Room
+
+        _imageUrls.value = item.images.map { it.url }
+        _sizeName.value = item.sizeName
+        _colorName.value = item.colorName
+        _brandName.value = item.brandName
+        _conditionName.value = item.conditionName
+
         item.schoolId?.let { schoolId ->
             val school = schoolDao.getById(schoolId)
             _schoolName.value = school?.name
         }
-        item.colorId?.let { colorId ->
-            val color = colorDao.getById(colorId)  // You'll need to inject ColorDao
-            _colorName.value = color?.name
-        }
     }
 
-    private suspend fun loadSimilarItems(currentItem: Item) {
-        val result = productsRepository.getRecommendedAll(
-            page = 1,
-            perPage = 10,
-            categoryId = currentItem.mainCategoryId,
-            conditionId = null,
-            minPrice = null,
-            maxPrice = null
-        )
-
-        if (result.isSuccess) {
-            val paginatedResponse = result.getOrNull()
-            val similar = paginatedResponse?.items
-                ?.filter { it.id != currentItem.id }
-                ?.take(6) ?: emptyList()
-            _similarItems.value = similar
-        } else {
-            _similarItems.value = emptyList()
-        }
+    private suspend fun fetchItemsByCategory(categoryId: Int, excludeItemId: String): List<Item> {
+        return try {
+            val result = productsRepository.getRecommendedAll(
+                page = 1, perPage = 10, categoryId = categoryId,
+                conditionId = null, minPrice = null, maxPrice = null
+            )
+            when (result) {
+                is Result.Success -> result.data.items.filter { it.id != excludeItemId }
+                is Result.Error -> emptyList()
+            }
+        } catch (e: Exception) { emptyList() }
     }
 
-    private fun trackView(itemId: String, source: String) {
+    private suspend fun fetchTrendingItems(excludeItemId: String, period: String = "today"): List<Item> {
+        return try {
+            val result = productsRepository.getTrendingAll(
+                period = period, page = 1, perPage = 10,
+                categoryId = null, conditionId = null, minPrice = null, maxPrice = null
+            )
+            when (result) {
+                is Result.Success -> result.data.items.filter { it.id != excludeItemId }
+                is Result.Error -> emptyList()
+            }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    private suspend fun fetchRecentItems(excludeItemId: String, period: String = "week"): List<Item> {
+        return try {
+            val result = productsRepository.getRecentAll(
+                period = period, page = 1, perPage = 10,
+                categoryId = null, conditionId = null, minPrice = null, maxPrice = null
+            )
+            when (result) {
+                is Result.Success -> result.data.items.filter { it.id != excludeItemId }
+                is Result.Error -> emptyList()
+            }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    private suspend fun fetchAnyPopularItems(excludeItemId: String): List<Item> {
+        return try {
+            val result = productsRepository.getRecommendedAll(
+                page = 1, perPage = 10, categoryId = null,
+                conditionId = null, minPrice = null, maxPrice = null
+            )
+            when (result) {
+                is Result.Success -> result.data.items.filter { it.id != excludeItemId }
+                is Result.Error -> emptyList()
+            }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    // Keep this public for the fragment's direct call, but loadItem now handles it internally
+    fun trackView(itemId: String, source: String) {
         viewModelScope.launch {
             productsRepository.trackClick(itemId, source, 0)
         }
+    }
+
+    fun getImageUrls(): List<String> {
+        val urls = _imageUrls.value
+        Timber.tag(TAG).d("getImageUrls returning ${urls.size} URLs")
+        return urls
+    }
+
+    fun clearState() {
+        _itemState.value = ItemDetailState.Loading
+        _similarItems.value = emptyList()
+        _similarSectionTitle.value = "Similar Items"
+        _isLoadingSimilar.value = false
+        _sizeName.value = null
+        _schoolName.value = null
+        _colorName.value = null
+        _brandName.value = null
+        _conditionName.value = null
+        _isFavorite.value = false
+        _sellerMobile.value = null
+        Timber.tag(TAG).d("State cleared")
     }
 
     sealed class ItemDetailState {

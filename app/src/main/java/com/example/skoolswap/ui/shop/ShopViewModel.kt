@@ -12,111 +12,124 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
 @HiltViewModel
 class ShopViewModel @Inject constructor(
     private val shopRepository: ShopRepositoryInterface,
     private val itemRepository: ItemRepositoryInterface
 ) : ViewModel() {
 
-    // Current shop from repository
     val currentShop: StateFlow<Shop?> = shopRepository.currentShop
 
-    // Loading state for operations
+    private val _allItems = MutableStateFlow<List<Item>>(emptyList())
+    val allItems: StateFlow<List<Item>> = _allItems.asStateFlow()
+
+    private val _filteredItems = MutableStateFlow<List<Item>>(emptyList())
+    val filteredItems: StateFlow<List<Item>> = _filteredItems.asStateFlow()
+
+    private val _categories = MutableStateFlow<List<String>>(emptyList())
+    val categories: StateFlow<List<String>> = _categories.asStateFlow()
+
+    private val _selectedCategory = MutableStateFlow("All Items")
+    val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    // Separate loading state for initial load
-    private val _isInitialLoading = MutableStateFlow(false)
-    val isInitialLoading: StateFlow<Boolean> = _isInitialLoading.asStateFlow()
-
-    // Error state
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-
-    // Update success state
-    private val _updateSuccess = MutableStateFlow(false)
-    val updateSuccess: StateFlow<Boolean> = _updateSuccess.asStateFlow()
-    private val _isLoadingItems = MutableStateFlow(false)
-    val isLoadingItems: StateFlow<Boolean> = _isLoadingItems.asStateFlow()
-    private val _shopItems = MutableStateFlow<List<Item>>(emptyList())
-    val shopItems: StateFlow<List<Item>> = _shopItems.asStateFlow()
-    init {
-        viewModelScope.launch {
-            itemRepository.currentItems.collect { items ->
-                // This will update whenever repository's currentItems changes
-                if (items.isNotEmpty()) {
-                    _shopItems.value = items
-                }
-            }
-        }
-    }
-
-    // MODIFIED: Added showLoading parameter
     fun loadMyShop(showLoading: Boolean = true) {
         viewModelScope.launch {
-            if (showLoading) {
-                _isLoading.value = true
-            }
-            _error.value = null
-
-            val result = shopRepository.getMyShop()
-            result.onFailure { throwable ->
-                _error.value = "Failed to load shop: ${throwable.message}"
-            }
-
-            if (showLoading) {
-                _isLoading.value = false
-            }
+            if (showLoading) _isLoading.value = true
+            shopRepository.getMyShop()
+            if (showLoading) _isLoading.value = false
         }
     }
+
     fun loadMyShopItems() {
         viewModelScope.launch {
-            _isLoadingItems.value = true
-            val result = itemRepository.getMyShopItems() // You'll need to add this to ItemRepository
+            val result = itemRepository.getMyShopItems()
             result.onSuccess { items ->
-                _shopItems.value = items
-            }.onFailure { error ->
-                _error.value = "Failed to load items: ${error.message}"
+                _allItems.value = items
+                extractCategoriesFromItems(items)
+                filterItemsByCategory()
+            }.onFailure { e ->
+                _error.value = e.message
             }
-            _isLoadingItems.value = false
         }
     }
-    // FIXED: Clear loading states properly
+
+    private fun extractCategoriesFromItems(items: List<Item>) {
+        // Get actual categories from items based on itemTypeId
+        val actualCategories = items.mapNotNull { item ->
+            getCategoryFromTypeId(item.itemTypeId)
+        }.distinct().sorted()
+
+        val categoryList = mutableListOf("All Items")
+        categoryList.addAll(actualCategories)
+
+        // If no categories found, use predefined ones
+        if (actualCategories.isEmpty()) {
+            categoryList.addAll(listOf("Uniform", "Sport", "Stationary", "Accessories", "Books"))
+        }
+
+        _categories.value = categoryList.distinct()
+    }
+
+    // FIXED: Filter using itemTypeId, not category field
+    private fun filterItemsByCategory() {
+        val selected = _selectedCategory.value
+        val items = _allItems.value
+
+        val filtered = if (selected == "All Items") {
+            items
+        } else {
+            items.filter { item ->
+                val categoryName = getCategoryFromTypeId(item.itemTypeId)
+                categoryName == selected
+            }
+        }
+
+        _filteredItems.value = filtered
+    }
+
+    fun selectCategory(category: String) {
+        _selectedCategory.value = category
+        filterItemsByCategory()  // Instant client-side filter
+    }
+
+    fun getCategoryFromTypeId(typeId: Int?): String? {
+        return when (typeId) {
+            1 -> "Uniform"
+            2 -> "Sport"
+            3 -> "Stationary"
+            4 -> "Accessories"
+            5 -> "Books"
+            else -> null
+        }
+    }
+
     suspend fun updateShopDisplayName(displayName: String): Result<Unit> {
         return try {
             _isLoading.value = true
-            _error.value = null
-            _updateSuccess.value = false
-
             val result = shopRepository.updateShopDisplayName(displayName)
-
             if (result.isSuccess) {
-                _updateSuccess.value = true
-                // Refresh data after update
                 loadMyShop(showLoading = false)
                 Result.success(Unit)
             } else {
-                _error.value = result.exceptionOrNull()?.message ?: "Failed to update shop"
-                Result.failure(Exception(_error.value))
+                Result.failure(result.exceptionOrNull() ?: Exception("Failed"))
             }
-        } catch (e: Exception) {
-            _error.value = "Update failed: ${e.message}"
-            Result.failure(e)
         } finally {
             _isLoading.value = false
         }
     }
 
-    fun clearError() {
-        _error.value = null
-    }
-
-    fun clearSuccess() {
-        _updateSuccess.value = false
-    }
-
     fun refresh() {
         loadMyShop(showLoading = true)
+        loadMyShopItems()
     }
+
+    fun clearError() { _error.value = null }
+
 }

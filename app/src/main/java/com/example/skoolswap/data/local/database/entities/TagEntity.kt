@@ -8,5 +8,5 @@ data class TagEntity(
     @PrimaryKey
     val id: Int,
     val name: String,
-    val tagType: String
+    val tagType: String? = null
 )

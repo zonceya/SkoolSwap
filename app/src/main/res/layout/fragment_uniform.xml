@@ -1,16 +1,78 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="#F5F5F5">
+    android:background="?android:attr/colorBackground">
 
-    <!-- Just the RecyclerView - no toolbar -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/uniformTabRecycler"
+    <!-- Shimmer Layout (shows while loading) -->
+    <LinearLayout
+        android:id="@+id/shimmerLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:paddingTop="12dp"
-        android:clipToPadding="false" />
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:padding="16dp">
 
-</LinearLayout>
+        <!-- Category item shimmer - repeat 6 times -->
+        <include layout="@layout/shimmer_category_item" />
+        <include layout="@layout/shimmer_category_item" />
+        <include layout="@layout/shimmer_category_item" />
+        <include layout="@layout/shimmer_category_item" />
+        <include layout="@layout/shimmer_category_item" />
+        <include layout="@layout/shimmer_category_item" />
+
+    </LinearLayout>
+
+    <!-- Error Layout -->
+    <LinearLayout
+        android:id="@+id/errorLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:padding="32dp">
+
+        <ImageView
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:src="@drawable/ic_error_placeholder" />
+
+        <TextView
+            android:id="@+id/errorMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Failed to load categories"
+            android:textSize="16sp"
+            android:textColor="#666"
+            android:layout_marginTop="16dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/retryButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Retry"
+            android:layout_marginTop="24dp" />
+
+    </LinearLayout>
+
+    <!-- RecyclerView (shows when data loaded) -->
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefreshLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- RecyclerView (shows when data loaded) -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/uniformTabRecycler"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:paddingTop="12dp"
+            android:paddingHorizontal="8dp"
+            android:clipToPadding="false"
+            android:visibility="gone" />
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+</FrameLayout>

@@ -1,6 +1,7 @@
 package com.example.skoolswap.data.mapper
 
 import com.example.skoolswap.data.local.database.entities.ItemEntity
+import com.example.skoolswap.data.remote.models.response.home.RecommendationItemDto
 import com.example.skoolswap.data.remote.models.response.item.*
 import com.example.skoolswap.data.remote.models.response.shop.PublicShopItemDto
 import com.example.skoolswap.data.remote.models.response.shop.PublicShopItemImageDto
@@ -10,9 +11,41 @@ import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.ItemImage
 import com.example.skoolswap.domain.model.ItemMeta
 import com.example.skoolswap.domain.model.Shop
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 
 // ============ ITEM DTO TO DOMAIN ============
 fun ItemDto.toDomain(): Item {
+    // Parse all images from the API response
+    val allImages = mutableListOf<ItemImage>()
+
+    // 1. Add cover photo if exists
+    val coverPhotoUrl = coverPhoto ?: image
+    coverPhotoUrl?.let { url ->
+        allImages.add(ItemImage(
+            id = 0,
+            url = url,
+            filename = null,
+            contentType = null,
+            createdAt = null,
+            isCover = true
+        ))
+    }
+
+    // 2. Add all images from the images array (THIS WAS THE PROBLEM!)
+    this.images?.forEach { imageUrl ->
+        if (imageUrl != coverPhotoUrl && imageUrl.isNotBlank()) {
+            allImages.add(ItemImage(
+                id = 0,
+                url = imageUrl,
+                filename = null,
+                contentType = null,
+                createdAt = null,
+                isCover = false
+            ))
+        }
+    }
+
     return Item(
         id = id,
         shopId = shopId,
@@ -23,8 +56,27 @@ fun ItemDto.toDomain(): Item {
         status = status,
         meta = meta?.toDomain(),
         createdAt = createdAt,
+        updatedAt = updatedAt,
         shop = shop?.toDomain(),
-        images = emptyList() // Images are separate in response
+        images = allImages,
+        coverImage = coverPhotoUrl,
+        schoolName = school?.name,
+        brandId = brand?.id,
+        sizeId = size?.id,
+        colorId = color?.id,
+        schoolId = school?.id,
+        itemConditionId = condition?.id,
+        locationId = town?.id,
+        provinceId = province?.id,
+        genderId = gender?.id,
+        mainCategoryId = mainCategory?.id,
+        subCategoryId = subCategory?.id,
+        sizeName = size?.name,
+        colorName = color?.name,
+        brandName = brand?.name,
+        conditionName = condition?.name,
+        reserved = (quantity - (availableQuantity ?: quantity)),
+        label = label
     )
 }
 
@@ -35,7 +87,8 @@ fun ItemImageDto.toDomain(): ItemImage {
         url = url,
         filename = filename,
         contentType = contentType,
-        createdAt = createdAt
+        createdAt = createdAt,
+        isCover = false
     )
 }
 
@@ -46,7 +99,8 @@ fun ShopItemImageDto.toDomain(): ItemImage {
         url = url,
         filename = filename,
         contentType = contentType,
-        createdAt = createdAt
+        createdAt = createdAt,
+        isCover = false
     )
 }
 
@@ -54,7 +108,8 @@ fun ShopItemImageDto.toDomain(): ItemImage {
 fun PublicShopItemImageDto.toDomain(): ItemImage {
     return ItemImage(
         id = id,
-        url = url
+        url = url,
+        isCover = false
     )
 }
 
@@ -74,6 +129,7 @@ fun ItemShopDto.toDomain(): Shop {
         displayName = "",
         userId = 0L,
         sellerName = "",
+        sellerMobile = "",
         profilePictureUrl = "",
         createdAt = "",
         itemsCount = 0
@@ -81,103 +137,83 @@ fun ItemShopDto.toDomain(): Shop {
 }
 
 // ============ CREATE ITEM RESPONSE TO DOMAIN ============
-
-// In your mapper file - COMPLETE FIX
 fun CreateItemResponse.toDomain(): Item {
     val itemData = item
+    val variant = variants?.firstOrNull()  // Get the first variant (contains actual price/quantity)
+
     val allImages = mutableListOf<ItemImage>()
 
     // 1. Get cover photo (primary image)
     val coverPhotoUrl = when {
-        // From Active Storage via image field
         !itemData?.image.isNullOrEmpty() -> itemData.image
-        // From database cover_photo column
-        !itemData?.cover_photo.isNullOrEmpty() -> itemData.cover_photo
+        !itemData?.coverPhoto.isNullOrEmpty() -> itemData.coverPhoto
         else -> null
     }
 
     // Add cover photo as first image if exists
     coverPhotoUrl?.let { url ->
         allImages.add(ItemImage(
-            id = 0,  // Temporary ID for CDN images
+            id = 0,
             url = url,
             filename = null,
             contentType = null,
             createdAt = null,
-            isCover = true  // Mark as cover (you may need to add this field)
+            isCover = true
         ))
     }
 
-    // 2. Get additional images from images array
-    // Handle both formats: List<String> OR List<ItemImageDto>
-    val additionalImages = when (val imagesRaw = itemData?.imagesRaw) {
-        is List<*> -> {
-            imagesRaw.mapNotNull { image ->
-                when (image) {
-                    is String -> {
-                        // String URL from CDN
-                        if (image != coverPhotoUrl) {  // Avoid duplicate cover
-                            ItemImage(
-                                id = 0,
-                                url = image,
-                                filename = null,
-                                contentType = null,
-                                createdAt = null,
-                                isCover = false
-                            )
-                        } else null
-                    }
-                    is ItemImageDto -> {
-                        // Object from Active Storage
-                        ItemImage(
-                            id = image.id,
-                            url = image.url,
-                            filename = image.filename,
-                            contentType = image.contentType,
-                            createdAt = image.createdAt,
-                            isCover = false
-                        )
-                    }
-                    else -> null
-                }
-            }
+    // Add images from the response (these are the uploaded images)
+    val additionalImages = images
+        .map { imageDto ->
+            ItemImage(
+                id = imageDto.id,
+                url = imageDto.url,
+                filename = imageDto.filename,
+                contentType = imageDto.contentType,
+                createdAt = imageDto.createdAt,
+                isCover = false
+            )
         }
-        else -> emptyList()
-    }
 
     allImages.addAll(additionalImages)
-
-    // 3. Ensure we don't exceed 3 images
     val finalImages = allImages.take(3)
+
+    // ✅ CRITICAL FIX: Get price and quantity from VARIANT, not from itemData
+    val finalPrice = variant?.price ?: itemData?.price?.toDoubleOrNull() ?: 0.0
+    val finalQuantity = variant?.quantity ?: itemData?.quantity ?: 0
 
     return Item(
         id = itemData?.id ?: "",
         shopId = itemData?.shopId ?: 0L,
         name = itemData?.name ?: "",
         description = itemData?.description ?: "",
-        price = itemData?.price?.toDoubleOrNull() ?: 0.0,
-        quantity = itemData?.quantity ?: 0,
+        price = finalPrice,      // ← Now from variant (30.0)
+        quantity = finalQuantity, // ← Now from variant (1)
         status = itemData?.status ?: "active",
         meta = itemData?.meta?.toDomain(),
         createdAt = itemData?.createdAt ?: "",
         shop = itemData?.shop?.toDomain(),
         images = finalImages,
-        coverImage = coverPhotoUrl,  // Add this field to your Item model
+        coverImage = coverPhotoUrl,
         brandId = itemData?.brand?.id,
-        sizeId = itemData?.size?.id,
-        colorId = itemData?.color?.id,
+        sizeId = variant?.sizeId ?: itemData?.size?.id,
+        colorId = variant?.colorId ?: itemData?.color?.id,
         schoolId = itemData?.school?.id,
-        itemConditionId = itemData?.condition?.id,
+        itemConditionId = variant?.conditionId ?: itemData?.condition?.id,
         locationId = itemData?.town?.id,
         provinceId = itemData?.province?.id,
         genderId = itemData?.gender?.id,
         mainCategoryId = itemData?.mainCategory?.id,
         subCategoryId = itemData?.subCategory?.id,
-        reserved = itemData?.let {
-            it.quantity - (it.availableQuantity ?: it.quantity)
+        reserved = variant?.let {
+            variant.quantity - (itemData?.availableQuantity ?: variant.quantity)
         } ?: 0,
         label = itemData?.label,
-        itemTypeId = null
+        itemTypeId = null,
+        sizeName = variant?.sizeName ?: itemData?.size?.name,
+        colorName = variant?.colorName ?: itemData?.color?.name,
+        brandName = itemData?.brand?.name,
+        conditionName = variant?.conditionName ?: itemData?.condition?.name
     )
 }
 
@@ -192,19 +228,13 @@ fun PublicShopItemDto.toDomain(shopId: Long): Item {
         quantity = 1,
         status = "active",
         createdAt = "",
-        // ✅ FIXED: Explicitly handle PublicShopItemImageDto
         images = images?.map { imageDto ->
             when (imageDto) {
                 is PublicShopItemImageDto -> imageDto.toDomain()
+                is String -> ItemImage(id = 0, url = imageDto)
                 else -> {
-                    // Fallback for any other type
-                    ItemImage(
-                        id = (imageDto as? Map<*, *>)?.get("id") as? Long ?: 0L,
-                        url = (imageDto as? Map<*, *>)?.get("url") as? String ?: "",
-                        filename = null,
-                        contentType = null,
-                        createdAt = null
-                    )
+                    val url = (imageDto as? Map<*, *>)?.get("url") as? String ?: ""
+                    ItemImage(id = 0, url = url)
                 }
             }
         } ?: emptyList(),
@@ -232,22 +262,17 @@ fun ShopItemDto.toDomain(shopId: Long): Item {
         price = price,
         quantity = quantity,
         status = status,
+        viewCount = viewCount,
         createdAt = createdAt,
-        // ✅ FIXED: Explicitly handle ShopItemImageDto
-        images = images.map { imageDto ->
-            when (imageDto) {
-                is ShopItemImageDto -> imageDto.toDomain()
-                else -> {
-                    // Fallback for any other type
-                    ItemImage(
-                        id = (imageDto as? Map<*, *>)?.get("id") as? Long ?: 0L,
-                        url = (imageDto as? Map<*, *>)?.get("url") as? String ?: "",
-                        filename = null,
-                        contentType = null,
-                        createdAt = null
-                    )
-                }
-            }
+        images = images.mapIndexed { index, url ->
+            ItemImage(
+                id = 0,
+                url = url,
+                filename = null,
+                contentType = null,
+                createdAt = null,
+                isCover = index == 0
+            )
         },
         brandId = null,
         sizeId = null,
@@ -259,12 +284,31 @@ fun ShopItemDto.toDomain(shopId: Long): Item {
         label = null,
         reserved = quantity - availableQuantity,
         meta = null,
-        shop = null
+        shop = null,
+        itemTypeId = null,
+        mainCategoryId = mainCategoryId,
+        subCategoryId = subCategoryId
     )
 }
 
-// ============ DOMAIN TO ENTITY ============
+// ============ DOMAIN TO ENTITY (WITH IMAGES JSON) ============
 fun Item.toEntity(): ItemEntity {
+    // Convert images to JSON string
+    val imagesJson = if (images.isNotEmpty()) {
+        val imagesData = images.map { image ->
+            mapOf(
+                "url" to image.url,
+                "isCover" to image.isCover
+            )
+        }
+        Gson().toJson(imagesData)
+    } else {
+        "[]"
+    }
+
+    // Get cover image URL
+    val coverImageUrl = coverImage ?: images.firstOrNull { it.isCover }?.url ?: images.firstOrNull()?.url
+
     return ItemEntity(
         id = id,
         shopId = shopId,
@@ -273,25 +317,118 @@ fun Item.toEntity(): ItemEntity {
         price = price,
         quantity = quantity,
         status = status,
-        itemTypeId = null,
-        brandId = null,
-        sizeId = null,
-        schoolId = null,
-        itemConditionId = null,
-        locationId = null,
-        provinceId = null,
-        genderId = null,
+        itemTypeId = itemTypeId,
+        brandId = brandId,
+        sizeId = sizeId,
+        schoolId = schoolId,
+        itemConditionId = itemConditionId,
+        locationId = locationId,
+        provinceId = provinceId,
+        genderId = genderId,
         metaColor = meta?.color,
         metaSize = meta?.size,
-        label = null,
-        reserved = 0,
+        label = label,
+        reserved = reserved,
         createdAt = createdAt,
-        imageCount = images.size
+        updatedAt = updatedAt,
+        deleted = false,
+        imageCount = images.size,
+        lastCacheTime = System.currentTimeMillis(),
+        sizeName = sizeName,
+        colorName = colorName,
+        brandName = brandName,
+        conditionName = conditionName,
+        imagesJson = imagesJson,
+        coverImage = coverImageUrl
     )
 }
-
-// ============ ENTITY TO DOMAIN ============
+// KEEP THIS VERSION
+fun RecommendationItemDto.toDomain(): com.example.skoolswap.domain.model.Item {
+    return com.example.skoolswap.domain.model.Item(
+        id = id,
+        shopId = shop?.id ?: 0L,
+        name = name,
+        description = description ?: "",
+        price = price,
+        quantity = availableQuantity,
+        status = "active",
+        createdAt = createdAt,
+        images = listOfNotNull(coverPhoto ?: image).map { url ->
+            com.example.skoolswap.domain.model.ItemImage(
+                id = 0,
+                url = url,
+                isCover = true
+            )
+        },
+        coverImage = coverPhoto ?: image,
+        sizeName = sizeName,
+        colorName = colorName,
+        conditionName = conditionName,
+        brandName = brandName,
+        gender = gender,
+        viewCount = viewCount,
+        schoolName = school,
+        shop = shop?.let {
+            com.example.skoolswap.domain.model.Shop(
+                id = it.id,
+                name = it.name,
+                displayName = "",
+                userId = 0L,
+                sellerName = it.sellerName ?: "",
+                sellerMobile = it.sellerMobile,
+                profilePictureUrl = "",
+                createdAt = "",
+                itemsCount = 0
+            )
+        }
+    )
+}
+// ============ ENTITY TO DOMAIN (WITH IMAGES FROM JSON) ============
 fun ItemEntity.toDomain(): Item {
+    // Parse images from JSON
+    val imagesList = mutableListOf<ItemImage>()
+
+    try {
+        if (imagesJson.isNotEmpty() && imagesJson != "[]") {
+            val type = object : TypeToken<List<Map<String, Any>>>() {}.type
+            val imagesData: List<Map<String, Any>> = Gson().fromJson(imagesJson, type)
+
+            imagesData.forEachIndexed { index, imageData ->
+                val url = imageData["url"] as? String ?: ""
+                val isCover = imageData["isCover"] as? Boolean ?: (index == 0)
+
+                if (url.isNotEmpty()) {
+                    imagesList.add(
+                        ItemImage(
+                            id = 0,
+                            url = url,
+                            filename = null,
+                            contentType = null,
+                            createdAt = null,
+                            isCover = isCover
+                        )
+                    )
+                }
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+
+    // Fallback: If no images parsed and there's a coverImage field, use it
+    if (imagesList.isEmpty() && coverImage != null && coverImage!!.isNotEmpty()) {
+        imagesList.add(
+            ItemImage(
+                id = 0,
+                url = coverImage!!,
+                filename = null,
+                contentType = null,
+                createdAt = null,
+                isCover = true
+            )
+        )
+    }
+
     return Item(
         id = id,
         shopId = shopId,
@@ -304,7 +441,23 @@ fun ItemEntity.toDomain(): Item {
             ItemMeta(color = metaColor, size = metaSize)
         } else null,
         createdAt = createdAt,
+        updatedAt = updatedAt,
         shop = null,
-        images = emptyList()
+        images = imagesList,
+        coverImage = coverImage ?: imagesList.firstOrNull()?.url,
+        brandId = brandId,
+        sizeId = sizeId,
+        schoolId = schoolId,
+        itemConditionId = itemConditionId,
+        locationId = locationId,
+        provinceId = provinceId,
+        genderId = genderId,
+        label = label,
+        reserved = reserved,
+        itemTypeId = itemTypeId,
+        sizeName = sizeName,
+        colorName = colorName,
+        brandName = brandName,
+        conditionName = conditionName
     )
 }

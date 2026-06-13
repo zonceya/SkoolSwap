@@ -6,7 +6,6 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -20,6 +19,7 @@
 
             <!-- ============ UNIFIED IMAGES SECTION ============ -->
             <TextView
+                android:id="@+id/imagesHeading"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Images"
@@ -46,10 +46,10 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal" />
             </HorizontalScrollView>
-            <!-- ============ END IMAGES SECTION ============ -->
 
             <!-- Item Name -->
             <TextView
+                android:id="@+id/itemNameLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Item Name"
@@ -65,34 +65,97 @@
 
             <!-- Main Category -->
             <TextView
+                android:id="@+id/mainCategoryLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Main Category"
                 android:textStyle="bold"
                 android:paddingTop="8dp" />
 
-            <Spinner
-                android:id="@+id/mainCategorySpinner"
+            <!-- Shimmer for Main Category -->
+            <com.facebook.shimmer.ShimmerFrameLayout
+                android:id="@+id/mainCategoryShimmer"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:visibility="gone"
+                app:shimmer_auto_start="true"
+                app:shimmer_duration="1000">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@android:drawable/editbox_background" />
+            </com.facebook.shimmer.ShimmerFrameLayout>
+
+            <!-- Actual Main Category Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/mainCategoryInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="8dp" />
+                android:visibility="visible"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/mainCategoryInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Select Category"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:inputType="none" />
+
+            </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Sub Category -->
             <TextView
+                android:id="@+id/subCategoryLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Sub Category"
                 android:textStyle="bold"
                 android:paddingTop="8dp" />
 
-            <Spinner
-                android:id="@+id/subCategorySpinner"
+            <!-- Shimmer for Sub Category -->
+            <com.facebook.shimmer.ShimmerFrameLayout
+                android:id="@+id/subCategoryShimmer"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:visibility="gone"
+                app:shimmer_auto_start="true"
+                app:shimmer_duration="1000">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@android:drawable/editbox_background" />
+            </com.facebook.shimmer.ShimmerFrameLayout>
+
+            <!-- Actual Sub Category Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/subCategoryInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="8dp" />
+                android:visibility="visible"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/subCategoryInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Select Sub Category"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:inputType="none" />
+
+            </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Description -->
             <TextView
+                android:id="@+id/descriptionLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Description"
@@ -110,62 +173,187 @@
 
             <!-- Condition -->
             <TextView
+                android:id="@+id/conditionLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Condition"
                 android:textStyle="bold"
                 android:paddingTop="8dp" />
 
-            <Spinner
-                android:id="@+id/conditionSpinner"
+            <!-- Shimmer for Condition -->
+            <com.facebook.shimmer.ShimmerFrameLayout
+                android:id="@+id/conditionShimmer"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:visibility="gone"
+                app:shimmer_auto_start="true"
+                app:shimmer_duration="1000">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@android:drawable/editbox_background" />
+            </com.facebook.shimmer.ShimmerFrameLayout>
+
+            <!-- Actual Condition Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/conditionInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="8dp" />
+                android:visibility="visible"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/conditionInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Select Condition"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:inputType="none" />
+
+            </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Size -->
             <TextView
+                android:id="@+id/sizeLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Size"
                 android:textStyle="bold"
                 android:paddingTop="8dp" />
 
-            <Spinner
-                android:id="@+id/sizeSpinner"
+            <!-- Shimmer for Size -->
+            <com.facebook.shimmer.ShimmerFrameLayout
+                android:id="@+id/sizeShimmer"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:visibility="gone"
+                app:shimmer_auto_start="true"
+                app:shimmer_duration="1000">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@android:drawable/editbox_background" />
+            </com.facebook.shimmer.ShimmerFrameLayout>
+
+            <!-- Actual Size Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/sizeInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="8dp" />
+                android:visibility="visible"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/sizeInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Select Size"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:inputType="none" />
+
+            </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Brand -->
             <TextView
+                android:id="@+id/brandLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Brand"
                 android:textStyle="bold"
                 android:paddingTop="8dp" />
 
-            <Spinner
-                android:id="@+id/brandSpinner"
+            <!-- Shimmer for Brand -->
+            <com.facebook.shimmer.ShimmerFrameLayout
+                android:id="@+id/brandShimmer"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:visibility="gone"
+                app:shimmer_auto_start="true"
+                app:shimmer_duration="1000">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@android:drawable/editbox_background" />
+            </com.facebook.shimmer.ShimmerFrameLayout>
+
+            <!-- Actual Brand Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/brandInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="8dp" />
+                android:visibility="visible"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/brandInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Select Brand"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:inputType="none" />
+
+            </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Color -->
             <TextView
+                android:id="@+id/colorLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Color"
                 android:textStyle="bold"
                 android:paddingTop="8dp" />
 
-            <Spinner
-                android:id="@+id/colorSpinner"
+            <!-- Shimmer for Color -->
+            <com.facebook.shimmer.ShimmerFrameLayout
+                android:id="@+id/colorShimmer"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:visibility="gone"
+                app:shimmer_auto_start="true"
+                app:shimmer_duration="1000">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@android:drawable/editbox_background" />
+            </com.facebook.shimmer.ShimmerFrameLayout>
+
+            <!-- Actual Color Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/colorInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="8dp" />
+                android:visibility="visible"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/colorInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Select Color"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:inputType="none" />
+
+            </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Quantity -->
             <TextView
+                android:id="@+id/quantityLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Quantity"
@@ -180,17 +368,48 @@
 
             <!-- Province -->
             <TextView
+                android:id="@+id/provinceLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Province"
                 android:textStyle="bold"
                 android:paddingTop="8dp" />
 
-            <Spinner
-                android:id="@+id/provinceSpinner"
+            <!-- Shimmer for Province -->
+            <com.facebook.shimmer.ShimmerFrameLayout
+                android:id="@+id/provinceShimmer"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:visibility="gone"
+                app:shimmer_auto_start="true"
+                app:shimmer_duration="1000">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@android:drawable/editbox_background" />
+            </com.facebook.shimmer.ShimmerFrameLayout>
+
+            <!-- Actual Province Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/provinceInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="8dp" />
+                android:visibility="visible"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/provinceInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Select Province"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:inputType="none" />
+
+            </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Town/City -->
             <TextView
@@ -201,42 +420,135 @@
                 android:textStyle="bold"
                 android:paddingTop="8dp" />
 
-            <Spinner
-                android:id="@+id/townSpinner"
+            <!-- Shimmer for Town -->
+            <com.facebook.shimmer.ShimmerFrameLayout
+                android:id="@+id/townShimmer"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:visibility="gone"
+                app:shimmer_auto_start="true"
+                app:shimmer_duration="1000">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@android:drawable/editbox_background" />
+            </com.facebook.shimmer.ShimmerFrameLayout>
+
+            <!-- Actual Town Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/townInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="8dp" />
+                android:visibility="visible"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/townInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Select Town/City"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:inputType="none" />
+
+            </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Gender -->
             <TextView
+                android:id="@+id/genderLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Gender"
                 android:textStyle="bold"
                 android:paddingTop="8dp" />
 
-            <Spinner
-                android:id="@+id/genderSpinner"
+            <!-- Shimmer for Gender -->
+            <com.facebook.shimmer.ShimmerFrameLayout
+                android:id="@+id/genderShimmer"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:visibility="gone"
+                app:shimmer_auto_start="true"
+                app:shimmer_duration="1000">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@android:drawable/editbox_background" />
+            </com.facebook.shimmer.ShimmerFrameLayout>
+
+            <!-- Actual Gender Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/genderInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="8dp" />
+                android:visibility="visible"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/genderInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Select Gender"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:inputType="none" />
+
+            </com.google.android.material.textfield.TextInputLayout>
 
             <!-- School -->
             <TextView
+                android:id="@+id/schoolLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="School"
                 android:textStyle="bold"
                 android:paddingTop="8dp" />
 
-            <Spinner
-                android:id="@+id/schoolSpinner"
+            <!-- Shimmer for School -->
+            <com.facebook.shimmer.ShimmerFrameLayout
+                android:id="@+id/schoolShimmer"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:visibility="gone"
+                app:shimmer_auto_start="true"
+                app:shimmer_duration="1000">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@android:drawable/editbox_background" />
+            </com.facebook.shimmer.ShimmerFrameLayout>
+
+            <!-- Actual School Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/schoolInputLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="8dp" />
+                android:visibility="visible"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/schoolInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Select School"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:inputType="none" />
+
+            </com.google.android.material.textfield.TextInputLayout>
 
             <!-- Price -->
             <TextView
+                android:id="@+id/priceLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Price (R)"
@@ -276,8 +588,7 @@
                     android:layout_marginEnd="8dp"
                     android:text="Delete"
                     android:textColor="@color/white"
-                    app:backgroundTint="@color/black"
-                     />
+                    app:backgroundTint="@color/black" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/updateButton"

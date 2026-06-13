@@ -10,7 +10,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.example.skoolswap.R
 import com.example.skoolswap.data.local.datastore.AppPreferences
-import com.google.android.material.floatingactionbutton.FloatingActionButton
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -22,35 +21,36 @@ class OnboardingThirdScreen : Fragment() {
     lateinit var appPreferences: AppPreferences
 
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
+        inflater: LayoutInflater,
+        container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View {
+    ): View? {
         val view = inflater.inflate(R.layout.fragment_onboarding_third_screen, container, false)
         val finishButton = view.findViewById<TextView>(R.id.finish)
 
-        // Safe FAB hiding
-        val fab = activity?.findViewById<FloatingActionButton>(R.id.fab)
-        fab?.visibility = View.GONE
-
         finishButton.setOnClickListener {
             lifecycleScope.launch {
-                // Save onboarding completion
-                appPreferences.setOnboardingFinished(true)
+                try {
+                    // Save onboarding as completed
+                    appPreferences.setOnboardingFinished(true)
 
-                // Navigate back to login
-                findNavController().navigate(
-                    R.id.action_viewPagerFragment_to_loginFragment
-                )
+                    // Safe navigation
+                    findNavController().navigate(
+                        R.id.action_viewPagerFragment_to_loginFragment
+                    )
+
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    // Fallback navigation
+                    try {
+                        findNavController().navigate(R.id.loginFragment)
+                    } catch (ex: Exception) {
+                        ex.printStackTrace()
+                    }
+                }
             }
         }
 
         return view
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        // Safe FAB showing
-        val fab = activity?.findViewById<FloatingActionButton>(R.id.fab)
-        fab?.visibility = View.VISIBLE
     }
 }

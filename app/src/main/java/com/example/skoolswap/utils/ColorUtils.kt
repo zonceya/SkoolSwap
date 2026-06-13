@@ -1,40 +1,46 @@
 package com.example.skoolswap.utils
-import com.example.skoolswap.R
-// Create this file: ColorMapper.kt
+
+import android.graphics.Color
+
 object ColorUtils {
 
-    // Map API color names to your colors.xml resources
-    fun getColorResourceId(colorName: String): Int {
+    // Your existing method
+    fun getColorHex(colorName: String): String {
         return when (colorName.lowercase()) {
-            "red" -> R.color.red
-            "blue" -> R.color.blue
-            "green" -> R.color.green
-            "black" -> R.color.black
-            "white" -> R.color.white
-            "gold" -> R.color.gold
-            "gray", "grey" -> R.color.lightgray
-            "yellow" -> R.color.gold  // Use gold for yellow
-            "navy" -> R.color.blue_dark  // You'd need to add blue_dark
-            "maroon" -> R.color.red_dark
-            "brown" -> R.color.brown  // You'd need to add brown
-            else -> R.color.lightgray  // Default fallback
+            "black" -> "#000000"
+            "white" -> "#FFFFFF"
+            "navy", "navy blue" -> "#000080"
+            "red" -> "#FF0000"
+            "blue" -> "#0000FF"
+            "grey" -> "#808080"
+            "maroon" -> "#800000"
+            "royal blue" -> "#4169E1"
+            "sky blue" -> "#87CEEB"
+            "charcoal" -> "#36454F"
+            "khaki" -> "#C3B091"
+            "brown" -> "#8B4513"
+            "burgundy" -> "#800020"
+            "green" -> "#008000"
+            "forest green" -> "#228B22"
+            "olive" -> "#808000"
+            "yellow" -> "#FFFF00"
+            "gold" -> "#FFD700"
+            "orange" -> "#FFA500"
+            "pink" -> "#FFC0CB"
+            "purple" -> "#800080"
+            "teal" -> "#008080"
+            "turquoise" -> "#40E0D0"
+            "multicolor" -> "#FF00FF"
+            else -> "#CCCCCC" // Default grey
         }
     }
 
-    // Alternative: If you want to use hex values directly
-    fun getColorHex(colorName: String): String {
-        return when (colorName.lowercase()) {
-            "red" -> "#FF0000"
-            "blue" -> "#0000FF"
-            "green" -> "#00FF00"
-            "black" -> "#000000"
-            "white" -> "#FFFFFF"
-            "gold" -> "#FFD700"
-            "gray", "grey" -> "#CCCCCC"
-            "navy" -> "#000080"
-            "maroon" -> "#800000"
-            "brown" -> "#A52A2A"
-            else -> "#CCCCCC"  // Default gray
+    // Add this method to get color as Int
+    fun getColorInt(colorName: String): Int {
+        return try {
+            Color.parseColor(getColorHex(colorName))
+        } catch (e: Exception) {
+            Color.parseColor("#CCCCCC")
         }
     }
 }

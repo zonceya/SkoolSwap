@@ -61,7 +61,11 @@ data class ViewShopItemDto(
 
     @SerializedName("sub_category_id")
     val subCategoryId: Int?,
+    @SerializedName("size")
+    val size: SizeDto?,  // ← ADD THIS
 
+    @SerializedName("color")
+    val color: ColorDto?,  // ← ADD THIS
     @SerializedName("total_quantity")
     val totalQuantity: Int,
 
@@ -95,19 +99,51 @@ data class ViewShopItemDto(
     @SerializedName("tags")
     val tags: List<ViewTagDto>?,
 
-    // ⚠️ IMPORTANT: Add this field for images!
-    @SerializedName("images")
-    val images: List<ItemImageDto>?  // Reuse your existing ItemImageDto
-)
 
+    @SerializedName("images")
+    val images: List<String>?,  // ← Change from List<ItemImageDto> to List<String>
+
+    // ✅ Add variants to get price/quantity
+    @SerializedName("variants")
+    val variants: List<ViewVariantDto>?,// Reuse your existing ItemImageDto
+)
+data class ViewVariantDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("price") val price: Double,
+    @SerializedName("quantity") val quantity: Int,
+    @SerializedName("size_id") val sizeId: Int?,
+    @SerializedName("size_name") val sizeName: String?,
+    @SerializedName("color_id") val colorId: Int?,
+    @SerializedName("color_name") val colorName: String?,
+    @SerializedName("condition_id") val conditionId: Int?,
+    @SerializedName("condition_name") val conditionName: String?
+)
 data class ViewShopDto(
     @SerializedName("id")
     val id: Long,
 
     @SerializedName("name")
-    val name: String
+    val name: String,
+    @SerializedName("seller_name")
+    val sellerName: String?,
+
+    @SerializedName("seller_mobile")
+    val sellerMobile: String?
+)
+data class ViewSizeDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String
 )
 
+data class ViewColorDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String
+)
+
+data class ViewConditionDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String
+)
 data class ViewCategoryDto(
     @SerializedName("id")
     val id: Int,

@@ -1,6 +1,8 @@
 package com.example.skoolswap.ui.products.adapter
 
+import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.core.os.bundleOf
 import androidx.navigation.findNavController
@@ -8,7 +10,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemHomeProductBinding
+import com.example.skoolswap.databinding.ItemProductGridBinding
 import com.example.skoolswap.domain.model.Item
+import com.example.skoolswap.utils.extensions.formatViewCount
+import timber.log.Timber
 
 class ProductsAdapter(
     private val onItemClick: (Item) -> Unit
@@ -22,7 +27,7 @@ class ProductsAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val binding = ItemHomeProductBinding.inflate(
+        val binding = ItemProductGridBinding.inflate(
             LayoutInflater.from(parent.context), parent, false
         )
         return ViewHolder(binding)
@@ -35,7 +40,8 @@ class ProductsAdapter(
     override fun getItemCount() = items.size
 
     inner class ViewHolder(
-        private val binding: ItemHomeProductBinding
+        private val binding: ItemProductGridBinding
+
     ) : RecyclerView.ViewHolder(binding.root) {
 
         init {
@@ -44,7 +50,6 @@ class ProductsAdapter(
                 if (position != RecyclerView.NO_POSITION) {
                     val item = items[position]
 
-                    // Navigate to detail fragment
                     val bundle = bundleOf(
                         "itemId" to item.id,
                         "source" to "products_screen"
@@ -56,12 +61,23 @@ class ProductsAdapter(
         }
 
         fun bind(item: Item) {
-            binding.productTitle.text = item.name
-            binding.productPrice.text = "R${item.price}"
+            Timber.tag("ProductsAdapter")
+                .d("Binding: ${item.name} | cover: ${item.coverImage} | images: ${item.images.size} | status: ${item.status}")
 
-            if (item.images.isNotEmpty()) {
+            binding.productTitle.text = item.name
+            binding.productPrice.text = "R${String.format("%.2f", item.price)}"
+
+            // Sold badge
+            if (item.status == "sold" || item.quantity <= 0) {
+                binding.soldBadge.visibility = View.VISIBLE
+            } else {
+                binding.soldBadge.visibility = View.GONE
+            }
+            val imageUrl = item.resolveImageUrl()
+
+            if (!imageUrl.isNullOrBlank()) {
                 Glide.with(binding.root.context)
-                    .load(item.images.first().url)
+                    .load(imageUrl)
                     .placeholder(R.drawable.ic_create_item_placeholder)
                     .error(R.drawable.ic_create_item_placeholder)
                     .centerCrop()

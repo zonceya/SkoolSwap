@@ -202,7 +202,7 @@ object ReferenceDataMapper {
         return LocationEntity(
             id = dto.id,
             province = dto.province,
-            stateOrRegion = dto.stateOrRegion,
+            stateOrRegion = dto.stateOrRegion ?: "",  // ← Use empty string if null
             country = dto.country,
             townId = dto.townId
         )

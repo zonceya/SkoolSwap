@@ -14,7 +14,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <!-- Images Section -->
+        <!-- Images Section (keep as is) -->
         <TextView
             android:id="@+id/images_heading"
             android:layout_width="wrap_content"
@@ -40,7 +40,7 @@
             android:gravity="center"
             android:paddingBottom="16dp">
 
-            <!-- Cover Photo with delete button -->
+            <!-- Cover Photo -->
             <FrameLayout
                 android:layout_width="80dp"
                 android:layout_height="80dp"
@@ -78,7 +78,7 @@
                     android:textColor="@android:color/white"/>
             </FrameLayout>
 
-            <!-- Angle 2 with delete button -->
+            <!-- Angle 2 -->
             <FrameLayout
                 android:layout_width="80dp"
                 android:layout_height="80dp"
@@ -116,7 +116,7 @@
                     android:textColor="@android:color/white"/>
             </FrameLayout>
 
-            <!-- Angle 3 with delete button -->
+            <!-- Angle 3 -->
             <FrameLayout
                 android:layout_width="80dp"
                 android:layout_height="80dp">
@@ -179,11 +179,23 @@
             android:textStyle="bold"
             android:paddingTop="8dp"/>
 
-        <Spinner
-            android:id="@+id/main_category_spinner"
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="8dp"/>
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:endIconMode="custom"
+            app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/main_category_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Select Category"
+                android:focusable="false"
+                android:clickable="true"
+                android:inputType="none" />
+
+        </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Sub Category -->
         <TextView
@@ -193,17 +205,29 @@
             android:text="Sub Category"
             android:textStyle="bold"
             android:paddingTop="8dp"/>
-        <!-- Add this next to your subcategory spinner -->
+
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:paddingBottom="8dp">
 
-            <Spinner
-                android:id="@+id/sub_category_spinner"
+            <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:visibility="visible"/>
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/sub_category_input"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Select Sub Category"
+                    android:focusable="false"
+                    android:clickable="true"
+                    android:inputType="none" />
+
+            </com.google.android.material.textfield.TextInputLayout>
 
             <ProgressBar
                 android:id="@+id/subcategory_loading"
@@ -241,11 +265,23 @@
             android:textStyle="bold"
             android:paddingTop="8dp"/>
 
-        <Spinner
-            android:id="@+id/condition_spinner"
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="8dp"/>
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:endIconMode="custom"
+            app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/condition_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Select Condition"
+                android:focusable="false"
+                android:clickable="true"
+                android:inputType="none" />
+
+        </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Size -->
         <TextView
@@ -256,11 +292,23 @@
             android:textStyle="bold"
             android:paddingTop="8dp"/>
 
-        <Spinner
-            android:id="@+id/size_spinner"
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="8dp"/>
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:endIconMode="custom"
+            app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/size_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Select Size"
+                android:focusable="false"
+                android:clickable="true"
+                android:inputType="none" />
+
+        </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Brand -->
         <TextView
@@ -271,11 +319,23 @@
             android:textStyle="bold"
             android:paddingTop="8dp"/>
 
-        <Spinner
-            android:id="@+id/brand_spinner"
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="8dp"/>
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:endIconMode="custom"
+            app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/brand_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Select Brand"
+                android:focusable="false"
+                android:clickable="true"
+                android:inputType="none" />
+
+        </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Color -->
         <TextView
@@ -286,26 +346,25 @@
             android:textStyle="bold"
             android:paddingTop="8dp"/>
 
-        <FrameLayout
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="8dp">
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:endIconMode="custom"
+            app:endIconDrawable="@drawable/ic_arrow_drop_down">
 
-            <Spinner
-                android:id="@+id/color_spinner"
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/color_input"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"/>
-
-            <ProgressBar
-                android:id="@+id/color_loading"
-                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:visibility="gone"/>
+                android:hint="Select Color"
+                android:focusable="false"
+                android:clickable="true"
+                android:inputType="none" />
 
-        </FrameLayout>
+        </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Quantity -->
+        <!-- Quantity (Keep as Spinner) -->
         <TextView
             android:id="@+id/quantity_label"
             android:layout_width="wrap_content"
@@ -329,11 +388,23 @@
             android:textStyle="bold"
             android:paddingTop="8dp"/>
 
-        <Spinner
-            android:id="@+id/province_spinner"
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="8dp"/>
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:endIconMode="custom"
+            app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/province_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Select Province"
+                android:focusable="false"
+                android:clickable="true"
+                android:inputType="none" />
+
+        </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Town/City -->
         <TextView
@@ -344,11 +415,23 @@
             android:textStyle="bold"
             android:paddingTop="8dp"/>
 
-        <Spinner
-            android:id="@+id/town_spinner"
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="8dp"/>
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:endIconMode="custom"
+            app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/town_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Select Town/City"
+                android:focusable="false"
+                android:clickable="true"
+                android:inputType="none" />
+
+        </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Gender -->
         <TextView
@@ -359,11 +442,23 @@
             android:textStyle="bold"
             android:paddingTop="8dp"/>
 
-        <Spinner
-            android:id="@+id/gender_spinner"
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="8dp"/>
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:endIconMode="custom"
+            app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/gender_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Select Gender"
+                android:focusable="false"
+                android:clickable="true"
+                android:inputType="none" />
+
+        </com.google.android.material.textfield.TextInputLayout>
 
         <!-- School -->
         <TextView
@@ -374,37 +469,23 @@
             android:textStyle="bold"
             android:paddingTop="8dp"/>
 
-        <Spinner
-            android:id="@+id/school_spinner"
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingBottom="8dp"/>
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:endIconMode="custom"
+            app:endIconDrawable="@drawable/ic_arrow_drop_down">
 
-        <!-- Tags Section -->
-        <TextView
-            android:id="@+id/tags_label"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Tags"
-            android:textStyle="bold"
-            android:paddingTop="8dp"/>
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/school_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Select School"
+                android:focusable="false"
+                android:clickable="true"
+                android:inputType="none" />
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/tags_recycler_view"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingBottom="8dp"
-            android:visibility="gone"/>
-
-        <!-- Selected Tags Display -->
-        <TextView
-            android:id="@+id/selected_tags_display"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="No tags selected"
-            android:textColor="@android:color/darker_gray"
-            android:paddingBottom="8dp"
-            android:visibility="gone"/>
+        </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Price -->
         <TextView
@@ -433,16 +514,21 @@
             android:paddingBottom="16dp"/>
 
         <!-- Submit Button -->
+
         <com.google.android.material.button.MaterialButton
-        android:id="@+id/submitButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Create Item"
+            android:id="@+id/submitButton"
+            android:layout_width="match_parent"
+            android:layout_height="76dp"
         android:textStyle="bold"
+        android:textSize="22sp"
         android:textColor="@color/white"
         app:backgroundTint="@color/black"
+        app:cornerRadius="8dp"
         android:gravity="center"
-        android:layout_margin="16dp"/>
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="32dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"/>
 
     </LinearLayout>
 </ScrollView>

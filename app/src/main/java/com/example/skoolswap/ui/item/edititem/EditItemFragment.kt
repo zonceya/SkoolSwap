@@ -13,7 +13,6 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.ProgressBar
-import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -31,12 +30,16 @@ import com.example.skoolswap.databinding.FragmentEditItemBinding
 import com.example.skoolswap.domain.model.EditImage
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.reference.*
-import com.example.skoolswap.utils.ColorUtils
+import com.example.skoolswap.ui.component.ColorPickerBottomSheet
+import com.example.skoolswap.ui.component.OptionsPickerBottomSheet
+import com.example.skoolswap.utils.DialogAction
+import com.example.skoolswap.utils.DialogHelper
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -45,13 +48,15 @@ import java.util.Locale
 @AndroidEntryPoint
 class EditItemFragment : Fragment() {
 
+    companion object {
+        private const val TAG = "EditItemFragment"
+    }
+
     private var _binding: FragmentEditItemBinding? = null
     private val binding get() = _binding!!
-
     private val viewModel: EditItemViewModel by viewModels()
-    private val itemId: String by lazy {
-        arguments?.getString("itemId") ?: ""
-    }
+    private var itemId: String = ""
+
     // Store selected values
     private var selectedMainCategoryId: Int? = null
     private var selectedSubCategoryId: Int? = null
@@ -67,7 +72,6 @@ class EditItemFragment : Fragment() {
 
     // Track original values to detect changes
     private var originalItem: Item? = null
-
     private var originalName: String = ""
     private var originalDescription: String = ""
     private var originalPrice: Double = 0.0
@@ -82,6 +86,7 @@ class EditItemFragment : Fragment() {
     private val simpleCameraLauncher = registerForActivityResult(
         ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
+        Timber.tag(TAG).d("📸 Camera callback")
         isCameraLaunched = false
         if (bitmap != null) {
             lifecycleScope.launch {
@@ -89,7 +94,6 @@ class EditItemFragment : Fragment() {
                 if (uri != null) {
                     val position = pendingImagePosition ?: return@launch
                     val isReplace = pendingIsReplace ?: false
-
                     if (isReplace) {
                         viewModel.replaceImage(uri, position)
                         Toast.makeText(requireContext(), "Image replaced", Toast.LENGTH_SHORT).show()
@@ -97,7 +101,6 @@ class EditItemFragment : Fragment() {
                         viewModel.addImage(uri, position)
                         Toast.makeText(requireContext(), "Image added", Toast.LENGTH_SHORT).show()
                     }
-
                     pendingImagePosition = null
                     pendingIsReplace = null
                 }
@@ -112,7 +115,6 @@ class EditItemFragment : Fragment() {
         if (uri != null) {
             val position = pendingImagePosition ?: return@registerForActivityResult
             val isReplace = pendingIsReplace ?: false
-
             lifecycleScope.launch {
                 if (isReplace) {
                     viewModel.replaceImage(uri, position)
@@ -150,13 +152,15 @@ class EditItemFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        itemId = arguments?.getString("itemId") ?: ""
+        Timber.tag(TAG).d("onViewCreated - Item ID: $itemId")
 
+        showAllShimmers()
         setupObservers()
         setupClickListeners()
         setupImageGrid()
         setupQuantitySpinner()
 
-        // Load the item
         if (itemId.isNotEmpty()) {
             viewModel.loadItem(itemId)
         } else {
@@ -164,7 +168,6 @@ class EditItemFragment : Fragment() {
             findNavController().navigateUp()
         }
     }
-
 
     private fun setupObservers() {
         // Observe item loading
@@ -183,7 +186,9 @@ class EditItemFragment : Fragment() {
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.mainCategories.collect { categories ->
-                    setupMainCategorySpinner(categories)
+                    Timber.tag(TAG).d("📦 MAIN CATEGORIES received: ${categories.size}")
+                    setupMainCategoryPicker(categories)
+                    restoreSelectionTexts()
                 }
             }
         }
@@ -192,7 +197,9 @@ class EditItemFragment : Fragment() {
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.subCategories.collect { subCategories ->
-                    setupSubCategorySpinner(subCategories)
+                    Timber.tag(TAG).d("📦 SUBCATEGORIES received: ${subCategories.size}")
+                    setupSubCategoryPicker(subCategories)
+                    restoreSelectionTexts()
                 }
             }
         }
@@ -201,7 +208,8 @@ class EditItemFragment : Fragment() {
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.conditions.collect { conditions ->
-                    setupConditionsSpinner(conditions)
+                    setupConditionPicker(conditions)
+                    restoreSelectionTexts()
                 }
             }
         }
@@ -210,7 +218,8 @@ class EditItemFragment : Fragment() {
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.sizes.collect { sizes ->
-                    setupSizesSpinner(sizes)
+                    setupSizePicker(sizes)
+                    restoreSelectionTexts()
                 }
             }
         }
@@ -219,7 +228,8 @@ class EditItemFragment : Fragment() {
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.brands.collect { brands ->
-                    setupBrandsSpinner(brands)
+                    setupBrandPicker(brands)
+                    restoreSelectionTexts()
                 }
             }
         }
@@ -228,7 +238,8 @@ class EditItemFragment : Fragment() {
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.colors.collect { colors ->
-                    setupColorsSpinner(colors)
+                    setupColorPicker(colors)
+                    restoreSelectionTexts()
                 }
             }
         }
@@ -237,7 +248,8 @@ class EditItemFragment : Fragment() {
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.provinces.collect { provinces ->
-                    setupProvincesSpinner(provinces)
+                    setupProvincePicker(provinces)
+                    restoreSelectionTexts()
                 }
             }
         }
@@ -246,7 +258,8 @@ class EditItemFragment : Fragment() {
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.towns.collect { towns ->
-                    setupTownsSpinner(towns)
+                    setupTownPicker(towns)
+                    restoreSelectionTexts()
                 }
             }
         }
@@ -255,7 +268,8 @@ class EditItemFragment : Fragment() {
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.schools.collect { schools ->
-                    setupSchoolsSpinner(schools)
+                    setupSchoolPicker(schools)
+                    restoreSelectionTexts()
                 }
             }
         }
@@ -264,7 +278,8 @@ class EditItemFragment : Fragment() {
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.genders.collect { genders ->
-                    setupGendersSpinner(genders)
+                    setupGenderPicker(genders)
+                    restoreSelectionTexts()
                 }
             }
         }
@@ -283,24 +298,8 @@ class EditItemFragment : Fragment() {
                             hideLoading()
                             showError(uiState.message)
                         }
-                        is EditItemUiState.Loading -> {
-                            showLoading()
-                        }
-                        is EditItemUiState.Idle -> {
-                            hideLoading()
-                        }
-                    }
-                }
-            }
-        }
-
-        // Observe delete confirmation
-        lifecycleScope.launch {
-            viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.showDeleteConfirmation.collect { show ->
-                    if (show) {
-                        showDeleteConfirmationDialog()
-                        viewModel.deleteConfirmationShown()
+                        is EditItemUiState.Loading -> showLoading()
+                        is EditItemUiState.Idle -> hideLoading()
                     }
                 }
             }
@@ -318,6 +317,210 @@ class EditItemFragment : Fragment() {
         }
     }
 
+    // ============ PICKER METHODS ============
+
+    private fun setupMainCategoryPicker(categories: List<MainCategory>) {
+        if (categories.isEmpty()) {
+            binding.mainCategoryInput.isEnabled = false
+            return
+        }
+        binding.mainCategoryInput.isEnabled = true
+
+        binding.mainCategoryInput.setOnClickListener {
+            OptionsPickerBottomSheet(
+                title = "Select Category",
+                options = categories.map { it.name }
+            ) { selectedName, position ->
+                val selectedCategory = categories[position]
+                selectedMainCategoryId = selectedCategory.id
+                binding.mainCategoryInput.setText(selectedName)
+                viewModel.onMainCategorySelected(selectedCategory.id)
+                Timber.tag(TAG).d("Selected main category: ${selectedCategory.name}")
+            }.show(childFragmentManager, "category_picker")
+        }
+    }
+
+    private fun setupSubCategoryPicker(subCategories: List<SubCategory>) {
+        if (subCategories.isEmpty()) {
+            binding.subCategoryInput.isEnabled = false
+            return
+        }
+        binding.subCategoryInput.isEnabled = true
+
+        binding.subCategoryInput.setOnClickListener {
+            if (selectedMainCategoryId == null) {
+                Toast.makeText(requireContext(), "First select a category", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            OptionsPickerBottomSheet(
+                title = "Select Sub Category",
+                options = subCategories.map { it.name }
+            ) { selectedName, position ->
+                val selected = subCategories[position]
+                selectedSubCategoryId = selected.id
+                binding.subCategoryInput.setText(selectedName)
+                Timber.tag(TAG).d("Selected subcategory: ${selected.name}")
+            }.show(childFragmentManager, "subcategory_picker")
+        }
+    }
+
+    private fun setupConditionPicker(conditions: List<Condition>) {
+        if (conditions.isEmpty()) {
+            binding.conditionInput.isEnabled = false
+            return
+        }
+        binding.conditionInput.isEnabled = true
+
+        binding.conditionInput.setOnClickListener {
+            OptionsPickerBottomSheet(
+                title = "Select Condition",
+                options = conditions.map { it.name }
+            ) { selectedName, position ->
+                selectedConditionId = conditions[position].id
+                binding.conditionInput.setText(selectedName)
+                Timber.tag(TAG).d("Selected condition: $selectedName")
+            }.show(childFragmentManager, "condition_picker")
+        }
+    }
+
+    private fun setupSizePicker(sizes: List<Size>) {
+        if (sizes.isEmpty()) {
+            binding.sizeInput.isEnabled = false
+            return
+        }
+        binding.sizeInput.isEnabled = true
+
+        binding.sizeInput.setOnClickListener {
+            OptionsPickerBottomSheet(
+                title = "Select Size",
+                options = sizes.map { it.name }
+            ) { selectedName, position ->
+                selectedSizeId = sizes[position].id
+                binding.sizeInput.setText(selectedName)
+                Timber.tag(TAG).d("Selected size: $selectedName")
+            }.show(childFragmentManager, "size_picker")
+        }
+    }
+
+    private fun setupBrandPicker(brands: List<Brand>) {
+        if (brands.isEmpty()) {
+            binding.brandInput.isEnabled = false
+            return
+        }
+        binding.brandInput.isEnabled = true
+
+        binding.brandInput.setOnClickListener {
+            OptionsPickerBottomSheet(
+                title = "Select Brand",
+                options = brands.map { it.name }
+            ) { selectedName, position ->
+                selectedBrandId = brands[position].id
+                binding.brandInput.setText(selectedName)
+                Timber.tag(TAG).d("Selected brand: $selectedName")
+            }.show(childFragmentManager, "brand_picker")
+        }
+    }
+
+    private fun setupColorPicker(colors: List<Color>) {
+        if (colors.isEmpty()) {
+            binding.colorInput.isEnabled = false
+            return
+        }
+        binding.colorInput.isEnabled = true
+
+        binding.colorInput.setOnClickListener {
+            ColorPickerBottomSheet(colors) { selectedColor, position ->
+                selectedColorId = selectedColor.id
+                binding.colorInput.setText(selectedColor.name)
+                Timber.tag(TAG).d("Selected color: ${selectedColor.name}")
+            }.show(childFragmentManager, "color_picker")
+        }
+    }
+
+    private fun setupProvincePicker(provinces: List<Province>) {
+        if (provinces.isEmpty()) {
+            binding.provinceInput.isEnabled = false
+            return
+        }
+        binding.provinceInput.isEnabled = true
+
+        binding.provinceInput.setOnClickListener {
+            OptionsPickerBottomSheet(
+                title = "Select Province",
+                options = provinces.map { it.name }
+            ) { selectedName, position ->
+                val selectedProvince = provinces[position]
+                selectedProvinceId = selectedProvince.id
+                binding.provinceInput.setText(selectedName)
+                viewModel.onProvinceSelected(selectedProvince.id)
+                Timber.tag(TAG).d("Selected province: ${selectedProvince.name}")
+            }.show(childFragmentManager, "province_picker")
+        }
+    }
+
+    private fun setupTownPicker(towns: List<Town>) {
+        if (towns.isEmpty()) {
+            binding.townInput.isEnabled = false
+            return
+        }
+        binding.townInput.isEnabled = true
+
+        binding.townInput.setOnClickListener {
+            if (selectedProvinceId == null) {
+                Toast.makeText(requireContext(), "First select a province", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            OptionsPickerBottomSheet(
+                title = "Select Town/City",
+                options = towns.map { it.name }
+            ) { selectedName, position ->
+                selectedTownId = towns[position].id
+                binding.townInput.setText(selectedName)
+                Timber.tag(TAG).d("Selected town: $selectedName")
+            }.show(childFragmentManager, "town_picker")
+        }
+    }
+
+    private fun setupGenderPicker(genders: List<Gender>) {
+        if (genders.isEmpty()) {
+            binding.genderInput.isEnabled = false
+            return
+        }
+        binding.genderInput.isEnabled = true
+
+        binding.genderInput.setOnClickListener {
+            OptionsPickerBottomSheet(
+                title = "Select Gender",
+                options = genders.map { it.name }
+            ) { selectedName, position ->
+                selectedGenderId = genders[position].id
+                binding.genderInput.setText(selectedName)
+                Timber.tag(TAG).d("Selected gender: $selectedName")
+            }.show(childFragmentManager, "gender_picker")
+        }
+    }
+
+    private fun setupSchoolPicker(schools: List<School>) {
+        if (schools.isEmpty()) {
+            binding.schoolInput.isEnabled = false
+            return
+        }
+        binding.schoolInput.isEnabled = true
+
+        binding.schoolInput.setOnClickListener {
+            OptionsPickerBottomSheet(
+                title = "Select School",
+                options = schools.map { it.name }
+            ) { selectedName, position ->
+                selectedSchoolId = schools[position].id
+                binding.schoolInput.setText(selectedName)
+                Timber.tag(TAG).d("Selected school: $selectedName")
+            }.show(childFragmentManager, "school_picker")
+        }
+    }
+
     private fun renderImageGrid(images: List<EditImage>) {
         binding.imageGrid.removeAllViews()
 
@@ -332,17 +535,10 @@ class EditItemFragment : Fragment() {
 
             when (editImage) {
                 is EditImage.Existing -> {
-                    // Show existing image from server
                     addButton.visibility = View.GONE
                     deleteButton.visibility = View.VISIBLE
                     loadingBar.visibility = View.GONE
-
-                    // Dim if marked for deletion
-                    if (editImage.isMarkedForDeletion) {
-                        itemImage.alpha = 0.5f
-                    } else {
-                        itemImage.alpha = 1.0f
-                    }
+                    itemImage.alpha = if (editImage.isMarkedForDeletion) 0.5f else 1.0f
 
                     Glide.with(requireContext())
                         .load(editImage.url)
@@ -351,26 +547,17 @@ class EditItemFragment : Fragment() {
                         .centerCrop()
                         .into(itemImage)
 
-                    // Click to replace
-                    itemImage.setOnClickListener {
-                        showImageSourceOptions(index, isReplace = true)
-                    }
-
-                    // Delete button
+                    itemImage.setOnClickListener { showImageSourceOptions(index, isReplace = true) }
                     deleteButton.setOnClickListener {
                         MaterialAlertDialogBuilder(requireContext())
                             .setTitle("Remove Image")
                             .setMessage("Remove this image from your item?")
-                            .setPositiveButton("Remove") { _, _ ->
-                                viewModel.removeImage(index)
-                            }
+                            .setPositiveButton("Remove") { _, _ -> viewModel.removeImage(index) }
                             .setNegativeButton("Cancel", null)
                             .show()
                     }
                 }
-
                 is EditImage.New -> {
-                    // Show new image (local URI)
                     addButton.visibility = View.GONE
                     deleteButton.visibility = View.VISIBLE
 
@@ -380,7 +567,6 @@ class EditItemFragment : Fragment() {
                     } else {
                         loadingBar.visibility = View.GONE
                         itemImage.visibility = View.VISIBLE
-
                         Glide.with(requireContext())
                             .load(editImage.uri)
                             .placeholder(R.drawable.ic_create_item_placeholder)
@@ -388,30 +574,16 @@ class EditItemFragment : Fragment() {
                             .centerCrop()
                             .into(itemImage)
                     }
-
-                    // Click to replace
-                    itemImage.setOnClickListener {
-                        showImageSourceOptions(index, isReplace = true)
-                    }
-
-                    // Delete button
-                    deleteButton.setOnClickListener {
-                        viewModel.removeImage(index)
-                    }
+                    itemImage.setOnClickListener { showImageSourceOptions(index, isReplace = true) }
+                    deleteButton.setOnClickListener { viewModel.removeImage(index) }
                 }
-
                 EditImage.Empty -> {
-                    // Show add button
                     addButton.visibility = View.VISIBLE
                     deleteButton.visibility = View.GONE
                     itemImage.setImageResource(R.drawable.ic_create_item_placeholder)
-
-                    addButton.setOnClickListener {
-                        showImageSourceOptions(index, isReplace = false)
-                    }
+                    addButton.setOnClickListener { showImageSourceOptions(index, isReplace = false) }
                 }
             }
-
             binding.imageGrid.addView(imageView)
         }
     }
@@ -426,38 +598,28 @@ class EditItemFragment : Fragment() {
         pendingImagePosition = position
         pendingIsReplace = isReplace
 
-        val options = arrayOf("Take Photo", "Choose from Gallery", "Cancel")
-
         AlertDialog.Builder(requireContext())
             .setTitle(if (isReplace) "Replace Image" else "Add Image")
-            .setItems(options) { _, which ->
+            .setItems(arrayOf("Take Photo", "Choose from Gallery", "Cancel")) { _, which ->
                 when (which) {
                     0 -> checkCameraPermission()
                     1 -> launchGallery()
                 }
             }
-            .setCancelable(true)
             .show()
     }
 
     private fun checkCameraPermission() {
         when {
-            ContextCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED -> {
+            ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> {
                 if (requireContext().packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)) {
                     launchCameraSafely()
                 } else {
                     Toast.makeText(requireContext(), "No camera available", Toast.LENGTH_SHORT).show()
                 }
             }
-            shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) -> {
-                showCameraPermissionExplanation()
-            }
-            else -> {
-                requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-            }
+            shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) -> showCameraPermissionExplanation()
+            else -> requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -465,9 +627,7 @@ class EditItemFragment : Fragment() {
         AlertDialog.Builder(requireContext())
             .setTitle("Camera Permission Needed")
             .setMessage("SkoolSwap needs camera permission to take photos of items")
-            .setPositiveButton("Allow") { _, _ ->
-                requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-            }
+            .setPositiveButton("Allow") { _, _ -> requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA) }
             .setNegativeButton("Cancel", null)
             .show()
     }
@@ -479,7 +639,7 @@ class EditItemFragment : Fragment() {
                 simpleCameraLauncher.launch(null)
             } catch (e: Exception) {
                 isCameraLaunched = false
-                Toast.makeText(requireContext(), "Failed to launch camera", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Failed to launch camera: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -493,16 +653,14 @@ class EditItemFragment : Fragment() {
         }
     }
 
-    private fun saveBitmapToFile(bitmap: Bitmap): Uri? {
+    private fun saveBitmapToFile(bitmap: android.graphics.Bitmap): Uri? {
         return try {
             val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
             val filename = "IMG_${timeStamp}.jpg"
-
             val file = File(requireContext().cacheDir, filename)
             file.outputStream().use { out ->
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
             }
-
             FileProvider.getUriForFile(
                 requireContext(),
                 "${requireContext().packageName}.fileprovider",
@@ -515,20 +673,23 @@ class EditItemFragment : Fragment() {
     }
 
     private fun populateItemData(item: Item) {
+        Timber.tag(TAG).d("=== POPULATING ITEM DATA ===")
+        Timber.tag(TAG).d("Item: ${item.name}, Price: ${item.price}")
+
         originalName = item.name
         originalDescription = item.description
         originalPrice = item.price
         originalQuantity = item.quantity
 
-        // Set text fields
         binding.itemName.setText(item.name)
         binding.description.setText(item.description)
         binding.price.setText(item.price.toString())
 
-        // Set quantity
         selectedQuantity = item.quantity
+        if (selectedQuantity in 1..5) {
+            binding.quantitySpinner.setSelection(selectedQuantity - 1)
+        }
 
-        // Store selected IDs
         selectedMainCategoryId = item.mainCategoryId
         selectedSubCategoryId = item.subCategoryId
         selectedConditionId = item.itemConditionId
@@ -540,19 +701,121 @@ class EditItemFragment : Fragment() {
         selectedSchoolId = item.schoolId
         selectedGenderId = item.genderId
 
+        Timber.tag(TAG).d("Selected IDs - MainCat: $selectedMainCategoryId, SubCat: $selectedSubCategoryId, Size: $selectedSizeId")
+
+        // Trigger dependent data loading
+        selectedMainCategoryId?.let { viewModel.onMainCategorySelected(it) }
+        selectedProvinceId?.let { viewModel.onProvinceSelected(it) }
+
+        // Restore picker display values
+        restoreSelectionTexts()
+
         val existingImages = item.images.map { image ->
             EditImage.Existing(image.id, image.url)
         }
         viewModel.setExistingImages(existingImages)
     }
 
+    private fun restoreSelectionTexts() {
+        Timber.tag(TAG).d("Restoring selection texts")
+
+        // Restore Main Category
+        selectedMainCategoryId?.let { id ->
+            if (binding.mainCategoryInput.text.isNullOrEmpty()) {
+                viewModel.mainCategories.value.find { it.id == id }?.let {
+                    binding.mainCategoryInput.setText(it.name)
+                    Timber.tag(TAG).d("Restored main category: ${it.name}")
+                }
+            }
+        }
+
+        // Restore Sub Category
+        selectedSubCategoryId?.let { id ->
+            if (binding.subCategoryInput.text.isNullOrEmpty()) {
+                viewModel.subCategories.value.find { it.id == id }?.let {
+                    binding.subCategoryInput.setText(it.name)
+                    Timber.tag(TAG).d("Restored subcategory: ${it.name}")
+                }
+            }
+        }
+
+        // Restore Condition
+        selectedConditionId?.let { id ->
+            if (binding.conditionInput.text.isNullOrEmpty()) {
+                viewModel.conditions.value.find { it.id == id }?.let {
+                    binding.conditionInput.setText(it.name)
+                }
+            }
+        }
+
+        // Restore Size
+        selectedSizeId?.let { id ->
+            if (binding.sizeInput.text.isNullOrEmpty()) {
+                viewModel.sizes.value.find { it.id == id }?.let {
+                    binding.sizeInput.setText(it.name)
+                    Timber.tag(TAG).d("Restored size: ${it.name}")
+                }
+            }
+        }
+
+        // Restore Brand
+        selectedBrandId?.let { id ->
+            if (binding.brandInput.text.isNullOrEmpty()) {
+                viewModel.brands.value.find { it.id == id }?.let {
+                    binding.brandInput.setText(it.name)
+                }
+            }
+        }
+
+        // Restore Color
+        selectedColorId?.let { id ->
+            if (binding.colorInput.text.isNullOrEmpty()) {
+                viewModel.colors.value.find { it.id == id }?.let {
+                    binding.colorInput.setText(it.name)
+                }
+            }
+        }
+
+        // Restore Province
+        selectedProvinceId?.let { id ->
+            if (binding.provinceInput.text.isNullOrEmpty()) {
+                viewModel.provinces.value.find { it.id == id }?.let {
+                    binding.provinceInput.setText(it.name)
+                }
+            }
+        }
+
+        // Restore Town
+        selectedTownId?.let { id ->
+            if (binding.townInput.text.isNullOrEmpty()) {
+                viewModel.towns.value.find { it.id == id }?.let {
+                    binding.townInput.setText(it.name)
+                }
+            }
+        }
+
+        // Restore School
+        selectedSchoolId?.let { id ->
+            if (binding.schoolInput.text.isNullOrEmpty()) {
+                viewModel.schools.value.find { it.id == id }?.let {
+                    binding.schoolInput.setText(it.name)
+                }
+            }
+        }
+
+        // Restore Gender
+        selectedGenderId?.let { id ->
+            if (binding.genderInput.text.isNullOrEmpty()) {
+                viewModel.genders.value.find { it.id == id }?.let {
+                    binding.genderInput.setText(it.name)
+                }
+            }
+        }
+    }
+
     private fun setupQuantitySpinner() {
         val quantities = listOf("1", "2", "3", "4", "5")
-        val adapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_spinner_item,
-            quantities
-        )
+        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, quantities)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         binding.quantitySpinner.adapter = adapter
 
@@ -563,295 +826,7 @@ class EditItemFragment : Fragment() {
         binding.quantitySpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
                 selectedQuantity = position + 1
-            }
-            override fun onNothingSelected(parent: AdapterView<*>) {}
-        }
-    }
-
-    private fun setupMainCategorySpinner(categories: List<MainCategory>) {
-        if (categories.isEmpty()) return
-
-        val adapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_spinner_item,
-            categories.map { it.name }
-        )
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.mainCategorySpinner.adapter = adapter
-
-        if (selectedMainCategoryId != null) {
-            val position = categories.indexOfFirst { it.id == selectedMainCategoryId }
-            if (position >= 0) {
-                binding.mainCategorySpinner.setSelection(position)
-            }
-        }
-
-        binding.mainCategorySpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                val selectedCategory = categories[position]
-                if (selectedMainCategoryId != selectedCategory.id) {
-                    selectedMainCategoryId = selectedCategory.id
-                    viewModel.onMainCategorySelected(selectedCategory.id)
-                }
-            }
-            override fun onNothingSelected(parent: AdapterView<*>) {}
-        }
-    }
-
-    private fun setupSubCategorySpinner(subCategories: List<SubCategory>) {
-        if (subCategories.isEmpty()) {
-            binding.subCategorySpinner.isEnabled = false
-            return
-        }
-
-        binding.subCategorySpinner.isEnabled = true
-
-        val adapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_spinner_item,
-            subCategories.map { it.name }
-        )
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.subCategorySpinner.adapter = adapter
-
-        if (selectedSubCategoryId != null) {
-            val position = subCategories.indexOfFirst { it.id == selectedSubCategoryId }
-            if (position >= 0) {
-                binding.subCategorySpinner.setSelection(position)
-            }
-        }
-
-        binding.subCategorySpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                selectedSubCategoryId = subCategories[position].id
-            }
-            override fun onNothingSelected(parent: AdapterView<*>) {}
-        }
-    }
-
-    private fun setupConditionsSpinner(conditions: List<Condition>) {
-        val adapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_spinner_item,
-            conditions.map { it.name }
-        )
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.conditionSpinner.adapter = adapter
-
-        if (selectedConditionId != null) {
-            val position = conditions.indexOfFirst { it.id == selectedConditionId }
-            if (position >= 0) {
-                binding.conditionSpinner.setSelection(position)
-            }
-        }
-
-        binding.conditionSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                selectedConditionId = conditions[position].id
-            }
-            override fun onNothingSelected(parent: AdapterView<*>) {}
-        }
-    }
-
-    private fun setupSizesSpinner(sizes: List<Size>) {
-        val adapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_spinner_item,
-            sizes.map { it.name }
-        )
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.sizeSpinner.adapter = adapter
-
-        if (selectedSizeId != null) {
-            val position = sizes.indexOfFirst { it.id == selectedSizeId }
-            if (position >= 0) {
-                binding.sizeSpinner.setSelection(position)
-            }
-        }
-
-        binding.sizeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                selectedSizeId = sizes[position].id
-            }
-            override fun onNothingSelected(parent: AdapterView<*>) {}
-        }
-    }
-
-    private fun setupBrandsSpinner(brands: List<Brand>) {
-        val adapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_spinner_item,
-            brands.map { it.name }
-        )
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.brandSpinner.adapter = adapter
-
-        if (selectedBrandId != null) {
-            val position = brands.indexOfFirst { it.id == selectedBrandId }
-            if (position >= 0) {
-                binding.brandSpinner.setSelection(position)
-            }
-        }
-
-        binding.brandSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                selectedBrandId = brands[position].id
-            }
-            override fun onNothingSelected(parent: AdapterView<*>) {}
-        }
-    }
-
-    private fun setupColorsSpinner(colors: List<Color>) {
-        if (colors.isEmpty()) {
-            binding.colorSpinner.isEnabled = false
-            return
-        }
-
-        class ColorAdapter(context: Context, private val colorItems: List<Color>) :
-            ArrayAdapter<Color>(context, 0, colorItems) {
-
-            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                val view = convertView ?: LayoutInflater.from(context)
-                    .inflate(R.layout.item_color_spinner, parent, false)
-
-                val colorItem = colorItems[position]
-
-                view.findViewById<TextView>(R.id.colorName).text = colorItem.name
-
-                val colorHex = ColorUtils.getColorHex(colorItem.name)
-                view.findViewById<View>(R.id.colorPreview)
-                    .setBackgroundColor(android.graphics.Color.parseColor(colorHex))
-
-                return view
-            }
-
-            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
-                return getView(position, convertView, parent)
-            }
-        }
-
-        binding.colorSpinner.adapter = ColorAdapter(requireContext(), colors)
-        binding.colorSpinner.isEnabled = true
-
-        if (selectedColorId != null) {
-            val position = colors.indexOfFirst { it.id == selectedColorId }
-            if (position >= 0) {
-                binding.colorSpinner.setSelection(position)
-            }
-        }
-
-        binding.colorSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                selectedColorId = colors[position].id
-            }
-            override fun onNothingSelected(parent: AdapterView<*>) {}
-        }
-    }
-
-    private fun setupProvincesSpinner(provinces: List<Province>) {
-        val adapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_spinner_item,
-            provinces.map { it.name }
-        )
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.provinceSpinner.adapter = adapter
-
-        if (selectedProvinceId != null) {
-            val position = provinces.indexOfFirst { it.id == selectedProvinceId }
-            if (position >= 0) {
-                binding.provinceSpinner.setSelection(position)
-            }
-        }
-
-        binding.provinceSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                val selectedProvince = provinces[position]
-                if (selectedProvinceId != selectedProvince.id) {
-                    selectedProvinceId = selectedProvince.id
-                    viewModel.onProvinceSelected(selectedProvince.id)
-                }
-            }
-            override fun onNothingSelected(parent: AdapterView<*>) {}
-        }
-    }
-
-    private fun setupTownsSpinner(towns: List<Town>) {
-        if (towns.isEmpty()) {
-            binding.townSpinner.visibility = View.GONE
-            binding.townLabel.visibility = View.GONE
-            return
-        }
-
-        binding.townSpinner.visibility = View.VISIBLE
-        binding.townLabel.visibility = View.VISIBLE
-
-        val adapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_spinner_item,
-            towns.map { it.name }
-        )
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.townSpinner.adapter = adapter
-
-        if (selectedTownId != null) {
-            val position = towns.indexOfFirst { it.id == selectedTownId }
-            if (position >= 0) {
-                binding.townSpinner.setSelection(position)
-            }
-        }
-
-        binding.townSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                selectedTownId = towns[position].id
-            }
-            override fun onNothingSelected(parent: AdapterView<*>) {}
-        }
-    }
-
-    private fun setupSchoolsSpinner(schools: List<School>) {
-        val adapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_spinner_item,
-            schools.map { it.name }
-        )
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.schoolSpinner.adapter = adapter
-
-        if (selectedSchoolId != null) {
-            val position = schools.indexOfFirst { it.id == selectedSchoolId }
-            if (position >= 0) {
-                binding.schoolSpinner.setSelection(position)
-            }
-        }
-
-        binding.schoolSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                selectedSchoolId = schools[position].id
-            }
-            override fun onNothingSelected(parent: AdapterView<*>) {}
-        }
-    }
-
-    private fun setupGendersSpinner(genders: List<Gender>) {
-        val adapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_spinner_item,
-            genders.map { it.name }
-        )
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.genderSpinner.adapter = adapter
-
-        if (selectedGenderId != null) {
-            val position = genders.indexOfFirst { it.id == selectedGenderId }
-            if (position >= 0) {
-                binding.genderSpinner.setSelection(position)
-            }
-        }
-
-        binding.genderSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                selectedGenderId = genders[position].id
+                Timber.tag(TAG).d("Quantity selected: $selectedQuantity")
             }
             override fun onNothingSelected(parent: AdapterView<*>) {}
         }
@@ -860,13 +835,55 @@ class EditItemFragment : Fragment() {
     private fun setupClickListeners() {
         binding.updateButton.setOnClickListener {
             if (validateForm()) {
-                updateItem()
+                showUpdateConfirmationDialog()
             }
         }
 
         binding.deleteItemButton.setOnClickListener {
-            viewModel.showDeleteConfirmation()
+            showDeleteConfirmationDialog()
         }
+    }
+
+    private fun showUpdateConfirmationDialog() {
+        val name = binding.itemName.text.toString()
+        val description = binding.description.text.toString()
+        val price = binding.price.text.toString().toDoubleOrNull() ?: 0.0
+
+        val changes = mutableListOf<String>()
+        if (name != originalName) changes.add("• Name: \"$originalName\" → \"$name\"")
+        if (description != originalDescription) changes.add("• Description changed")
+        if (price != originalPrice) changes.add("• Price: R$originalPrice → R$price")
+        if (selectedQuantity != originalQuantity) changes.add("• Quantity: $originalQuantity → $selectedQuantity")
+        if (selectedMainCategoryId != originalItem?.mainCategoryId) changes.add("• Category changed")
+        if (selectedSubCategoryId != originalItem?.subCategoryId) changes.add("• Subcategory changed")
+        if (selectedConditionId != originalItem?.itemConditionId) changes.add("• Condition changed")
+        if (selectedSizeId != originalItem?.sizeId) changes.add("• Size changed")
+        if (selectedBrandId != originalItem?.brandId) changes.add("• Brand changed")
+        if (selectedColorId != originalItem?.colorId) changes.add("• Color changed")
+        if (viewModel.getDeletionIds().isNotEmpty()) changes.add("• ${viewModel.getDeletionIds().size} image(s) removed")
+        if (viewModel.getImagesForUpload().isNotEmpty()) changes.add("• ${viewModel.getImagesForUpload().size} new image(s) added")
+
+        val changesSummary = if (changes.isEmpty()) "No changes detected" else changes.joinToString("\n")
+
+        DialogHelper.showConfirmationDialog(
+            context = requireContext(),
+            action = DialogAction.SaveChanges(changesSummary),
+            onConfirm = {
+                Timber.tag(TAG).d("User confirmed update")
+                updateItem()
+            }
+        )
+    }
+
+    private fun showDeleteConfirmationDialog() {
+        DialogHelper.showConfirmationDialog(
+            context = requireContext(),
+            action = DialogAction.DeleteItem,
+            onConfirm = {
+                Timber.tag(TAG).d("User confirmed delete for item: $itemId")
+                viewModel.deleteItem(itemId)
+            }
+        )
     }
 
     private fun validateForm(): Boolean {
@@ -874,23 +891,19 @@ class EditItemFragment : Fragment() {
             Toast.makeText(requireContext(), "Please enter item name", Toast.LENGTH_SHORT).show()
             return false
         }
-
         if (binding.description.text.isNullOrEmpty()) {
             Toast.makeText(requireContext(), "Please enter description", Toast.LENGTH_SHORT).show()
             return false
         }
-
         if (binding.price.text.isNullOrEmpty()) {
             Toast.makeText(requireContext(), "Please enter price", Toast.LENGTH_SHORT).show()
             return false
         }
-
         val price = binding.price.text.toString().toDoubleOrNull()
         if (price == null || price <= 0) {
             Toast.makeText(requireContext(), "Please enter a valid price", Toast.LENGTH_SHORT).show()
             return false
         }
-
         return true
     }
 
@@ -898,30 +911,6 @@ class EditItemFragment : Fragment() {
         val name = binding.itemName.text.toString()
         val description = binding.description.text.toString()
         val price = binding.price.text.toString().toDoubleOrNull() ?: 0.0
-
-        // Check if any changes were made
-        val hasChanges = name != originalName ||
-                description != originalDescription ||
-                price != originalPrice ||
-                selectedQuantity != originalQuantity ||
-                selectedMainCategoryId != originalItem?.mainCategoryId ||
-                selectedSubCategoryId != originalItem?.subCategoryId ||
-                selectedConditionId != originalItem?.itemConditionId ||
-                selectedSizeId != originalItem?.sizeId ||
-                selectedBrandId != originalItem?.brandId ||
-                selectedColorId != originalItem?.colorId ||
-                selectedProvinceId != originalItem?.provinceId ||
-                selectedTownId != originalItem?.locationId ||
-                selectedSchoolId != originalItem?.schoolId ||
-                selectedGenderId != originalItem?.genderId ||
-                viewModel.getDeletionIds().isNotEmpty() ||
-                viewModel.getImagesForUpload().isNotEmpty()
-
-        if (!hasChanges) {
-            Toast.makeText(requireContext(), "No changes to save", Toast.LENGTH_SHORT).show()
-            findNavController().navigateUp()
-            return
-        }
 
         viewModel.updateItem(
             context = requireContext(),
@@ -945,15 +934,88 @@ class EditItemFragment : Fragment() {
         )
     }
 
-    private fun showDeleteConfirmationDialog() {
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Delete Item")
-            .setMessage("Are you sure you want to delete this item? This action cannot be undone.")
-            .setPositiveButton("Delete") { _, _ ->
-                viewModel.deleteItem(itemId)  // Changed from args.itemId to itemId
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+    private fun showAllShimmers() {
+        binding.mainCategoryShimmer.visibility = View.VISIBLE
+        binding.mainCategoryInputLayout.visibility = View.GONE
+        binding.mainCategoryShimmer.startShimmer()
+
+        binding.subCategoryShimmer.visibility = View.VISIBLE
+        binding.subCategoryInputLayout.visibility = View.GONE
+        binding.subCategoryShimmer.startShimmer()
+
+        binding.conditionShimmer.visibility = View.VISIBLE
+        binding.conditionInputLayout.visibility = View.GONE
+        binding.conditionShimmer.startShimmer()
+
+        binding.sizeShimmer.visibility = View.VISIBLE
+        binding.sizeInputLayout.visibility = View.GONE
+        binding.sizeShimmer.startShimmer()
+
+        binding.brandShimmer.visibility = View.VISIBLE
+        binding.brandInputLayout.visibility = View.GONE
+        binding.brandShimmer.startShimmer()
+
+        binding.colorShimmer.visibility = View.VISIBLE
+        binding.colorInputLayout.visibility = View.GONE
+        binding.colorShimmer.startShimmer()
+
+        binding.provinceShimmer.visibility = View.VISIBLE
+        binding.provinceInputLayout.visibility = View.GONE
+        binding.provinceShimmer.startShimmer()
+
+        binding.townShimmer.visibility = View.VISIBLE
+        binding.townInputLayout.visibility = View.GONE
+        binding.townShimmer.startShimmer()
+
+        binding.genderShimmer.visibility = View.VISIBLE
+        binding.genderInputLayout.visibility = View.GONE
+        binding.genderShimmer.startShimmer()
+
+        binding.schoolShimmer.visibility = View.VISIBLE
+        binding.schoolInputLayout.visibility = View.GONE
+        binding.schoolShimmer.startShimmer()
+    }
+
+    private fun hideAllShimmers() {
+        binding.mainCategoryShimmer.visibility = View.GONE
+        binding.mainCategoryInputLayout.visibility = View.VISIBLE
+        binding.mainCategoryShimmer.stopShimmer()
+
+        binding.subCategoryShimmer.visibility = View.GONE
+        binding.subCategoryInputLayout.visibility = View.VISIBLE
+        binding.subCategoryShimmer.stopShimmer()
+
+        binding.conditionShimmer.visibility = View.GONE
+        binding.conditionInputLayout.visibility = View.VISIBLE
+        binding.conditionShimmer.stopShimmer()
+
+        binding.sizeShimmer.visibility = View.GONE
+        binding.sizeInputLayout.visibility = View.VISIBLE
+        binding.sizeShimmer.stopShimmer()
+
+        binding.brandShimmer.visibility = View.GONE
+        binding.brandInputLayout.visibility = View.VISIBLE
+        binding.brandShimmer.stopShimmer()
+
+        binding.colorShimmer.visibility = View.GONE
+        binding.colorInputLayout.visibility = View.VISIBLE
+        binding.colorShimmer.stopShimmer()
+
+        binding.provinceShimmer.visibility = View.GONE
+        binding.provinceInputLayout.visibility = View.VISIBLE
+        binding.provinceShimmer.stopShimmer()
+
+        binding.townShimmer.visibility = View.GONE
+        binding.townInputLayout.visibility = View.VISIBLE
+        binding.townShimmer.stopShimmer()
+
+        binding.genderShimmer.visibility = View.GONE
+        binding.genderInputLayout.visibility = View.VISIBLE
+        binding.genderShimmer.stopShimmer()
+
+        binding.schoolShimmer.visibility = View.GONE
+        binding.schoolInputLayout.visibility = View.VISIBLE
+        binding.schoolShimmer.stopShimmer()
     }
 
     private fun showLoading() {
@@ -981,15 +1043,10 @@ class EditItemFragment : Fragment() {
     private fun navigateBack() {
         lifecycleScope.launch {
             delay(1500)
-            findNavController().previousBackStackEntry?.savedStateHandle?.set(
-                "item_updated",
-                true
-            )
+            findNavController().previousBackStackEntry?.savedStateHandle?.set("item_updated", true)
             findNavController().navigateUp()
-
         }
     }
-
 
     override fun onResume() {
         super.onResume()

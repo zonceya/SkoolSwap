@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.skoolswap"
-        minSdk = 24
+        minSdk = 25
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -38,6 +38,7 @@ android {
     }
     kotlinOptions {
         jvmTarget = "11"
+        freeCompilerArgs = listOf("-XXLanguage:+PropertyParamAnnotationDefaultTargetMode")
 
     }
     packagingOptions {
@@ -64,6 +65,7 @@ android {
     buildFeatures {
       viewBinding = true
       dataBinding = true
+      buildConfig = true
     }
 }
 
@@ -86,6 +88,7 @@ dependencies {
     // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
+    implementation(libs.firebase.ui.auth)
 
     // Authentication
     implementation(libs.androidx.credentials)
@@ -96,6 +99,8 @@ dependencies {
     implementation(libs.glide)
     implementation(libs.androidx.viewpager2)
     implementation(libs.facebook.shimmer)
+    implementation(libs.subsampling.scale.image.view)
+    implementation(libs.lottie)
 
     // Networking
     implementation(libs.retrofit)
@@ -105,6 +110,12 @@ dependencies {
     // Database
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.firebase.crashlytics.buildtools)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.navigation.fragment.ktx)
+    implementation(libs.navigation.ui.ktx)
+    implementation(libs.androidx.swiperefreshlayout)
+    implementation(libs.androidx.compose.remote.creation.core)
     kapt(libs.room.compiler)
     implementation(libs.kotlinx.datetime)
     implementation(libs.play.services.cast.framework)

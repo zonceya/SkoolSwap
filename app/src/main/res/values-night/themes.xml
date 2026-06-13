@@ -1,16 +1,106 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Theme.SkoolSwap" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
-        <!-- Primary brand color. -->
-        <item name="colorPrimary">@color/purple_200</item>
-        <item name="colorPrimaryVariant">@color/purple_700</item>
+    <style name="Theme.SkoolSwap" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- ADD THESE - Launch window background -->
+        <item name="android:windowBackground">@color/dark_background</item>
+        <item name="android:windowIsTranslucent">false</item>
+
+        <!-- Primary brand color - WHITE for dark mode -->
+        <item name="colorPrimary">@color/white</item>
+        <item name="colorPrimaryVariant">@color/dark_surface</item>
         <item name="colorOnPrimary">@color/black</item>
-        <!-- Secondary brand color. -->
+        <item name="colorSurfaceVariant">#333333</item>
+        <item name="colorOnSurfaceVariant">#CCCCCC</item>
+        <!-- Secondary brand color -->
         <item name="colorSecondary">@color/teal_200</item>
         <item name="colorSecondaryVariant">@color/teal_200</item>
         <item name="colorOnSecondary">@color/black</item>
-        <!-- Status bar color. -->
-        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
-        <!-- Customize your theme here. -->
+
+        <!-- Surface colors for dark mode -->
+        <item name="colorSurface">@color/dark_surface</item>
+        <item name="colorOnSurface">@color/white</item>
+
+        <!-- Background -->
+        <item name="android:colorBackground">@color/dark_background</item>
+        <item name="colorOnBackground">@color/white</item>
+
+        <!-- Status bar -->
+        <item name="android:statusBarColor">@color/black</item>
+        <item name="android:windowLightStatusBar">false</item>
+
+        <!-- Navigation bar -->
+        <item name="android:navigationBarColor">@color/dark_surface</item>
+
+        <item name="android:elevation">0dp</item>
+        <item name="android:windowContentOverlay">@null</item>
+
+        <!-- Control colors -->
+        <item name="colorControlNormal">@color/white</item>
+        <item name="colorControlActivated">@color/white</item>
+        <item name="colorControlHighlight">@color/white_transparent_20</item>
+        <item name="colorAccent">@color/teal_200</item>
+        <item name="elevationOverlayEnabled">false</item>
+
+        <!-- Action Bar Theme for dark mode -->
+        <item name="actionBarTheme">@style/Theme.SkoolSwap.AppBarOverlay</item>
+    </style>
+    <style name="LogoutButtonStyle" parent="Widget.Material3.Button">
+        <item name="android:backgroundTint">@color/white</item>
+        <item name="android:textColor">@color/black</item>
+    </style>
+    <style name="SizeBadgeStyle" parent="Widget.Material3.Button">
+        <item name="android:backgroundTint">@color/badge_background</item>
+        <item name="android:textColor">@color/badge_text</item>
+        <item name="cornerRadius">6dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">6dp</item>
+    </style>
+    <!-- Dialog Animation -->
+    <style name="DialogAnimation" parent="android:Animation">
+        <item name="android:windowEnterAnimation">@anim/dialog_enter</item>
+        <item name="android:windowExitAnimation">@anim/dialog_exit</item>
+    </style>
+    <!-- Rest of your dark mode styles -->
+    <style name="CustomTabText" parent="TextAppearance.Design.Tab">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">normal</item>
+        <item name="android:textColor">@color/white_70</item>
+        <item name="textAllCaps">false</item>
+    </style>
+
+    <style name="CustomTabTextSelected" parent="TextAppearance.Design.Tab">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="textAllCaps">false</item>
+    </style>
+
+    <style name="Theme.SkoolSwap.AppBarOverlay" parent="ThemeOverlay.MaterialComponents.Dark">
+        <item name="android:textColorPrimary">@color/white</item>
+        <item name="android:textColorSecondary">@color/white_60</item>
+        <item name="actionMenuTextColor">@color/white</item>
+    </style>
+
+    <style name="Theme.SkoolSwap.PopupOverlay" parent="ThemeOverlay.MaterialComponents.Dark" />
+
+    <style name="GoldRatingBar" parent="Widget.AppCompat.RatingBar.Small">
+        <item name="android:minHeight">20dp</item>
+        <item name="android:maxHeight">20dp</item>
+        <item name="android:progressDrawable">@drawable/rating_bar_gold</item>
+    </style>
+
+    <style name="Theme.SkoolSwap.NoActionBar" parent="Theme.SkoolSwap">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowBackground">@color/dark_background</item>
+    </style>
+
+    <style name="FullScreenDialogStyle" parent="Theme.MaterialComponents.Dialog">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/dark_surface</item>
     </style>
 </resources>

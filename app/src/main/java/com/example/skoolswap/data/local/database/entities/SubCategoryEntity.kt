@@ -14,6 +14,6 @@ data class SubCategoryEntity(
     val name: String,
     val mainCategoryId: Int? = null,
     val description: String?,
-    val displayOrder: Int,
+    val displayOrder: Int = 0,
     val isActive: Boolean? = true
 )
