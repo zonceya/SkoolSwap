@@ -6,7 +6,9 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.skoolswap.R
@@ -32,14 +34,15 @@ class UniformFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         setupRecyclerView()
+        setupSwipeRefresh()
         observeViewModel()
 
         binding.retryButton.setOnClickListener {
             binding.errorLayout.visibility = View.GONE
             viewModel.loadUniformCategories()
         }
+
         viewModel.loadUniformCategories()
     }
 
@@ -52,14 +55,16 @@ class UniformFragment : Fragment() {
             this.adapter = adapter
         }
     }
+
     private fun setupSwipeRefresh() {
         binding.swipeRefreshLayout.setOnRefreshListener {
             viewModel.loadUniformCategories()
             binding.swipeRefreshLayout.isRefreshing = false
         }
     }
+
     private fun observeViewModel() {
-        // Loading state - show shimmer
+        // LiveData observers are already view-lifecycle-aware, these are fine as-is
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
             if (isLoading && viewModel.categories.value.isNullOrEmpty()) {
                 binding.shimmerLayout.visibility = View.VISIBLE
@@ -70,37 +75,32 @@ class UniformFragment : Fragment() {
             }
         }
 
-        // Error state
-        lifecycleScope.launch {
-            viewModel.error.collect { errorMsg ->
-                if (errorMsg != null && viewModel.categories.value.isNullOrEmpty()) {
-                    binding.errorLayout.visibility = View.VISIBLE
-                    binding.errorMessage.text = errorMsg
-                    binding.uniformTabRecycler.visibility = View.GONE
-                    binding.shimmerLayout.visibility = View.GONE
-                } else {
-                    binding.errorLayout.visibility = View.GONE
-                }
-            }
-        }
-
-        // Categories data
+        // Single observer — removed the duplicate
         viewModel.categories.observe(viewLifecycleOwner) { categories ->
-            if (categories.isNotEmpty()) {
+            if (!categories.isNullOrEmpty()) {
                 binding.shimmerLayout.visibility = View.GONE
                 binding.uniformTabRecycler.visibility = View.VISIBLE
                 binding.errorLayout.visibility = View.GONE
-                (binding.uniformTabRecycler.adapter as? UniformCategoryAdapter)?.submitList(categories)
             }
-        }
-        viewModel.categories.observe(viewLifecycleOwner) { categories ->
             (binding.uniformTabRecycler.adapter as? UniformCategoryAdapter)?.submitList(categories)
         }
+
+        // StateFlow collector — must use repeatOnLifecycle to be view-lifecycle-safe
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.error.collect { errorMsg ->
+                    if (errorMsg != null && viewModel.categories.value.isNullOrEmpty()) {
+                        binding.errorLayout.visibility = View.VISIBLE
+                        binding.errorMessage.text = errorMsg
+                        binding.uniformTabRecycler.visibility = View.GONE
+                        binding.shimmerLayout.visibility = View.GONE
+                    } else {
+                        binding.errorLayout.visibility = View.GONE
+                    }
+                }
+            }
+        }
     }
-
-
-
-
 
     private fun navigateToProducts(category: UniformCategory) {
         val bundle = Bundle().apply {

@@ -51,6 +51,7 @@
                 android:numStars="5"
                 android:rating="4.5"
                 android:stepSize="0.5"
+                android:visibility="gone"
                 android:progressTint="?attr/colorPrimary"
                 android:progressBackgroundTint="?attr/colorOnSurface"
                 android:alpha="0.8" />

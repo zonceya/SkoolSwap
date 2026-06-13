@@ -41,6 +41,7 @@ class ProductsAdapter(
 
     inner class ViewHolder(
         private val binding: ItemProductGridBinding
+
     ) : RecyclerView.ViewHolder(binding.root) {
 
         init {

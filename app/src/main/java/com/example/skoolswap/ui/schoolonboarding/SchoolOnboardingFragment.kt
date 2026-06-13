@@ -11,6 +11,8 @@ import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -22,10 +24,13 @@ import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentSchoolOnboardingBinding
 import com.example.skoolswap.domain.model.Province
 import com.example.skoolswap.ui.profile.SchoolAdapter
+import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 @AndroidEntryPoint
 class SchoolOnboardingFragment : Fragment() {
@@ -47,6 +52,8 @@ class SchoolOnboardingFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+
         verifyAllDrawables()
         setupUI()
         setupRecyclerView()
@@ -74,7 +81,7 @@ class SchoolOnboardingFragment : Fragment() {
         Log.d("SchoolOnboardingFragment", "📊 Progress reset: Only PROVINCE active")
     }
 
-    private fun setupUI() {
+        private fun setupUI() {
         binding.submitButton.isEnabled = false
         binding.schoolSearch.isEnabled = false
 
@@ -396,6 +403,7 @@ class SchoolOnboardingFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+
         _binding = null
     }
 }

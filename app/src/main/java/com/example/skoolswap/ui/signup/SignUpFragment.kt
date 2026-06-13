@@ -1,6 +1,7 @@
 package com.example.skoolswap.ui.signup
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -68,7 +69,8 @@ class SignUpFragment : Fragment() {
                     return@setOnClickListener
                 }
                 else -> {
-                    viewModel.sendSignUpOtp(name, email, password, confirmPassword)
+                    // ✅ Call Firebase sign up instead of OTP
+                    viewModel.signUpWithEmail(name, email, password, confirmPassword)
                 }
             }
         }
@@ -80,25 +82,37 @@ class SignUpFragment : Fragment() {
 
     private fun observeViewModel() {
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
+            Log.e("SignUpFragment", "Loading state: $isLoading")
             binding.buttonRegister.isEnabled = !isLoading
-            binding.buttonRegister.text = if (isLoading) "Signing up..." else "Sign Up"
+            binding.buttonRegister.text = if (isLoading) "Creating account..." else "Sign Up"
         }
 
         viewModel.error.observe(viewLifecycleOwner) { error ->
             if (error != null) {
+                Log.e("SignUpFragment", "Error: $error")
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show()
             }
         }
 
-        viewModel.signUpSuccess.observe(viewLifecycleOwner) { otpToken ->
-            if (otpToken != null) {
-                val email = binding.editEmail.text.toString().trim()
-                val bundle = Bundle().apply {
-                    putString("email", email)
-                    putString("otp_token", otpToken)
-                    putString("purpose", "SIGNUP")
+        // ✅ Changed from otpToken to user object
+        viewModel.signUpSuccess.observe(viewLifecycleOwner) { user ->
+            if (user != null) {
+                Log.e("SignUpFragment", "✅ Sign up successful!")
+                Log.e("SignUpFragment", "👤 User: ${user.name}")
+                Log.e("SignUpFragment", "🏫 schoolMapped: ${user.schoolMapped}")
+                Log.e("SignUpFragment", "🏫 schoolId: ${user.schoolId}")
+
+                // Navigate directly - no OTP screen
+                if (user.schoolMapped == true && user.schoolId != null) {
+                    Log.e("SignUpFragment", "➡️ User has school - navigating to HOME")
+                    val bundle = Bundle().apply {
+                        putInt("schoolId", user.schoolId)
+                    }
+                    findNavController().navigate(R.id.action_signUpFragment_to_nav_home, bundle)
+                } else {
+                    Log.e("SignUpFragment", "➡️ User has NO school - navigating to ONBOARDING")
+                    findNavController().navigate(R.id.action_signUpFragment_to_schoolOnboardingFragment)
                 }
-                findNavController().navigate(R.id.action_signUpFragment_to_otpFragment, bundle)
             }
         }
     }

@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -55,30 +56,56 @@ class HomeViewModel @Inject constructor(
 
     private var searchJob: Job? = null
     private var cachedHomeFeed: HomeFeed? = null
-
+    private var knownSchoolId: Int? = null
+    fun setKnownSchoolId(schoolId: Int) {
+        Timber.tag("HomeViewModel")
+            .d("🔑 setKnownSchoolId called with: $schoolId, previous: $knownSchoolId")
+        knownSchoolId = schoolId
+    }
     fun loadHomeFeed(forceRefresh: Boolean = false) {
         if (!forceRefresh && cachedHomeFeed != null) {
+            Log.d("HomeViewModel", "📦 Using cached feed")
             _homeFeed.value = cachedHomeFeed
             return
         }
-
-        if (_isLoading.value) return
+// ✅ Only skip if loading AND not a force refresh
+        if (!forceRefresh && _isLoading.value) {
+            Log.d("HomeViewModel", "⏳ Already loading, skipping")
+            return
+        }
+        if (_isLoading.value) {
+            Log.d("HomeViewModel", "⏳ Already loading, skipping")
+            return
+        }
 
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
 
+            val directSchoolId = knownSchoolId
+            Log.d("HomeViewModel", "🔑 knownSchoolId = $directSchoolId")
+
+            if (directSchoolId != null) {
+                Log.d("HomeViewModel", "✅ Using known schoolId: $directSchoolId")
+                loadFeedWithSchoolId(directSchoolId, forceRefresh)
+                return@launch
+            }
+
+            Log.d("HomeViewModel", "🔍 Falling back to Room lookup")
             when (val result = userSchoolRepository.getCurrentSchoolMapping()) {
                 is Result.Success -> {
                     val mapping = result.data
+                    Log.d("HomeViewModel", "📍 Room mapping result: ${mapping?.schoolId}")
                     if (mapping != null) {
                         loadFeedWithSchoolId(mapping.schoolId, forceRefresh)
                     } else {
+                        Log.e("HomeViewModel", "❌ No school mapping in Room")
                         _error.value = "Please select a school first"
                         _isLoading.value = false
                     }
                 }
                 is Result.Error -> {
+                    Log.e("HomeViewModel", "❌ Room error: ${result.exception.message}")
                     _error.value = "Failed to get school: ${result.exception.message}"
                     _isLoading.value = false
                 }
@@ -87,17 +114,18 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun loadFeedWithSchoolId(schoolId: Int, forceRefresh: Boolean) {
-        Log.d("HomeViewModel", "🔄 Loading feed for school $schoolId")
+        Timber.tag("HomeViewModel").d("🔄 Loading feed for school $schoolId")
         when (val result = homeRepository.getHomeFeed(schoolId)) {
             is Result.Success -> {
                 cachedHomeFeed = result.data
                 _homeFeed.value = result.data
                 _error.value = null
-                Log.d("HomeViewModel", "✅ Feed loaded: ${result.data?.sections?.size} sections")
+                Timber.tag("HomeViewModel")
+                    .d("✅ Feed loaded: ${result.data?.sections?.size} sections")
             }
             is Result.Error -> {
                 _error.value = result.exception.message
-                Log.e("HomeViewModel", "❌ Feed error: ${result.exception.message}")
+                Timber.tag("HomeViewModel").e("❌ Feed error: ${result.exception.message}")
             }
         }
         _isLoading.value = false
@@ -123,7 +151,7 @@ class HomeViewModel @Inject constructor(
 
         // Minimum query length check
         if (query.length < 2) {
-            Log.d("HomeViewModel", "Query too short (< 2 chars), clearing results")
+            Timber.tag("HomeViewModel").d("Query too short (< 2 chars), clearing results")
             _searchResults.value = emptyList()
             _isShowingLocalResults.value = false
             _serverItemsCount.value = 0

@@ -23,10 +23,6 @@ class LoginViewModel @Inject constructor(
     private val _loginSuccess = MutableLiveData<User?>()
     val loginSuccess: LiveData<User?> = _loginSuccess
 
-    // Email OTP LiveData
-    private val _otpSent = MutableLiveData<String?>() // Returns otpToken
-    val otpSent: LiveData<String?> = _otpSent
-
     // UI States
     private val _isLoading = MutableLiveData(false)
     val isLoading: LiveData<Boolean> = _isLoading
@@ -65,72 +61,37 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    // ==================== EMAIL OTP LOGIN ====================
-    fun sendLoginOtp(email: String) {
+    // ==================== FIREBASE EMAIL/PASSWORD LOGIN ====================
+    fun signInWithEmail(email: String, password: String) {
         viewModelScope.launch {
-            try {
-                _isLoading.value = true
-                _error.value = null
+            _isLoading.value = true
+            _error.value = null
 
-                Log.e("LoginViewModel", "📧 Sending login OTP to: $email")
+            Log.e("LoginViewModel", "📧 Signing in with email: $email")
 
-                val result = authRepository.sendLoginOtp(email)
+            val result = authRepository.signInWithEmail(email, password)
 
-                result.onSuccess { otpToken ->
-                    Log.e("LoginViewModel", "✅ OTP sent successfully")
-                    _otpSent.value = otpToken
-                }.onFailure { throwable ->
-                    Log.e("LoginViewModel", "❌ Failed to send OTP: ${throwable.message}")
-                    _error.value = throwable.message ?: "Failed to send OTP"
-                }
-
-            } catch (e: Exception) {
-                Log.e("LoginViewModel", "❌ Error: ${e.message}")
-                _error.value = e.message ?: "Failed to send OTP"
-            } finally {
-                _isLoading.value = false
+            result.onSuccess { user ->
+                Log.e("LoginViewModel", "✅ Email sign in successful!")
+                saveUserToPreferences(user)
+                _loginSuccess.value = user
+            }.onFailure { throwable ->
+                Log.e("LoginViewModel", "❌ Email sign in failed: ${throwable.message}")
+                _error.value = throwable.message ?: "Sign in failed"
             }
+
+            _isLoading.value = false
         }
     }
-
 
     fun restoreSession() {
         viewModelScope.launch {
             authRepository.restoreSession()
         }
     }
+
     fun clearLoginSuccess() {
         _loginSuccess.value = null
-    }
-    fun resendOtp(email: String, purpose: String = "LOGIN") {
-        viewModelScope.launch {
-            try {
-                _isLoading.value = true
-                _error.value = null
-
-                Log.e("LoginViewModel", "🔄 Resending OTP to: $email")
-
-                val result = authRepository.resendOtp(email, purpose)
-
-                result.onSuccess { otpToken ->
-                    Log.e("LoginViewModel", "✅ OTP resent successfully")
-                    _otpSent.value = otpToken
-                }.onFailure { throwable ->
-                    Log.e("LoginViewModel", "❌ Failed to resend OTP: ${throwable.message}")
-                    _error.value = throwable.message ?: "Failed to resend OTP"
-                }
-
-            } catch (e: Exception) {
-                Log.e("LoginViewModel", "❌ Error: ${e.message}")
-                _error.value = e.message ?: "Failed to resend OTP"
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
-
-    fun clearOtpSent() {
-        _otpSent.value = null
     }
 
     private suspend fun saveUserToPreferences(user: User) {

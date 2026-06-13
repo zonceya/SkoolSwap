@@ -139,6 +139,8 @@ fun ItemShopDto.toDomain(): Shop {
 // ============ CREATE ITEM RESPONSE TO DOMAIN ============
 fun CreateItemResponse.toDomain(): Item {
     val itemData = item
+    val variant = variants?.firstOrNull()  // Get the first variant (contains actual price/quantity)
+
     val allImages = mutableListOf<ItemImage>()
 
     // 1. Get cover photo (primary image)
@@ -160,30 +162,33 @@ fun CreateItemResponse.toDomain(): Item {
         ))
     }
 
-
-    val additionalImages = itemData?.images
-        ?.filter { it != coverPhotoUrl && it.isNotBlank() }
-        ?.map { imageUrl ->
+    // Add images from the response (these are the uploaded images)
+    val additionalImages = images
+        .map { imageDto ->
             ItemImage(
-                id = 0,
-                url = imageUrl,
-                filename = null,
-                contentType = null,
-                createdAt = null,
+                id = imageDto.id,
+                url = imageDto.url,
+                filename = imageDto.filename,
+                contentType = imageDto.contentType,
+                createdAt = imageDto.createdAt,
                 isCover = false
             )
-        } ?: emptyList()
+        }
 
     allImages.addAll(additionalImages)
     val finalImages = allImages.take(3)
+
+    // ✅ CRITICAL FIX: Get price and quantity from VARIANT, not from itemData
+    val finalPrice = variant?.price ?: itemData?.price?.toDoubleOrNull() ?: 0.0
+    val finalQuantity = variant?.quantity ?: itemData?.quantity ?: 0
 
     return Item(
         id = itemData?.id ?: "",
         shopId = itemData?.shopId ?: 0L,
         name = itemData?.name ?: "",
         description = itemData?.description ?: "",
-        price = itemData?.price?.toDoubleOrNull() ?: 0.0,
-        quantity = itemData?.quantity ?: 0,
+        price = finalPrice,      // ← Now from variant (30.0)
+        quantity = finalQuantity, // ← Now from variant (1)
         status = itemData?.status ?: "active",
         meta = itemData?.meta?.toDomain(),
         createdAt = itemData?.createdAt ?: "",
@@ -191,24 +196,24 @@ fun CreateItemResponse.toDomain(): Item {
         images = finalImages,
         coverImage = coverPhotoUrl,
         brandId = itemData?.brand?.id,
-        sizeId = itemData?.size?.id,
-        colorId = itemData?.color?.id,
+        sizeId = variant?.sizeId ?: itemData?.size?.id,
+        colorId = variant?.colorId ?: itemData?.color?.id,
         schoolId = itemData?.school?.id,
-        itemConditionId = itemData?.condition?.id,
+        itemConditionId = variant?.conditionId ?: itemData?.condition?.id,
         locationId = itemData?.town?.id,
         provinceId = itemData?.province?.id,
         genderId = itemData?.gender?.id,
         mainCategoryId = itemData?.mainCategory?.id,
         subCategoryId = itemData?.subCategory?.id,
-        reserved = itemData?.let {
-            it.quantity - (it.availableQuantity ?: it.quantity)
+        reserved = variant?.let {
+            variant.quantity - (itemData?.availableQuantity ?: variant.quantity)
         } ?: 0,
         label = itemData?.label,
         itemTypeId = null,
-        sizeName = itemData?.size?.name,
-        colorName = itemData?.color?.name,
+        sizeName = variant?.sizeName ?: itemData?.size?.name,
+        colorName = variant?.colorName ?: itemData?.color?.name,
         brandName = itemData?.brand?.name,
-        conditionName = itemData?.condition?.name
+        conditionName = variant?.conditionName ?: itemData?.condition?.name
     )
 }
 

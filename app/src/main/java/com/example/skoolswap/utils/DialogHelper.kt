@@ -12,6 +12,10 @@ import com.google.android.material.button.MaterialButton
 sealed class DialogAction {
     object Logout : DialogAction()
     object DeleteAccount : DialogAction()
+    object DeleteShop : DialogAction()
+    object DeleteItem : DialogAction()
+    data class UpdateShop(val currentName: String, val newName: String) : DialogAction()
+    data class UpdateItem(val itemName: String, val changes: String) : DialogAction()
     data class SaveChanges(val changesSummary: String) : DialogAction()
     data class Custom(
         val title: String,
@@ -50,6 +54,49 @@ object DialogHelper {
                 messageView.text = "Are you sure you want to delete your account? This action cannot be undone."
                 confirmButton.text = "Delete"
             }
+            is DialogAction.DeleteShop -> {
+                logoImage.visibility = android.view.View.VISIBLE
+                titleView.text = "DELETE SHOP"
+                messageView.text = "Are you sure you want to delete your shop? This will remove all your items and cannot be undone."
+                confirmButton.text = "Delete Shop"
+            }
+            is DialogAction.DeleteItem -> {
+                logoImage.visibility = android.view.View.VISIBLE
+                titleView.text = "DELETE ITEM"
+                messageView.text = "Are you sure you want to delete this item? This action cannot be undone."
+                confirmButton.text = "Delete Item"
+            }
+            is DialogAction.UpdateShop -> {
+                logoImage.visibility = android.view.View.VISIBLE
+                titleView.text = "UPDATE SHOP"
+                messageView.text = """
+                    You are about to update your shop name from:
+                    
+                    "${action.currentName}"
+                    
+                    to:
+                    
+                    "${action.newName}"
+                    
+                    Do you want to continue?
+                """.trimIndent()
+                confirmButton.text = "Update Shop"
+            }
+            is DialogAction.UpdateItem -> {
+                logoImage.visibility = android.view.View.VISIBLE
+                titleView.text = "UPDATE ITEM"
+                messageView.text = """
+                    You are about to update:
+                    
+                    ${action.itemName}
+                    
+                    Changes:
+                    ${action.changes}
+                    
+                    Do you want to continue?
+                """.trimIndent()
+                confirmButton.text = "Update Item"
+            }
             is DialogAction.SaveChanges -> {
                 logoImage.visibility = android.view.View.VISIBLE
                 titleView.text = "SAVE CHANGES"
@@ -70,8 +117,8 @@ object DialogHelper {
                 android.content.res.Configuration.UI_MODE_NIGHT_YES
 
         when (action) {
-            is DialogAction.DeleteAccount -> {
-                // Delete button - use red for danger
+            is DialogAction.DeleteAccount, is DialogAction.DeleteShop, is DialogAction.DeleteItem -> {
+                // Delete buttons - use red for danger
                 confirmButton.backgroundTintList = ContextCompat.getColorStateList(context, R.color.red)
                 confirmButton.setTextColor(ContextCompat.getColor(context, R.color.white))
             }

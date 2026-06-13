@@ -45,6 +45,7 @@ remoteCreationCore = "1.0.0-alpha11"
 
 
 [libraries]
+firebase-ui-auth = { module = "com.firebaseui:firebase-ui-auth", version = "8.0.2" }
 lottie = { module = "com.airbnb.android:lottie", version = "6.4.0" }
 photoview = { module = "com.github.chrisbanes:PhotoView", version.ref = "photoview" }
 subsampling-scale-image-view = { module = "com.davemorrissey.labs:subsampling-scale-image-view", version.ref = "subsamplingScaleImageView" }

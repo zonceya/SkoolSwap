@@ -19,11 +19,13 @@ class FavoritesViewModel @Inject constructor(
     private val _favorites = MutableStateFlow<List<Item>>(emptyList())
     val favorites: StateFlow<List<Item>> = _favorites.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(false)
+    private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+
+    private var loadJob: kotlinx.coroutines.Job? = null
 
     init {
         loadFavorites()
@@ -34,7 +36,10 @@ class FavoritesViewModel @Inject constructor(
     }
 
     private fun loadFavorites() {
-        viewModelScope.launch {
+
+        loadJob?.cancel()
+
+        loadJob = viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
 

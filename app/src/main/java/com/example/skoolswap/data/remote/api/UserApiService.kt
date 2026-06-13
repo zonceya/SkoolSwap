@@ -8,6 +8,7 @@ import com.example.skoolswap.data.remote.models.request.VerifySignUpRequest
 import com.example.skoolswap.data.remote.models.response.profile.DeleteProfileResponse
 import com.example.skoolswap.data.remote.models.response.profile.ProfileResponse
 import com.example.skoolswap.data.remote.models.response.school.AssignSchoolResponse
+import com.example.skoolswap.data.remote.models.response.user.FirebaseAuthResponse
 import com.example.skoolswap.data.remote.models.response.user.SendOtpResponse
 import com.example.skoolswap.data.remote.models.response.user.SignInResponse
 import com.example.skoolswap.data.remote.models.response.user.UpdateMobileResponse
@@ -23,7 +24,10 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 
 interface UserApiService {
-
+    @POST("api/v1/users/firebase_auth")
+    suspend fun firebaseAuth(
+        @Body request: Map<String, String>
+    ): Response<FirebaseAuthResponse>
     @POST("api/v1/users/sign_in")
     suspend fun signIn(
         @Body request: SignInRequest

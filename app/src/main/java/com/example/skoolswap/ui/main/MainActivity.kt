@@ -147,75 +147,7 @@ class MainActivity : AppCompatActivity() {
         )
         setupActionBarWithNavController(navController, appBarConfiguration)
     }
-    // Add this function to debug the divider color
-    private fun debugDividerColor() {
-        val navView: NavigationView = binding.navView
-        val headerView = navView.getHeaderView(0)
 
-        // Find the divider view
-        val divider = headerView.findViewById<View>(R.id.divider)
-
-        if (divider != null) {
-            // Get the divider background color
-            val background = divider.background
-            if (background != null) {
-                // For color drawable
-                if (background is android.graphics.drawable.ColorDrawable) {
-                    val colorInt = background.color
-                    val hexColor = String.format("#%08X", colorInt)
-                    val alpha = (colorInt shr 24) and 0xFF
-                    val alphaPercent = (alpha / 255.0) * 100
-
-                    Timber.tag("DIVIDER_DEBUG").e("=== DIVIDER COLOR DEBUG ===")
-                    Timber.tag("DIVIDER_DEBUG").e("Divider exists: YES")
-                    Timber.tag("DIVIDER_DEBUG").e("Color: $hexColor")
-                    Timber.tag("DIVIDER_DEBUG").e("Alpha: $alpha (${String.format("%.1f", alphaPercent)}%)")
-                    Timber.tag("DIVIDER_DEBUG").e("Visible: ${divider.visibility == View.VISIBLE}")
-                    Timber.tag("DIVIDER_DEBUG").e("Height: ${divider.layoutParams?.height}px")
-                    Timber.tag("DIVIDER_DEBUG").e("Alpha property: ${divider.alpha}")
-                }
-            } else {
-                Timber.tag("DIVIDER_DEBUG").e("Divider has no background drawable")
-            }
-
-            // Temporarily force the divider to be very visible for testing
-            // Uncomment to force visibility:
-            // forceDividerVisible(divider)
-        } else {
-            Timber.tag("DIVIDER_DEBUG").e("Divider not found in header layout!")
-
-            // List all views in header for debugging
-            listAllViews(headerView)
-        }
-    }
-
-    // Force divider to be very visible for testing
-    private fun forceDividerVisible(divider: View) {
-        Timber.tag("DIVIDER_DEBUG").e("=== FORCING DIVIDER VISIBLE FOR TEST ===")
-
-        // Make divider bright red for testing
-        divider.setBackgroundColor(android.graphics.Color.RED)
-        divider.alpha = 1.0f  // Fully opaque
-
-        // Increase height
-        val params = divider.layoutParams
-        params.height = 4  // 4dp for testing
-        divider.layoutParams = params
-    }
-
-    // Helper to list all views in header (for debugging)
-    private fun listAllViews(view: View, level: Int = 0) {
-        val indent = "  ".repeat(level)
-        Timber.tag("DIVIDER_DEBUG").e("$indent- ${view::class.java.simpleName} (id: ${view.id})")
-
-        if (view is ViewGroup) {
-            for (i in 0 until view.childCount) {
-                listAllViews(view.getChildAt(i), level + 1)
-            }
-        }
-    }
-
-    // Call this function after setupNavigationHeader()
     private fun setupNavigationHeader() {
         val navView: NavigationView = binding.navView
         val headerView = navView.getHeaderView(0)
@@ -353,24 +285,29 @@ class MainActivity : AppCompatActivity() {
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
             when (destination.id) {
+                // === FULL SCREEN / ONBOARDING SCREENS (Hide everything) ===
+                R.id.schoolOnboardingFragment,
                 R.id.viewPagerFragment,
+                R.id.introFragment,
                 R.id.loginFragment -> {
                     supportActionBar?.hide()
-                    binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
                     binding.appBarMain.fab.visibility = View.GONE
+                    binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+
+                    // Optional: Make it more immersive
                     window.statusBarColor = android.graphics.Color.BLACK
                     @Suppress("DEPRECATION")
-                    window.decorView.systemUiVisibility = 0 // light icons
+                    window.decorView.systemUiVisibility = 0 // Light icons on dark background
                 }
 
-                R.id.signUpFragment,
-                R.id.otpFragment -> {
+                R.id.signUpFragment -> {
                     supportActionBar?.show()
                     binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
                     binding.appBarMain.fab.visibility = View.GONE
                     binding.appBarMain.toolbar.menu.findItem(R.id.action_search)?.isVisible = false
                 }
 
+                // Screens where FAB should be visible
                 R.id.nav_profile,
                 R.id.nav_favorites,
                 R.id.createItemFragment,
@@ -382,25 +319,24 @@ class MainActivity : AppCompatActivity() {
                     binding.appBarMain.toolbar.menu.findItem(R.id.action_search)?.isVisible = false
                 }
 
+                // Default / Normal app screens
                 else -> {
                     supportActionBar?.show()
                     binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
                     binding.appBarMain.fab.visibility = View.VISIBLE
                     binding.appBarMain.toolbar.menu.findItem(R.id.action_search)?.isVisible = true
 
-                    // Restore theme-based status bar for all other screens
+                    // Restore normal status bar based on theme
                     val nightMode = resources.configuration.uiMode and
                             android.content.res.Configuration.UI_MODE_NIGHT_MASK
                     val isDark = nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES
-                    window.statusBarColor = if (isDark) android.graphics.Color.BLACK
-                    else android.graphics.Color.WHITE
+
+                    window.statusBarColor = if (isDark) android.graphics.Color.BLACK else android.graphics.Color.WHITE
                     @Suppress("DEPRECATION")
-                    window.decorView.systemUiVisibility = if (isDark) 0
-                    else View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+                    window.decorView.systemUiVisibility = if (isDark) 0 else View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
                 }
             }
         }
-
     }
 
     private fun showLogoutConfirmationDialog() {
@@ -515,18 +451,8 @@ class MainActivity : AppCompatActivity() {
     override fun onSupportNavigateUp(): Boolean {
         val currentDestId = navController.currentDestination?.id
 
+        // ✅ UPDATED: Removed OTP fragment references
         when (currentDestId) {
-            R.id.otpFragment -> {
-                val purpose = navController.currentBackStackEntry
-                    ?.arguments?.getString("purpose") ?: "LOGIN"
-
-                if (purpose == "SIGNUP") {
-                    navController.navigate(R.id.action_otpFragment_to_signUpFragment)
-                } else {
-                    navController.navigate(R.id.action_otpFragment_to_loginFragment)
-                }
-                return true
-            }
             R.id.signUpFragment -> {
                 navController.navigate(R.id.action_signUpFragment_to_loginFragment)
                 return true
@@ -584,6 +510,11 @@ class MainActivity : AppCompatActivity() {
         Timber.tag("MainActivity")
             .e("🎯 navigateToDestination: $destination, current: $currentDestName")
 
+        if (currentDestId == R.id.createItemFragment) {
+            Timber.tag("MainActivity")
+                .e("🛑 BLOCKING navigation - createItemFragment is active (camera return)")
+            return
+        }
         if (currentDestId == R.id.nav_profile) {
             Timber.tag("MainActivity")
                 .e("🛑 BLOCKING navigation to $destination - ProfileFragment is active")

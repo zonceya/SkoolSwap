@@ -25,23 +25,10 @@ interface AuthRepositoryInterface {
     val loading: StateFlow<Boolean>
     val error: StateFlow<String?>
 
-    // ==================== EMAIL OTP METHODS ====================
-    suspend fun sendSignUpOtp(
-        email: String,
-        name: String,
-        password: String,
-        passwordConfirmation: String
-    ): Result<String>
+    // ==================== FIREBASE EMAIL/PASSWORD METHODS (REPLACES OTP) ====================
+    suspend fun signInWithEmail(email: String, password: String): Result<User>
+    suspend fun signUpWithEmail(name: String, email: String, password: String, passwordConfirmation: String): Result<User>
+    suspend fun sendPasswordResetEmail(email: String): Result<Unit>
 
-    suspend fun sendLoginOtp(email: String): Result<String> // Returns otpToken
 
-    suspend fun verifyOtp(
-        email: String,
-        otpToken: String,
-        otpCode: String,
-        purpose: String,
-        name: String? = null
-    ): Result<User> // Returns authenticated User
-
-    suspend fun resendOtp(email: String, purpose: String): Result<String> // Returns new otpToken
 }

@@ -1,7 +1,6 @@
 package com.example.skoolswap.ui.shop
 
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -34,7 +33,7 @@ class ShopFragment : Fragment() {
     private val viewModel: ShopViewModel by viewModels()
 
     private lateinit var productAdapter: ProductAdapter
-    private lateinit var categorySectionAdapter: CategorySectionAdapter
+    private lateinit var categoryGridAdapter: CategoryGridAdapter  // ← FIXED: Use CategoryGridAdapter
     @Inject
     lateinit var authRepository: AuthRepositoryInterface
     private var isCategoriesView = false
@@ -67,11 +66,13 @@ class ShopFragment : Fragment() {
     private fun setupRecyclerViews() {
         // Adapter for All Items view (simple grid)
         productAdapter = ProductAdapter { itemId ->
+            Timber.d("Product clicked: $itemId")
             navigateToEditItem(itemId)
         }
 
-        // Adapter for Categories view (sectioned)
-        categorySectionAdapter = CategorySectionAdapter { itemId ->
+        // ✅ FIXED: Use CategoryGridAdapter for categories view
+        categoryGridAdapter = CategoryGridAdapter { itemId ->
+            Timber.d("Category grid item clicked: $itemId")
             navigateToEditItem(itemId)
         }
 
@@ -96,13 +97,11 @@ class ShopFragment : Fragment() {
 
     private fun updateTabStyles() {
         if (isCategoriesView) {
-            // Categories tab selected
             binding.categoriesTab.setBackgroundColor(ContextCompat.getColor(requireContext(), android.R.color.black))
             binding.categoriesTab.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.white))
             binding.allItemsTab.setBackgroundColor(ContextCompat.getColor(requireContext(), android.R.color.white))
             binding.allItemsTab.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.black))
         } else {
-            // All Items tab selected
             binding.allItemsTab.setBackgroundColor(ContextCompat.getColor(requireContext(), android.R.color.black))
             binding.allItemsTab.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.white))
             binding.categoriesTab.setBackgroundColor(ContextCompat.getColor(requireContext(), android.R.color.white))
@@ -112,6 +111,8 @@ class ShopFragment : Fragment() {
 
     private fun showAllItemsView() {
         val allItems = viewModel.allItems.value
+        Timber.d("showAllItemsView: ${allItems.size} items")
+
         if (allItems.isEmpty()) {
             binding.emptyStateText.visibility = View.VISIBLE
             binding.productRecyclerView.visibility = View.GONE
@@ -119,13 +120,12 @@ class ShopFragment : Fragment() {
             binding.emptyStateText.visibility = View.GONE
             binding.productRecyclerView.visibility = View.VISIBLE
 
-            // For All Items, use GridLayoutManager
             binding.productRecyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
-
             productAdapter.submitList(allItems)
             binding.productRecyclerView.adapter = productAdapter
         }
     }
+
     private fun loadProfilePicture(url: String?) {
         try {
             Glide.with(requireContext())
@@ -136,11 +136,15 @@ class ShopFragment : Fragment() {
                 .timeout(10000)
                 .into(binding.storeProfileImage)
         } catch (e: Exception) {
+            Timber.e(e, "Failed to load profile picture")
             binding.storeProfileImage.setImageResource(R.drawable.ic_user)
         }
     }
+
     private fun showCategoriesView() {
         val allItems = viewModel.allItems.value
+        Timber.d("showCategoriesView: ${allItems.size} items")
+
         if (allItems.isEmpty()) {
             binding.emptyStateText.visibility = View.VISIBLE
             binding.productRecyclerView.visibility = View.GONE
@@ -148,12 +152,10 @@ class ShopFragment : Fragment() {
             binding.emptyStateText.visibility = View.GONE
             binding.productRecyclerView.visibility = View.VISIBLE
 
-            // IMPORTANT: Use LinearLayoutManager for VERTICAL stacking of sections
-            binding.productRecyclerView.layoutManager = LinearLayoutManager(requireContext())
-
-            val sections = groupItemsByCategory(allItems)
-            categorySectionAdapter.submitSections(sections)
-            binding.productRecyclerView.adapter = categorySectionAdapter
+            // ✅ Use GridLayoutManager with 2 columns for categories view
+            binding.productRecyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
+            categoryGridAdapter.submitList(allItems)
+            binding.productRecyclerView.adapter = categoryGridAdapter
         }
     }
 
@@ -169,11 +171,11 @@ class ShopFragment : Fragment() {
     }
 
     private fun setupObservers() {
-        // ========== LOADING STATE (SHIMMER) ==========
+        // Loading state
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.isLoading.collect { isLoading ->
+                Timber.d("Loading state: $isLoading")
                 if (isLoading && isFirstLoad && viewModel.allItems.value.isEmpty()) {
-                    // Show shimmer on first load
                     binding.shimmerLayout.visibility = View.VISIBLE
                     binding.productRecyclerView.visibility = View.GONE
                     binding.emptyStateText.visibility = View.GONE
@@ -185,7 +187,7 @@ class ShopFragment : Fragment() {
             }
         }
 
-        // ========== ERROR STATE ==========
+        // Error state
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.error.collect { errorMsg ->
                 if (errorMsg != null && viewModel.allItems.value.isEmpty()) {
@@ -201,38 +203,30 @@ class ShopFragment : Fragment() {
             }
         }
 
-
-
+        // All items
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.allItems.collectLatest { items ->
-                Timber.tag("ShopFragment").d("=== ALL ITEMS RECEIVED ===")
-                Timber.tag("ShopFragment").d("Total items count: ${items.size}")
+                Timber.d("=== ALL ITEMS RECEIVED ===")
+                Timber.d("Total items count: ${items.size}")
                 items.forEachIndexed { i, item ->
-                    Timber.tag("ShopFragment")
-                        .d("Item[$i]: ${item.name}, viewCount: ${item.viewCount}, status: ${item.status}")
+                    Timber.d("Item[$i]: ${item.name}, viewCount: ${item.viewCount}, status: ${item.status}, id: ${item.id}")
                 }
-                Timber.tag("ShopFragment").d("Total shop views: ${items.sumOf { it.viewCount }}")
 
-                // Don't react until we have real data OR loading is done
                 if (items.isEmpty()) {
-                    // Still loading — keep progress visible, hide content
                     binding.loadingProgress.visibility = View.VISIBLE
                     binding.productRecyclerView.visibility = View.GONE
                     binding.emptyStateText.visibility = View.GONE
                     return@collectLatest
                 }
 
-                // Data arrived — hide progress, show content
                 binding.loadingProgress.visibility = View.GONE
-
                 binding.emptyStateText.visibility = View.GONE
                 binding.productRecyclerView.visibility = View.VISIBLE
 
                 if (isCategoriesView) {
-                    val sections = groupItemsByCategory(items)
-                    categorySectionAdapter.submitSections(sections)
-                    binding.productRecyclerView.layoutManager = LinearLayoutManager(requireContext())
-                    binding.productRecyclerView.adapter = categorySectionAdapter
+                    categoryGridAdapter.submitList(items)
+                    binding.productRecyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
+                    binding.productRecyclerView.adapter = categoryGridAdapter
                 } else {
                     productAdapter.submitList(items)
                     binding.productRecyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
@@ -243,9 +237,11 @@ class ShopFragment : Fragment() {
             }
         }
 
+        // Shop info
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.currentShop.collectLatest { shop ->
                 shop?.let {
+                    Timber.d("Shop loaded: ${it.name}")
                     binding.storeName.text = it.displayName.ifEmpty { it.name }
                     if (it.profilePictureUrl.isNotEmpty()) {
                         loadProfilePicture(it.profilePictureUrl)
@@ -261,12 +257,26 @@ class ShopFragment : Fragment() {
         }
     }
 
-
-
     private fun navigateToEditItem(itemId: String) {
-        findNavController().navigate(R.id.editItemFragment, Bundle().apply {
-            putString("itemId", itemId)
-        })
+        Timber.d("🔍 Navigating to edit item with ID: $itemId")
+        try {
+            // ✅ Use action ID instead of direct fragment navigation
+            val action = R.id.action_shopFragment_to_editItemFragment
+            val bundle = Bundle().apply {
+                putString("itemId", itemId)
+            }
+            findNavController().navigate(action, bundle)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to navigate to edit item")
+            // Fallback to direct navigation
+            try {
+                findNavController().navigate(R.id.editItemFragment, Bundle().apply {
+                    putString("itemId", itemId)
+                })
+            } catch (e2: Exception) {
+                Timber.e(e2, "Fallback navigation also failed")
+            }
+        }
     }
 
     override fun onDestroyView() {

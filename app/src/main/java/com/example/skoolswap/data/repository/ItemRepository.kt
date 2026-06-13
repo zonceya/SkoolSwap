@@ -370,54 +370,72 @@ class ItemRepository @Inject constructor(
         }
     }
 
+    // In ItemRepository.kt - fix mapViewShopItemToDomain
     private fun mapViewShopItemToDomain(dto: ViewShopItemDto): Item {
-        // Convert images to List<ItemImage>
-        val imageList = dto.images?.map { imageDto ->
+        val variant = dto.variants?.firstOrNull()
+
+        // Images are strings (URLs)
+        val imageList = dto.images?.mapIndexed { index, url ->
             ItemImage(
-                id = imageDto.id,
-                url = imageDto.url,
-                filename = imageDto.filename,
-                contentType = imageDto.contentType,
-                createdAt = imageDto.createdAt,
-                isCover = false
+                id = 0,
+                url = url,
+                filename = null,
+                contentType = null,
+                createdAt = null,
+                isCover = index == 0
             )
         } ?: emptyList()
+
+        // Get price from variant or from dto price
+        val finalPrice = variant?.price ?: dto.price?.toDoubleOrNull() ?: 0.0
+        val finalQuantity = variant?.quantity ?: dto.totalQuantity
 
         return Item(
             id = dto.id,
             shopId = dto.shopId,
             name = dto.name,
             description = dto.description,
-            price = dto.price?.toDoubleOrNull() ?: 0.0,
-            quantity = dto.totalQuantity,
+            price = finalPrice,
+            quantity = finalQuantity,
             status = dto.status,
-            mainCategoryId = dto.mainCategoryId,
-            subCategoryId = dto.subCategoryId,
-            brandId = dto.brandId,
-            schoolId = dto.schoolId,
-            itemConditionId = dto.itemConditionId,
-            locationId = dto.locationId,
-            provinceId = dto.provinceId,
-            genderId = dto.genderId,
-            sizeId = dto.size?.id,
-            colorId = dto.color?.id,
-            label = dto.label,
-            reserved = dto.totalReserved,
             createdAt = dto.createdAt,
-            images = imageList,  // ← Now List<ItemImage>, not List<String>
+            updatedAt = dto.updatedAt,
+            images = imageList,
+            coverImage = imageList.firstOrNull()?.url,
+
+            // IDs from DTO
+            brandId = dto.brand?.id ?: dto.brandId,
+            sizeId = variant?.sizeId ?: dto.size?.id,
+            colorId = variant?.colorId ?: dto.color?.id,
+            schoolId = dto.school?.id ?: dto.schoolId,
+            itemConditionId = variant?.conditionId ?: dto.itemConditionId,  // ← Use itemConditionId, not condition
+            locationId = dto.locationId,
+            provinceId = dto.province?.id ?: dto.provinceId,
+            genderId = dto.gender?.id ?: dto.genderId,
+            mainCategoryId = dto.mainCategory?.id ?: dto.mainCategoryId,
+            subCategoryId = dto.subCategory?.id ?: dto.subCategoryId,
+
+            // Names for display
+            sizeName = variant?.sizeName ?: dto.size?.name,
+            colorName = variant?.colorName ?: dto.color?.name,
+            brandName = dto.brand?.name,
+            conditionName = variant?.conditionName,  // ← From variant, no condition field in dto
+
             shop = dto.shop?.let {
                 Shop(
                     id = it.id,
                     name = it.name,
                     displayName = "",
                     userId = 0L,
-                    sellerName = "",
+                    sellerName = it.sellerName ?: "",
                     profilePictureUrl = "",
                     createdAt = "",
                     sellerMobile = it.sellerMobile,
                     itemsCount = 0
                 )
             },
+            label = dto.label,
+            reserved = dto.totalReserved,
             meta = null,
             itemTypeId = null
         )
@@ -837,6 +855,7 @@ class ItemRepository @Inject constructor(
         }
     }
 
+    // In ItemRepository.kt - Fix updateItemSimple
     override suspend fun updateItemSimple(
         itemId: String,
         name: String?,
@@ -862,6 +881,7 @@ class ItemRepository @Inject constructor(
                 return Result.failure(Exception("Not authenticated"))
             }
 
+            // ✅ Only include fields that are actually changing
             val updateData = UpdateItemData(
                 name = name,
                 description = description,
@@ -885,10 +905,18 @@ class ItemRepository @Inject constructor(
             val request = UpdateItemRequest(item = updateData)
 
             Log.d(TAG, "Updating item $itemId")
+            Log.d(TAG, "Update data: ${updateData}") // Debug log
+
             val response = itemApiService.updateItem("Bearer $token", itemId, request)
 
             if (!response.isSuccessful) {
-                val errorMsg = "Failed to update item: ${response.errorBody()?.string()}"
+                val errorBody = response.errorBody()?.string()
+                val errorMsg = when (response.code()) {
+                    422 -> "Validation failed: $errorBody"
+                    502 -> "Server is temporarily unavailable. Please try again."
+                    500 -> "Server error. Please try again later."
+                    else -> "Failed to update item: ${response.code()}"
+                }
                 Log.e(TAG, errorMsg)
                 return Result.failure(Exception(errorMsg))
             }
@@ -906,15 +934,6 @@ class ItemRepository @Inject constructor(
             itemDao.insertItem(updatedItem.toEntity())
             Log.d(TAG, "✅ Updated item ${updatedItem.id} in local database")
 
-            val currentList = _currentItems.value.toMutableList()
-            val index = currentList.indexOfFirst { it.id == updatedItem.id }
-            if (index >= 0) {
-                currentList[index] = updatedItem
-                _currentItems.value = currentList
-                Log.d(TAG, "✅ Updated item in currentItems StateFlow")
-            }
-
-            Log.i(TAG, "Item updated successfully: ${updatedItem.name}")
             Result.success(updatedItem)
 
         } catch (e: Exception) {
@@ -922,7 +941,6 @@ class ItemRepository @Inject constructor(
             Result.failure(e)
         }
     }
-
     override suspend fun updateItemWithImages(
         context: Context,
         itemId: String,

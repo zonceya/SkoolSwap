@@ -48,6 +48,12 @@ import com.example.skoolswap.data.remote.models.request.VerifyLoginRequest
 import com.example.skoolswap.data.remote.models.request.VerifySignUpRequest
 import kotlinx.coroutines.flow.first
 import timber.log.Timber
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.auth.FirebaseAuthWeakPasswordException
+import com.google.firebase.auth.UserProfileChangeRequest
+import com.example.skoolswap.data.remote.models.response.user.FirebaseAuthResponse
 
 
 @Singleton
@@ -86,6 +92,133 @@ class AuthRepository @Inject constructor(
 
     private val _error = MutableStateFlow<String?>(null)
     override val error: StateFlow<String?> = _error.asStateFlow()
+    override suspend fun signInWithEmail(email: String, password: String): Result<User> {
+        return try {
+            _loading.value = true
+            _error.value = null
+
+            Log.i(TAG, "🔐 Signing in with email: $email")
+
+            // 1. Sign in with Firebase
+            val authResult = firebaseAuth.signInWithEmailAndPassword(email, password).await()
+            val firebaseUser = authResult.user ?: throw Exception("Firebase user is null")
+
+            // 2. Get Firebase ID token
+            val idToken = firebaseUser.getIdToken(false).await().token
+                ?: throw Exception("Failed to get ID token")
+
+            // 3. Sync with Rails API
+            val user = syncWithRailsApi(idToken, firebaseUser, email)
+
+            // 4. Cache the user
+            cacheUserAfterFirebaseAuth(user, user.token)
+
+            Log.i(TAG, "✅ Email sign-in successful for: $email")
+            Result.success(user)
+
+        } catch (e: FirebaseAuthInvalidUserException) {
+            val error = "No account found with this email"
+            _error.value = error
+            Result.failure(Exception(error))
+        } catch (e: FirebaseAuthInvalidCredentialsException) {
+            val error = "Invalid password"
+            _error.value = error
+            Result.failure(Exception(error))
+        } catch (e: Exception) {
+            _error.value = e.message ?: "Sign in failed"
+            Result.failure(e)
+        } finally {
+            _loading.value = false
+        }
+    }
+
+    override suspend fun signUpWithEmail(
+        name: String,
+        email: String,
+        password: String,
+        passwordConfirmation: String
+    ): Result<User> {
+        return try {
+            _loading.value = true
+            _error.value = null
+
+            // Validate passwords match
+            if (password != passwordConfirmation) {
+                throw Exception("Passwords do not match")
+            }
+
+            // Validate password length
+            if (password.length < 6) {
+                throw Exception("Password must be at least 6 characters")
+            }
+
+            Timber.tag(TAG).i("📝 Creating new account: $email")
+
+            // 1. Create user in Firebase
+            val authResult = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
+            val firebaseUser = authResult.user ?: throw Exception("Firebase user creation failed")
+
+            // 2. Update profile with name
+            val profileUpdates = UserProfileChangeRequest.Builder()
+                .setDisplayName(name)
+                .build()
+            firebaseUser.updateProfile(profileUpdates).await()
+
+            // 3. Get Firebase ID token
+            val idToken = firebaseUser.getIdToken(false).await().token
+                ?: throw Exception("Failed to get ID token")
+
+            // 4. Sync with Rails API (pass name for new user)
+            val user = syncWithRailsApi(idToken, firebaseUser, email, name)
+
+            // 5. Cache the user
+            cacheUserAfterFirebaseAuth(user, user.token)
+
+            Timber.tag(TAG).i("✅ Account created successfully for: $email")
+            Result.success(user)
+
+        } catch (e: FirebaseAuthWeakPasswordException) {
+            val error = "Password is too weak. Use at least 6 characters with letters and numbers"
+            _error.value = error
+            Result.failure(Exception(error))
+        } catch (e: FirebaseAuthUserCollisionException) {
+            val error = "An account with this email already exists"
+            _error.value = error
+            Result.failure(Exception(error))
+        } catch (e: FirebaseAuthInvalidCredentialsException) {
+            val error = "Invalid email format"
+            _error.value = error
+            Result.failure(Exception(error))
+        } catch (e: Exception) {
+            _error.value = e.message ?: "Sign up failed"
+            Result.failure(e)
+        } finally {
+            _loading.value = false
+        }
+    }
+
+
+    override suspend fun sendPasswordResetEmail(email: String): Result<Unit> {
+        return try {
+            _loading.value = true
+            _error.value = null
+
+            firebaseAuth.sendPasswordResetEmail(email).await()
+
+            Timber.tag(TAG).i("📧 Password reset email sent to: $email")
+            Result.success(Unit)
+
+        } catch (e: FirebaseAuthInvalidUserException) {
+            val error = "No account found with this email"
+            _error.value = error
+            Result.failure(Exception(error))
+        } catch (e: Exception) {
+            _error.value = e.message ?: "Failed to send reset email"
+            Result.failure(e)
+        } finally {
+            _loading.value = false
+        }
+    }
 
     init {
         // Load cached user on initialization
@@ -93,7 +226,81 @@ class AuthRepository @Inject constructor(
             loadCachedUser()
         }
     }
+    private suspend fun syncWithRailsApi(
+        idToken: String,
+        firebaseUser: com.google.firebase.auth.FirebaseUser,
+        email: String,
+        name: String? = null
+    ): User {
+        // Call your Rails firebase_auth endpoint
+        val requestBody = mapOf(
+            "id_token" to idToken,
+            "email" to email.lowercase(),
+            "name" to (name ?: firebaseUser.displayName ?: email.split("@")[0]),
+            "profile_picture_url" to (firebaseUser.photoUrl?.toString() ?: "")
+        )
 
+        val response = userApiService.firebaseAuth(requestBody)
+
+        if (!response.isSuccessful) {
+            val errorMsg = response.errorBody()?.string() ?: "Failed to sync with server"
+            throw Exception(errorMsg)
+        }
+
+        val body = response.body()
+        if (body?.success != true) {
+            throw Exception(body?.message ?: "Server sync failed")
+        }
+
+        // Convert to your User model - map snake_case to camelCase
+        return User(
+            id = body.user.id,
+            name = body.user.name,
+            email = body.user.email,
+            mobile = body.user.mobile,
+            username = body.user.username,
+            profilePictureUrl = body.user.profilePictureUrl,
+            authMode = body.user.authMode,
+            role = body.user.role,
+            token = body.token,
+            createdAt = body.user.createdAt,
+            updatedAt = body.user.updatedAt,
+            schoolMapped = body.user.schoolMapped ?: false,
+            schoolId = body.user.schoolId,
+            schoolName = body.user.schoolName
+        )
+    }
+    private suspend fun cacheUserAfterFirebaseAuth(user: User, token: String) {
+        try {
+            val userEntity = user.toEntity()
+            userDao.insertUser(userEntity)
+
+            _serverUser.value = user
+            _authToken.value = token
+
+            appPreferences.setAuthToken(token)
+            appPreferences.setLoggedIn(true)
+            appPreferences.setFirstTimeLogin(false)
+            appPreferences.setUserId(user.id.toString())
+            appPreferences.setUserName(user.name)
+            appPreferences.setUserEmail(user.email)
+
+            if (user.profilePictureUrl != null) {
+                appPreferences.setUserProfileImage(user.profilePictureUrl)
+            }
+
+            if (user.schoolMapped && user.schoolId != null) {
+                appPreferences.setSchoolMapped(true)
+                appPreferences.setSchoolInfo(user.schoolId, user.schoolName ?: "")
+            } else {
+                appPreferences.setSchoolMapped(false)
+            }
+
+            Log.i(TAG, "✅ User cached after Firebase auth: ${user.name}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error caching user after Firebase auth", e)
+        }
+    }
     private suspend fun loadCachedUser() {
         try {
             val cachedUser = userDao.getCurrentUser()
@@ -688,190 +895,6 @@ class AuthRepository @Inject constructor(
             val errorMsg = "Delete profile failed: ${e.message}"
             e(TAG, errorMsg, e)
             _error.value = errorMsg
-            Result.failure(e)
-        } finally {
-            _loading.value = false
-        }
-    }
-
-    override suspend fun sendSignUpOtp(
-        email: String,
-        name: String,
-        password: String,
-        passwordConfirmation: String
-    ): Result<String> {
-        return try {
-            _loading.value = true
-            _error.value = null
-
-            val request = SignUpRequest(
-                name = name,
-                email = email,
-                password = password,
-                passwordConfirmation = passwordConfirmation
-            )
-
-            val response = userApiService.signUp(request)
-
-            if (response.isSuccessful) {
-                val body = response.body()
-                if (body?.success == true) {
-                    val otpToken = body.data?.authToken ?: ""
-
-                    // ✅ Add guard for empty token
-                    if (otpToken.isEmpty()) {
-                        Result.failure(Exception("Missing OTP token from server"))
-                    } else {
-                        Log.i(TAG, "✅ Sign up OTP sent to: $email")
-                        Result.success(otpToken)
-                    }
-                } else {
-                    val errorMsg = body?.message ?: "Sign up failed"
-                    _error.value = errorMsg
-                    Result.failure(Exception(errorMsg))
-                }
-            } else {
-                val errorMsg = when (response.code()) {
-                    409 -> "An account with this email already exists"
-                    else -> "Server error: ${response.code()}"
-                }
-                _error.value = errorMsg
-                Result.failure(Exception(errorMsg))
-            }
-        } catch (e: Exception) {
-            _error.value = e.message ?: "Network error"
-            Result.failure(e)
-        } finally {
-            _loading.value = false
-        }
-    }
-
-    override suspend fun sendLoginOtp(email: String): Result<String> {
-        return try {
-            _loading.value = true
-            _error.value = null
-
-            Log.i(TAG, "📧 Sending login OTP to: $email")
-
-            val response = userApiService.sendLoginOtp(mapOf("email" to email))
-
-            if (response.isSuccessful) {
-                val body = response.body()
-                if (body?.success == true) {
-                    val otpToken = body.data?.authToken ?: ""
-                    Log.i(TAG, "✅ Login OTP sent to: $email")
-                    Result.success(otpToken)
-                } else {
-                    val errorMsg = body?.message ?: "Failed to send OTP"
-                    _error.value = errorMsg
-                    Result.failure(Exception(errorMsg))
-                }
-            } else {
-                val errorMsg = "Server error: ${response.code()}"
-                _error.value = errorMsg
-                Result.failure(Exception(errorMsg))
-            }
-        } catch (e: Exception) {
-            _error.value = e.message ?: "Network error"
-            Result.failure(e)
-        } finally {
-            _loading.value = false
-        }
-    }
-
-    override suspend fun verifyOtp(
-        email: String,
-        otpToken: String,
-        otpCode: String,
-        purpose: String,
-        name: String?
-    ): Result<User> {
-        return try {
-            _loading.value = true
-            _error.value = null
-
-            Log.i(TAG, "🔐 Verifying OTP for: $email, purpose: $purpose")
-
-            val response = if (purpose == "SIGNUP") {
-                val request = VerifySignUpRequest(
-                    email = email,
-                    otpToken = otpToken,
-                    otpCode = otpCode,
-                    name = name
-                )
-                userApiService.verifySignUp(request)
-            } else {
-                val request = VerifyLoginRequest(
-                    email = email,
-                    otpToken = otpToken,
-                    otpCode = otpCode
-                )
-                userApiService.verifyLogin(request)
-            }
-
-            if (response.isSuccessful) {
-                val body = response.body()
-                if (body?.success == true) {
-                    val token = body.data?.token ?: ""
-                    val userResponse = body.data?.user
-
-                    if (userResponse != null) {
-                        val user = userResponse.toDomain(token)
-                        cacheUserAfterOtp(user, token)
-                        Log.i(TAG, "✅ OTP verified successfully for: ${user.email}")
-                        Result.success(user)
-                    } else {
-                        Result.failure(Exception("User data is null"))
-                    }
-                } else {
-                    val errorMsg = body?.message ?: "Verification failed"
-                    _error.value = errorMsg
-                    Result.failure(Exception(errorMsg))
-                }
-            } else {
-                val errorMsg = "Server error: ${response.code()}"
-                _error.value = errorMsg
-                Result.failure(Exception(errorMsg))
-            }
-        } catch (e: Exception) {
-            _error.value = e.message ?: "Verification failed"
-            Result.failure(e)
-        } finally {
-            _loading.value = false
-        }
-    }
-
-    override suspend fun resendOtp(email: String, purpose: String): Result<String> {
-        return try {
-            _loading.value = true
-            _error.value = null
-
-            Log.i(TAG, "🔄 Resending OTP to: $email, purpose: $purpose")
-
-            val response = if (purpose == "SIGNUP") {
-                userApiService.resendSignUpOtp(mapOf("email" to email))
-            } else {
-                userApiService.resendLoginOtp(mapOf("email" to email))
-            }
-
-            if (response.isSuccessful) {
-                val body = response.body()
-                if (body?.success == true) {
-                    val otpToken = body.data?.authToken ?: ""
-                    Log.i(TAG, "✅ OTP resent to: $email")
-                    Result.success(otpToken)
-                } else {
-                    val errorMsg = body?.message ?: "Failed to resend OTP"
-                    _error.value = errorMsg
-                    Result.failure(Exception(errorMsg))
-                }
-            } else {
-                val errorMsg = "Server error: ${response.code()}"
-                _error.value = errorMsg
-                Result.failure(Exception(errorMsg))
-            }
-        } catch (e: Exception) {
-            _error.value = e.message ?: "Network error"
             Result.failure(e)
         } finally {
             _loading.value = false

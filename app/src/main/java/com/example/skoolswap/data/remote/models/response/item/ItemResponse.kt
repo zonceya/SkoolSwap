@@ -12,8 +12,21 @@ import com.google.gson.annotations.SerializedName
 data class CreateItemResponse(
     @SerializedName("success") val success: Boolean,
     @SerializedName("item") val item: ItemDto?,
+    @SerializedName("variants") val variants: List<VariantDto>? = null,  // ← ADD THIS
     @SerializedName("images") val images: List<ItemImageDto> = emptyList(),
     @SerializedName("message") val message: String?
+)
+data class VariantDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("size_id") val sizeId: Int?,
+    @SerializedName("size_name") val sizeName: String?,
+    @SerializedName("color_id") val colorId: Int?,
+    @SerializedName("color_name") val colorName: String?,
+    @SerializedName("condition_id") val conditionId: Int?,
+    @SerializedName("condition_name") val conditionName: String?,
+    @SerializedName("price") val price: Double,
+    @SerializedName("quantity") val quantity: Int,
+    @SerializedName("sku") val sku: String?
 )
 
 data class ItemDto(

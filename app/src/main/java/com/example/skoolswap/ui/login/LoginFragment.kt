@@ -13,6 +13,7 @@ import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentLoginBinding
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
+import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputLayout
 import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
@@ -32,7 +33,6 @@ class LoginFragment : Fragment() {
     lateinit var authRepository: AuthRepositoryInterface
 
     private var isSigningIn = false
-    private var isSendingOtp = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -52,12 +52,9 @@ class LoginFragment : Fragment() {
         val fromIntro = arguments?.getBoolean("from_intro", false) ?: false
 
         if (fromIntro) {
-            // Session already checked by IntroFragment, just show login UI
             Timber.tag("LoginFragment").d("Coming from IntroFragment - session already validated")
             binding.root.visibility = View.VISIBLE
         } else {
-            // Only check session if not coming from IntroFragment
-            // This handles edge cases like direct navigation to login
             Timber.tag("LoginFragment").d("Direct navigation - checking session")
             checkExistingSession()
         }
@@ -72,6 +69,7 @@ class LoginFragment : Fragment() {
         setBoxStrokeColor(binding.emailLayout, ContextCompat.getColor(requireContext(), R.color.white))
         setBoxStrokeColor(binding.passwordLayout, ContextCompat.getColor(requireContext(), R.color.white))
 
+        // Google Sign-In Button
         binding.signInButton.setOnClickListener {
             if (isSigningIn) return@setOnClickListener
 
@@ -89,10 +87,12 @@ class LoginFragment : Fragment() {
             }, 5000)
         }
 
+        // Email/Password Login Button
         binding.loginButton.setOnClickListener {
-            if (isSendingOtp) return@setOnClickListener
+            if (isSigningIn) return@setOnClickListener
 
             val email = binding.emailInput.text.toString().trim()
+            val password = binding.passwordInput.text.toString()
 
             if (email.isEmpty()) {
                 binding.emailLayout.error = "Email is required"
@@ -104,20 +104,33 @@ class LoginFragment : Fragment() {
                 return@setOnClickListener
             }
 
+            if (password.isEmpty()) {
+                binding.passwordLayout.error = "Password is required"
+                return@setOnClickListener
+            }
+
             binding.emailLayout.error = null
-            isSendingOtp = true
+            binding.passwordLayout.error = null
+
+            isSigningIn = true
             binding.loginButton.isEnabled = false
 
-            viewModel.sendLoginOtp(email)
+            // Call Firebase email sign in
+            viewModel.signInWithEmail(email, password)
 
             binding.loginButton.postDelayed({
-                if (isSendingOtp) {
-                    isSendingOtp = false
+                if (isSigningIn) {
+                    isSigningIn = false
                     if (_binding != null) {
                         binding.loginButton.isEnabled = true
                     }
                 }
             }, 10000)
+        }
+
+        // Forgot Password Link - Add this TextView to your login XML
+        binding.textForgotPassword?.setOnClickListener {
+            navigateToForgotPassword()
         }
 
         binding.textSignUpLink.setOnClickListener {
@@ -127,13 +140,17 @@ class LoginFragment : Fragment() {
         }
     }
 
+    private fun navigateToForgotPassword() {
+        findNavController().navigate(R.id.action_loginFragment_to_forgotPasswordFragment)
+    }
+
     private fun setBoxStrokeColor(textInputLayout: TextInputLayout, color: Int) {
         try {
             val states = arrayOf(
                 intArrayOf(android.R.attr.state_focused),
                 intArrayOf(android.R.attr.state_hovered),
                 intArrayOf(-android.R.attr.state_enabled),
-                intArrayOf() // default
+                intArrayOf()
             )
             val colors = intArrayOf(color, color, color, color)
             val colorStateList = ColorStateList(states, colors)
@@ -156,21 +173,20 @@ class LoginFragment : Fragment() {
                 binding.progressBar.visibility = View.VISIBLE
             } else {
                 binding.signInButton.isEnabled = !isSigningIn
-                binding.loginButton.isEnabled = !isSendingOtp
+                binding.loginButton.isEnabled = !isSigningIn
                 binding.progressBar.visibility = View.GONE
             }
         }
 
         viewModel.error.observe(viewLifecycleOwner) { error ->
             if (error != null && _binding != null) {
-                com.google.android.material.snackbar.Snackbar.make(
+                Snackbar.make(
                     binding.root,
                     error,
-                    com.google.android.material.snackbar.Snackbar.LENGTH_LONG
+                    Snackbar.LENGTH_LONG
                 ).show()
 
                 isSigningIn = false
-                isSendingOtp = false
                 binding.signInButton.isEnabled = true
                 binding.loginButton.isEnabled = true
                 binding.progressBar.visibility = View.GONE
@@ -182,50 +198,21 @@ class LoginFragment : Fragment() {
                 navigateAfterLogin(user)
             }
         }
-
-        viewModel.otpSent.observe(viewLifecycleOwner) { otpToken ->
-            if (otpToken != null && _binding != null) {
-                val email = binding.emailInput.text.toString().trim()
-                val bundle = Bundle().apply {
-                    putString("email", email)
-                    putString("otp_token", otpToken)
-                    putString("purpose", "LOGIN")
-                }
-                isSendingOtp = false
-                findNavController().navigate(R.id.action_loginFragment_to_otpFragment, bundle)
-                viewModel.clearOtpSent()
-            }
-        }
     }
 
-    /**
-     * Only called when LoginFragment is accessed directly (not through IntroFragment)
-     * This handles edge cases like deeplinks or direct navigation
-     */
     private fun checkExistingSession() {
-        // REMOVED: We no longer restore session here
-        // Session restoration is now handled ENTIRELY by IntroFragment
-        // LoginFragment only shows the login UI
         Timber.tag("LoginFragment").d("LoginFragment - no session restore, just showing UI")
         binding.root.visibility = View.VISIBLE
     }
 
     private fun navigateAfterLogin(user: com.example.skoolswap.domain.model.User) {
         if (!isAdded || isDetached) return
-
         try {
-            // 🔴 TEMPORARY: Force test the school onboarding screen
-            // Comment this out when done testing
-            val forceOnboarding = true  // Change to false when done
-
-            if (forceOnboarding) {
-                findNavController().navigate(R.id.action_loginFragment_to_schoolOnboardingFragment)
-                return
-            }
-
-            // Original logic
             if (user.schoolMapped) {
-                findNavController().navigate(R.id.action_loginFragment_to_nav_home)
+                val bundle = Bundle().apply {
+                    user.schoolId?.let { putInt("schoolId", it) }
+                }
+                findNavController().navigate(R.id.action_loginFragment_to_nav_home, bundle)
             } else {
                 findNavController().navigate(R.id.action_loginFragment_to_schoolOnboardingFragment)
             }

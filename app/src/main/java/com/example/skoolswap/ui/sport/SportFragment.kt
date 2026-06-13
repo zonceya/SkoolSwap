@@ -6,7 +6,9 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -27,7 +29,7 @@ class SportFragment : Fragment() {
     private val viewModel: SportViewModel by viewModels()
 
     private lateinit var featuredSportsAdapter: FeaturedSportsAdapter
-    private lateinit var moreSportsAdapter: MoreSportsAdapter  // ✅ Fixed name
+    private lateinit var moreSportsAdapter: MoreSportsAdapter
     private lateinit var gearAdapter: GearAdapter
     private lateinit var productsAdapter: ProductsAdapter
     private var isFirstLoad = true
@@ -53,7 +55,6 @@ class SportFragment : Fragment() {
     }
 
     private fun setupRecyclerViews() {
-        // ✅ Featured Sports - Always images
         featuredSportsAdapter = FeaturedSportsAdapter { sport ->
             navigateToSportProducts(sport)
         }
@@ -62,8 +63,7 @@ class SportFragment : Fragment() {
             adapter = featuredSportsAdapter
         }
 
-        // ✅ More Sports - Always text chips
-        moreSportsAdapter = MoreSportsAdapter { sport ->  // ✅ Fixed
+        moreSportsAdapter = MoreSportsAdapter { sport ->
             navigateToSportProducts(sport)
         }
         binding.moreSportsRecycler.apply {
@@ -71,7 +71,6 @@ class SportFragment : Fragment() {
             adapter = moreSportsAdapter
         }
 
-        // Gear adapter
         gearAdapter = GearAdapter { gear ->
             navigateToGearProducts(gear)
         }
@@ -80,7 +79,6 @@ class SportFragment : Fragment() {
             adapter = gearAdapter
         }
 
-        // Products Grid
         productsAdapter = ProductsAdapter { item ->
             val bundle = Bundle().apply {
                 putString("itemId", item.id)
@@ -108,7 +106,7 @@ class SportFragment : Fragment() {
     }
 
     private fun observeViewModel() {
-        // Loading state
+        // Loading state - LiveData is already view-lifecycle-safe
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
             if (isLoading && isFirstLoad && viewModel.allSportItems.value.isNullOrEmpty()) {
                 binding.shimmerLayout.visibility = View.VISIBLE
@@ -119,42 +117,40 @@ class SportFragment : Fragment() {
             }
         }
 
-        // Error state
-        lifecycleScope.launch {
-            viewModel.error.collect { errorMsg ->
-                if (errorMsg != null && viewModel.allSportItems.value.isNullOrEmpty()) {
-                    binding.errorLayout.visibility = View.VISIBLE
-                    binding.errorMessage.text = errorMsg
-                    binding.scrollView.visibility = View.GONE
-                    binding.shimmerLayout.visibility = View.GONE
-                } else {
-                    binding.errorLayout.visibility = View.GONE
+        // Error state - StateFlow MUST use repeatOnLifecycle
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.error.collect { errorMsg ->
+                    if (errorMsg != null && viewModel.allSportItems.value.isNullOrEmpty()) {
+                        binding.errorLayout.visibility = View.VISIBLE
+                        binding.errorMessage.text = errorMsg
+                        binding.scrollView.visibility = View.GONE
+                        binding.shimmerLayout.visibility = View.GONE
+                    } else {
+                        binding.errorLayout.visibility = View.GONE
+                    }
                 }
             }
         }
 
-        // ✅ Featured Sports - Images that change randomly
         viewModel.featuredSports.observe(viewLifecycleOwner) { sports ->
             if (sports.isNotEmpty()) {
                 featuredSportsAdapter.submitList(sports)
             }
         }
 
-        // ✅ More Sports - Text chips that change randomly
         viewModel.moreSports.observe(viewLifecycleOwner) { sports ->
             if (sports.isNotEmpty()) {
                 moreSportsAdapter.submitList(sports)
             }
         }
 
-        // Gear Items
         viewModel.gearItems.observe(viewLifecycleOwner) { gear ->
             if (gear.isNotEmpty()) {
                 gearAdapter.submitList(gear)
             }
         }
 
-        // All Sport Items
         viewModel.allSportItems.observe(viewLifecycleOwner) { items ->
             isFirstLoad = false
             binding.shimmerLayout.visibility = View.GONE

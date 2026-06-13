@@ -41,7 +41,6 @@ class CategoryGridAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(item: Item) {
-            // ✅ ADD LOGGING
             Log.d("CategoryGridAdapter", "Binding grid item: ${item.name}, viewCount: ${item.viewCount}, status: ${item.status}")
 
             binding.productName.text = item.name
@@ -73,6 +72,14 @@ class CategoryGridAdapter(
                     .error(R.drawable.ic_create_item_placeholder)
                     .centerCrop()
                     .into(binding.productImage)
+            } else {
+                binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
+            }
+
+            // ✅ ADD THIS - Set click listener
+            binding.root.setOnClickListener {
+                Log.d("CategoryGridAdapter", "✅ Grid item clicked: ${item.name} (ID: ${item.id})")
+                onItemClick(item.id)
             }
         }
     }

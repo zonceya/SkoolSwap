@@ -41,13 +41,6 @@
             app:popUpTo="@id/introFragment"
             app:popUpToInclusive="true" />
 
-        <!-- ❌ REMOVE THIS FROM HERE - It's in the wrong fragment -->
-        <!-- <action
-            android:id="@+id/action_loginFragment_to_schoolOnboardingFragment"
-            app:destination="@id/schoolOnboardingFragment"
-            app:popUpTo="@id/loginFragment"
-            app:popUpToInclusive="true" /> -->
-
     </fragment>
 
     <!-- School Onboarding Fragment -->
@@ -106,12 +99,6 @@
             app:popUpToInclusive="true" />
 
         <action
-            android:id="@+id/action_loginFragment_to_otpFragment"
-            app:destination="@id/otpFragment"
-            app:popUpTo="@id/loginFragment"
-            app:popUpToInclusive="false" />
-
-        <action
             android:id="@+id/action_loginFragment_to_signUpFragment"
             app:destination="@id/signUpFragment"
             app:popUpTo="@id/loginFragment"
@@ -123,60 +110,28 @@
             app:popUpTo="@id/mobile_navigation"
             app:popUpToInclusive="true" />
 
-        <!-- ✅ ADD THE ACTION HERE - Inside loginFragment -->
         <action
             android:id="@+id/action_loginFragment_to_schoolOnboardingFragment"
             app:destination="@id/schoolOnboardingFragment"
             app:popUpTo="@id/loginFragment"
             app:popUpToInclusive="true" />
 
+        <!-- ✅ ADD FORGOT PASSWORD ACTION -->
+        <action
+            android:id="@+id/action_loginFragment_to_forgotPasswordFragment"
+            app:destination="@id/forgotPasswordFragment"
+            app:popUpTo="@id/loginFragment"
+            app:popUpToInclusive="false" />
+
     </fragment>
 
-    <!-- OTP Verification Fragment -->
+    <!-- ✅ FORGOT PASSWORD FRAGMENT - ADD THIS -->
     <fragment
-        android:id="@+id/otpFragment"
-        android:name="com.example.skoolswap.ui.otp.OTPFragment"
-        android:label="OTP Verification"
-        tools:layout="@layout/fragment_otp">
+        android:id="@+id/forgotPasswordFragment"
+        android:name="com.example.skoolswap.ui.forgotpassword.ForgotPasswordFragment"
+        android:label="Forgot Password"
+        tools:layout="@layout/fragment_forgot_password" />
 
-        <argument
-            android:name="email"
-            app:argType="string" />
-
-        <argument
-            android:name="otp_token"
-            app:argType="string" />
-
-        <argument
-            android:name="purpose"
-            app:argType="string"
-            android:defaultValue="LOGIN" />
-
-        <action
-            android:id="@+id/action_otpFragment_to_nav_home"
-            app:destination="@id/nav_home"
-            app:popUpTo="@id/loginFragment"
-            app:popUpToInclusive="true" />
-
-        <action
-            android:id="@+id/action_otpFragment_to_nav_profile"
-            app:destination="@id/nav_profile"
-            app:popUpTo="@id/loginFragment"
-            app:popUpToInclusive="true" />
-
-        <action
-            android:id="@+id/action_otpFragment_to_loginFragment"
-            app:destination="@id/loginFragment"
-            app:popUpTo="@id/loginFragment"
-            app:popUpToInclusive="false" />
-
-        <action
-            android:id="@+id/action_otpFragment_to_signUpFragment"
-            app:destination="@id/signUpFragment"
-            app:popUpTo="@id/signUpFragment"
-            app:popUpToInclusive="false" />
-
-    </fragment>
 
     <!-- Sign Up Fragment -->
     <fragment
@@ -185,17 +140,29 @@
         android:label="Sign Up"
         tools:layout="@layout/fragment_sign_up">
 
-        <action
-            android:id="@+id/action_signUpFragment_to_otpFragment"
-            app:destination="@id/otpFragment"
-            app:popUpTo="@id/signUpFragment"
-            app:popUpToInclusive="false" />
-
+        <!-- ✅ UPDATE THIS - Remove OTP action, add direct navigation -->
         <action
             android:id="@+id/action_signUpFragment_to_loginFragment"
             app:destination="@id/loginFragment"
             app:popUpTo="@id/loginFragment"
             app:popUpToInclusive="false" />
+
+        <action
+            android:id="@+id/action_signUpFragment_to_schoolOnboardingFragment"
+            app:destination="@id/schoolOnboardingFragment"
+            app:popUpTo="@id/signUpFragment"
+            app:popUpToInclusive="true" />
+
+        <action
+            android:id="@+id/action_signUpFragment_to_nav_home"
+            app:destination="@id/nav_home"
+            app:popUpTo="@id/signUpFragment"
+            app:popUpToInclusive="true" />
+
+        <!-- ❌ REMOVE THIS OTP ACTION -->
+        <!-- <action
+            android:id="@+id/action_signUpFragment_to_otpFragment"
+            app:destination="@id/otpFragment" /> -->
 
     </fragment>
 
@@ -283,6 +250,13 @@
             app:destination="@id/nav_home"
             app:popUpTo="@id/nav_home"
             app:popUpToInclusive="false" />
+        <action
+            android:id="@+id/action_shopFragment_to_editItemFragment"
+            app:destination="@id/editItemFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
 
     </fragment>
 

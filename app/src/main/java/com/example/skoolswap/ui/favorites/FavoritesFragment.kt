@@ -6,10 +6,11 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
-import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.GridLayoutManager
 import com.example.skoolswap.R
@@ -51,9 +52,11 @@ class FavoritesFragment : Fragment() {
     }
 
     private fun setUserName() {
-        lifecycleScope.launch {
+        // viewLifecycleOwner.lifecycleScope so it cancels when the view is destroyed
+        viewLifecycleOwner.lifecycleScope.launch {
             val userName = appPreferences.userName.first() ?: "My"
-            binding.favoritesTitle.text = if (userName == "My") "My Favorites" else "$userName's Favorites"
+            binding.favoritesTitle.text =
+                if (userName == "My") "My Favorites" else "$userName's Favorites"
         }
     }
 
@@ -87,46 +90,54 @@ class FavoritesFragment : Fragment() {
     }
 
     private fun observeViewModel() {
-        // Loading state (shimmer)
-        lifecycleScope.launch {
-            viewModel.isLoading.collect { isLoading ->
-                if (isLoading && isFirstLoad && viewModel.favorites.value.isEmpty()) {
-                    binding.shimmerLayout.visibility = View.VISIBLE
-                    binding.recyclerView.visibility = View.GONE
-                    binding.emptyView.visibility = View.GONE
-                    binding.errorLayout.visibility = View.GONE
-                } else {
-                    binding.shimmerLayout.visibility = View.GONE
-                    binding.swipeRefreshLayout.isRefreshing = false
-                }
-            }
-        }
+        // Single coroutine, all collectors inside repeatOnLifecycle.
+        // repeatOnLifecycle cancels everything inside it when the view
+        // drops below STARTED (i.e. on back press / destroy), so _binding
+        // is guaranteed to be non-null whenever a collector runs.
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
 
-        // Error state
-        lifecycleScope.launch {
-            viewModel.error.collect { errorMsg ->
-                if (errorMsg != null && viewModel.favorites.value.isEmpty()) {
-                    binding.errorLayout.visibility = View.VISIBLE
-                    binding.errorMessage.text = errorMsg
-                    binding.recyclerView.visibility = View.GONE
-                    binding.emptyView.visibility = View.GONE
-                    binding.shimmerLayout.visibility = View.GONE
-                    binding.swipeRefreshLayout.isRefreshing = false
-                } else {
-                    binding.errorLayout.visibility = View.GONE
+                launch {
+                    viewModel.isLoading.collect { isLoading ->
+                        if (isLoading && isFirstLoad && viewModel.favorites.value.isEmpty()) {
+                            binding.shimmerLayout.visibility = View.VISIBLE
+                            binding.recyclerView.visibility = View.GONE
+                            binding.emptyView.visibility = View.GONE
+                            binding.errorLayout.visibility = View.GONE
+                        } else {
+                            binding.shimmerLayout.visibility = View.GONE
+                            binding.swipeRefreshLayout.isRefreshing = false
+                        }
+                    }
                 }
-            }
-        }
 
-        // Favorites data
-        lifecycleScope.launch {
-            viewModel.favorites.collect { items ->
-                isFirstLoad = false
-                binding.shimmerLayout.visibility = View.GONE
-                binding.recyclerView.visibility = if (items.isNotEmpty()) View.VISIBLE else View.GONE
-                binding.emptyView.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
-                binding.errorLayout.visibility = View.GONE
-                adapter.submitList(items)
+                launch {
+                    viewModel.error.collect { errorMsg ->
+                        if (errorMsg != null && viewModel.favorites.value.isEmpty()) {
+                            binding.errorLayout.visibility = View.VISIBLE
+                            binding.errorMessage.text = errorMsg
+                            binding.recyclerView.visibility = View.GONE
+                            binding.emptyView.visibility = View.GONE
+                            binding.shimmerLayout.visibility = View.GONE
+                            binding.swipeRefreshLayout.isRefreshing = false
+                        } else {
+                            binding.errorLayout.visibility = View.GONE
+                        }
+                    }
+                }
+
+                launch {
+                    viewModel.favorites.collect { items ->
+                        isFirstLoad = false
+                        binding.shimmerLayout.visibility = View.GONE
+                        binding.recyclerView.visibility =
+                            if (items.isNotEmpty()) View.VISIBLE else View.GONE
+                        binding.emptyView.visibility =
+                            if (items.isEmpty()) View.VISIBLE else View.GONE
+                        binding.errorLayout.visibility = View.GONE
+                        adapter.submitList(items)
+                    }
+                }
             }
         }
     }

@@ -19,6 +19,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.viewpager2.widget.ViewPager2
 import com.example.skoolswap.R
+import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.databinding.FragmentHomeBinding
 import com.example.skoolswap.domain.model.BannerItem
 import com.example.skoolswap.domain.model.FilterOption
@@ -29,7 +30,9 @@ import com.example.skoolswap.ui.home.adapter.HomeFeedAdapter
 import com.example.skoolswap.ui.shop.ProductAdapter
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import dagger.hilt.android.AndroidEntryPoint
+import jakarta.inject.Inject
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -53,7 +56,8 @@ class HomeFragment : Fragment() {
     private var selectedSize: String? = null
     private var selectedColor: String? = null
     private var selectedBrand: String? = null
-
+    @Inject
+    lateinit var appPreferences: AppPreferences
     private val bannerItems = listOf(
         BannerItem(imageUrl = "https://cdn.skoolswap.co.za/banners/home_1.jpg"),
         BannerItem(imageUrl = "https://cdn.skoolswap.co.za/banners/home_2.jpg"),
@@ -79,8 +83,29 @@ class HomeFragment : Fragment() {
         setupBackButton()
         observeViewModel()
         setupSwipeRefresh()
-        if (viewModel.homeFeed.value == null) {
-            viewModel.loadHomeFeed()
+        viewLifecycleOwner.lifecycleScope.launch {
+            // Try nav argument first (freshly logged in - prefs not written yet)
+            val argSchoolId = arguments?.getInt("schoolId", -1)?.takeIf { it > 0 }
+
+            // Fall back to prefs (returning user)
+            val prefSchoolId = appPreferences.schoolId.first()?.takeIf { it > 0 }
+
+            val schoolId = argSchoolId ?: prefSchoolId
+            Log.d("HomeFragment", "🔑 schoolId: arg=$argSchoolId prefs=$prefSchoolId using=$schoolId")
+
+            if (schoolId != null) {
+                viewModel.setKnownSchoolId(schoolId)
+            }
+
+            if (viewModel.homeFeed.value == null && !viewModel.isLoading.value) {
+                viewModel.loadHomeFeed()
+            } else if (viewModel.isLoading.value) {
+                // Already loading with wrong schoolId — cancel and restart with correct one
+                if (schoolId != null) {
+                    Log.d("HomeFragment", "🔄 Restarting load with correct schoolId: $schoolId")
+                    viewModel.loadHomeFeed(forceRefresh = true)
+                }
+            }
         }
 
         return binding.root
@@ -456,27 +481,40 @@ class HomeFragment : Fragment() {
 
     private fun setupCustomTabs() {
         val tabs = listOf(binding.tabHome, binding.tabUniform, binding.tabSport, binding.tabRecent)
-
-        // Check if dark mode is active
         val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
                 android.content.res.Configuration.UI_MODE_NIGHT_YES
+        val unselectedDrawable = if (isDarkMode) R.drawable.tablayout_unselected_night else R.drawable.tablayout_unselected
 
-        // Choose the correct drawable based on theme
-        val unselectedDrawable = if (isDarkMode) {
-            R.drawable.tablayout_unselected_night
-        } else {
-            R.drawable.tablayout_unselected
-        }
-
-        // Apply to all tabs initially
         tabs.forEach { tab ->
             tab.setBackgroundResource(unselectedDrawable)
             tab.setOnClickListener { selectTab(tab) }
         }
 
-        selectTab(binding.tabHome)
+        // ✅ Just style the tab, don't trigger a load
+        highlightTab(binding.tabHome)
     }
+    private fun highlightTab(selectedTab: TextView) {
+        val tabs = listOf(binding.tabHome, binding.tabUniform, binding.tabSport, binding.tabRecent)
+        val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
 
+        tabs.forEach { tab ->
+            if (tab == selectedTab) {
+                tab.setBackgroundResource(R.drawable.tablayout_selector)
+                tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), android.R.color.white))
+                tab.setTypeface(null, android.graphics.Typeface.BOLD)
+            } else {
+                if (isDarkMode) {
+                    tab.setBackgroundResource(R.drawable.tablayout_unselected_night)
+                    tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white_70))
+                } else {
+                    tab.setBackgroundResource(R.drawable.tablayout_unselected)
+                    tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.black_70))
+                }
+                tab.setTypeface(null, android.graphics.Typeface.NORMAL)
+            }
+        }
+    }
     fun getCurrentCategoryId(): Int? {
         return when (currentTabId) {
             R.id.tabUniform -> 6
@@ -506,34 +544,11 @@ class HomeFragment : Fragment() {
     }
     private fun selectTab(selectedTab: TextView) {
         currentTabId = selectedTab.id
-        val tabs = listOf(binding.tabHome, binding.tabUniform, binding.tabSport, binding.tabRecent)
-
-        // Check dark mode
-        val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                android.content.res.Configuration.UI_MODE_NIGHT_YES
-
-        tabs.forEach { tab ->
-            if (tab == selectedTab) {
-                // Selected tab - black background, WHITE text
-                tab.setBackgroundResource(R.drawable.tablayout_selector)
-                tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), android.R.color.white))
-                tab.setTypeface(null, android.graphics.Typeface.BOLD)
-            } else {
-                // Unselected tab - use theme-aware background
-                if (isDarkMode) {
-                    tab.setBackgroundResource(R.drawable.tablayout_unselected_night)
-                    tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white_70))
-                } else {
-                    tab.setBackgroundResource(R.drawable.tablayout_unselected)
-                    tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.black_70))
-                }
-                tab.setTypeface(null, android.graphics.Typeface.NORMAL)
-            }
-        }
+        highlightTab(selectedTab)
 
         when (selectedTab.id) {
             R.id.tabHome -> {
-                if (viewModel.homeFeed.value == null) {
+                if (viewModel.homeFeed.value == null && !viewModel.isLoading.value) {
                     viewModel.loadHomeFeed()
                 }
             }
@@ -542,20 +557,22 @@ class HomeFragment : Fragment() {
             R.id.tabRecent -> navigateToRecentTab()
         }
     }
+
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.isLoading.collect { isLoading ->
-                Log.d("HomeFragment", "🔄 Loading state: $isLoading, hasData: ${viewModel.homeFeed.value != null}")
                 if (isLoading && viewModel.homeFeed.value == null) {
-                    // Show shimmer only on first load (no data yet)
                     binding.shimmerLayout.visibility = View.VISIBLE
                     binding.homeRecycler.visibility = View.GONE
                     binding.errorLayout.visibility = View.GONE
                     binding.noSchoolLayout.visibility = View.GONE
                 } else {
-                    // Hide shimmer when loading complete or data exists
                     binding.shimmerLayout.visibility = View.GONE
                     binding.swipeRefreshLayout.isRefreshing = false
+                    // ✅ Restore recycler visibility if we have data
+                    if (viewModel.homeFeed.value != null && !isInSearchMode) {
+                        binding.homeRecycler.visibility = View.VISIBLE
+                    }
                 }
             }
         }
@@ -716,7 +733,7 @@ class HomeFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         autoScrollHelper?.resumeAutoScroll()
-        if (viewModel.homeFeed.value == null && !isInSearchMode) {
+        if (viewModel.homeFeed.value == null && !isInSearchMode && !viewModel.isLoading.value) {
             viewModel.loadHomeFeed()
         }
     }
