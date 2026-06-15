@@ -14,6 +14,7 @@ sealed class DialogAction {
     object DeleteAccount : DialogAction()
     object DeleteShop : DialogAction()
     object DeleteItem : DialogAction()
+    object MissingContactNumber : DialogAction()
     data class UpdateShop(val currentName: String, val newName: String) : DialogAction()
     data class UpdateItem(val itemName: String, val changes: String) : DialogAction()
     data class SaveChanges(val changesSummary: String) : DialogAction()
@@ -30,7 +31,8 @@ object DialogHelper {
     fun showConfirmationDialog(
         context: Context,
         action: DialogAction,
-        onConfirm: () -> Unit
+        onConfirm: () -> Unit,
+        onCancel: (() -> Unit)? = null  // ADD THIS PARAMETER
     ) {
         val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_logout, null)
 
@@ -53,6 +55,13 @@ object DialogHelper {
                 titleView.text = "DELETE ACCOUNT"
                 messageView.text = "Are you sure you want to delete your account? This action cannot be undone."
                 confirmButton.text = "Delete"
+            }
+            is DialogAction.MissingContactNumber -> {
+                logoImage.visibility = android.view.View.VISIBLE
+                titleView.text = "MISSING CONTACT NUMBER"
+                messageView.text = "We have noticed you don't have a contact number under your profile.\n\nBuyers won't be able to reach you without a contact number.\n\nWould you like to add your contact number now?"
+                confirmButton.text = "Add Number"
+                cancelButton.text = "Not Now"
             }
             is DialogAction.DeleteShop -> {
                 logoImage.visibility = android.view.View.VISIBLE
@@ -142,8 +151,10 @@ object DialogHelper {
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.window?.attributes?.windowAnimations = R.style.DialogAnimation
 
+        // UPDATE cancel button to use onCancel callback
         cancelButton.setOnClickListener {
             dialog.dismiss()
+            onCancel?.invoke()  // Call onCancel if provided
         }
 
         confirmButton.setOnClickListener {

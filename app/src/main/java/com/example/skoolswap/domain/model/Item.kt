@@ -18,6 +18,7 @@ data class Item(
     val schoolName: String? = null,
     val itemConditionId: Int? = null,
     val locationId: Int? = null,
+    val locationName: String? = null,
     val provinceId: Int? = null,
     val genderId: Int? = null,
     val meta: ItemMeta? = null,

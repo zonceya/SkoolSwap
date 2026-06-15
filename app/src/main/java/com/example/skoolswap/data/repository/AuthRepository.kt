@@ -12,6 +12,7 @@ import com.example.skoolswap.R
 import com.example.skoolswap.common.constants.ErrorConstants
 import com.example.skoolswap.data.local.database.SkoolSwapDatabase
 import com.example.skoolswap.data.local.database.dao.UserSchoolDao
+import com.example.skoolswap.data.local.database.entities.UserEntity
 import com.example.skoolswap.data.local.database.entities.UserSchoolEntity
 import com.example.skoolswap.data.mapper.toDomain
 import com.example.skoolswap.data.mapper.toEntity
@@ -113,7 +114,7 @@ class AuthRepository @Inject constructor(
             // 4. Cache the user
             cacheUserAfterFirebaseAuth(user, user.token)
 
-            Log.i(TAG, "✅ Email sign-in successful for: $email")
+            Timber.tag(TAG).i("✅ Email sign-in successful for: $email")
             Result.success(user)
 
         } catch (e: FirebaseAuthInvalidUserException) {
@@ -307,12 +308,55 @@ class AuthRepository @Inject constructor(
             cachedUser?.let {
                 _serverUser.value = it.toDomain()
                 _authToken.value = it.token
+                Log.e("DEBUG", "User.schoolMapped: ${cachedUser?.schoolMapped}")
+                Log.e("DEBUG", "User.schoolName: ${cachedUser?.schoolName}")
+
             }
         } catch (e: Exception) {
             e(TAG, "Error loading cached user", e)
         }
     }
+    // In AuthRepository.kt - Add this method
+    override suspend fun restoreSessionFromRoom(userEntity: UserEntity): Boolean {
+        return try {
+            val user = userEntity.toDomain()
+            _serverUser.value = user
+            _authToken.value = user.token
 
+            // Also update Preferences for backward compatibility
+            appPreferences.setAuthToken(user.token)
+            appPreferences.setLoggedIn(true)
+            appPreferences.setUserId(user.id.toString())
+            appPreferences.setUserName(user.name)
+            appPreferences.setUserEmail(user.email)
+
+            if (user.profilePictureUrl != null) {
+                appPreferences.setUserProfileImage(user.profilePictureUrl)
+            }
+
+            if (user.schoolMapped && user.schoolId != null) {
+                appPreferences.setSchoolMapped(true)
+                appPreferences.setSchoolInfo(user.schoolId, user.schoolName ?: "")
+            } else {
+                appPreferences.setSchoolMapped(false)
+            }
+
+            Log.e(TAG, "✅ Session restored from Room for: ${user.name}")
+            true
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Failed to restore session from Room")
+            false
+        }
+    }
+    // In AuthRepository.kt - Add this method
+    override suspend fun getRoomUser(): UserEntity? {
+        return try {
+            userDao.getCurrentUser()
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Failed to get user from Room")
+            null
+        }
+    }
     override suspend fun signInWithGoogle(activity: Activity): Result<User> {
         return try {
             _loading.value = true
@@ -420,7 +464,19 @@ class AuthRepository @Inject constructor(
         return _authToken.value ?: appPreferences.authToken.first()
     }
 
-    // In AuthRepository.kt
+    override suspend fun getCurrentUserId(): Int? {
+        return try {
+            // Try from memory first
+            _serverUser.value?.id ?: run {
+                // Fallback to Room
+                val roomUser = userDao.getCurrentUser()
+                roomUser?.id
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get current user ID", e)
+            null
+        }
+    }
     override suspend fun validateToken(token: String): Boolean {
         return try {
             val response = userApiService.getProfile("Bearer $token")

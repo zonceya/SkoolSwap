@@ -54,15 +54,39 @@ class ShopFragment : Fragment() {
         setupRecyclerViews()
         setupTabListeners()
         setupObservers()
-
+        updateTabStyles()
         binding.retryButton.setOnClickListener {
             binding.errorLayout.visibility = View.GONE
             viewModel.refresh()
         }
         viewModel.loadMyShop()
         viewModel.loadMyShopItems()
-    }
 
+        // In ShopFragment.kt, add this in onViewCreated after the existing observer
+        findNavController().currentBackStackEntry?.savedStateHandle
+            ?.getLiveData<Boolean>("item_updated")
+            ?.observe(viewLifecycleOwner) { updated ->
+                if (updated == true) {
+                    Timber.d("🔄 Item updated, refreshing immediately")
+                    // Get the updated item ID
+                    val updatedItemId = findNavController().currentBackStackEntry
+                        ?.savedStateHandle?.get<String>("updated_item_id")
+
+                    if (updatedItemId != null) {
+                        // You could update the item locally without full refresh
+                        // For now, just refresh everything
+                        viewModel.loadMyShopItems()
+                        findNavController().currentBackStackEntry
+                            ?.savedStateHandle?.remove<String>("updated_item_id")
+                    } else {
+                        viewModel.loadMyShopItems()
+                    }
+
+                    findNavController().currentBackStackEntry
+                        ?.savedStateHandle?.remove<Boolean>("item_updated")
+                }
+            }
+    }
     private fun setupRecyclerViews() {
         // Adapter for All Items view (simple grid)
         productAdapter = ProductAdapter { itemId ->

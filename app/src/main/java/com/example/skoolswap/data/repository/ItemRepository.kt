@@ -47,12 +47,14 @@ class ItemRepository @Inject constructor(
     companion object {
         private const val TAG = "ItemRepository"
         private const val MAX_IMAGES = 3
-        private const val CACHE_DURATION_MS = 5 * 60 * 1000 // 5 minutes cache
+        private const val CACHE_DURATION_MS = 24 * 60 * 60 * 1000L // 5 minutes cache
     }
 
     private val _recentlyCreatedItem = MutableStateFlow<Item?>(null)
     override val recentlyCreatedItem: StateFlow<Item?> = _recentlyCreatedItem.asStateFlow()
-
+    private fun isCacheValid(cacheTime: Long): Boolean {
+        return System.currentTimeMillis() - cacheTime < CACHE_DURATION_MS
+    }
     private val _currentItems = MutableStateFlow<List<Item>>(emptyList())
     override val currentItems: StateFlow<List<Item>> = _currentItems.asStateFlow()
     private val memoryCache = mutableMapOf<String, Item>()
@@ -370,11 +372,9 @@ class ItemRepository @Inject constructor(
         }
     }
 
-    // In ItemRepository.kt - fix mapViewShopItemToDomain
     private fun mapViewShopItemToDomain(dto: ViewShopItemDto): Item {
         val variant = dto.variants?.firstOrNull()
 
-        // Images are strings (URLs)
         val imageList = dto.images?.mapIndexed { index, url ->
             ItemImage(
                 id = 0,
@@ -386,7 +386,6 @@ class ItemRepository @Inject constructor(
             )
         } ?: emptyList()
 
-        // Get price from variant or from dto price
         val finalPrice = variant?.price ?: dto.price?.toDoubleOrNull() ?: 0.0
         val finalQuantity = variant?.quantity ?: dto.totalQuantity
 
@@ -408,8 +407,8 @@ class ItemRepository @Inject constructor(
             sizeId = variant?.sizeId ?: dto.size?.id,
             colorId = variant?.colorId ?: dto.color?.id,
             schoolId = dto.school?.id ?: dto.schoolId,
-            itemConditionId = variant?.conditionId ?: dto.itemConditionId,  // ← Use itemConditionId, not condition
-            locationId = dto.locationId,
+            itemConditionId = variant?.conditionId ?: dto.itemConditionId,
+            locationId = dto.town?.id ?: dto.locationId,  // ✅ FIXED: Get town ID here
             provinceId = dto.province?.id ?: dto.provinceId,
             genderId = dto.gender?.id ?: dto.genderId,
             mainCategoryId = dto.mainCategory?.id ?: dto.mainCategoryId,
@@ -419,7 +418,8 @@ class ItemRepository @Inject constructor(
             sizeName = variant?.sizeName ?: dto.size?.name,
             colorName = variant?.colorName ?: dto.color?.name,
             brandName = dto.brand?.name,
-            conditionName = variant?.conditionName,  // ← From variant, no condition field in dto
+            conditionName = variant?.conditionName,
+            locationName = dto.town?.name,  // ✅ Store town name
 
             shop = dto.shop?.let {
                 Shop(
@@ -440,7 +440,6 @@ class ItemRepository @Inject constructor(
             itemTypeId = null
         )
     }
-
     // ============ GET SINGLE ITEM ============
     override suspend fun getItem(itemId: String): Result<Item> {
         Log.d(TAG, "getItem called for ID: $itemId")
@@ -449,11 +448,11 @@ class ItemRepository @Inject constructor(
         memoryCache[itemId]?.let { cachedItem ->
             val cacheAge = System.currentTimeMillis() - (memoryCacheTime[itemId] ?: 0)
             if (cacheAge < CACHE_DURATION_MS && cachedItem.images.isNotEmpty()) {
-                Log.d(TAG, "✅ Using MEMORY cache (age: ${cacheAge}ms)")
-                Log.d(TAG, "   - Images: ${cachedItem.images.size}")
+                Timber.tag(TAG).d("✅ Using MEMORY cache (age: ${cacheAge}ms)")
+                Timber.tag(TAG).d("   - Images: ${cachedItem.images.size}")
                 return Result.success(cachedItem)
             } else {
-                Log.d(TAG, "⚠️ Memory cache expired or has no images")
+                Timber.tag(TAG).d("⚠️ Memory cache expired or has no images")
                 memoryCache.remove(itemId)
                 memoryCacheTime.remove(itemId)
             }
@@ -855,7 +854,7 @@ class ItemRepository @Inject constructor(
         }
     }
 
-    // In ItemRepository.kt - Fix updateItemSimple
+    // In ItemRepository.kt - updateItemSimple
     override suspend fun updateItemSimple(
         itemId: String,
         name: String?,
@@ -881,18 +880,18 @@ class ItemRepository @Inject constructor(
                 return Result.failure(Exception("Not authenticated"))
             }
 
-            // ✅ Only include fields that are actually changing
+            // ✅ Only include fields that belong to Item, not variant
             val updateData = UpdateItemData(
                 name = name,
                 description = description,
-                price = price,
-                quantity = quantity,
+                price = price,  // This goes to variant
+                quantity = quantity,  // This goes to variant
                 mainCategoryId = mainCategoryId,
                 subCategoryId = subCategoryId,
                 brandId = brandId,
-                sizeId = sizeId,
-                colorId = colorId,
-                itemConditionId = itemConditionId,
+                sizeId = sizeId,  // This goes to variant
+                colorId = colorId,  // This goes to variant
+                itemConditionId = itemConditionId,  // This goes to variant
                 provinceId = provinceId,
                 locationId = locationId,
                 genderId = genderId,
@@ -905,7 +904,7 @@ class ItemRepository @Inject constructor(
             val request = UpdateItemRequest(item = updateData)
 
             Log.d(TAG, "Updating item $itemId")
-            Log.d(TAG, "Update data: ${updateData}") // Debug log
+            Log.d(TAG, "Update data: ${updateData}")
 
             val response = itemApiService.updateItem("Bearer $token", itemId, request)
 

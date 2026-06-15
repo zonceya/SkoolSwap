@@ -22,15 +22,23 @@ object MobileValidator {
 
         // Validate South African mobile prefixes
         val prefix = cleanMobile.substring(0, 3)
+
+        // Comprehensive list of valid SA mobile prefixes
         val validPrefixes = setOf(
-            // Vodacom
-            "060", "061", "062", "063", "064",
-            // MTN
-            "071", "072", "073", "074", "076",
-            // Cell C
-            "079", "078",
-            // Telkom, Virgin Mobile, etc.
-            "081", "082", "083", "084", "085"
+            // Vodacom (060-069)
+            "060", "061", "062", "063", "064", "065", "066", "067", "068", "069",
+
+            // MTN (071-076, 078, 083)
+            "071", "072", "073", "074", "075", "076", "078", "083",
+
+            // Cell C (079, 084)
+            "079", "084",
+
+            // Telkom (081, 082, 085)
+            "081", "082", "085",
+
+            // Other/Virtual Networks
+            "080", "086", "087", "088", "089"
         )
 
         return validPrefixes.contains(prefix)
@@ -68,10 +76,34 @@ object MobileValidator {
 
         return when {
             cleanMobile.isEmpty() -> "Mobile number is required"
-            !cleanMobile.startsWith("0") -> "Mobile number must start with 0"
-            cleanMobile.length != 10 -> "Mobile number must be 10 digits"
+            !cleanMobile.startsWith("0") -> "Must start with 0 (e.g., 0712345678)"
+            cleanMobile.length < 10 -> "Mobile number must be 10 digits (currently ${cleanMobile.length})"
+            cleanMobile.length > 10 -> "Mobile number must be 10 digits (currently ${cleanMobile.length})"
             !cleanMobile.all { it.isDigit() } -> "Mobile number must contain only digits"
-            !isValidSouthAfricanMobile(cleanMobile) -> "Invalid South African mobile number"
+            !isValidSouthAfricanMobile(cleanMobile) -> {
+                val prefix = cleanMobile.take(3)
+                "Invalid SA mobile number. '$prefix' is not a valid prefix. Use 060-089"
+            }
+            else -> null
+        }
+    }
+
+    /**
+     * Gets user-friendly error message for UI
+     */
+    fun getUserFriendlyErrorMessage(mobile: String): String? {
+        val cleanMobile = mobile.trim()
+
+        return when {
+            cleanMobile.isEmpty() -> "📱 Please enter your mobile number"
+            !cleanMobile.startsWith("0") -> "📱 South African numbers start with 0\nExample: 0712345678"
+            cleanMobile.length < 10 -> "📱 Need ${10 - cleanMobile.length} more digit(s)"
+            cleanMobile.length > 10 -> "📱 Too many digits (${cleanMobile.length - 10} extra)"
+            !cleanMobile.all { it.isDigit() } -> "📱 Numbers only, no spaces or dashes"
+            !isValidSouthAfricanMobile(cleanMobile) -> {
+                val prefix = cleanMobile.take(3)
+                "📱 '$prefix' is not a valid SA prefix\nValid: 060-089"
+            }
             else -> null
         }
     }

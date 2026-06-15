@@ -33,7 +33,7 @@ import java.io.File
         UserSchoolEntity::class,
         HomeFeedEntity::class
     ],
-    version = 11,
+    version = 13,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -64,9 +64,6 @@ abstract class SkoolSwapDatabase : RoomDatabase() {
 
         fun getInstance(context: Context): SkoolSwapDatabase {
             return INSTANCE ?: synchronized(this) {
-                // Force delete old database to avoid migration issues
-              //  context.getDatabasePath("skoolswap_database").delete()
-
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     SkoolSwapDatabase::class.java,

@@ -272,6 +272,11 @@
             app:destination="@id/nav_home"
             app:popUpTo="@id/nav_home"
             app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_createItemFragment_to_profileFragment"
+            app:destination="@id/nav_profile"
+            app:popUpTo="@id/createItemFragment"
+            app:popUpToInclusive="false" />
 
     </fragment>
 

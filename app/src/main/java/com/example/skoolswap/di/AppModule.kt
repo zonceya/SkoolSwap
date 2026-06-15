@@ -7,6 +7,7 @@ import androidx.annotation.RequiresApi
 import androidx.credentials.CredentialManager
 import com.example.skoolswap.data.local.database.SkoolSwapDatabase
 import com.example.skoolswap.data.local.database.dao.FavoriteDao
+import com.example.skoolswap.data.local.database.dao.HomeFeedDao
 import com.example.skoolswap.data.local.database.dao.ItemDao
 import com.example.skoolswap.data.local.database.dao.ItemImageDao
 import com.example.skoolswap.data.local.database.dao.ProvinceDao
@@ -90,7 +91,11 @@ object AppModule {
     fun provideProvinceDao(database: SkoolSwapDatabase): ProvinceDao {
         return database.provinceDao()
     }
-
+    @Provides
+    @Singleton
+    fun provideHomeFeedDao(database: SkoolSwapDatabase): HomeFeedDao {
+        return database.homeFeedDao()
+    }
     @Provides
     @Singleton
     fun provideShopDao(database: SkoolSwapDatabase): ShopDao {
@@ -256,12 +261,19 @@ object AppModule {
     fun provideHomeRepository(
         recommendationsApiService: RecommendationsApiService,
         authRepository: AuthRepositoryInterface,
-        appPreferences: AppPreferences
+        appPreferences: AppPreferences,
+        homeFeedDao: HomeFeedDao,
+        itemDao: ItemDao,           // ← ADD THIS
+        itemImageDao: ItemImageDao
     ): HomeRepositoryInterface {
         return HomeRepository(
             recommendationsApiService = recommendationsApiService,
             authRepository = authRepository,
-            appPreferences = appPreferences
+            appPreferences = appPreferences,
+            homeFeedDao = homeFeedDao,
+            itemDao = itemDao,
+            itemImageDao = itemImageDao
+
         )
     }
 

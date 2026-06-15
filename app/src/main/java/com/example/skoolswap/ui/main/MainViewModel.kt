@@ -7,6 +7,8 @@ import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.example.skoolswap.data.repository.AuthRepository
 import com.example.skoolswap.data.local.datastore.AppPreferences
+import com.example.skoolswap.domain.repository.AuthRepositoryInterface
+import com.example.skoolswap.ui.item.CreateItemViewModel.Companion.TAG
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
@@ -18,7 +20,7 @@ enum class NavigationDestination { ONBOARDING, LOGIN, HOME }
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val preferences: AppPreferences,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepositoryInterface
 ) : ViewModel() {
 
     private val _forceNavigation = MutableLiveData<NavigationDestination?>()
@@ -83,7 +85,17 @@ class MainViewModel @Inject constructor(
             preferences.setLoggedIn(true)
         }
     }
-
+    suspend fun hasContactNumber(): Boolean {
+        return try {
+            val userProfile = authRepository.getServerUser().firstOrNull()
+            val hasContactNumber = !userProfile?.mobile.isNullOrEmpty()
+            Log.d(TAG, "Has contact number: $hasContactNumber")
+            hasContactNumber
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking contact number", e)
+            false
+        }
+    }
     fun logout() {
         viewModelScope.launch {
             authRepository.signOut()

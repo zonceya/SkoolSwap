@@ -1,6 +1,5 @@
 package com.example.skoolswap.ui.products.adapter
 
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,9 +9,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemHomeProductBinding
-import com.example.skoolswap.databinding.ItemProductGridBinding
 import com.example.skoolswap.domain.model.Item
-import com.example.skoolswap.utils.extensions.formatViewCount
 import timber.log.Timber
 
 class ProductsAdapter(
@@ -27,7 +24,7 @@ class ProductsAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val binding = ItemProductGridBinding.inflate(
+        val binding = ItemHomeProductBinding.inflate(
             LayoutInflater.from(parent.context), parent, false
         )
         return ViewHolder(binding)
@@ -40,7 +37,7 @@ class ProductsAdapter(
     override fun getItemCount() = items.size
 
     inner class ViewHolder(
-        private val binding: ItemProductGridBinding
+        private val binding: ItemHomeProductBinding
 
     ) : RecyclerView.ViewHolder(binding.root) {
 
@@ -80,7 +77,7 @@ class ProductsAdapter(
                     .load(imageUrl)
                     .placeholder(R.drawable.ic_create_item_placeholder)
                     .error(R.drawable.ic_create_item_placeholder)
-                    .centerCrop()
+                    .fitCenter()
                     .into(binding.productImage)
             } else {
                 binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)

@@ -67,9 +67,11 @@ class MainActivity : AppCompatActivity() {
     lateinit var authRepository: AuthRepositoryInterface
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
         super.onCreate(savedInstanceState)
+        window.statusBarColor = ContextCompat.getColor(this, R.color.white)
 
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
         val nightMode = resources.configuration.uiMode and
                 android.content.res.Configuration.UI_MODE_NIGHT_MASK
         val isDark = nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES
@@ -137,6 +139,7 @@ class MainActivity : AppCompatActivity() {
                 else -> { /* stay on loginFragment */ }
             }
         }
+        refreshToolbarVisibility()
     }
 
     private fun setupNavigationDrawer() {
@@ -255,11 +258,35 @@ class MainActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
         outState.putInt("currentDestinationId", navController.currentDestination?.id ?: R.id.nav_home)
     }
-
+    private fun showMissingContactDialog() {
+        DialogHelper.showConfirmationDialog(
+            context = this,
+            action = DialogAction.MissingContactNumber,
+            onConfirm = {
+                // User wants to add contact number - navigate to profile
+                navController.navigate(R.id.nav_profile)
+            },
+            onCancel = {
+                // User chose not to add contact number
+                Toast.makeText(this, "Please add a contact number to list items", Toast.LENGTH_LONG).show()
+            }
+        )
+    }
     private fun setupNavigationListener() {
         val navView: NavigationView = binding.navView
         binding.appBarMain.fab.setOnClickListener {
-            navController.navigate(R.id.createItemFragment)
+            // Check if user has contact number before navigating
+            lifecycleScope.launch {
+                val hasContactNumber = viewModel.hasContactNumber()
+
+                if (hasContactNumber) {
+                    // User has contact number - allow navigation to create item
+                    navController.navigate(R.id.createItemFragment)
+                } else {
+                    // User doesn't have contact number - show dialog
+                    showMissingContactDialog()
+                }
+            }
         }
 
         navView.setNavigationItemSelectedListener { menuItem ->
@@ -553,11 +580,35 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+    private fun refreshToolbarVisibility() {
+        val currentDestination = navController.currentDestination?.id
+        Timber.tag("MainActivity").d("🔄 Refreshing toolbar for destination: $currentDestination")
 
+        when (currentDestination) {
+            R.id.schoolOnboardingFragment,
+            R.id.viewPagerFragment,
+            R.id.introFragment,
+            R.id.loginFragment -> {
+                supportActionBar?.hide()
+                binding.appBarMain.fab.visibility = View.GONE
+            }
+            else -> {
+                supportActionBar?.show()
+                // Restore FAB visibility based on your logic
+                binding.appBarMain.fab.visibility = View.VISIBLE
+            }
+        }
+    }
     override fun onResume() {
         super.onResume()
-        Timber.tag("MainActivity").e("🔥 onResume at ${System.currentTimeMillis()}")
+        Timber.tag("MainActivity").d("🔄 onResume - refreshing toolbar")
+        refreshToolbarVisibility()
+
         navHeaderViewModel.refresh()
+        // Optional: force re-evaluate current destination
+        navController.currentDestination?.let {
+            // You can manually trigger listener logic if needed
+        }
     }
 
     override fun onPause() {

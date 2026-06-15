@@ -22,6 +22,8 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 import androidx.core.net.toUri
+import com.example.skoolswap.SkoolSwapApplication
+import com.example.skoolswap.data.local.database.entities.UserEntity
 
 @AndroidEntryPoint
 class IntroFragment : Fragment() {
@@ -77,95 +79,48 @@ class IntroFragment : Fragment() {
         setupVideo()
     }
 
+    // In IntroFragment.kt - Simplified version
     private fun determineDestination() {
         lifecycleScope.launch {
             try {
-                Log.e("IntroFragment", "🎯 === DETERMINING DESTINATION ===")
-
-                // 🔴 Remove force testing flag
-                val forceOnboarding = false
-
-                if (forceOnboarding) {
-                    Log.e("IntroFragment", "🚨 FORCE ONBOARDING enabled")
-                    onDestinationDetermined(R.id.schoolOnboardingFragment)
-                    return@launch
-                }
-
-                // Check if onboarding was ever completed
                 val isOnboardingFinished = appPreferences.isOnboardingFinished.first()
-                Log.e("IntroFragment", "📱 isOnboardingFinished: $isOnboardingFinished")
 
                 if (!isOnboardingFinished) {
-                    Log.e("IntroFragment", "➡️ First time user - go to onboarding")
                     onDestinationDetermined(R.id.viewPagerFragment)
                     return@launch
                 }
 
-                // Check login status
-                val isLoggedIn = appPreferences.isLoggedIn.first()
-                val authToken = appPreferences.authToken.first()
-                val userId = appPreferences.getUserId()
-                val cachedSchoolId = appPreferences.schoolId.first()
-                val cachedSchoolMapped = appPreferences.hasSchoolMapped()
+                // ✅ Use AuthRepository to check Room
+                val roomUser = authRepository.getRoomUser()
 
-                Log.e("IntroFragment", "🔐 isLoggedIn: $isLoggedIn")
-                Log.e("IntroFragment", "🔐 authToken exists: ${!authToken.isNullOrEmpty()}")
-                Log.e("IntroFragment", "🔐 userId: $userId")
-                Log.e("IntroFragment", "🏫 cachedSchoolId: $cachedSchoolId")
-                Log.e("IntroFragment", "🏫 cachedSchoolMapped: $cachedSchoolMapped")
+                if (roomUser != null && !roomUser.token.isNullOrEmpty()) {
+                    Timber.e("✅ Found user in Room: ${roomUser.name}")
+                    Timber.e("✅ School mapped: ${roomUser.schoolMapped}")
+                    Timber.e("✅ School name: ${roomUser.schoolName}")
 
-                val isValidSession = isLoggedIn && !authToken.isNullOrEmpty() && userId != null
+                    // Restore session from Room data
+                    authRepository.restoreSessionFromRoom(roomUser)
 
-                if (!isValidSession) {
-                    Log.e("IntroFragment", "➡️ Not logged in - go to login")
-                    onDestinationDetermined(R.id.loginFragment)
-                    return@launch
-                }
-
-                // User is logged in, check session validity with backend
-                Log.e("IntroFragment", "🔄 Refreshing user profile from backend...")
-                val refreshResult = authRepository.refreshUserProfile()
-
-                if (refreshResult.isFailure) {
-                    Log.e("IntroFragment", "❌ Session invalid - clearing data and going to login")
-                    Log.e("IntroFragment", "❌ Error: ${refreshResult.exceptionOrNull()?.message}")
-                    appPreferences.clearUserData()
-                    onDestinationDetermined(R.id.loginFragment)
-                    return@launch
-                }
-
-                val user = authRepository.getServerUser().first()
-                Log.e("IntroFragment", "👤 User from backend: ${user?.name}")
-                Log.e("IntroFragment", "👤 User school_mapped: ${user?.schoolMapped}")
-                Log.e("IntroFragment", "👤 User school_id: ${user?.schoolId}")
-
-                if (user != null) {
-                    // ✅ CRITICAL: Use BACKEND data, not cached data
-                    val hasValidSchoolMapping = user.schoolMapped == true && user.schoolId != null
-
-                    Log.e("IntroFragment", "🎯 hasValidSchoolMapping from BACKEND: $hasValidSchoolMapping")
-
-                    val destination = if (hasValidSchoolMapping) {
-                        Log.e("IntroFragment", "➡️ User has valid school mapping - go to HOME")
+                    val destination = if (roomUser.schoolMapped) {
                         R.id.nav_home
                     } else {
-                        Log.e("IntroFragment", "➡️ User has NO school mapping - go to ONBOARDING")
-                        R.id.schoolOnboardingFragment
+                        R.id.nav_profile
                     }
                     onDestinationDetermined(destination)
-                } else {
-                    Log.e("IntroFragment", "❌ User is null - clearing data and going to login")
-                    appPreferences.clearUserData()
-                    onDestinationDetermined(R.id.loginFragment)
+                    return@launch
                 }
+
+                Timber.e("❌ No user in Room - go to login")
+                onDestinationDetermined(R.id.loginFragment)
+
             } catch (e: Exception) {
-                Log.e("IntroFragment", "❌ Exception in determineDestination: ${e.message}", e)
+                Timber.e(e, "Error in determineDestination")
                 onDestinationDetermined(R.id.loginFragment)
             }
         }
     }
 
-    private fun onDestinationDetermined(destination: Int) {
+       private fun onDestinationDetermined(destination: Int) {
         Timber.tag(TAG).e("Destination determined: $destination")
         targetDestination = destination
         destinationReady = true

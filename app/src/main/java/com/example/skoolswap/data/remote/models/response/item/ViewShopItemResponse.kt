@@ -53,6 +53,7 @@ data class ViewShopItemDto(
     @SerializedName("province_id")
     val provinceId: Int?,
 
+
     @SerializedName("gender_id")
     val genderId: Int?,
 
@@ -95,7 +96,8 @@ data class ViewShopItemDto(
 
     @SerializedName("brand")
     val brand: ViewBrandDto?,
-
+    @SerializedName("town")
+    val town: ViewTownDto?,
     @SerializedName("tags")
     val tags: List<ViewTagDto>?,
 
@@ -183,7 +185,10 @@ data class ViewBrandDto(
     @SerializedName("name")
     val name: String
 )
-
+data class ViewTownDto(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String
+)
 data class ViewTagDto(
     @SerializedName("id")
     val id: Int,

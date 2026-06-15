@@ -5,7 +5,6 @@ import com.example.skoolswap.data.local.database.dao.FavoriteDao
 import com.example.skoolswap.data.local.database.entities.FavoriteEntity
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.repository.FavoriteRepositoryInterface
-import com.example.skoolswap.ui.products.PriceRangeDialogFragment.Companion.TAG
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import timber.log.Timber
@@ -18,51 +17,47 @@ class FavoriteRepository @Inject constructor(
     private val itemRepository: ItemRepository
 ) : FavoriteRepositoryInterface {
 
-    override fun getAllFavorites(): Flow<List<Item>> {
-        return favoriteDao.getAllFavorites().map { favorites ->
-            Timber.tag("PriceRangeDialogFragmen").d("Loading ${favorites.size} favorites from database")
+    override fun getAllFavorites(userId: Int): Flow<List<Item>> {
+        return favoriteDao.getFavoritesForUser(userId).map { favorites ->
+            Timber.d("Loading ${favorites.size} favorites from database for user $userId")
 
             favorites.mapNotNull { favorite ->
-                // This will now use the cache which includes images from database
                 val result = itemRepository.getItem(favorite.itemId)
                 val item = result.getOrNull()
 
                 if (item != null) {
-                    Timber.tag("PriceRangeDialogFragmen").d("Loaded favorite: ${item.name}, Images: ${item.images.size}")
-                    if (item.images.isEmpty()) {
-                        Log.w(TAG, "⚠️ Item ${item.name} has NO images in cache")
-                    } else {
-                        Log.d(TAG, "✅ First image: ${item.images.first().url}")
-                    }
+                    Timber.d("Loaded favorite: ${item.name}, Images: ${item.images.size}")
                 }
                 item
             }
         }
     }
 
-    override suspend fun isFavorite(itemId: String): Boolean {
-        return favoriteDao.isFavorite(itemId)
+    override suspend fun isFavorite(userId: Int, itemId: String): Boolean {
+        return favoriteDao.isFavorite(userId, itemId)
     }
 
-    override suspend fun addFavorite(itemId: String) {
-        favoriteDao.addFavorite(FavoriteEntity(itemId))
+    override suspend fun addFavorite(userId: Int, itemId: String) {
+        favoriteDao.addFavorite(FavoriteEntity(userId, itemId))
+        Timber.d("Added favorite for user $userId: $itemId")
     }
 
-    override suspend fun removeFavorite(itemId: String) {
-        favoriteDao.removeFavoriteById(itemId)
+    override suspend fun removeFavorite(userId: Int, itemId: String) {
+        favoriteDao.removeFavorite(userId, itemId)
+        Timber.d("Removed favorite for user $userId: $itemId")
     }
 
-    override suspend fun toggleFavorite(itemId: String): Boolean {
-        return if (isFavorite(itemId)) {
-            removeFavorite(itemId)
+    override suspend fun toggleFavorite(userId: Int, itemId: String): Boolean {
+        return if (isFavorite(userId, itemId)) {
+            removeFavorite(userId, itemId)
             false
         } else {
-            addFavorite(itemId)
+            addFavorite(userId, itemId)
             true
         }
     }
 
-    override suspend fun getFavoritesCount(): Int {
-        return favoriteDao.getFavoritesCount()
+    override suspend fun getFavoritesCount(userId: Int): Int {
+        return favoriteDao.getFavoritesCount(userId)
     }
 }

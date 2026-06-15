@@ -2,6 +2,7 @@
 package com.example.skoolswap.domain.repository
 
 import android.app.Activity
+import com.example.skoolswap.data.local.database.entities.UserEntity
 import com.example.skoolswap.domain.model.User
 import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.flow.StateFlow
@@ -24,11 +25,14 @@ interface AuthRepositoryInterface {
     val currentUser: StateFlow<FirebaseUser?>
     val loading: StateFlow<Boolean>
     val error: StateFlow<String?>
+    // Add to interface
+    suspend fun getRoomUser(): UserEntity?
+    suspend fun restoreSessionFromRoom(userEntity: UserEntity): Boolean
 
     // ==================== FIREBASE EMAIL/PASSWORD METHODS (REPLACES OTP) ====================
     suspend fun signInWithEmail(email: String, password: String): Result<User>
     suspend fun signUpWithEmail(name: String, email: String, password: String, passwordConfirmation: String): Result<User>
     suspend fun sendPasswordResetEmail(email: String): Result<Unit>
-
+    suspend fun getCurrentUserId(): Int?
 
 }
