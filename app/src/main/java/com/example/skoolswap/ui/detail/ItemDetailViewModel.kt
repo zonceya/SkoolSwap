@@ -68,7 +68,9 @@ class ItemDetailViewModel @Inject constructor(
 
     private val _sellerMobile = MutableStateFlow<String?>(null)
     val sellerMobile: StateFlow<String?> = _sellerMobile.asStateFlow()
-
+    // In ItemDetailViewModel.kt
+    private val _similarItemsShimmer = MutableStateFlow(true)
+    val similarItemsShimmer: StateFlow<Boolean> = _similarItemsShimmer.asStateFlow()
     private var cachedItem: Item? = null
     private var currentItemId: String? = null
     private var currentUserId: Int? = null  // ← ADD THIS
@@ -124,31 +126,41 @@ class ItemDetailViewModel @Inject constructor(
         }
     }
 
-    // ... rest of your existing code (loadSimilarItemsEarly, fetchItem, etc.) stays the same
+    // In ItemDetailViewModel.kt - update loadSimilarItemsEarly
     private suspend fun loadSimilarItemsEarly(itemId: String) {
         // Serve from cache immediately if we have it
         similarItemsCache[itemId]?.let { cached ->
             Timber.tag(TAG).d("Similar items served from cache: ${cached.size} items")
+            // ✅ Flip shimmer BEFORE setting items
+            _similarItemsShimmer.value = false
             _similarItems.value = cached
             return
         }
 
         _isLoadingSimilar.value = true
+        _similarItemsShimmer.value = true
+
+        Timber.tag(TAG).d("🔄 Loading similar items for: $itemId")
 
         val items = fetchTrendingItems(excludeItemId = itemId, period = "today")
             .ifEmpty { fetchRecentItems(excludeItemId = itemId, period = "week") }
             .ifEmpty { fetchAnyPopularItems(excludeItemId = itemId) }
+
+        Timber.tag(TAG).d("📦 Found ${items.size} similar items")
+
+        // ✅ Flip shimmer BEFORE setting items
+        _isLoadingSimilar.value = false
+        _similarItemsShimmer.value = false
 
         if (items.isNotEmpty()) {
             _similarSectionTitle.value = "Trending Today"
             val result = items.take(6)
             similarItemsCache[itemId] = result
             _similarItems.value = result
+        } else {
+            _similarItems.value = emptyList()
         }
-
-        _isLoadingSimilar.value = false
     }
-
     private suspend fun fetchItem(itemId: String) {
         val result = itemRepository.getItem(itemId)
 

@@ -142,7 +142,37 @@ class ShopViewModel @Inject constructor(
         loadMyShop(showLoading = true)
         loadMyShopItems()
     }
+    fun toggleItemSoldStatus(itemId: String, markAsSold: Boolean) {
+        viewModelScope.launch {
+            Timber.d("🔄 Toggling item $itemId to sold=$markAsSold")
 
+            // Update local list immediately for UI
+            val currentItems = _allItems.value.toMutableList()
+            val index = currentItems.indexOfFirst { it.id == itemId }
+
+            if (index != -1) {
+                val newStatus = if (markAsSold) "sold" else "available"
+                val newQuantity = if (markAsSold) 0 else 1
+
+                val updatedItem = currentItems[index].copy(
+                    status = newStatus,
+                    quantity = newQuantity
+                )
+                currentItems[index] = updatedItem
+                _allItems.value = currentItems
+
+                // ✅ Now this will work
+                itemRepository.updateItemStatus(itemId, newStatus)
+                    .onSuccess {
+                        Timber.d("✅ Successfully updated status to $newStatus")
+                    }
+                    .onFailure { error ->
+                        Timber.e(error, "❌ Failed to update status")
+                        loadMyShopItems()  // Revert on failure
+                    }
+            }
+        }
+    }
     fun clearError() { _error.value = null }
 
 }

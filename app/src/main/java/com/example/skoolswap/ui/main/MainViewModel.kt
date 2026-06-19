@@ -26,40 +26,42 @@ class MainViewModel @Inject constructor(
     private val _forceNavigation = MutableLiveData<NavigationDestination?>()
     val forceNavigation: MutableLiveData<NavigationDestination?> = _forceNavigation
 
-    // Make this MutableLiveData so we can clear it
     private val _navigationDestination = MutableLiveData<NavigationDestination?>()
     val navigationDestination: MutableLiveData<NavigationDestination?> = _navigationDestination
+
+    // Guard — only emit initial navigation once
+    private var initialNavigationEmitted = false
 
     init {
         viewModelScope.launch {
             checkAuthState()
-            observeNavigationState()
+            emitInitialNavigation()
         }
     }
 
-    private suspend fun observeNavigationState() {
-        combine(
-            preferences.isOnboardingFinished,
-            authRepository.getServerUser()
-        ) { onboardingFinished, user ->
-            when {
-                !onboardingFinished -> NavigationDestination.ONBOARDING
-                user == null -> NavigationDestination.LOGIN
-                user.schoolMapped -> NavigationDestination.HOME
-                else -> null
-            }
-        }.collect { destination ->
-            _navigationDestination.value = destination
+    // Called ONCE on startup to determine where to go
+    private suspend fun emitInitialNavigation() {
+        if (initialNavigationEmitted) return
+        initialNavigationEmitted = true
+
+        val onboardingFinished = preferences.isOnboardingFinished.firstOrNull() ?: false
+        val user = authRepository.getServerUser().firstOrNull()
+
+        val destination = when {
+            !onboardingFinished -> NavigationDestination.ONBOARDING
+            user == null -> NavigationDestination.LOGIN
+            user.schoolMapped -> NavigationDestination.HOME
+            else -> NavigationDestination.LOGIN
         }
+
+        _navigationDestination.value = destination
     }
 
     fun checkAuthState() {
         viewModelScope.launch {
             authRepository.checkCurrentUser()
 
-            // Check DataStore login state
             val isLoggedIn = preferences.isLoggedIn.firstOrNull() ?: false
-
             if (!isLoggedIn) {
                 _forceNavigation.value = NavigationDestination.LOGIN
             }
@@ -85,17 +87,16 @@ class MainViewModel @Inject constructor(
             preferences.setLoggedIn(true)
         }
     }
+
     suspend fun hasContactNumber(): Boolean {
         return try {
             val userProfile = authRepository.getServerUser().firstOrNull()
-            val hasContactNumber = !userProfile?.mobile.isNullOrEmpty()
-            Log.d(TAG, "Has contact number: $hasContactNumber")
-            hasContactNumber
+            !userProfile?.mobile.isNullOrEmpty()
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking contact number", e)
             false
         }
     }
+
     fun logout() {
         viewModelScope.launch {
             authRepository.signOut()

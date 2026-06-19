@@ -535,47 +535,95 @@ class MainActivity : AppCompatActivity() {
         val currentDestName = navController.currentDestination?.displayName
 
         Timber.tag("MainActivity")
-            .e("🎯 navigateToDestination: $destination, current: $currentDestName")
+            .e("🎯 navigateToDestination: $destination, current: $currentDestName (id: $currentDestId)")
 
+        // BLOCK: Never navigate away from createItemFragment (camera is active)
         if (currentDestId == R.id.createItemFragment) {
             Timber.tag("MainActivity")
                 .e("🛑 BLOCKING navigation - createItemFragment is active (camera return)")
             return
         }
+
+        // BLOCK: Never navigate away from profile (user is editing profile)
         if (currentDestId == R.id.nav_profile) {
             Timber.tag("MainActivity")
-                .e("🛑 BLOCKING navigation to $destination - ProfileFragment is active")
+                .e("🛑 BLOCKING navigation - ProfileFragment is active")
             return
         }
 
-        if (currentDestId == R.id.productsFragment ||
-            currentDestId == R.id.uniformFragment ||
-            currentDestId == R.id.sportFragment) {
-            Timber.tag("MainActivity").e("🛑 BLOCKED - Already on a content screen")
-            return
-        }
-
+        // Handle navigation based on destination
         when (destination) {
-            NavigationDestination.ONBOARDING -> {
-                if (currentDestId != R.id.viewPagerFragment) {
-                    navController.navigate(R.id.viewPagerFragment)
-                }
-            }
             NavigationDestination.HOME -> {
-                if (currentDestId != R.id.nav_home &&
-                    currentDestId != R.id.productsFragment &&
-                    currentDestId != R.id.uniformFragment &&
-                    currentDestId != R.id.sportFragment &&
-                    currentDestId != R.id.recentFragment) {
-                    navController.navigate(R.id.nav_home)
-                } else {
-                    Timber.tag("MainActivity")
-                        .e("🛑 Already on a valid screen, skipping HOME navigation")
+                Timber.tag("MainActivity").e("🏠 Navigating to HOME")
+
+                if (currentDestId == R.id.nav_home) {
+                    Timber.tag("MainActivity").e("✅ Already on home, skipping")
+                    return
                 }
+
+                val popped = navController.popBackStack(R.id.nav_home, false)
+                if (!popped) {
+                    navController.navigate(R.id.action_introFragment_to_nav_home)
+                }
+
+                Timber.tag("MainActivity").e("✅ Navigated to HOME")
             }
+
             NavigationDestination.LOGIN -> {
-                if (currentDestId != R.id.loginFragment) {
-                    navController.navigate(R.id.loginFragment)
+                Timber.tag("MainActivity").e("🔐 Navigating to LOGIN")
+
+                if (currentDestId == R.id.loginFragment) {
+                    Timber.tag("MainActivity").e("✅ Already on login, skipping")
+                    return
+                }
+
+                val popped = navController.popBackStack(R.id.loginFragment, false)
+                if (!popped) {
+                    navController.navigate(R.id.action_global_logout)
+                }
+
+                Timber.tag("MainActivity").e("✅ Navigated to LOGIN")
+            }
+
+            NavigationDestination.ONBOARDING -> {
+                Timber.tag("MainActivity").e("📋 Navigating to ONBOARDING")
+
+                if (currentDestId == R.id.viewPagerFragment) {
+                    Timber.tag("MainActivity").e("✅ Already on onboarding, skipping")
+                    return
+                }
+
+                val popped = navController.popBackStack(R.id.viewPagerFragment, false)
+                if (!popped) {
+                    navController.navigate(R.id.action_introFragment_to_onboarding)
+                }
+
+                Timber.tag("MainActivity").e("✅ Navigated to ONBOARDING")
+            }
+
+            NavigationDestination.ONBOARDING -> {
+                Timber.tag("MainActivity").e("📋 Navigating to ONBOARDING")
+
+                if (currentDestId == R.id.viewPagerFragment) {
+                    Timber.tag("MainActivity").e("✅ Already on onboarding, skipping")
+                    return
+                }
+
+                navController.navigate(R.id.viewPagerFragment) {
+                    popUpTo(R.id.mobile_navigation) {
+                        inclusive = true
+                    }
+                    launchSingleTop = true
+                }
+                Timber.tag("MainActivity").e("✅ Navigated to ONBOARDING")
+            }
+
+            else -> {
+                // Unknown destination - fallback to login
+                Timber.tag("MainActivity").e("⚠️ Unknown destination: $destination - falling back to LOGIN")
+                val popped = navController.popBackStack(R.id.loginFragment, false)
+                if (!popped) {
+                    navController.navigate(R.id.action_global_logout)
                 }
             }
         }

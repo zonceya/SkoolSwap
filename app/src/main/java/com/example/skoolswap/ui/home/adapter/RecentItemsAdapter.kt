@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import java.text.NumberFormat
 import java.util.Locale
+import kotlin.collections.List
 
 class RecentItemsAdapter(
     private val onItemClick: (Item) -> Unit,

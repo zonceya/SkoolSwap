@@ -28,39 +28,55 @@ data class Item(
     val gender: String? = null,
     val createdAt: String,
     val shop: Shop? = null,
-    val images: List<ItemImage> = emptyList(), // For backward compatibility
+    val images: List<ItemImage> = emptyList(),
     val coverImage: String? = null,
+    val image: String? = null,  // The 'image' field from API
+    val additionalPhoto: String? = null,  // The 'additional_photo' column from database
     val sizeName: String? = null,
     val colorName: String? = null,
     val brandName: String? = null,
     val conditionName: String? = null,
     val viewCount: Int = 0,
 ) {
+    val availableQuantity: Int
+        get() = quantity - reserved
 
-        val availableQuantity: Int
-            get() = quantity - reserved
-
-        fun resolveImageUrl(): String? =
-            coverImage?.takeIf { it.isNotBlank() && it.startsWith("http") }
-                ?: images.firstOrNull { !it.url.isNullOrBlank() && it.url.startsWith("http") }?.url
-
-        fun resolveAllImageUrls(): List<String> {
-            val result = mutableListOf<String>()
-
-            coverImage?.takeIf { it.isNotBlank() && it.startsWith("http") }?.let {
-                result.add(it)
-            }
-
-            images
-                .mapNotNull { it.url }
-                .filter { it.startsWith("http") && it != coverImage }
-                .forEach { result.add(it) }
-
-            return result
-        }
+    fun resolveImageUrl(): String? {
+        return coverImage?.takeIf { it.isNotBlank() }
+            ?: image?.takeIf { it.isNotBlank() }
+            ?: additionalPhoto?.takeIf { it.isNotBlank() }
+            ?: images.firstOrNull { !it.url.isNullOrBlank() }?.url
     }
 
+    fun resolveAllImageUrls(): List<String> {
+        val result = mutableListOf<String>()
 
+        // 1. Add cover photo
+        coverImage?.takeIf { it.isNotBlank() }?.let {
+            if (!result.contains(it)) result.add(it)
+        }
+
+        // 2. Add single 'image' field
+        image?.takeIf { it.isNotBlank() }?.let {
+            if (!result.contains(it)) result.add(it)
+        }
+
+        // 3. Add additional_photo
+        additionalPhoto?.takeIf { it.isNotBlank() }?.let {
+            if (!result.contains(it)) result.add(it)
+        }
+
+        // 4. Add all images from Active Storage attachments
+        images.forEach { img ->
+            val url = img.url
+            if (!url.isNullOrBlank() && !result.contains(url)) {
+                result.add(url)
+            }
+        }
+
+        return result
+    }
+}
 
 data class ItemMeta(
     val color: String?,

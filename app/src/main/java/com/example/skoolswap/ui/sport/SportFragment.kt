@@ -162,10 +162,10 @@ class SportFragment : Fragment() {
 
     private fun navigateToSportProducts(sport: SportItem) {
         val bundle = Bundle().apply {
-            putString("SECTION_TYPE", "sport")
+            putString("SECTION_TYPE", "sport")           // keep lowercase for consistency
             putString("SECTION_TITLE", sport.name)
             putInt("CATEGORY_ID", 2)
-            putInt("SPORT_TYPE_ID", sport.id)
+            putInt("SPORT_TYPE_ID", sport.id)            // if you still need sport-specific filter
         }
         findNavController().navigate(R.id.action_sportFragment_to_productsFragment, bundle)
     }

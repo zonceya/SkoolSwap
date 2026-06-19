@@ -444,25 +444,64 @@ class ItemRepository @Inject constructor(
     override suspend fun getItem(itemId: String): Result<Item> {
         Log.d(TAG, "getItem called for ID: $itemId")
 
+        // 1. ALWAYS fetch from network first to get the latest data
+        Log.d(TAG, "🌐 Fetching from NETWORK (prioritizing latest)...")
+        val startTime = System.currentTimeMillis()
+
+        return try {
+            val response = itemApiService.getItem(itemId)
+            val duration = System.currentTimeMillis() - startTime
+
+            if (!response.isSuccessful) {
+                Log.e(TAG, "Network error: ${response.code()}, falling back to cache")
+                // If API fails, fallback to cache
+                return getItemFromCache(itemId)
+            }
+
+            val itemResponse = response.body()
+            if (itemResponse?.success == true && itemResponse.item != null) {
+                val item = mapItemDetailToDomain(itemResponse.item)
+
+                Log.d(TAG, "✅ Network fetch successful (${duration}ms):")
+                Log.d(TAG, "   - Name: ${item.name}")
+                Log.d(TAG, "   - Images: ${item.images.size}")
+                item.images.forEachIndexed { index, image ->
+                    Log.d(TAG, "     Image $index: ${image.url}")
+                }
+
+                // Save to database WITH images (this updates Room with latest)
+                saveToDatabaseWithImages(item)
+
+                // Update memory cache
+                memoryCache[itemId] = item
+                memoryCacheTime[itemId] = System.currentTimeMillis()
+
+                Result.success(item)
+            } else {
+                Log.e(TAG, "Item not found in response, falling back to cache")
+                getItemFromCache(itemId)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Network exception: ${e.message}, falling back to cache", e)
+            getItemFromCache(itemId)
+        }
+    }
+
+    // Helper method to get from cache (memory or database)
+    private suspend fun getItemFromCache(itemId: String): Result<Item> {
         // 1. Check memory cache first (fastest)
         memoryCache[itemId]?.let { cachedItem ->
             val cacheAge = System.currentTimeMillis() - (memoryCacheTime[itemId] ?: 0)
-            if (cacheAge < CACHE_DURATION_MS && cachedItem.images.isNotEmpty()) {
-                Timber.tag(TAG).d("✅ Using MEMORY cache (age: ${cacheAge}ms)")
-                Timber.tag(TAG).d("   - Images: ${cachedItem.images.size}")
-                return Result.success(cachedItem)
-            } else {
-                Timber.tag(TAG).d("⚠️ Memory cache expired or has no images")
-                memoryCache.remove(itemId)
-                memoryCacheTime.remove(itemId)
-            }
+            Timber.tag(TAG).d("💾 Using MEMORY cache (age: ${cacheAge}ms)")
+            Timber.tag(TAG).d("   - Images: ${cachedItem.images.size}")
+            return Result.success(cachedItem)
         }
 
-        // 2. Check database cache with images
+        // 2. Check database cache
         try {
             val dbItem = itemDao.getItemById(itemId)
             if (dbItem != null) {
-                Log.d(TAG, "💾 Using database cache")
+                Log.d(TAG, "💾 Using DATABASE cache")
 
                 // Load images from database
                 val images = itemImageDao.getImagesForItem(itemId).map { imageEntity ->
@@ -497,7 +536,7 @@ class ItemRepository @Inject constructor(
                     conditionName = dbItem.conditionName,
                     createdAt = dbItem.createdAt,
                     updatedAt = dbItem.updatedAt,
-                    images = images,  // Now with actual images!
+                    images = images,
                     coverImage = images.firstOrNull { it.isCover }?.url ?: images.firstOrNull()?.url,
                     shop = null,
                     provinceId = dbItem.provinceId,
@@ -505,7 +544,8 @@ class ItemRepository @Inject constructor(
                     label = dbItem.label,
                     reserved = dbItem.reserved,
                     meta = null,
-                    itemTypeId = dbItem.itemTypeId
+                    itemTypeId = dbItem.itemTypeId,
+                    viewCount = dbItem.viewCount ?: 0
                 )
 
                 // Update memory cache
@@ -513,50 +553,13 @@ class ItemRepository @Inject constructor(
                 memoryCacheTime[itemId] = System.currentTimeMillis()
 
                 return Result.success(domainItem)
-            } else {
-                Log.d(TAG, "💾 No database cache found")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Database error: ${e.message}", e)
         }
 
-        // 3. Fetch from network (slowest but most reliable)
-        Log.d(TAG, "🌐 Fetching from NETWORK...")
-        val startTime = System.currentTimeMillis()
-
-        return try {
-            val response = itemApiService.getItem(itemId)
-            val duration = System.currentTimeMillis() - startTime
-
-            if (!response.isSuccessful) {
-                Log.e(TAG, "Network error: ${response.code()}")
-                return Result.failure(Exception("Server error: ${response.code()}"))
-            }
-
-            val itemResponse = response.body()
-            if (itemResponse?.success == true && itemResponse.item != null) {
-                val item = mapItemDetailToDomain(itemResponse.item)
-
-                Log.d(TAG, "✅ Network fetch successful (${duration}ms):")
-                Log.d(TAG, "   - Name: ${item.name}")
-                Log.d(TAG, "   - Images: ${item.images.size}")
-
-                // Save to database WITH images
-                saveToDatabaseWithImages(item)
-
-                // Update memory cache
-                memoryCache[itemId] = item
-                memoryCacheTime[itemId] = System.currentTimeMillis()
-
-                Result.success(item)
-            } else {
-                Log.e(TAG, "Item not found in response")
-                Result.failure(Exception("Item not found"))
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Network exception: ${e.message}", e)
-            Result.failure(e)
-        }
+        Log.e(TAG, "❌ No data found anywhere for: $itemId")
+        return Result.failure(Exception("Item not found"))
     }
 
     // Add this method to ItemRepositoryInterface and implementation
@@ -627,7 +630,8 @@ class ItemRepository @Inject constructor(
             updatedAt = updatedAt,
             deleted = false,
             imageCount = images.size,
-            lastCacheTime = System.currentTimeMillis()
+            lastCacheTime = System.currentTimeMillis(),
+            viewCount = viewCount
         )
     }
     private fun mapItemDetailToDomain(dto: ItemDetailDto): Item {
@@ -843,13 +847,25 @@ class ItemRepository @Inject constructor(
         }
     }
 
-    suspend fun updateItemStatus(itemId: String, status: String): Result<Unit> {
+    // ✅ Add @Override annotation or just make sure it's marked as override
+    override suspend fun updateItemStatus(itemId: String, status: String): Result<Unit> {
         return try {
+            // Update local database
             itemDao.updateItemStatus(itemId, status)
-            Log.i(TAG, "Updated item $itemId status to $status")
+            Log.i(TAG, "✅ Updated item $itemId status to $status in database")
+
+            // Also update the cache
+            val currentList = _currentItems.value.toMutableList()
+            val index = currentList.indexOfFirst { it.id == itemId }
+            if (index != -1) {
+                val updatedItem = currentList[index].copy(status = status)
+                currentList[index] = updatedItem
+                _currentItems.value = currentList
+            }
+
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e(TAG, "Update item status failed", e)
+            Log.e(TAG, "❌ Update item status failed", e)
             Result.failure(e)
         }
     }

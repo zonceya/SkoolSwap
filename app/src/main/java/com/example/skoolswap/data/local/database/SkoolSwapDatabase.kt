@@ -33,7 +33,7 @@ import java.io.File
         UserSchoolEntity::class,
         HomeFeedEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

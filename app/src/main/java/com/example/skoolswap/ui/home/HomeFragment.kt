@@ -2,12 +2,11 @@ package com.example.skoolswap.ui.home
 
 import android.os.Bundle
 import android.util.Log
-import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.core.view.GravityCompat
@@ -27,7 +26,7 @@ import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.homefeed.Section
 import com.example.skoolswap.ui.home.adapter.BannerAdapter
 import com.example.skoolswap.ui.home.adapter.HomeFeedAdapter
-import com.example.skoolswap.ui.shop.ProductAdapter
+import com.example.skoolswap.ui.shop.CategoryGridAdapter
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
@@ -44,20 +43,28 @@ class HomeFragment : Fragment() {
 
     private val viewModel: HomeViewModel by viewModels()
     private lateinit var homeAdapter: HomeFeedAdapter
-    private lateinit var searchResultsAdapter: ProductAdapter
     private lateinit var bannerAdapter: BannerAdapter
     private lateinit var autoScrollHelper: BannerAutoScrollHelper
+    private lateinit var categorySearchAdapter: CategoryGridAdapter
+
     private var currentTabId: Int = R.id.tabHome
     internal var searchJob: Job? = null
     private var isInSearchMode = false
+
+    // Search result state — single source of truth
+    private var originalSearchResults = mutableListOf<Item>()
     private var currentSearchResults = mutableListOf<Item>()
+
+    // Filter state
     private var selectedGender: String? = null
     private var selectedCondition: String? = null
     private var selectedSize: String? = null
     private var selectedColor: String? = null
     private var selectedBrand: String? = null
+
     @Inject
     lateinit var appPreferences: AppPreferences
+
     private val bannerItems = listOf(
         BannerItem(imageUrl = "https://cdn.skoolswap.co.za/banners/home_1.jpg"),
         BannerItem(imageUrl = "https://cdn.skoolswap.co.za/banners/home_2.jpg"),
@@ -83,13 +90,10 @@ class HomeFragment : Fragment() {
         setupBackButton()
         observeViewModel()
         setupSwipeRefresh()
+
         viewLifecycleOwner.lifecycleScope.launch {
-            // Try nav argument first (freshly logged in - prefs not written yet)
             val argSchoolId = arguments?.getInt("schoolId", -1)?.takeIf { it > 0 }
-
-            // Fall back to prefs (returning user)
             val prefSchoolId = appPreferences.schoolId.first()?.takeIf { it > 0 }
-
             val schoolId = argSchoolId ?: prefSchoolId
             Log.d("HomeFragment", "🔑 schoolId: arg=$argSchoolId prefs=$prefSchoolId using=$schoolId")
 
@@ -99,52 +103,89 @@ class HomeFragment : Fragment() {
 
             if (viewModel.homeFeed.value == null && !viewModel.isLoading.value) {
                 viewModel.loadHomeFeed()
-            } else if (viewModel.isLoading.value) {
-                // Already loading with wrong schoolId — cancel and restart with correct one
-                if (schoolId != null) {
-                    Log.d("HomeFragment", "🔄 Restarting load with correct schoolId: $schoolId")
-                    viewModel.loadHomeFeed(forceRefresh = true)
-                }
+            } else if (viewModel.isLoading.value && schoolId != null) {
+                Log.d("HomeFragment", "🔄 Restarting load with correct schoolId: $schoolId")
+                viewModel.loadHomeFeed(forceRefresh = true)
             }
         }
 
         return binding.root
     }
 
+    // ====================== SEARCH ======================
+
     fun performLiveSearch(query: String) {
         Timber.tag("HomeFragment").d("🔍 performLiveSearch called with: $query")
         isInSearchMode = true
         enterSearchMode()
+        // Always null — home search covers full catalogue across all sections
         viewModel.searchItems(query, categoryId = null)
     }
 
     fun exitSearchMode() {
         isInSearchMode = false
+
         binding.topTabs.visibility = View.VISIBLE
-        binding.filterBar.visibility = View.GONE
-        binding.homeRecycler.visibility = View.VISIBLE
         binding.bannerViewPager.visibility = View.VISIBLE
         binding.indicatorDots.visibility = View.VISIBLE
-        binding.searchResultsContainer.visibility = View.GONE  // ← ADD THIS
+        binding.swipeRefreshLayout.visibility = View.VISIBLE
+        binding.homeRecycler.visibility = View.VISIBLE
+
+        binding.filterBar.visibility = View.GONE
+        binding.searchResultsContainer.visibility = View.GONE
         binding.searchResultsRecycler.visibility = View.GONE
         binding.emptySearchResults.visibility = View.GONE
-        selectedGender = null
-        selectedCondition = null
-        selectedSize = null
-        selectedColor = null
-        selectedBrand = null
+
+        clearFilterState()
     }
 
     private fun enterSearchMode() {
         binding.topTabs.visibility = View.GONE
-        binding.filterBar.visibility = View.VISIBLE
-        binding.homeRecycler.visibility = View.GONE
         binding.bannerViewPager.visibility = View.GONE
         binding.indicatorDots.visibility = View.GONE
-        binding.searchResultsContainer.visibility = View.VISIBLE  // ← ADD THIS
+        binding.homeRecycler.visibility = View.GONE
+        binding.swipeRefreshLayout.visibility = View.GONE
+
+        binding.filterBar.visibility = View.VISIBLE
+        binding.searchResultsContainer.visibility = View.VISIBLE
         binding.searchResultsRecycler.visibility = View.VISIBLE
         binding.emptySearchResults.visibility = View.GONE
     }
+
+    // ====================== RECYCLER ======================
+
+    private fun setupRecyclerView() {
+        homeAdapter = HomeFeedAdapter(
+            onItemClick = { item, source ->
+                navigateToItemDetail(item.id, source)
+            },
+            onViewAllClick = { sectionType ->
+                when (sectionType) {
+                    "recommended" -> navigateToProducts("recommended", "Recommended For You", null, null)
+                    "essentials" -> navigateToProducts("essentials", "School Essentials", null, null)
+                    "trending" -> navigateToProducts("trending", "Trending", "today", null)
+                    "recent" -> navigateToProducts("recent", "Recently Added", "all", null)
+                }
+            }
+        )
+        binding.homeRecycler.apply {
+            layoutManager = LinearLayoutManager(requireContext())
+            adapter = homeAdapter
+        }
+
+        // Single adapter for search results — CategoryGridAdapter only
+        categorySearchAdapter = CategoryGridAdapter(
+            onItemClick = { itemId ->
+                navigateToItemDetail(itemId, "search")
+            },
+            onSoldToggle = null,
+            isShopMode = false
+        )
+        binding.searchResultsRecycler.layoutManager = GridLayoutManager(requireContext(), 2)
+        binding.searchResultsRecycler.adapter = categorySearchAdapter
+    }
+
+    // ====================== SORT ======================
 
     private fun setupFilterBar() {
         binding.sortBtn.setOnClickListener { showSortMenu() }
@@ -157,33 +198,15 @@ class HomeFragment : Fragment() {
                 android.content.res.Configuration.UI_MODE_NIGHT_YES
 
         if (isDarkMode) {
-            // Use existing dark_surface color for background
-            binding.sortBtn.setBackgroundColor(
-                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.dark_surface)
-            )
-            binding.filterBtn.setBackgroundColor(
-                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.dark_surface)
-            )
-            binding.sortBtn.setTextColor(
-                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white)
-            )
-            binding.filterBtn.setTextColor(
-                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white)
-            )
+            binding.sortBtn.setBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.dark_surface))
+            binding.filterBtn.setBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.dark_surface))
+            binding.sortBtn.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white))
+            binding.filterBtn.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white))
         } else {
-            // Use existing light_background color for light mode
-            binding.sortBtn.setBackgroundColor(
-                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.light_background)
-            )
-            binding.filterBtn.setBackgroundColor(
-                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.light_background)
-            )
-            binding.sortBtn.setTextColor(
-                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.black)
-            )
-            binding.filterBtn.setTextColor(
-                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.black)
-            )
+            binding.sortBtn.setBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.light_background))
+            binding.filterBtn.setBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.light_background))
+            binding.sortBtn.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.black))
+            binding.filterBtn.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.black))
         }
     }
 
@@ -208,12 +231,14 @@ class HomeFragment : Fragment() {
             "price_low" -> currentSearchResults.sortedBy { it.price }
             "price_high" -> currentSearchResults.sortedByDescending { it.price }
             "newest" -> currentSearchResults.sortedByDescending { it.createdAt }
-            else -> currentSearchResults
+            else -> currentSearchResults.toList()
         }
         currentSearchResults.clear()
         currentSearchResults.addAll(sorted)
-        searchResultsAdapter.submitList(currentSearchResults)
+        categorySearchAdapter.submitList(currentSearchResults.toList())
     }
+
+    // ====================== FILTER DRAWER ======================
 
     private fun setupFilterDrawer() {
         setupPriceSlider()
@@ -241,57 +266,61 @@ class HomeFragment : Fragment() {
         }
     }
 
+    private fun setupBackButton() {
+        binding.backToMain.setOnClickListener {
+            binding.filterHeaderTitle.visibility = View.VISIBLE
+            binding.optionsHeader.visibility = View.GONE
+            binding.dynamicFilterContainer.visibility = View.VISIBLE
+            binding.optionsContainer.visibility = View.GONE
+        }
+    }
+
     private fun rebuildLocalFilters() {
         binding.dynamicFilterContainer.removeAllViews()
 
-        // Get unique values from current search results
+        // For each filter group, available options = originalResults filtered by
+        // ALL OTHER active filters (not its own), so it never drains to zero
+        fun itemsExcluding(excludeGroup: String): List<Item> {
+            var items = originalSearchResults.toList()
+            if (excludeGroup != "gender" && selectedGender != null)
+                items = items.filter { getGender(it) == selectedGender }
+            if (excludeGroup != "condition" && selectedCondition != null)
+                items = items.filter { it.conditionName == selectedCondition }
+            if (excludeGroup != "size" && selectedSize != null)
+                items = items.filter { it.sizeName == selectedSize }
+            if (excludeGroup != "color" && selectedColor != null)
+                items = items.filter { it.colorName == selectedColor }
+            if (excludeGroup != "brand" && selectedBrand != null)
+                items = items.filter { it.brandName == selectedBrand }
+            return items
+        }
 
-        val conditions = currentSearchResults.mapNotNull { it.conditionName }.distinct()
-        val sizes = currentSearchResults.mapNotNull { it.sizeName }.distinct()
-        val colors = currentSearchResults.mapNotNull { it.colorName }.distinct()
-        val brands = currentSearchResults.mapNotNull { it.brandName }.distinct()
-
-        // Add Gender filter
-        val genders = currentSearchResults.mapNotNull { item ->
-            when (item.genderId) {
-                42 -> "Boys"
-                43 -> "Girls"
-                27 -> "Unisex"
-                in 1..26 -> if (item.genderId?.rem(2) == 0) "Girls" else "Boys"
-                else -> item.gender
-            }
-        }.distinct()
-
-        Timber.tag("HomeFragment").d("Genders found: $genders")
+        val genders = itemsExcluding("gender").mapNotNull { getGender(it) }.distinct()
+        val conditions = itemsExcluding("condition").mapNotNull { it.conditionName }.distinct()
+        val sizes = itemsExcluding("size").mapNotNull { it.sizeName }.distinct()
+        val colors = itemsExcluding("color").mapNotNull { it.colorName }.distinct()
+        val brands = itemsExcluding("brand").mapNotNull { it.brandName }.distinct()
 
         if (genders.isNotEmpty()) {
             addFilterItem("Gender", selectedGender) {
                 showOptionsDrawer("gender", "Gender", genders.map { FilterOption(it.hashCode(), it) }, selectedGender)
             }
         }
-
-        // Add Condition filter
         if (conditions.isNotEmpty()) {
             addFilterItem("Condition", selectedCondition) {
                 showOptionsDrawer("condition", "Condition", conditions.map { FilterOption(it.hashCode(), it) }, selectedCondition)
             }
         }
-
-        // Add Size filter
         if (sizes.isNotEmpty()) {
             addFilterItem("Size", selectedSize) {
                 showOptionsDrawer("size", "Size", sizes.map { FilterOption(it.hashCode(), it) }, selectedSize)
             }
         }
-
-        // Add Color filter
         if (colors.isNotEmpty()) {
             addFilterItem("Color", selectedColor) {
                 showOptionsDrawer("color", "Color", colors.map { FilterOption(it.hashCode(), it) }, selectedColor)
             }
         }
-
-        // Add Brand filter
         if (brands.isNotEmpty()) {
             addFilterItem("Brand", selectedBrand) {
                 showOptionsDrawer("brand", "Brand", brands.map { FilterOption(it.hashCode(), it) }, selectedBrand)
@@ -303,9 +332,9 @@ class HomeFragment : Fragment() {
         val itemView = layoutInflater.inflate(R.layout.item_filter_section, binding.dynamicFilterContainer, false)
         val titleView = itemView.findViewById<TextView>(R.id.filterTitle)
         val valueView = itemView.findViewById<TextView>(R.id.filterValue)
+        val clickableRow = itemView.findViewById<LinearLayout>(R.id.filterRow)
 
         titleView.text = title
-
         if (!selectedValue.isNullOrEmpty()) {
             valueView.text = selectedValue
             valueView.visibility = View.VISIBLE
@@ -313,11 +342,17 @@ class HomeFragment : Fragment() {
             valueView.visibility = View.GONE
         }
 
+        clickableRow.setOnClickListener { onClick() }
         itemView.setOnClickListener { onClick() }
         binding.dynamicFilterContainer.addView(itemView)
     }
 
-    private fun showOptionsDrawer(groupId: String, groupName: String, options: List<FilterOption>, currentSelection: String?) {
+    private fun showOptionsDrawer(
+        groupId: String,
+        groupName: String,
+        options: List<FilterOption>,
+        currentSelection: String?
+    ) {
         binding.filterHeaderTitle.visibility = View.GONE
         binding.optionsHeader.visibility = View.VISIBLE
         binding.optionsTitle.text = groupName
@@ -327,7 +362,9 @@ class HomeFragment : Fragment() {
         val container = binding.optionsContainer
         container.removeAllViews()
 
-        options.forEach { option ->
+        val sortedOptions = options.sortedBy { if (it.name == currentSelection) 0 else 1 }
+
+        sortedOptions.forEach { option ->
             val optionView = layoutInflater.inflate(R.layout.item_filter_option, container, false)
             val textView = optionView.findViewById<TextView>(R.id.optionName)
             val checkIcon = optionView.findViewById<ImageView>(R.id.checkIcon)
@@ -337,93 +374,111 @@ class HomeFragment : Fragment() {
 
             optionView.setOnClickListener {
                 when (groupId) {
-                    "gender" -> selectedGender = option.name
-                    "condition" -> selectedCondition = option.name
-                    "size" -> selectedSize = option.name
-                    "color" -> selectedColor = option.name
-                    "brand" -> selectedBrand = option.name
+                    "gender" -> {
+                        selectedGender = if (selectedGender == option.name) null else option.name
+                        if (selectedGender != null) {
+                            selectedCondition = null
+                            selectedSize = null
+                            selectedColor = null
+                            selectedBrand = null
+                        }
+                    }
+                    "condition" -> selectedCondition = if (selectedCondition == option.name) null else option.name
+                    "size" -> selectedSize = if (selectedSize == option.name) null else option.name
+                    "color" -> selectedColor = if (selectedColor == option.name) null else option.name
+                    "brand" -> selectedBrand = if (selectedBrand == option.name) null else option.name
                 }
 
                 applyAllFilters()
-
-                binding.filterHeaderTitle.visibility = View.VISIBLE
-                binding.optionsHeader.visibility = View.GONE
-                binding.dynamicFilterContainer.visibility = View.VISIBLE
-                binding.optionsContainer.visibility = View.GONE
-
-                rebuildLocalFilters()
+                // Rebuild the options list in place so user can keep filtering
+                // without drawer closing
+                showOptionsDrawer(groupId, groupName, getUpdatedOptions(groupId), getSelection(groupId))
             }
 
             container.addView(optionView)
         }
     }
 
-    private fun setupBackButton() {
-        binding.backToMain.setOnClickListener {
-            binding.filterHeaderTitle.visibility = View.VISIBLE
-            binding.optionsHeader.visibility = View.GONE
-            binding.dynamicFilterContainer.visibility = View.VISIBLE
-            binding.optionsContainer.visibility = View.GONE
+    // Returns updated options for the current group after a filter was applied
+    private fun getUpdatedOptions(groupId: String): List<FilterOption> {
+        var items = originalSearchResults.toList()
+        // Apply all filters EXCEPT the one for this group
+        if (groupId != "gender" && selectedGender != null)
+            items = items.filter { getGender(it) == selectedGender }
+        if (groupId != "condition" && selectedCondition != null)
+            items = items.filter { it.conditionName == selectedCondition }
+        if (groupId != "size" && selectedSize != null)
+            items = items.filter { it.sizeName == selectedSize }
+        if (groupId != "color" && selectedColor != null)
+            items = items.filter { it.colorName == selectedColor }
+        if (groupId != "brand" && selectedBrand != null)
+            items = items.filter { it.brandName == selectedBrand }
+
+        val values = when (groupId) {
+            "gender" -> items.mapNotNull { getGender(it) }.distinct()
+            "condition" -> items.mapNotNull { it.conditionName }.distinct()
+            "size" -> items.mapNotNull { it.sizeName }.distinct()
+            "color" -> items.mapNotNull { it.colorName }.distinct()
+            "brand" -> items.mapNotNull { it.brandName }.distinct()
+            else -> emptyList()
         }
+        return values.map { FilterOption(it.hashCode(), it) }
+    }
+
+    private fun getSelection(groupId: String): String? = when (groupId) {
+        "gender" -> selectedGender
+        "condition" -> selectedCondition
+        "size" -> selectedSize
+        "color" -> selectedColor
+        "brand" -> selectedBrand
+        else -> null
     }
 
     private fun applyAllFilters() {
-        var filtered = currentSearchResults.toList()
+        var filtered = originalSearchResults.toList()
 
         val minPrice = binding.priceSlider.values[0]
         val maxPrice = binding.priceSlider.values[1]
         filtered = filtered.filter { it.price in minPrice..maxPrice }
 
-        // Apply gender filter
-        if (selectedGender != null) {
-            filtered = filtered.filter { item ->
-                val itemGender = when (item.genderId) {
-                    42 -> "Boys"
-                    43 -> "Girls"
-                    27 -> "Unisex"
-                    in 1..26 -> if (item.genderId?.rem(2) == 0) "Girls" else "Boys"
-                    else -> item.gender
-                }
-                itemGender == selectedGender
-            }
-        }
-
-        if (selectedCondition != null) {
-            filtered = filtered.filter { it.conditionName == selectedCondition }
-        }
-
-        if (selectedSize != null) {
-            filtered = filtered.filter { it.sizeName == selectedSize }
-        }
-
-        if (selectedColor != null) {
-            filtered = filtered.filter { it.colorName == selectedColor }
-        }
-
-        if (selectedBrand != null) {
-            filtered = filtered.filter { it.brandName == selectedBrand }
-        }
+        if (selectedGender != null) filtered = filtered.filter { getGender(it) == selectedGender }
+        if (selectedCondition != null) filtered = filtered.filter { it.conditionName == selectedCondition }
+        if (selectedSize != null) filtered = filtered.filter { it.sizeName == selectedSize }
+        if (selectedColor != null) filtered = filtered.filter { it.colorName == selectedColor }
+        if (selectedBrand != null) filtered = filtered.filter { it.brandName == selectedBrand }
 
         currentSearchResults.clear()
         currentSearchResults.addAll(filtered)
-        searchResultsAdapter.submitList(currentSearchResults)
+        categorySearchAdapter.submitList(currentSearchResults.toList())
     }
 
     private fun resetLocalFilters() {
         binding.priceSlider.setValues(0f, 1000f)
         binding.selectedPriceRange.text = "R0 - R1000"
+        clearFilterState()
+        currentSearchResults.clear()
+        currentSearchResults.addAll(originalSearchResults)
+        categorySearchAdapter.submitList(currentSearchResults.toList())
+        rebuildLocalFilters()
+    }
 
+    private fun clearFilterState() {
         selectedGender = null
         selectedCondition = null
         selectedSize = null
         selectedColor = null
         selectedBrand = null
+    }
 
-        rebuildLocalFilters()
+    // ====================== HELPERS ======================
 
-        val currentQuery = viewModel.searchQuery.value
-        if (currentQuery != null && currentQuery.isNotEmpty()) {
-            viewModel.searchItems(currentQuery, null)
+    private fun getGender(item: Item): String? {
+        return when (item.genderId) {
+            42 -> "Boys"
+            43 -> "Girls"
+            27 -> "Unisex"
+            in 1..26 -> if (item.genderId?.rem(2) == 0) "Girls" else "Boys"
+            else -> item.gender?.takeIf { it.isNotBlank() }  // null if no gender
         }
     }
 
@@ -433,33 +488,6 @@ class HomeFragment : Fragment() {
             putString("source", source)
         }
         findNavController().navigate(R.id.itemDetailFragment, bundle)
-    }
-
-    private fun setupRecyclerView() {
-        homeAdapter = HomeFeedAdapter(
-            onItemClick = { item, source ->
-                navigateToItemDetail(item.id, source)
-            },
-            onViewAllClick = { sectionType ->
-                when (sectionType) {
-                    "recommended" -> navigateToProducts("recommended", "Recommended For You", null, null)
-                    "essentials" -> navigateToProducts("essentials", "School Essentials", null, null)
-                    "trending" -> navigateToProducts("trending", "Trending", "today", null)
-                    "recent" -> navigateToProducts("recent", "Recently Added", "all", null)
-                }
-            }
-        )
-
-        binding.homeRecycler.apply {
-            layoutManager = LinearLayoutManager(requireContext())
-            adapter = homeAdapter
-        }
-
-        searchResultsAdapter = ProductAdapter { itemId ->
-            navigateToItemDetail(itemId, "search")
-        }
-        binding.searchResultsRecycler.layoutManager = GridLayoutManager(requireContext(), 2)
-        binding.searchResultsRecycler.adapter = searchResultsAdapter
     }
 
     private fun navigateToProducts(
@@ -472,91 +500,12 @@ class HomeFragment : Fragment() {
             putString("SECTION_TYPE", sectionType)
             putString("SECTION_TITLE", title)
             period?.let { putString("PERIOD", it) }
-            if (categoryId != null) {
-                putInt("CATEGORY_ID", categoryId)
-            }
+            if (categoryId != null) putInt("CATEGORY_ID", categoryId)
         }
         findNavController().navigate(R.id.action_homeFragment_to_productsFragment, bundle)
     }
 
-    private fun setupCustomTabs() {
-        val tabs = listOf(binding.tabHome, binding.tabUniform, binding.tabSport, binding.tabRecent)
-        val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                android.content.res.Configuration.UI_MODE_NIGHT_YES
-        val unselectedDrawable = if (isDarkMode) R.drawable.tablayout_unselected_night else R.drawable.tablayout_unselected
-
-        tabs.forEach { tab ->
-            tab.setBackgroundResource(unselectedDrawable)
-            tab.setOnClickListener { selectTab(tab) }
-        }
-
-        // ✅ Just style the tab, don't trigger a load
-        highlightTab(binding.tabHome)
-    }
-    private fun highlightTab(selectedTab: TextView) {
-        val tabs = listOf(binding.tabHome, binding.tabUniform, binding.tabSport, binding.tabRecent)
-        val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                android.content.res.Configuration.UI_MODE_NIGHT_YES
-
-        tabs.forEach { tab ->
-            if (tab == selectedTab) {
-                tab.setBackgroundResource(R.drawable.tablayout_selector)
-                tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), android.R.color.white))
-                tab.setTypeface(null, android.graphics.Typeface.BOLD)
-            } else {
-                if (isDarkMode) {
-                    tab.setBackgroundResource(R.drawable.tablayout_unselected_night)
-                    tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white_70))
-                } else {
-                    tab.setBackgroundResource(R.drawable.tablayout_unselected)
-                    tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.black_70))
-                }
-                tab.setTypeface(null, android.graphics.Typeface.NORMAL)
-            }
-        }
-    }
-    fun getCurrentCategoryId(): Int? {
-        return when (currentTabId) {
-            R.id.tabUniform -> 6
-            R.id.tabSport -> 7
-            else -> null
-        }
-    }
-    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
-        super.onConfigurationChanged(newConfig)
-        // Re-apply correct drawable when theme changes
-        val isDarkMode = (newConfig.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                android.content.res.Configuration.UI_MODE_NIGHT_YES
-
-        val unselectedDrawable = if (isDarkMode) {
-            R.drawable.tablayout_unselected_night
-        } else {
-            R.drawable.tablayout_unselected
-        }
-
-        // Update all unselected tabs
-        val tabs = listOf(binding.tabHome, binding.tabUniform, binding.tabSport, binding.tabRecent)
-        tabs.forEach { tab ->
-            if (tab.id != currentTabId) {
-                tab.setBackgroundResource(unselectedDrawable)
-            }
-        }
-    }
-    private fun selectTab(selectedTab: TextView) {
-        currentTabId = selectedTab.id
-        highlightTab(selectedTab)
-
-        when (selectedTab.id) {
-            R.id.tabHome -> {
-                if (viewModel.homeFeed.value == null && !viewModel.isLoading.value) {
-                    viewModel.loadHomeFeed()
-                }
-            }
-            R.id.tabUniform -> navigateToUniformTab()
-            R.id.tabSport -> navigateToSportTab()
-            R.id.tabRecent -> navigateToRecentTab()
-        }
-    }
+    // ====================== OBSERVERS ======================
 
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
@@ -569,16 +518,15 @@ class HomeFragment : Fragment() {
                 } else {
                     binding.shimmerLayout.visibility = View.GONE
                     binding.swipeRefreshLayout.isRefreshing = false
-                    // ✅ Restore recycler visibility if we have data
                     if (viewModel.homeFeed.value != null && !isInSearchMode) {
                         binding.homeRecycler.visibility = View.VISIBLE
                     }
                 }
             }
         }
+
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.error.collect { errorMsg ->
-                // Hide technical errors from users
                 val isTechnicalError = errorMsg?.contains("401") == true ||
                         errorMsg?.contains("token") == true ||
                         errorMsg?.contains("Authorization") == true ||
@@ -608,33 +556,6 @@ class HomeFragment : Fragment() {
                     binding.errorLayout.visibility = View.GONE
                     binding.noSchoolLayout.visibility = View.GONE
                     binding.swipeRefreshLayout.isRefreshing = false
-                    it.sections.forEach { section ->
-                        when (section) {
-                            is Section.Recommended -> {
-                                Timber.tag("HomeFragment")
-                                    .d("Recommended section: ${section.items.size} items")
-                                section.items.forEach { item ->
-                                    Log.d("HomeFragment", "  Item: ${item.name}, viewCount: ${item.viewCount}")
-                                }
-                            }
-                            is Section.Trending -> {
-                                Timber.tag("HomeFragment")
-                                    .d("Trending section: ${section.items.size} items")
-                                section.items.forEach { item ->
-                                    Log.d("HomeFragment", "  Item: ${item.name}, viewCount: ${item.viewCount}")
-                                }
-                            }
-                            is Section.Recent -> {
-                                Timber.tag("HomeFragment")
-                                    .d("Recent section: ${section.items.size} items")
-                                section.items.forEach { item ->
-                                    Timber.tag("HomeFragment")
-                                        .d("  Item: ${item.name}, viewCount: ${item.viewCount}")
-                                }
-                            }
-                            else -> {}
-                        }
-                    }
                     homeAdapter.submitList(it.sections)
                 }
             }
@@ -642,53 +563,104 @@ class HomeFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.searchResults.collect { results ->
-                Timber.tag("HomeFragment").d("=== SEARCH RESULTS CALLBACK ===")
-                Timber.tag("HomeFragment").d("results.size: ${results.size}")
-                Timber.tag("HomeFragment").d("isInSearchMode: $isInSearchMode")
-                Timber.tag("HomeFragment").d("isLoadingMore: ${viewModel.isLoadingMore.value}")
+                if (!isInSearchMode) return@collect
 
-                // Print each result
-                results.forEachIndexed { index, item ->
-                    Timber.tag("HomeFragment")
-                        .d("Result[$index]: ${item.name}, gender: ${item.gender}")
-                }
+                if (results.isEmpty()) {
+                    binding.emptySearchResults.visibility = View.VISIBLE
+                    binding.searchResultsRecycler.visibility = View.GONE
+                } else {
+                    binding.emptySearchResults.visibility = View.GONE
+                    binding.searchResultsRecycler.visibility = View.VISIBLE
 
-                if (isInSearchMode) {
-                    if (results.isEmpty()) {
-                        Timber.tag("HomeFragment").d("Case: Empty results - showing empty state")
-                        binding.searchResultsContainer.visibility = View.VISIBLE  // ← ADD THIS
-                        binding.emptySearchResults.visibility = View.VISIBLE
-                        binding.searchResultsRecycler.visibility = View.GONE
-                    } else {
-                        Timber.tag("HomeFragment")
-                            .d("Case: Has ${results.size} results - showing recycler")
-                        binding.searchResultsContainer.visibility = View.VISIBLE  // ← ADD THIS
-                        binding.emptySearchResults.visibility = View.GONE
-                        binding.searchResultsRecycler.visibility = View.VISIBLE
-                        currentSearchResults.clear()
-                        currentSearchResults.addAll(results)
+                    // Fresh search — reset everything
+                    originalSearchResults.clear()
+                    originalSearchResults.addAll(results)
+                    clearFilterState()
+                    currentSearchResults.clear()
+                    currentSearchResults.addAll(results)
 
-                        Timber.tag("HomeFragment")
-                            .d("Calling searchResultsAdapter.submitList with ${results.size} items")
-                        searchResultsAdapter.submitList(results)
-
-                        Timber.tag("HomeFragment").d("Calling rebuildLocalFilters")
-                        rebuildLocalFilters()
-                    }
+                    categorySearchAdapter.submitList(currentSearchResults.toList())
+                    rebuildLocalFilters()
                 }
             }
         }
     }
-    private fun setupSwipeRefresh() {
-        binding.swipeRefreshLayout.apply {
-            setColorSchemeColors(
-                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.teal_200)
-            )
-            setOnRefreshListener {
-                viewModel.refreshHomeFeed()
+
+    // ====================== TABS ======================
+
+    private fun setupCustomTabs() {
+        val tabs = listOf(binding.tabHome, binding.tabUniform, binding.tabSport, binding.tabRecent)
+        val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+        val unselectedDrawable = if (isDarkMode) R.drawable.tablayout_unselected_night else R.drawable.tablayout_unselected
+
+        tabs.forEach { tab ->
+            tab.setBackgroundResource(unselectedDrawable)
+            tab.setOnClickListener { selectTab(tab) }
+        }
+        highlightTab(binding.tabHome)
+    }
+
+    private fun highlightTab(selectedTab: TextView) {
+        val tabs = listOf(binding.tabHome, binding.tabUniform, binding.tabSport, binding.tabRecent)
+        val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+        tabs.forEach { tab ->
+            if (tab == selectedTab) {
+                tab.setBackgroundResource(R.drawable.tablayout_selector)
+                tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), android.R.color.white))
+                tab.setTypeface(null, android.graphics.Typeface.BOLD)
+            } else {
+                if (isDarkMode) {
+                    tab.setBackgroundResource(R.drawable.tablayout_unselected_night)
+                    tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white_70))
+                } else {
+                    tab.setBackgroundResource(R.drawable.tablayout_unselected)
+                    tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.black_70))
+                }
+                tab.setTypeface(null, android.graphics.Typeface.NORMAL)
             }
         }
     }
+
+    fun getCurrentCategoryId(): Int? {
+        return when (currentTabId) {
+            R.id.tabUniform -> 6
+            R.id.tabSport -> 7
+            else -> null
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val isDarkMode = (newConfig.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+        val unselectedDrawable = if (isDarkMode) R.drawable.tablayout_unselected_night else R.drawable.tablayout_unselected
+        val tabs = listOf(binding.tabHome, binding.tabUniform, binding.tabSport, binding.tabRecent)
+        tabs.forEach { tab ->
+            if (tab.id != currentTabId) tab.setBackgroundResource(unselectedDrawable)
+        }
+    }
+
+    private fun selectTab(selectedTab: TextView) {
+        currentTabId = selectedTab.id
+        highlightTab(selectedTab)
+
+        when (selectedTab.id) {
+            R.id.tabHome -> {
+                if (viewModel.homeFeed.value == null && !viewModel.isLoading.value) {
+                    viewModel.loadHomeFeed()
+                }
+            }
+            R.id.tabUniform -> navigateToUniformTab()
+            R.id.tabSport -> navigateToSportTab()
+            R.id.tabRecent -> navigateToRecentTab()
+        }
+    }
+
+    // ====================== BANNER ======================
+
     private fun setupBannerSlider() {
         bannerAdapter = BannerAdapter(bannerItems)
         binding.bannerViewPager.apply {
@@ -708,7 +680,6 @@ class HomeFragment : Fragment() {
 
     private fun setupIndicatorDots() {
         binding.indicatorDots.removeAllViews()
-
         bannerItems.forEachIndexed { index, _ ->
             val dot = ImageView(requireContext()).apply {
                 setImageResource(R.drawable.dot_selector)
@@ -727,6 +698,19 @@ class HomeFragment : Fragment() {
         for (i in 0 until binding.indicatorDots.childCount) {
             val dot = binding.indicatorDots.getChildAt(i) as ImageView
             dot.isSelected = (i == currentIndex)
+        }
+    }
+
+    // ====================== LIFECYCLE ======================
+
+    private fun setupSwipeRefresh() {
+        binding.swipeRefreshLayout.apply {
+            setColorSchemeColors(
+                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.teal_200)
+            )
+            setOnRefreshListener {
+                viewModel.refreshHomeFeed()
+            }
         }
     }
 

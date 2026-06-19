@@ -11,9 +11,9 @@ import com.example.skoolswap.databinding.ItemProductBinding
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.utils.extensions.formatViewCount
 
-class ProductAdapter(
+class ShopProductAdapter(
     private val onItemClick: (String) -> Unit
-) : RecyclerView.Adapter<ProductAdapter.ProductViewHolder>() {
+) : RecyclerView.Adapter<ShopProductAdapter.ProductViewHolder>() {
 
     private val items = mutableListOf<Item>()
 

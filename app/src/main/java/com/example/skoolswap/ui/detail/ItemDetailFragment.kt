@@ -193,17 +193,77 @@ class ItemDetailFragment : Fragment() {
                 }
             }
         }
+        lifecycleScope.launch {
+            viewModel.similarItemsShimmer.collect { isShimmering ->
+                Timber.tag(TAG).d("Similar shimmer state: $isShimmering")
+                if (isShimmering) {
+                    // Show shimmer with animation
+                    binding.similarShimmer.visibility = View.VISIBLE
+                    startShimmer(binding.similarShimmer)  // ✅ Safe call
+                    binding.similarRecycler.visibility = View.GONE
+                    binding.similarSectionTitle.visibility = View.GONE
+                } else {
+                    // ✅ Stop shimmer and render items
+                    stopShimmer(binding.similarShimmer)  // ✅ Safe call
+                    binding.similarShimmer.visibility = View.GONE
 
+                    val items = viewModel.similarItems.value
+                    val isLoading = viewModel.itemState.value is ItemDetailViewModel.ItemDetailState.Loading
+
+                    Timber.tag(TAG).d("Shimmer done - rendering ${items.size} items, isLoading=$isLoading")
+
+                    if (!isLoading) {
+                        if (items.isEmpty()) {
+                            binding.similarRecycler.visibility = View.GONE
+                            binding.similarSectionTitle.visibility = View.GONE
+                            Timber.tag(TAG).d("No similar items - hiding section")
+                        } else {
+                            binding.similarRecycler.visibility = View.VISIBLE
+                            binding.similarSectionTitle.visibility = View.VISIBLE
+                            similarItemsAdapter.submitList(items)
+                            Timber.tag(TAG).d("Showing ${items.size} similar items")
+                        }
+                    }
+                }
+            }
+        }
+
+        // ✅ FIXED: Similar items data
         lifecycleScope.launch {
             viewModel.similarItems.collect { items ->
-                if (items.isEmpty()) {
-                    // Still loading or truly empty — keep shimmer visible
+                Timber.tag(TAG).d("Similar items received: ${items.size} items")
+
+                // Check if we're still loading the main item
+                val isLoading = viewModel.itemState.value is ItemDetailViewModel.ItemDetailState.Loading
+                if (isLoading) {
+                    // Still loading main item - keep shimmer
+                    binding.similarShimmer.visibility = View.VISIBLE
+                    startShimmer(binding.similarShimmer)  // ✅ Safe call
+                    binding.similarRecycler.visibility = View.GONE
+                    binding.similarSectionTitle.visibility = View.GONE
                     return@collect
                 }
-                // Items arrived — hide shimmer, show recycler
+
+                // If shimmer is still active, let the shimmer collector handle rendering
+                if (viewModel.similarItemsShimmer.value) {
+                    Timber.tag(TAG).d("Shimmer still active - deferring to shimmer collector")
+                    return@collect
+                }
+
+                // Shimmer is done, render items
+                stopShimmer(binding.similarShimmer)  // ✅ Safe call
                 binding.similarShimmer.visibility = View.GONE
-                binding.similarRecycler.visibility = View.VISIBLE
-                similarItemsAdapter.submitList(items)
+
+                if (items.isEmpty()) {
+                    binding.similarRecycler.visibility = View.GONE
+                    binding.similarSectionTitle.visibility = View.GONE
+                    Timber.tag(TAG).d("No similar items - hiding section")
+                } else {
+                    binding.similarRecycler.visibility = View.VISIBLE
+                    binding.similarSectionTitle.visibility = View.VISIBLE
+                    similarItemsAdapter.submitList(items)
+                    Timber.tag(TAG).d("Showing ${items.size} similar items")
+                }
             }
         }
 
@@ -456,17 +516,27 @@ class ItemDetailFragment : Fragment() {
     private fun showLoading(show: Boolean) {
         Timber.tag(TAG).d("showLoading: $show")
         if (show) {
-            // Show shimmer, hide everything else
+            // Show main shimmer
             binding.shimmerLayout.visibility = View.VISIBLE
+            startShimmer(binding.shimmerLayout)  // ✅ Safe call
             binding.progressBar.visibility = View.GONE
             binding.scrollView.visibility = View.GONE
             binding.errorLayout.visibility = View.GONE
+
+            // Show similar items shimmer with animation
+            binding.similarShimmer.visibility = View.VISIBLE
+            startShimmer(binding.similarShimmer)  // ✅ Safe call
+            binding.similarRecycler.visibility = View.GONE
+            binding.similarSectionTitle.visibility = View.GONE
         } else {
-            // Hide shimmer, show content
+            // Hide main shimmer
+            stopShimmer(binding.shimmerLayout)  // ✅ Safe call
             binding.shimmerLayout.visibility = View.GONE
             binding.progressBar.visibility = View.GONE
             binding.scrollView.visibility = View.VISIBLE
             binding.errorLayout.visibility = View.GONE
+
+            // Let the similarItems collector handle showing/hiding similar items
         }
     }
 
@@ -479,7 +549,29 @@ class ItemDetailFragment : Fragment() {
         binding.errorLayout.visibility = View.VISIBLE
         binding.errorMessage.text = message
     }
+    private fun startShimmer(shimmerLayout: View) {
+        try {
+            when (shimmerLayout) {
+                is com.facebook.shimmer.ShimmerFrameLayout -> shimmerLayout.startShimmer()
+                else -> shimmerLayout.visibility = View.VISIBLE
+            }
+        } catch (e: Exception) {
+            Timber.tag(TAG).e("Error starting shimmer: ${e.message}")
+            shimmerLayout.visibility = View.VISIBLE
+        }
+    }
 
+    private fun stopShimmer(shimmerLayout: View) {
+        try {
+            when (shimmerLayout) {
+                is com.facebook.shimmer.ShimmerFrameLayout -> shimmerLayout.stopShimmer()
+                else -> shimmerLayout.visibility = View.GONE
+            }
+        } catch (e: Exception) {
+            Timber.tag(TAG).e("Error stopping shimmer: ${e.message}")
+            shimmerLayout.visibility = View.GONE
+        }
+    }
     override fun onDestroyView() {
         super.onDestroyView()
         // Do NOT show action bar here — it triggers a synchronous layout pass
@@ -521,4 +613,5 @@ class ItemDetailFragment : Fragment() {
             findNavController().popBackStack()
         }
     }
+
 }

@@ -11,7 +11,7 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Sort / Filter Bar (FIXED - doesn't pull) -->
+        <!-- Sort / Filter Bar -->
         <LinearLayout
             android:id="@+id/sortFilterBar"
             android:layout_width="match_parent"
@@ -85,18 +85,19 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent">
 
-                <!-- Shimmer Layout (shows while loading) -->
-                <LinearLayout
+                <!-- ✅ ShimmerFrameLayout (shows while loading) -->
+                <com.facebook.shimmer.ShimmerFrameLayout
                     android:id="@+id/shimmerLayout"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:orientation="vertical"
                     android:visibility="gone"
-                    android:padding="16dp">
+                    android:padding="16dp"
+                    app:shimmer_duration="1200"
+                    app:shimmer_auto_start="false">
 
                     <include layout="@layout/shimmer_grid" />
 
-                </LinearLayout>
+                </com.facebook.shimmer.ShimmerFrameLayout>
 
                 <!-- Products Grid (normal mode) -->
                 <androidx.recyclerview.widget.RecyclerView
@@ -122,7 +123,7 @@
                         android:src="@drawable/ic_error_placeholder" />
 
                     <TextView
-                        android:id="@+id/errorMessage"
+                        android:id="@+id/errorText"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Failed to load items"

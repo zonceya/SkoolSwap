@@ -130,5 +130,6 @@ interface ItemRepositoryInterface {
 
     // Clear cached items
     suspend fun clearItems()
+    suspend fun updateItemStatus(itemId: String, status: String): Result<Unit>
 
 }
