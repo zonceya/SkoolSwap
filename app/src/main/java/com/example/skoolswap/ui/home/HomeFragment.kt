@@ -28,6 +28,7 @@ import com.example.skoolswap.ui.home.adapter.BannerAdapter
 import com.example.skoolswap.ui.home.adapter.HomeFeedAdapter
 import com.example.skoolswap.ui.shop.CategoryGridAdapter
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
 import kotlinx.coroutines.Job
@@ -95,7 +96,8 @@ class HomeFragment : Fragment() {
             val argSchoolId = arguments?.getInt("schoolId", -1)?.takeIf { it > 0 }
             val prefSchoolId = appPreferences.schoolId.first()?.takeIf { it > 0 }
             val schoolId = argSchoolId ?: prefSchoolId
-            Log.d("HomeFragment", "🔑 schoolId: arg=$argSchoolId prefs=$prefSchoolId using=$schoolId")
+            Timber.tag("HomeFragment")
+                .d("🔑 schoolId: arg=$argSchoolId prefs=$prefSchoolId using=$schoolId")
 
             if (schoolId != null) {
                 viewModel.setKnownSchoolId(schoolId)
@@ -104,7 +106,7 @@ class HomeFragment : Fragment() {
             if (viewModel.homeFeed.value == null && !viewModel.isLoading.value) {
                 viewModel.loadHomeFeed()
             } else if (viewModel.isLoading.value && schoolId != null) {
-                Log.d("HomeFragment", "🔄 Restarting load with correct schoolId: $schoolId")
+                Timber.tag("HomeFragment").d("🔄 Restarting load with correct schoolId: $schoolId")
                 viewModel.loadHomeFeed(forceRefresh = true)
             }
         }
@@ -549,14 +551,37 @@ class HomeFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.homeFeed.collect { feed ->
                 feed?.let {
-                    Log.d("HomeFragment", "=== HOME FEED RECEIVED ===")
-                    Log.d("HomeFragment", "Sections count: ${it.sections.size}")
+                    Timber.tag("HomeFragment").d("=== HOME FEED RECEIVED ===")
+                    Timber.tag("HomeFragment").d("Sections count: ${it.sections.size}")
                     binding.shimmerLayout.visibility = View.GONE
                     binding.homeRecycler.visibility = View.VISIBLE
                     binding.errorLayout.visibility = View.GONE
                     binding.noSchoolLayout.visibility = View.GONE
                     binding.swipeRefreshLayout.isRefreshing = false
                     homeAdapter.submitList(it.sections)
+                    // FIX: Show Snackbar only if fragment is attached
+                    if (isAdded && view != null && binding.root.isAttachedToWindow) {
+                        val message = if (it.message == "Cached data") "Using cached data" else "Data updated"
+                        try {
+                            Snackbar.make(binding.root, message, Snackbar.LENGTH_SHORT).show()
+                        } catch (e: Exception) {
+                            Timber.e("Failed to show Snackbar: ${e.message}")
+                        }
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.isFromCache.collect { fromCache ->
+                // FIX: Check if fragment is attached and view is available
+                if (isAdded && view != null && binding.root.isAttachedToWindow) {
+                    val message = if (fromCache) "Using cached data" else "Data updated"
+                    try {
+                        Snackbar.make(binding.root, message, Snackbar.LENGTH_SHORT).show()
+                    } catch (e: Exception) {
+                        Timber.e("Failed to show Snackbar: ${e.message}")
+                    }
                 }
             }
         }

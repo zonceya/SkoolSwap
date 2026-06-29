@@ -10,6 +10,8 @@ import com.example.skoolswap.data.local.database.dao.FavoriteDao
 import com.example.skoolswap.data.local.database.dao.HomeFeedDao
 import com.example.skoolswap.data.local.database.dao.ItemDao
 import com.example.skoolswap.data.local.database.dao.ItemImageDao
+import com.example.skoolswap.data.local.database.dao.PendingActionDao
+import com.example.skoolswap.data.local.database.dao.ProductsCacheDao
 import com.example.skoolswap.data.local.database.dao.ProvinceDao
 import com.example.skoolswap.data.local.database.dao.SchoolDao
 import com.example.skoolswap.data.local.database.dao.ShopDao
@@ -31,6 +33,7 @@ import com.example.skoolswap.data.repository.FavoriteRepository
 import com.example.skoolswap.data.repository.FilterRepository
 import com.example.skoolswap.data.repository.HomeRepository
 import com.example.skoolswap.data.repository.ItemRepository
+import com.example.skoolswap.data.repository.ProductsCacheRepository
 import com.example.skoolswap.data.repository.SchoolRepository
 import com.example.skoolswap.data.repository.ShopRepository
 import com.example.skoolswap.data.repository.UserSchoolRepository
@@ -39,6 +42,7 @@ import com.example.skoolswap.domain.repository.FavoriteRepositoryInterface
 import com.example.skoolswap.domain.repository.FilterRepositoryInterface
 import com.example.skoolswap.domain.repository.HomeRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
+import com.example.skoolswap.domain.repository.ProductsCacheRepositoryInterface
 import com.example.skoolswap.domain.repository.ShopRepositoryInterface
 import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.Gson
@@ -73,7 +77,18 @@ object AppModule {
     fun provideUserDao(database: SkoolSwapDatabase): UserDao {
         return database.userDao()
     }
-
+    @Provides
+    @Singleton
+    fun provideProductsCacheRepository(
+        productsCacheRepository: ProductsCacheRepository
+    ): ProductsCacheRepositoryInterface {
+        return productsCacheRepository
+    }
+    @Provides
+    @Singleton
+    fun provideProductsCacheDao(database: SkoolSwapDatabase): ProductsCacheDao {
+        return database.productsCacheDao()
+    }
     @Provides
     @Singleton
     fun provideSchoolDao(database: SkoolSwapDatabase): SchoolDao {
@@ -96,6 +111,12 @@ object AppModule {
     fun provideHomeFeedDao(database: SkoolSwapDatabase): HomeFeedDao {
         return database.homeFeedDao()
     }
+    @Provides
+    @Singleton
+    fun providePendingActionDao(database: SkoolSwapDatabase): PendingActionDao {
+        return database.pendingActionDao()
+    }
+
     @Provides
     @Singleton
     fun provideShopDao(database: SkoolSwapDatabase): ShopDao {
@@ -208,6 +229,7 @@ object AppModule {
         userSchoolDao: UserSchoolDao,
         schoolDao: SchoolDao,
         provinceDao: ProvinceDao,
+        userDao: UserDao,
         appPreferences: AppPreferences
     ): UserSchoolRepository {
         return UserSchoolRepository(
@@ -215,6 +237,7 @@ object AppModule {
             userSchoolDao = userSchoolDao,
             schoolDao = schoolDao,
             provinceDao = provinceDao,
+            userDao = userDao,
             appPreferences = appPreferences
         )
     }

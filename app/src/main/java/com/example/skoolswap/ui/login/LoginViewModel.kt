@@ -11,6 +11,7 @@ import com.example.skoolswap.domain.model.User
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -37,7 +38,29 @@ class LoginViewModel @Inject constructor(
     fun setRestoredUser(user: User) {
         _loginSuccess.value = user
     }
+    // In LoginViewModel.kt - add this method
+    suspend fun refreshUserToken(): Boolean {
+        return try {
+            val result = authRepository.refreshToken()
+            result.isSuccess
+        } catch (e: Exception) {
+            Timber.e(e, "Token refresh failed")
+            false
+        }
+    }
 
+    // Optional: Add a method to check token validity
+    suspend fun checkTokenValidity(): Boolean {
+        return try {
+            val token = authRepository.getCurrentToken()
+            if (token.isNullOrEmpty()) {
+                return false
+            }
+            authRepository.validateToken(token)
+        } catch (e: Exception) {
+            false
+        }
+    }
     // ==================== GOOGLE SIGN-IN ====================
     fun signInWithGoogle(activity: Activity) {
         viewModelScope.launch {

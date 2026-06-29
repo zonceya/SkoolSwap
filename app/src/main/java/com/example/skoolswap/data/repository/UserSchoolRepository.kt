@@ -4,6 +4,7 @@ package com.example.skoolswap.data.repository
 import android.util.Log
 import com.example.skoolswap.data.local.database.dao.ProvinceDao
 import com.example.skoolswap.data.local.database.dao.SchoolDao
+import com.example.skoolswap.data.local.database.dao.UserDao
 import com.example.skoolswap.data.local.database.dao.UserSchoolDao
 import com.example.skoolswap.data.local.database.entities.SchoolEntity
 import com.example.skoolswap.data.local.database.entities.UserSchoolEntity
@@ -27,6 +28,7 @@ class UserSchoolRepository @Inject constructor(
     private val userSchoolDao: UserSchoolDao,
     private val schoolDao: SchoolDao,
     private val  provinceDao: ProvinceDao,
+    private val userDao: UserDao,
     private val appPreferences: AppPreferences
 ) : UserSchoolRepositoryInterface {
 
@@ -36,31 +38,34 @@ class UserSchoolRepository @Inject constructor(
 
     override suspend fun assignSchool(schoolId: Int): Result<Unit> {
         return try {
-            val token = appPreferences.authToken.firstOrNull() ?: return Result.Error(Exception("No auth token"))
+            val token = appPreferences.authToken.firstOrNull()
+                ?: return Result.Error(Exception("No auth token"))
 
-            Log.d(TAG, "📚 Token from prefs: $token")
-            val response = userSchoolApiService.assignSchool("Bearer $token", mapOf("school_id" to schoolId))
-            val authHeader = "Bearer $token"
-            Log.d(TAG, "📚 Auth header: $authHeader")
-            Log.d(TAG, "📚 Response code: ${response.code()}")
+            Log.d(TAG, "📚 Assigning school: $schoolId")
+            val response = userSchoolApiService.assignSchool(
+                "Bearer $token",
+                mapOf("school_id" to schoolId)
+            )
+
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body?.success == true && body.school != null) {
                     val school = body.school
-                    val userId = appPreferences.getUserId() ?: return Result.Error(Exception("No user ID"))
+                    val userId = appPreferences.getUserId()
+                        ?: return Result.Error(Exception("No user ID"))
 
-                    // Save to user_schools table (with mapping_id!)
+                    // Save to user_schools table
                     val userSchoolEntity = UserSchoolEntity(
                         id = school.mapping_id,
                         userId = userId,
                         schoolId = school.id,
                         schoolName = school.name,
                         mappedAt = school.mapped_at,
-                        updatedAt = school.updated_at // If your response includes this
+                        updatedAt = school.updated_at
                     )
                     userSchoolDao.insert(userSchoolEntity)
 
-                    // Save to schools table for reference
+                    // Save to schools table
                     val schoolEntity = SchoolEntity(
                         id = school.id,
                         name = school.name,
@@ -74,6 +79,10 @@ class UserSchoolRepository @Inject constructor(
                     appPreferences.setSchoolInfo(school.id, school.name)
                     appPreferences.setSchoolMappingId(school.mapping_id)
 
+                    // ✅ CRITICAL: Sync to users table
+                    syncSchoolToUserEntity(userId, school.id, school.name)
+
+                    Log.d(TAG, "✅ School assigned successfully: ${school.name}")
                     Result.Success(Unit)
                 } else {
                     Result.Error(Exception(body?.message ?: "Failed to assign school"))
@@ -85,7 +94,6 @@ class UserSchoolRepository @Inject constructor(
             Result.Error(e)
         }
     }
-
     // In UserSchoolRepository.kt - update getCurrentSchoolMapping
     override suspend fun getCurrentSchoolMapping(): Result<SchoolMapping?> {
         return try {
@@ -272,6 +280,12 @@ class UserSchoolRepository @Inject constructor(
                     appPreferences.setSchoolInfo(school.id, school.name)
                     appPreferences.setSchoolMappingId(school.mapping_id)
 
+                    // ✅ SYNC: Update users table
+                    val userId = appPreferences.getUserId()
+                    if (userId != null) {
+                        syncSchoolToUserEntity(userId, school.id, school.name)
+                    }
+
                     Result.Success(mapping)
                 } else {
                     Log.e(TAG, "❌ Update failed: ${body?.message}")
@@ -286,6 +300,7 @@ class UserSchoolRepository @Inject constructor(
             Result.Error(e)
         }
     }
+// UserSchoolRepository.kt - update removeSchoolMapping
 
     override suspend fun removeSchoolMapping(mappingId: String): Result<Boolean> {
         return try {
@@ -301,9 +316,15 @@ class UserSchoolRepository @Inject constructor(
             if (response.isSuccessful) {
                 Log.d(TAG, "✅ School mapping removed")
 
-                // Clear school info from preferences
+                // Clear preferences - use clearSchoolInfo() instead of clearSchoolInfo()
                 appPreferences.setSchoolMapped(false)
-            //    appPreferences.clearSchoolInfo()
+                appPreferences.clearSchoolInfo()  // ✅ This method exists now
+
+                // ✅ SYMMETRIC: Clear from users table
+                val userId = appPreferences.getUserId()
+                if (userId != null) {
+                    clearSchoolFromUserEntity(userId)
+                }
 
                 Result.Success(true)
             } else {
@@ -313,6 +334,40 @@ class UserSchoolRepository @Inject constructor(
         } catch (e: Exception) {
             Log.e(TAG, "❌ Exception: ${e.message}", e)
             Result.Error(e)
+        }
+    }
+    private suspend fun clearSchoolFromUserEntity(userId: Int) {
+        try {
+            val currentUser = userDao.getCurrentUser()
+            if (currentUser != null && currentUser.id == userId) {
+                val updatedUser = currentUser.copy(
+                    schoolMapped = false,
+                    schoolId = null,
+                    schoolName = null
+                )
+                userDao.insertUser(updatedUser)
+                Log.d(TAG, "✅ Cleared school info from users table")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "⚠️ Failed to clear school from UserEntity: ${e.message}", e)
+        }
+    }
+    private suspend fun syncSchoolToUserEntity(userId: Int, schoolId: Int, schoolName: String) {
+        try {
+            val currentUser = userDao.getCurrentUser()
+            if (currentUser != null && currentUser.id == userId) {
+                val updatedUser = currentUser.copy(
+                    schoolMapped = true,
+                    schoolId = schoolId,
+                    schoolName = schoolName
+                )
+                userDao.insertUser(updatedUser)
+                Log.d(TAG, "✅ Synced school mapping to users table: $schoolName")
+            } else {
+                Log.w(TAG, "⚠️ User not found in Room with ID: $userId")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "⚠️ Failed to sync school to UserEntity: ${e.message}", e)
         }
     }
 }

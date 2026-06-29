@@ -28,6 +28,8 @@ import androidx.fragment.app.DialogFragment
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.utils.extensions.formatViewCount
 import com.example.skoolswap.utils.ColorUtils
+import com.example.skoolswap.workers.WorkerManager
+import jakarta.inject.Inject
 
 private const val TAG = "ItemDetailFragment"
 
@@ -41,7 +43,8 @@ class ItemDetailFragment : Fragment() {
     private lateinit var similarItemsAdapter: SimilarItemsAdapter
     private var currentItemId: String? = null
     private var currentImageUrls: List<String>? = null
-
+    @Inject
+    lateinit var workerManager: WorkerManager
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -72,6 +75,9 @@ class ItemDetailFragment : Fragment() {
             Timber.tag(TAG).e("itemId is null, popping backstack")
             findNavController().popBackStack()
             return
+        }
+        lifecycleScope.launch {
+            workerManager.cacheItemNow(itemId)
         }
 
         currentItemId = itemId
@@ -603,12 +609,15 @@ class ItemDetailFragment : Fragment() {
 
     private val backPressedCallback = object : OnBackPressedCallback(true) {
         override fun handleOnBackPressed() {
-            val fullScreenDialog = parentFragmentManager.findFragmentByTag("full_screen_viewer")
-            if (fullScreenDialog is DialogFragment) {
+            val fullScreenDialog = parentFragmentManager
+                .findFragmentByTag("full_screen_viewer") as? DialogFragment
+
+            // ✅ Only intercept if the dialog is actually showing — not mid-dismissal
+            if (fullScreenDialog != null && fullScreenDialog.isAdded && !fullScreenDialog.isRemoving) {
                 fullScreenDialog.dismiss()
                 return
             }
-            // Disable before navigating — prevents double-fire
+
             isEnabled = false
             findNavController().popBackStack()
         }

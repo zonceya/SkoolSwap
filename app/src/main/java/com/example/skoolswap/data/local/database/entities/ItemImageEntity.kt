@@ -8,7 +8,10 @@ data class ItemImageEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val itemId: String,
-    val url: String,
-    val isCover: Boolean = false,
-    val position: Int = 0
+    val url: String,  // ✅ Changed from imageUrl to url
+    val localPath: String? = null,
+    val position: Int = 0,
+    val isCover: Boolean = false,  // ✅ ADD THIS
+    val createdAt: Long = System.currentTimeMillis(),
+    val fileSize: Long = 0
 )

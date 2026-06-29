@@ -34,5 +34,6 @@ interface AuthRepositoryInterface {
     suspend fun signUpWithEmail(name: String, email: String, password: String, passwordConfirmation: String): Result<User>
     suspend fun sendPasswordResetEmail(email: String): Result<Unit>
     suspend fun getCurrentUserId(): Int?
-
+    suspend fun refreshToken(): Result<String>
+    suspend fun updateUserInRoom(user: UserEntity)
 }

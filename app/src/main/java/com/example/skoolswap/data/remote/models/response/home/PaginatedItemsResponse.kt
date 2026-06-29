@@ -6,7 +6,13 @@ data class PaginatedItemsResponse(
     @SerializedName("success") val success: Boolean,
     @SerializedName("title") val title: String?,
     @SerializedName("items") val items: List<ProductItemDto>,
-    @SerializedName("pagination") val pagination: PaginationDto
+    @SerializedName("pagination") val pagination: PaginationDto,
+    @SerializedName("sections") val sections: List<EssentialsSectionDto>? = null
+)
+data class EssentialsSectionDto(
+    @SerializedName("title") val title: String?,
+    @SerializedName("category") val category: String?,
+    @SerializedName("items") val items: List<ProductItemDto>? = null
 )
 
 data class ProductItemDto(

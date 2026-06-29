@@ -108,11 +108,10 @@ class SportFragment : Fragment() {
     private fun observeViewModel() {
         // Loading state - LiveData is already view-lifecycle-safe
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
-            if (isLoading && isFirstLoad && viewModel.allSportItems.value.isNullOrEmpty()) {
+            if (isLoading && isFirstLoad) {
                 binding.shimmerLayout.visibility = View.VISIBLE
                 binding.scrollView.visibility = View.GONE
-                binding.errorLayout.visibility = View.GONE
-            } else {
+            } else if (!isLoading) {
                 binding.shimmerLayout.visibility = View.GONE
             }
         }
@@ -162,10 +161,12 @@ class SportFragment : Fragment() {
 
     private fun navigateToSportProducts(sport: SportItem) {
         val bundle = Bundle().apply {
-            putString("SECTION_TYPE", "sport")           // keep lowercase for consistency
+            putString("SECTION_TYPE", "sport")
             putString("SECTION_TITLE", sport.name)
-            putInt("CATEGORY_ID", 2)
-            putInt("SPORT_TYPE_ID", sport.id)            // if you still need sport-specific filter
+            putInt("CATEGORY_ID", 2)                    // Sports main category
+            putInt("SUB_CATEGORY_ID", sport.id)         // ← This is key
+            putString("SUB_CATEGORY_NAME", sport.name)  // For banner
+            putString("MAIN_CATEGORY_NAME", "Sports")   // For banner
         }
         findNavController().navigate(R.id.action_sportFragment_to_productsFragment, bundle)
     }
@@ -176,6 +177,9 @@ class SportFragment : Fragment() {
             putString("SECTION_TITLE", gear.name)
             putInt("CATEGORY_ID", 2)
             putString("GEAR_TYPE", gear.type)
+            putInt("SUB_CATEGORY_ID", -1)               // Not a sub-category
+            putString("SUB_CATEGORY_NAME", gear.name)
+            putString("MAIN_CATEGORY_NAME", "Sports")
         }
         findNavController().navigate(R.id.action_sportFragment_to_productsFragment, bundle)
     }

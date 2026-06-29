@@ -1,6 +1,8 @@
 package com.example.skoolswap.ui.main
 
+import android.content.res.Configuration
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Log
 import android.view.Menu
 import android.view.View
@@ -47,6 +49,7 @@ import com.example.skoolswap.ui.home.HomeViewModel
 import com.example.skoolswap.ui.products.ProductsFragment
 import com.example.skoolswap.utils.DialogAction
 import com.example.skoolswap.utils.DialogHelper
+import com.example.skoolswap.workers.WorkerManager
 import jakarta.inject.Inject
 import timber.log.Timber
 import kotlinx.coroutines.flow.first
@@ -65,7 +68,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var navController: NavController
     @Inject
     lateinit var authRepository: AuthRepositoryInterface
-
+    private var lastForegroundRefreshAt = 0L
+    private val MIN_REFRESH_INTERVAL_MS = 30_000L
+    @Inject
+    lateinit var workerManager: WorkerManager
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = ContextCompat.getColor(this, R.color.white)
@@ -75,7 +81,7 @@ class MainActivity : AppCompatActivity() {
         val nightMode = resources.configuration.uiMode and
                 android.content.res.Configuration.UI_MODE_NIGHT_MASK
         val isDark = nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES
-
+        updateStatusBar()
         // Set status bar color explicitly based on mode
         window.statusBarColor = if (isDark) {
             android.graphics.Color.BLACK
@@ -357,7 +363,7 @@ class MainActivity : AppCompatActivity() {
                     val nightMode = resources.configuration.uiMode and
                             android.content.res.Configuration.UI_MODE_NIGHT_MASK
                     val isDark = nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES
-
+                    updateStatusBar()
                     window.statusBarColor = if (isDark) android.graphics.Color.BLACK else android.graphics.Color.WHITE
                     @Suppress("DEPRECATION")
                     window.decorView.systemUiVisibility = if (isDark) 0 else View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
@@ -386,18 +392,32 @@ class MainActivity : AppCompatActivity() {
 
     private fun performLogout() {
         binding.drawerLayout.closeDrawer(GravityCompat.START)
+
         lifecycleScope.launch {
             try {
-                viewModel.logout()
+                viewModel.logout()           // This already calls signOut()
                 viewHomeModel.clearHomeData()
                 appPreferences.clearUserData()
+                workerManager.cancelTokenRefresh()
 
-                // Use the action from loginFragment
-                navController.navigate(R.id.action_global_logout)
+                // ✅ SAFER LOGOUT NAVIGATION
+                val navController = findNavController(R.id.nav_host_fragment_content_main)
+
+                try {
+                    // Try global action first
+                    navController.navigate(R.id.action_global_logout)
+                } catch (e: Exception) {
+                    Timber.tag("MainActivity").w("Global logout action failed, using fallback")
+                    // Fallback: Clear back stack and go to login
+                    navController.popBackStack(R.id.mobile_navigation, true)
+                    navController.navigate(R.id.loginFragment)
+                }
 
                 Snackbar.make(binding.root, "Logged out successfully", Snackbar.LENGTH_SHORT).show()
+
             } catch (e: Exception) {
-                Snackbar.make(binding.root, "Logout failed: ${e.message}", Snackbar.LENGTH_LONG).show()
+                Timber.tag("MainActivity").e(e, "Logout failed")
+                Snackbar.make(binding.root, "Logout failed. Please try again.", Snackbar.LENGTH_LONG).show()
             }
         }
     }
@@ -478,7 +498,6 @@ class MainActivity : AppCompatActivity() {
     override fun onSupportNavigateUp(): Boolean {
         val currentDestId = navController.currentDestination?.id
 
-        // ✅ UPDATED: Removed OTP fragment references
         when (currentDestId) {
             R.id.signUpFragment -> {
                 navController.navigate(R.id.action_signUpFragment_to_loginFragment)
@@ -489,7 +508,26 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+    private fun updateStatusBar() {
+        val nightMode = resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK
+        val isDark = nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES
 
+        // Set status bar color
+        window.statusBarColor = if (isDark) {
+            android.graphics.Color.BLACK
+        } else {
+            android.graphics.Color.WHITE
+        }
+
+        // Set icon tint — light icons for dark, dark icons for light
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = if (isDark) {
+            0  // dark background = light icons, clear the flag
+        } else {
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR  // light background = dark icons
+        }
+    }
     private fun observeNavigation() {
         Timber.tag("MainActivity").e("👀 observeNavigation called at ${System.currentTimeMillis()}")
 
@@ -532,12 +570,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun navigateToDestination(destination: NavigationDestination) {
         val currentDestId = navController.currentDestination?.id
-        val currentDestName = navController.currentDestination?.displayName
 
-        Timber.tag("MainActivity")
-            .e("🎯 navigateToDestination: $destination, current: $currentDestName (id: $currentDestId)")
-
-        // BLOCK: Never navigate away from createItemFragment (camera is active)
         if (currentDestId == R.id.createItemFragment) {
             Timber.tag("MainActivity")
                 .e("🛑 BLOCKING navigation - createItemFragment is active (camera return)")
@@ -577,11 +610,8 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
 
-                val popped = navController.popBackStack(R.id.loginFragment, false)
-                if (!popped) {
-                    navController.navigate(R.id.action_global_logout)
-                }
-
+                // ✅ FIX: Always use the global action - no manual popBackStack needed
+                navController.navigate(R.id.action_global_logout)
                 Timber.tag("MainActivity").e("✅ Navigated to LOGIN")
             }
 
@@ -601,30 +631,10 @@ class MainActivity : AppCompatActivity() {
                 Timber.tag("MainActivity").e("✅ Navigated to ONBOARDING")
             }
 
-            NavigationDestination.ONBOARDING -> {
-                Timber.tag("MainActivity").e("📋 Navigating to ONBOARDING")
-
-                if (currentDestId == R.id.viewPagerFragment) {
-                    Timber.tag("MainActivity").e("✅ Already on onboarding, skipping")
-                    return
-                }
-
-                navController.navigate(R.id.viewPagerFragment) {
-                    popUpTo(R.id.mobile_navigation) {
-                        inclusive = true
-                    }
-                    launchSingleTop = true
-                }
-                Timber.tag("MainActivity").e("✅ Navigated to ONBOARDING")
-            }
-
             else -> {
                 // Unknown destination - fallback to login
                 Timber.tag("MainActivity").e("⚠️ Unknown destination: $destination - falling back to LOGIN")
-                val popped = navController.popBackStack(R.id.loginFragment, false)
-                if (!popped) {
-                    navController.navigate(R.id.action_global_logout)
-                }
+                navController.navigate(R.id.action_global_logout)
             }
         }
     }
@@ -651,14 +661,28 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         Timber.tag("MainActivity").d("🔄 onResume - refreshing toolbar")
         refreshToolbarVisibility()
-
+        updateStatusBar()
         navHeaderViewModel.refresh()
-        // Optional: force re-evaluate current destination
-        navController.currentDestination?.let {
-            // You can manually trigger listener logic if needed
-        }
-    }
 
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastForegroundRefreshAt > MIN_REFRESH_INTERVAL_MS) {
+            lastForegroundRefreshAt = now
+
+            lifecycleScope.launch {
+                workerManager.refreshTokenNow()
+                workerManager.syncHomeFeedNow()
+                workerManager.scheduleProductsSync()
+                workerManager.cleanupImagesNow()
+            }
+        }
+
+
+    }
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // ✅ Update status bar when theme changes
+        updateStatusBar()
+    }
     override fun onPause() {
         super.onPause()
         Timber.tag("MainActivity").e("🔥 onPause at ${System.currentTimeMillis()}")

@@ -11,6 +11,7 @@ import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.domain.repository.FavoriteRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
+import com.example.skoolswap.domain.repository.ProductsCacheRepositoryInterface
 import com.example.skoolswap.domain.repository.ProductsRepositoryInterface
 import com.example.skoolswap.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,7 +31,8 @@ class ItemDetailViewModel @Inject constructor(
     private val authRepository: AuthRepositoryInterface,
     private val schoolDao: SchoolDao,
     private val colorDao: ColorDao,
-    private val brandDao: BrandDao
+    private val brandDao: BrandDao,
+    private val productsCacheRepository: ProductsCacheRepositoryInterface
 ) : ViewModel() {
 
     private val _itemState = MutableStateFlow<ItemDetailState>(ItemDetailState.Loading)
@@ -98,8 +100,7 @@ class ItemDetailViewModel @Inject constructor(
         }
     }
 
-    // ✅ FIXED: Pass userId to isFavorite
-    private suspend fun checkFavoriteStatus(itemId: String) {
+      private suspend fun checkFavoriteStatus(itemId: String) {
         val userId = currentUserId ?: authRepository.getCurrentUserId()
         if (userId != null) {
             _isFavorite.value = favoriteRepository.isFavorite(userId, itemId)
@@ -126,14 +127,23 @@ class ItemDetailViewModel @Inject constructor(
         }
     }
 
-    // In ItemDetailViewModel.kt - update loadSimilarItemsEarly
+
     private suspend fun loadSimilarItemsEarly(itemId: String) {
         // Serve from cache immediately if we have it
         similarItemsCache[itemId]?.let { cached ->
             Timber.tag(TAG).d("Similar items served from cache: ${cached.size} items")
-            // ✅ Flip shimmer BEFORE setting items
             _similarItemsShimmer.value = false
             _similarItems.value = cached
+            return
+        }
+
+        // Check Room cache
+        val cachedSimilar = productsCacheRepository.getCachedSimilarItems(itemId)
+        if (cachedSimilar != null && cachedSimilar.isNotEmpty()) {
+            Timber.tag(TAG).d("📦 Similar items from Room cache: ${cachedSimilar.size}")
+            _similarItemsShimmer.value = false
+            _similarItems.value = cachedSimilar
+            similarItemsCache[itemId] = cachedSimilar
             return
         }
 
@@ -148,7 +158,6 @@ class ItemDetailViewModel @Inject constructor(
 
         Timber.tag(TAG).d("📦 Found ${items.size} similar items")
 
-        // ✅ Flip shimmer BEFORE setting items
         _isLoadingSimilar.value = false
         _similarItemsShimmer.value = false
 
@@ -156,30 +165,49 @@ class ItemDetailViewModel @Inject constructor(
             _similarSectionTitle.value = "Trending Today"
             val result = items.take(6)
             similarItemsCache[itemId] = result
+            // ✅ Cache similar items for next time
+            productsCacheRepository.cacheSimilarItems(itemId, result)
             _similarItems.value = result
         } else {
             _similarItems.value = emptyList()
         }
     }
+
     private suspend fun fetchItem(itemId: String) {
+        // STEP 1: Check Room cache FIRST
+        val cachedItem = productsCacheRepository.getCachedItemDetail(itemId)
+        if (cachedItem != null) {
+            Timber.tag(TAG).d("📦 Loading item from cache: ${cachedItem.name}")
+            _itemState.value = ItemDetailState.Success(cachedItem)
+            _sellerMobile.value = cachedItem.shop?.sellerMobile
+            loadReferenceData(cachedItem)
+        }
+
+        // STEP 2: Fetch from API
         val result = itemRepository.getItem(itemId)
 
         if (result.isSuccess) {
             val item = result.getOrNull() ?: return
-            cachedItem = item
+
             _itemState.value = ItemDetailState.Success(item)
             _sellerMobile.value = item.shop?.sellerMobile
             Timber.tag(TAG).d("Seller mobile: ${_sellerMobile.value}")
 
             loadReferenceData(item)
 
+            // ✅ Cache for next time
+            productsCacheRepository.cacheItemDetail(itemId, item)
+
             if (item.mainCategoryId != null) {
                 loadSimilarItemsWithCategory(item)
             }
         } else {
-            _itemState.value = ItemDetailState.Error(
-                result.exceptionOrNull()?.message ?: "Unknown error"
-            )
+            // Only show error if no cache was shown
+            if (_itemState.value !is ItemDetailState.Success) {
+                _itemState.value = ItemDetailState.Error(
+                    result.exceptionOrNull()?.message ?: "Unknown error"
+                )
+            }
         }
     }
 

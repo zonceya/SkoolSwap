@@ -18,6 +18,7 @@ interface ProductsRepositoryInterface {
     suspend fun getEssentialsAll(
         page: Int,
         category: String? = null,
+        subCategoryId: Int? = null,
         perPage: Int = 20,
         conditionId: Int? = null,
         minPrice: Float? = null,

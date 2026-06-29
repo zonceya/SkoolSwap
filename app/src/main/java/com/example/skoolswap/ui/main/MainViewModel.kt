@@ -13,6 +13,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 enum class NavigationDestination { ONBOARDING, LOGIN, HOME }
@@ -99,9 +100,13 @@ class MainViewModel @Inject constructor(
 
     fun logout() {
         viewModelScope.launch {
-            authRepository.signOut()
-            preferences.setLoggedIn(false)
-            _forceNavigation.value = NavigationDestination.LOGIN
+            try {
+                authRepository.signOut()
+                preferences.setLoggedIn(false)
+                _forceNavigation.value = NavigationDestination.LOGIN
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Logout error in ViewModel")
+            }
         }
     }
 }

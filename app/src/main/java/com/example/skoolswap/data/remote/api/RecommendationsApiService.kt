@@ -53,6 +53,7 @@ interface RecommendationsApiService {
     suspend fun getEssentialsAll(
         @Query("school_id") schoolId: Int,
         @Query("category") category: String? = null,
+        @Query("sub_category_id") subCategoryId: Int? = null,  // ← ADD THIS
         @Query("page") page: Int = 1,
         @Query("per_page") perPage: Int = 20,
         @Query("condition_id") conditionId: Int? = null,

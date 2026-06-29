@@ -55,10 +55,12 @@ class SportViewModel @Inject constructor(
             if (useSet1) {
                 _featuredSports.value = SportConstants.FEATURED_SET_1
                 _moreSports.value = SportConstants.MORE_SET_1
+                _gearItems.value = SportConstants.GEAR_ITEMS
                 Log.d("SportViewModel", "Using SET 1")
             } else {
                 _featuredSports.value = SportConstants.FEATURED_SET_2
                 _moreSports.value = SportConstants.MORE_SET_2
+                _gearItems.value = SportConstants.GEAR_ITEMS
                 Log.d("SportViewModel", "Using SET 2")
             }
 
@@ -77,6 +79,7 @@ class SportViewModel @Inject constructor(
             if (useSet1) {
                 _featuredSports.value = SportConstants.FEATURED_SET_1
                 _moreSports.value = SportConstants.MORE_SET_1
+
                 Log.d("SportViewModel", "REFRESH - Using SET 1")
             } else {
                 _featuredSports.value = SportConstants.FEATURED_SET_2
@@ -86,31 +89,26 @@ class SportViewModel @Inject constructor(
         }
     }
 
-    private fun loadAllSportItems() {
-        viewModelScope.launch {
-            Log.d("SportViewModel", "Loading all sport items from API")
+    private suspend fun loadAllSportItems() {
+        val result = productsRepository.getRecommendedAll(
+            page = 1,
+            categoryId = 2,           // Sports category
+            conditionId = null,
+            minPrice = null,
+            maxPrice = null
+        )
 
-            val result = productsRepository.getRecommendedAll(
-                page = 1,
-                categoryId = 2,
-                conditionId = null,
-                minPrice = null,
-                maxPrice = null
-            )
-
-            when (result) {
-                is Result.Success -> {
-                    _allSportItems.value = result.data.items
-                    Log.d("SportViewModel", "All sport items loaded: ${result.data.items.size}")
-                }
-                is Result.Error -> {
-                    _error.value = result.exception.message
-                    _allSportItems.value = emptyList()
-                    Log.e("SportViewModel", "Failed to load sport items: ${result.exception.message}")
-                }
+        when (result) {
+            is Result.Success -> {
+                _allSportItems.value = result.data.items
+                Log.d("SportViewModel", "✅ All sports loaded: ${result.data.items.size} items")
             }
-
-            _isLoading.value = false
+            is Result.Error -> {
+                _error.value = result.exception.message
+                _allSportItems.value = emptyList()
+                Log.e("SportViewModel", "❌ Failed: ${result.exception.message}")
+            }
         }
+        _isLoading.value = false
     }
 }

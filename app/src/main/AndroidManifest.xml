@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- PERMISSIONS - at manifest level (CORRECT) -->
+    <!-- PERMISSIONS -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
@@ -12,7 +12,6 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
-        android:attributionTags="@array/attribution_tags"
         android:name=".SkoolSwapApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -24,7 +23,7 @@
         android:theme="@style/Theme.SkoolSwap"
         tools:targetApi="31">
 
-        <!-- ✅ MOVED FileProvider INSIDE application tag -->
+        <!-- FileProvider -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -34,6 +33,30 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- ✅ KEEP THIS - DISABLE WorkManager auto-init -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup.InitializationProvider"
+                tools:node="remove" />
+        </provider>
+
+        <!-- Test receiver -->
+        <receiver
+            android:name=".workers.TestWorkerReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="TEST_TOKEN_REFRESH" />
+                <action android:name="TEST_HOME_FEED_SYNC" />
+                <action android:name="TEST_IMAGE_CLEANUP" />
+                <action android:name="TEST_OFFLINE_SYNC" />
+            </intent-filter>
+        </receiver>
 
         <activity
             android:name=".ui.main.MainActivity"
@@ -46,6 +69,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
     </application>
 
 </manifest>

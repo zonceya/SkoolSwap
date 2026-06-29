@@ -33,6 +33,7 @@ import com.google.gson.JsonDeserializer
 import com.google.gson.JsonElement
 import com.google.gson.JsonSerializationContext
 import com.google.gson.JsonSerializer
+import timber.log.Timber
 import java.lang.reflect.Type
 
 
@@ -198,27 +199,27 @@ fun RecentSectionDto.toDomain(): RecentSection {
 fun HomeFeed.toEntity(): HomeFeedEntity {
     return try {
         val json = gson.toJson(this)   // ← was Gson().toJson(this)
-        Log.d("Mapper", "Converting HomeFeed to JSON, sections: ${sections.size}")
+        Timber.tag("Mapper").d("Converting HomeFeed to JSON, sections: ${sections.size}")
         HomeFeedEntity(
             id = "home_feed",
             sectionsJson = json,
             cachedAt = System.currentTimeMillis()
         )
     } catch (e: Exception) {
-        Log.e("Mapper", "Failed to convert HomeFeed to JSON: ${e.message}", e)
+        Timber.tag("Mapper").e(e, "Failed to convert HomeFeed to JSON: ${e.message}")
         HomeFeedEntity(id = "home_feed", sectionsJson = "{}", cachedAt = System.currentTimeMillis())
     }
 }
 
 fun HomeFeedEntity.toDomain(): HomeFeed {
     return try {
-        Log.d("Mapper", "Parsing JSON, length: ${sectionsJson.length}")
+        Timber.tag("Mapper").d("Parsing JSON, length: ${sectionsJson.length}")
         val feed = gson.fromJson(sectionsJson, HomeFeed::class.java)  // ← was Gson().fromJson(...)
-        Log.d("Mapper", "Parsed feed, sections: ${feed.sections.size}")
+        Timber.tag("Mapper").d("Parsed feed, sections: ${feed.sections.size}")
         feed
     } catch (e: Exception) {
-        Log.e("Mapper", "Failed to parse HomeFeed from JSON: ${e.message}", e)
-        Log.e("Mapper", "JSON: ${sectionsJson.take(500)}")
+        Timber.tag("Mapper").e(e, "Failed to parse HomeFeed from JSON: ${e.message}")
+        Timber.tag("Mapper").e("JSON: ${sectionsJson.take(500)}")
         HomeFeed(success = false, schoolId = 0, message = null, sections = emptyList())
     }
 }
@@ -262,9 +263,9 @@ suspend fun HomeFeed.saveItemsToCache(itemDao: ItemDao, itemImageDao: ItemImageD
                 itemImageDao.updateImagesForItem(item.id, imageEntities)
             }
         } catch (e: Exception) {
-            Log.e("HomeFeed", "Failed to cache item ${item.id}: ${e.message}")
+            Timber.tag("HomeFeed").e("Failed to cache item ${item.id}: ${e.message}")
         }
     }
 
-    Log.d("HomeFeed", "✅ Cached ${allItems.size} individual items to Room")
+    Timber.tag("HomeFeed").d("✅ Cached ${allItems.size} individual items to Room")
 }

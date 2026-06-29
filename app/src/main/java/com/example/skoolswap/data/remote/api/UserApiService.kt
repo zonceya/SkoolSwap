@@ -9,6 +9,7 @@ import com.example.skoolswap.data.remote.models.response.profile.DeleteProfileRe
 import com.example.skoolswap.data.remote.models.response.profile.ProfileResponse
 import com.example.skoolswap.data.remote.models.response.school.AssignSchoolResponse
 import com.example.skoolswap.data.remote.models.response.user.FirebaseAuthResponse
+import com.example.skoolswap.data.remote.models.response.user.RefreshTokenResponse
 import com.example.skoolswap.data.remote.models.response.user.SendOtpResponse
 import com.example.skoolswap.data.remote.models.response.user.SignInResponse
 import com.example.skoolswap.data.remote.models.response.user.UpdateMobileResponse
@@ -32,7 +33,10 @@ interface UserApiService {
     suspend fun signIn(
         @Body request: SignInRequest
     ): Response<SignInResponse>
-
+    @POST("api/v1/auth/refresh")
+    suspend fun refreshToken(
+        @Header("Authorization") token: String
+    ): Response<RefreshTokenResponse>
     @PUT("api/v1/users/update_mobile")
     suspend fun updateMobile(
         @Header("Authorization") authToken: String,

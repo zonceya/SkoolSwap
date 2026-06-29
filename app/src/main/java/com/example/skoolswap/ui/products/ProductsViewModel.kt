@@ -3,6 +3,7 @@ package com.example.skoolswap.ui.products
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.skoolswap.data.remote.models.response.home.PaginatedResponse
 import com.example.skoolswap.domain.model.AppliedFilters
 import com.example.skoolswap.domain.model.FilterConfig
 import com.example.skoolswap.domain.model.FilterGroup
@@ -76,7 +77,7 @@ class ProductsViewModel @Inject constructor(
 
     // Sort state
     private var _currentSortType: String? = null
-
+    private var currentSubCategoryId: Int? = null
     // ==================== Public Methods ====================
 // ProductsViewModel.kt - Add these with other state variables
 
@@ -93,7 +94,7 @@ class ProductsViewModel @Inject constructor(
     val searchQuery: StateFlow<String?> = _searchQuery.asStateFlow()
     fun getSavedCategoryId(): Int? = savedCategoryId
     fun getSavedCategoryName(): String? = savedCategoryName
-
+    private var currentNavCategoryId: Int? = null  // ← ADD THIS
     fun setSavedCategory(categoryId: Int, categoryName: String) {
         savedCategoryId = categoryId
         savedCategoryName = categoryName
@@ -108,7 +109,7 @@ class ProductsViewModel @Inject constructor(
 
     // UPDATED: Search with debounce like HomeViewModel
     fun searchInCurrentSection(query: String) {
-        Log.d("ProductsViewModel", "🔍 searchInCurrentSection called with query: '$query'")
+        Timber.tag("ProductsViewModel").d("🔍 searchInCurrentSection called with query: '$query'")
         searchJob?.cancel()
 
         _searchQuery.value = query
@@ -198,6 +199,9 @@ class ProductsViewModel @Inject constructor(
         // Convert -1 or 0 to null (meaning "all categories")
         return if (categoryId == null || categoryId <= 0) null else categoryId
     }
+    fun setSubCategoryId(subCategoryId: Int?) {
+        currentSubCategoryId = subCategoryId
+    }
     fun resetFirstLoadFlag() {
         // This helps reset any stale state
         _error.value = null
@@ -239,43 +243,43 @@ class ProductsViewModel @Inject constructor(
         sectionType: String,
         period: String? = null,
         navCategoryId: Int? = null,
+        subCategoryId: Int? = null,
         preSelectedSportTypeId: Int? = null,
         preSelectedGearType: String? = null
     ) {
-        Timber.tag("ProductsViewModel").d("🔄 loadProducts called: sectionType='$sectionType', navCategoryId=$navCategoryId")
+        Timber.tag("ProductsViewModel").d("🔄 loadProducts: section='$sectionType', subCategoryId=$subCategoryId, navCategoryId=$navCategoryId")
 
-        // Reset search
+        currentSubCategoryId = subCategoryId
+        currentNavCategoryId = navCategoryId
+        currentSectionType = sectionType.lowercase()
+
         currentSearchQuery = null
         _searchResults.value = emptyList()
+        _products.value = emptyList()
+
+        loadProductsJob?.cancel()
+        searchJob?.cancel()
+
 
         this.preSelectedSportTypeId = preSelectedSportTypeId
         this.preSelectedGearType = preSelectedGearType
 
         val normalizedType = sectionType.lowercase()
-
         val incomingCategoryId = if (navCategoryId == -1) null else navCategoryId
 
-        // FIXED: Handle both "sports" and "sport"
         val effectiveCategoryId = when {
             normalizedType == "sports" || normalizedType == "sport" -> incomingCategoryId ?: 2
-            else -> savedCategoryId
-                ?: _appliedFilters.value.categoryId
-                ?: lastLoadedCategoryId
-                ?: incomingCategoryId
+            else -> savedCategoryId ?: _appliedFilters.value.categoryId ?: incomingCategoryId
         }
 
         currentSectionType = normalizedType
         currentPeriod = period
         if (effectiveCategoryId != null) lastLoadedCategoryId = effectiveCategoryId
 
-        Timber.tag("ProductsViewModel")
-            .d("→ normalizedType=$normalizedType, effectiveCategoryId=$effectiveCategoryId")
-
         loadFilterConfigIfNeeded(effectiveCategoryId)
-
-        // NEW: Pass the section type down so we can choose the right endpoint
         loadProductsInternal(effectiveCategoryId, normalizedType)
     }
+
 
     fun loadFilterConfig(categoryId: Int) {
         if (categoryId <= 0) return
@@ -461,22 +465,28 @@ class ProductsViewModel @Inject constructor(
     }
 
     private fun loadProductsInternal(categoryId: Int?, sectionType: String? = null) {
+        // ✅ Use the stored currentSubCategoryId (set in loadProducts)
+        val effectiveSubCategoryId = currentSubCategoryId
+
+        Timber.tag("ProductsViewModel").d("🚀 loadProductsInternal START → section=$sectionType, subCategoryId=$effectiveSubCategoryId, categoryId=$categoryId")
+
+        // Cancel previous job
         loadProductsJob?.cancel()
+
         loadProductsJob = viewModelScope.launch {
             _isNewSectionLoading.value = true
             _isLoading.value = true
             _error.value = null
             _products.value = emptyList()
 
-            val effectiveCategoryId = getValidCategoryId()
-
-            val result = when {
-                // NEW: Special handling for Essentials Sports
-                sectionType == "sports" || sectionType == "sport" -> {
-                    Timber.tag("ProductsViewModel").d("🏅 Loading Sports via getEssentialsAll")
+            // ✅ Use effectiveSubCategoryId in all calls
+            val result: Result<PaginatedResponse<Item>> = when {
+                sectionType == "uniform" || sectionType == "uniforms" -> {
+                    Timber.tag("ProductsViewModel").d("👕 Loading Uniforms with subCategoryId=$effectiveSubCategoryId")
                     productsRepository.getEssentialsAll(
                         page = 1,
-                        category = "Sports",           // ← Confirm this exact string with backend
+                        category = "Uniforms",
+                        subCategoryId = effectiveSubCategoryId,  // ← USE STORED VALUE
                         perPage = 30,
                         conditionId = _appliedFilters.value.condition,
                         minPrice = _appliedFilters.value.minPrice,
@@ -484,28 +494,37 @@ class ProductsViewModel @Inject constructor(
                     )
                 }
 
-                sectionType == "uniforms" || sectionType == "uniform" -> {
+                sectionType == "sports" || sectionType == "sport" -> {
+                    Timber.tag("ProductsViewModel").d("🏅 Loading Sports with subCategoryId=$effectiveSubCategoryId")
                     productsRepository.getEssentialsAll(
                         page = 1,
-                        category = "Uniforms",
+                        category = "Sports",
+                        subCategoryId = effectiveSubCategoryId,  // ← USE STORED VALUE
                         perPage = 30,
-
+                        conditionId = _appliedFilters.value.condition,
+                        minPrice = _appliedFilters.value.minPrice,
+                        maxPrice = _appliedFilters.value.maxPrice
                     )
                 }
 
                 sectionType == "accessories" -> {
+                    Timber.tag("ProductsViewModel").d("🎒 Loading Accessories")
                     productsRepository.getEssentialsAll(
                         page = 1,
                         category = "Accessories",
+                        subCategoryId = null,
                         perPage = 30,
+                        conditionId = _appliedFilters.value.condition,
+                        minPrice = _appliedFilters.value.minPrice,
+                        maxPrice = _appliedFilters.value.maxPrice
                     )
                 }
 
                 else -> {
-                    // Default fallback (recommended, trending, etc.)
+                    Timber.tag("ProductsViewModel").d("✨ Loading Recommended")
                     productsRepository.getRecommendedAll(
                         page = 1,
-                        categoryId = effectiveCategoryId,
+                        categoryId = getValidCategoryId(),
                         conditionId = _appliedFilters.value.condition,
                         minPrice = _appliedFilters.value.minPrice,
                         maxPrice = _appliedFilters.value.maxPrice
@@ -513,21 +532,35 @@ class ProductsViewModel @Inject constructor(
                 }
             }
 
-            when (result) {
+            when (val res = result) {
                 is Result.Success -> {
-                    _products.value = result.data.items
-                    Timber.tag("ProductsViewModel").d("✅ Loaded ${result.data.items.size} items for $sectionType")
+                    val items = res.data.items
+                    _products.value = items
+                    Timber.tag("ProductsViewModel")
+                        .d("✅ SUCCESS: Loaded ${items.size} items | section=$sectionType | subCategory=$effectiveSubCategoryId")
                 }
                 is Result.Error -> {
-                    _error.value = result.exception.message
+                    _error.value = res.exception.message ?: "Failed to load items"
+                    Timber.e(res.exception, "❌ Failed to load products")
                 }
             }
 
             _isLoading.value = false
             _isNewSectionLoading.value = false
+            Timber.tag("ProductsViewModel").d("🏁 Loading finished")
         }
     }
 
+
+
+    // Add this helper if you don't have it
+    fun reloadLocalFiltersOnly() {
+        // Just trigger filter rebuild without new network call
+        viewModelScope.launch {
+            // You can emit the current products again to trigger collector
+            _products.value = _products.value
+        }
+    }
     override fun onCleared() {
         loadProductsJob?.cancel()
         loadFilterJob?.cancel()
@@ -542,7 +575,8 @@ class ProductsViewModel @Inject constructor(
     fun reloadCurrentSection() {
         currentSearchQuery = null
         _searchResults.value = emptyList()
-        loadProductsInternal(_appliedFilters.value.categoryId)
+        // ✅ Pass the current section type to preserve sub-category filter
+        loadProductsInternal(_appliedFilters.value.categoryId, currentSectionType)
     }
 
     // Add items cache

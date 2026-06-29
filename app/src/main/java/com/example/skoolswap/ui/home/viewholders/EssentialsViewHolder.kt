@@ -50,7 +50,7 @@ class EssentialsViewHolder(
                 categoryType = "uniforms",
                 displayName = "Uniforms",
                 categoryId = 1,
-                defaultImageUrl = "https://cdn.skoolswap.co.za/products/uniforms/56859424-a3cc-411d-9098-d7eda59743ae.jpg"
+                defaultImageUrl = "https://cdn.skoolswap.co.za/schools_demo/ic_uniform_placeholder.webp"
             )
         } else {
             EssentialsCategoryItem(
@@ -59,7 +59,7 @@ class EssentialsViewHolder(
                 displayName = "Uniforms",
                 categoryId = 1,
                 isPlaceholder = true,
-                defaultImageUrl = "https://cdn.skoolswap.co.za/products/uniforms/56859424-a3cc-411d-9098-d7eda59743ae.jpg"
+                defaultImageUrl = "https://cdn.skoolswap.co.za/schools_demo/ic_uniform_placeholder.webp"
             )
         }
         categoryCards.add(uniformsItem)
@@ -72,7 +72,7 @@ class EssentialsViewHolder(
                 categoryType = "sports",
                 displayName = "Sports",
                 categoryId = 2,
-                defaultImageUrl = "https://cdn.skoolswap.co.za/products/sport/cricket.jpg"
+                defaultImageUrl = "https://cdn.skoolswap.co.za/schools_demo/ic_sports_placeholder.webp"
             )
         } else {
             EssentialsCategoryItem(
@@ -81,7 +81,7 @@ class EssentialsViewHolder(
                 displayName = "Sports",
                 categoryId = 2,
                 isPlaceholder = true,
-                defaultImageUrl = "https://cdn.skoolswap.co.za/products/sport/cricket.jpg"
+                defaultImageUrl = "https://cdn.skoolswap.co.za/schools_demo/ic_sports_placeholder.webp"
             )
         }
         categoryCards.add(sportsItem)
@@ -97,7 +97,7 @@ class EssentialsViewHolder(
                 categoryType = "stationery",
                 displayName = "Stationery",
                 categoryId = 5,
-                defaultImageUrl = "https://cdn.skoolswap.co.za/products/textbooks/fad19ac4-6f06-41be-8f5c-6f2f5f304477.jpg"
+                defaultImageUrl = "https://cdn.skoolswap.co.za/schools_demo/ic_stationery_placeholder.webp"
             )
         } else {
             EssentialsCategoryItem(
@@ -106,7 +106,7 @@ class EssentialsViewHolder(
                 displayName = "Stationery",
                 categoryId = 5,
                 isPlaceholder = true,
-                defaultImageUrl = "https://cdn.skoolswap.co.za/products/textbooks/fad19ac4-6f06-41be-8f5c-6f2f5f304477.jpg"
+                defaultImageUrl = "https://cdn.skoolswap.co.za/schools_demo/ic_stationery_placeholder.webp"
             )
         }
         categoryCards.add(stationeryItem)
@@ -119,7 +119,7 @@ class EssentialsViewHolder(
                 categoryType = "accessories",
                 displayName = "Accessories",
                 categoryId = 3,
-                defaultImageUrl = "https://cdn.skoolswap.co.za/products/accessories/39f6a4a9-8a3f-4f3c-8f83-c052070b4b7f.jpg"
+                defaultImageUrl = "https://cdn.skoolswap.co.za/schools_demo/ic_accessories_placeholder.webp"
             )
         } else {
             EssentialsCategoryItem(
@@ -128,7 +128,7 @@ class EssentialsViewHolder(
                 displayName = "Accessories",
                 categoryId = 3,
                 isPlaceholder = true,
-                defaultImageUrl = "https://cdn.skoolswap.co.za/products/accessories/39f6a4a9-8a3f-4f3c-8f83-c052070b4b7f.jpg"
+                defaultImageUrl = "https://cdn.skoolswap.co.za/schools_demo/ic_accessories_placeholder.webp"
             )
         }
         categoryCards.add(accessoriesItem)

@@ -27,4 +27,26 @@ interface ItemImageDao {
 
     @Query("DELETE FROM item_images")
     suspend fun clearAllImages()
+
+    // ✅ ADD THESE METHODS FOR IMAGE CLEANUP
+
+    // Time-based cleanup: Delete images older than cutoff time
+    @Query("DELETE FROM item_images WHERE createdAt < :cutoffTime")
+    suspend fun deleteImagesOlderThan(cutoffTime: Long): Int
+
+    // Cap-based cleanup: Get all images sorted by age (oldest first)
+    @Query("SELECT * FROM item_images ORDER BY createdAt ASC")
+    suspend fun getAllImagesSortedByAge(): List<ItemImageEntity>
+
+    // Get total size of all images
+    @Query("SELECT SUM(fileSize) FROM item_images")
+    suspend fun getTotalImageSize(): Long?
+
+    // Delete a specific image by ID
+    @Query("DELETE FROM item_images WHERE id = :imageId")
+    suspend fun deleteImage(imageId: Long)
+
+    // Get total count of images
+    @Query("SELECT COUNT(*) FROM item_images")
+    suspend fun getImageCount(): Int
 }

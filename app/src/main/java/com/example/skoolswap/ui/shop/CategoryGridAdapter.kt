@@ -80,7 +80,7 @@ class CategoryGridAdapter(
                 } else {
                     binding.soldBadge.text = "MARK SOLD"
                     binding.soldBadge.setBackgroundColor(
-                        ContextCompat.getColor(binding.root.context, R.color.teal_200)
+                        ContextCompat.getColor(binding.root.context, R.color.green_dark)
                     )
                     binding.productName.alpha = 1f
                     binding.productPrice.alpha = 1f
