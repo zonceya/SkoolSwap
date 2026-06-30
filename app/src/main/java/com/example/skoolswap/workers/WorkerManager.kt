@@ -1,6 +1,7 @@
 package com.example.skoolswap.workers
 
 import android.content.Context
+import android.net.Uri
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkManager
@@ -243,6 +244,35 @@ class WorkerManager @Inject constructor(
             Timber.d("❌ All workers cancelled")
         } catch (e: Exception) {
             Timber.e(e, "❌ Failed to cancel workers")
+        }
+    }
+
+    fun scheduleItemCreation(itemId: String, imageUris: List<Uri>) {
+        try {
+            val request = ItemCreationWorker.createOneTimeRequest(itemId, imageUris)
+            workManager.enqueueUniqueWork(
+                "item_creation_$itemId",
+                ExistingWorkPolicy.REPLACE,
+                request
+            )
+            Timber.d("✅ Item creation worker scheduled for: $itemId")
+        } catch (e: Exception) {
+            Timber.e(e, "❌ Failed to schedule item creation worker")
+        }
+    }
+
+    fun retryFailedItem(itemId: String) {
+        try {
+            // Get the item and retry
+            val request = ItemCreationWorker.createOneTimeRequest(itemId, emptyList())
+            workManager.enqueueUniqueWork(
+                "item_retry_$itemId",
+                ExistingWorkPolicy.REPLACE,
+                request
+            )
+            Timber.d("🔄 Retry scheduled for item: $itemId")
+        } catch (e: Exception) {
+            Timber.e(e, "❌ Failed to schedule retry")
         }
     }
 }

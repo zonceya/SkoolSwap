@@ -39,7 +39,14 @@ data class ItemEntity(
     val lastCacheTime: Long = System.currentTimeMillis(),
     val imagesJson: String = "[]",
     val coverImage: String? = null,
-    val viewCount: Int = 0 // ADD THIS FIELD
+    val viewCount: Int = 0 ,
+    val syncStatus: String = "ACTIVE", // "UPLOADING", "ACTIVE", "FAILED"
+    val syncError: String? = null,     // Error message if failed
+    val retryCount: Int = 0,
+    val lastSyncAttempt: Long? = null,
+    val mainCategoryId: Int? = null,
+    val subCategoryId: Int? = null,
+    val colorId: Int? = null
 )
 
 // Extension functions (outside the data class)

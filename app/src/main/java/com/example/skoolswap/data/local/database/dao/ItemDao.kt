@@ -48,4 +48,16 @@ interface ItemDao {
 
     @Query("SELECT * FROM items WHERE id = :itemId AND lastCacheTime > :expiryTime")
     suspend fun getValidItemById(itemId: String, expiryTime: Long): ItemEntity?
+    // ItemDao.kt - Add these methods
+
+    @Query("SELECT * FROM items WHERE syncStatus = 'UPLOADING'")
+    suspend fun getUploadingItems(): List<ItemEntity>
+
+    @Query("SELECT * FROM items WHERE syncStatus = 'FAILED'")
+    suspend fun getFailedItems(): List<ItemEntity>
+    @Query("DELETE FROM items WHERE id = :itemId")
+    suspend fun deleteItemById(itemId: String)
+
+    @Query("UPDATE items SET syncStatus = :status, syncError = :error WHERE id = :itemId")
+    suspend fun updateSyncStatus(itemId: String, status: String, error: String? = null)
 }

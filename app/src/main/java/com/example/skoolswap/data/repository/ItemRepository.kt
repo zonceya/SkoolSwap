@@ -40,7 +40,7 @@ class ItemRepository @Inject constructor(
     private val itemDao: ItemDao,
     private val itemImageDao: ItemImageDao,
     private val authRepository: AuthRepositoryInterface,
-    private val appPreferences: AppPreferences
+    private val imageUploadRepository: ImageUploadRepository
 
 ) : ItemRepositoryInterface {
 
@@ -109,14 +109,14 @@ class ItemRepository @Inject constructor(
 
             if (!response.isSuccessful) {
                 val errorMsg = "Failed to create item: ${response.errorBody()?.string()}"
-                Log.e(TAG, errorMsg)
+                Timber.tag(TAG).e(errorMsg)
                 return Result.failure(Exception(errorMsg))
             }
 
             val responseBody = response.body()
             if (responseBody?.success != true || responseBody.item == null) {
                 val errorMsg = responseBody?.message ?: "Failed to create item"
-                Log.e(TAG, errorMsg)
+                Timber.tag(TAG).e(errorMsg)
                 return Result.failure(Exception(errorMsg))
             }
 
@@ -134,6 +134,8 @@ class ItemRepository @Inject constructor(
     }
 
     // ============ CREATE ITEM WITH IMAGES ============
+    // In ItemRepository.kt - createItemWithImages with uploadAndAttachImages
+
     override suspend fun createItemWithImages(
         context: Context,
         name: String,
@@ -163,6 +165,7 @@ class ItemRepository @Inject constructor(
                 return Result.failure(Exception("Cannot exceed $MAX_IMAGES images"))
             }
 
+            // 1. First create the item (without images)
             val request = CreateItemRequest(
                 item = ItemData(
                     name = name,
@@ -185,67 +188,60 @@ class ItemRepository @Inject constructor(
                 )
             )
 
-            Log.d(TAG, "Creating item: $name")
+            Timber.tag(TAG).d("Creating item: $name")
             val itemResponse = itemApiService.createItem("Bearer $token", request)
 
             if (!itemResponse.isSuccessful) {
                 val errorMsg = "Failed to create item: ${itemResponse.errorBody()?.string()}"
-                Log.e(TAG, errorMsg)
+                Timber.tag(TAG).e(errorMsg)
                 return Result.failure(Exception(errorMsg))
             }
 
             val createdItemResponse = itemResponse.body()
             if (createdItemResponse?.success != true || createdItemResponse.item == null) {
                 val errorMsg = createdItemResponse?.message ?: "Failed to create item"
-                Log.e(TAG, errorMsg)
+                Timber.tag(TAG).e(errorMsg)
                 return Result.failure(Exception(errorMsg))
             }
 
             val itemId = createdItemResponse.item.id
-            Log.d(TAG, "Item created with ID: $itemId")
+            Timber.tag(TAG).d("Item created with ID: $itemId")
 
             var finalItem = createdItemResponse.toDomain()
 
+            // 2. Upload and attach images using ImageUploadRepository
             if (imageUris.isNotEmpty()) {
-                Timber.tag(TAG).d("Uploading ${imageUris.size} images")
-                val imageParts = ImageMultipartHelper.createImageParts(context, imageUris)
+                val result = imageUploadRepository.uploadAndAttachImages(
+                    context = context,
+                    itemId = itemId,
+                    imageUris = imageUris
+                )
 
-                if (imageParts.isNotEmpty()) {
-                    val imagesResponse = itemApiService.addItemImages(
-                        "Bearer $token",
-                        itemId,
-                        imageParts
-                    )
-
-                    if (imagesResponse.isSuccessful && imagesResponse.body()?.success == true) {
-                        val images = imagesResponse.body()?.images ?: emptyList()
-                        // Convert to List<ItemImage> correctly
-                        val imageItems: List<ItemImage> = images.map { imageDto ->
-                            ItemImage(
-                                id = imageDto.id,
-                                url = imageDto.url,
-                                filename = imageDto.filename,
-                                contentType = imageDto.contentType,
-                                createdAt = imageDto.createdAt,
-                                isCover = false
-                            )
+                if (result.isSuccess) {
+                    val uploadedUrls = result.getOrNull() ?: emptyList()
+                    // If you need the full image objects, fetch the updated item
+                    if (uploadedUrls.isNotEmpty()) {
+                        // Optionally fetch the updated item to get image details
+                        val updatedItemResult = getItem(itemId)
+                        if (updatedItemResult.isSuccess) {
+                            finalItem = updatedItemResult.getOrNull()!!
                         }
-                        finalItem = finalItem.copy(images = imageItems)
-                        Log.d(TAG, "Images uploaded successfully: ${imageItems.size} images")
-                    } else {
-                        Log.w(TAG, "Image upload failed, but item was created")
                     }
+                    Timber.tag(TAG).d("✅ Uploaded and attached ${uploadedUrls.size} images")
+                } else {
+                    Timber.tag(TAG).w("⚠️ Image upload failed: ${result.exceptionOrNull()?.message}")
                 }
             }
 
+            // Save to database
             itemDao.insertItem(finalItem.toEntity())
             _recentlyCreatedItem.value = finalItem
 
-            Log.i(TAG, "Item with images created successfully: ${finalItem.name}")
+            Timber.tag(TAG).i("Item created successfully: ${finalItem.name}")
             Result.success(finalItem)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Create item with images failed", e)
+            Timber.tag(TAG).e(e, "Create item with images failed")
             Result.failure(e)
         }
     }
@@ -866,6 +862,17 @@ class ItemRepository @Inject constructor(
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "❌ Update item status failed", e)
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun saveLocalItem(item: Item): Result<Unit> {
+        return try {
+            itemDao.insertItem(item.toEntity())
+            Timber.tag(TAG).d("✅ Item saved locally: ${item.id}")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "❌ Failed to save local item")
             Result.failure(e)
         }
     }

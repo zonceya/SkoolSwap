@@ -37,6 +37,10 @@ data class Item(
     val brandName: String? = null,
     val conditionName: String? = null,
     val viewCount: Int = 0,
+    val syncStatus: String = "ACTIVE",
+    val syncError: String? = null,
+    val retryCount: Int = 0,
+    val lastSyncAttempt: Long? = null
 ) {
     val availableQuantity: Int
         get() = quantity - reserved

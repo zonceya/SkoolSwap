@@ -16,10 +16,13 @@ import com.example.skoolswap.data.local.database.dao.SizeDao
 import com.example.skoolswap.data.local.database.dao.SubCategoryDao
 import com.example.skoolswap.data.local.database.dao.TagDao
 import com.example.skoolswap.data.local.database.dao.TownDao
+import com.example.skoolswap.data.remote.api.ImageApiService
+import com.example.skoolswap.data.remote.api.ItemApiService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import retrofit2.Retrofit
 import javax.inject.Singleton
 
 @Module
@@ -31,7 +34,6 @@ object ItemModule {
     @Singleton
     fun provideItemDao(database: SkoolSwapDatabase): ItemDao = database.itemDao()
 
-    // Item-related reference DAOs
     @Provides
     @Singleton
     fun provideMainCategoryDao(database: SkoolSwapDatabase): MainCategoryDao = database.mainCategoryDao()

@@ -5,11 +5,16 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.WorkManager
+import com.example.skoolswap.data.local.database.dao.ItemDao
+import com.example.skoolswap.data.mapper.toEntity
 import com.example.skoolswap.domain.model.Item
+import com.example.skoolswap.domain.model.ItemImage
 import com.example.skoolswap.domain.model.reference.*
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.domain.repository.ReferenceDataRepositoryInterface
+import com.example.skoolswap.workers.ItemCreationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +24,8 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
@@ -90,32 +97,32 @@ class CreateItemViewModel @Inject constructor(
     val selectedProvinceId: StateFlow<Int?> = _selectedProvinceId.asStateFlow()
 
     init {
-        Log.d(TAG, "=== ViewModel INIT ===")
+        Timber.tag(TAG).d("=== ViewModel INIT ===")
         viewModelScope.launch {
             _isLoading.value = true
-            Log.d(TAG, "Loading started")
+            Timber.tag(TAG).d("Loading started")
 
             // STEP 1: Start collecting from DB FIRST (so we catch any updates)
-            Log.d(TAG, "Setting up database collectors")
+            Timber.tag(TAG).d("Setting up database collectors")
             launch {
                 referenceRepository.getMainCategories().collect {
                     _mainCategories.value = it
-                    Log.d(TAG, "📦 Loaded ${it.size} main categories from DB")
+                    Timber.tag(TAG).d("📦 Loaded ${it.size} main categories from DB")
                     it.forEach { category ->
-                        Log.d(TAG, "  - Category: ${category.name} (ID: ${category.id})")
+                        Timber.tag(TAG).d("  - Category: ${category.name} (ID: ${category.id})")
                     }
                 }
             }
             launch {
                 referenceRepository.getColors().collect {
                     _colors.value = it
-                    Log.d(TAG, "🎨 Loaded ${it.size} colors from DB")
+                    Timber.tag(TAG).d("🎨 Loaded ${it.size} colors from DB")
                 }
             }
             launch {
                 referenceRepository.getSizes().collect {
                     _sizes.value = it
-                    Log.d(TAG, "📏 Loaded ${it.size} sizes from DB")
+                    Timber.tag(TAG).d("📏 Loaded ${it.size} sizes from DB")
                 }
             }
             launch {
@@ -127,61 +134,62 @@ class CreateItemViewModel @Inject constructor(
             launch {
                 referenceRepository.getConditions().collect {
                     _conditions.value = it
-                    Log.d(TAG, "✅ Loaded ${it.size} conditions from DB")
+                    Timber.tag(TAG).d("✅ Loaded ${it.size} conditions from DB")
                 }
             }
             launch {
                 referenceRepository.getProvinces().collect {
                     _provinces.value = it
-                    Log.d(TAG, "🗺️ Loaded ${it.size} provinces from DB")
+                    Timber.tag(TAG).d("🗺️ Loaded ${it.size} provinces from DB")
                 }
             }
             launch {
                 referenceRepository.getSchools().collect {
                     _schools.value = it
-                    Log.d(TAG, "🏫 Loaded ${it.size} schools from DB")
+                    Timber.tag(TAG).d("🏫 Loaded ${it.size} schools from DB")
                 }
             }
             launch {
                 referenceRepository.getGenders().collect {
                     _genders.value = it
-                    Log.d(TAG, "👥 Loaded ${it.size} genders from DB")
+                    Timber.tag(TAG).d("👥 Loaded ${it.size} genders from DB")
                 }
             }
             launch {
                 referenceRepository.getTags().collect {
                     _tags.value = it
-                    Log.d(TAG, "🏷️ Loaded ${it.size} tags from DB")
+                    Timber.tag(TAG).d("🏷️ Loaded ${it.size} tags from DB")
                 }
             }
             launch {
                 referenceRepository.getLocations().collect {
                     _locations.value = it
-                    Log.d(TAG, "📍 Loaded ${it.size} locations from DB")
+                    Timber.tag(TAG).d("📍 Loaded ${it.size} locations from DB")
                 }
             }
 
             // STEP 2: Set up observers
-            Log.d(TAG, "Setting up observers for subcategories and towns")
+            Timber.tag(TAG).d("Setting up observers for subcategories and towns")
             observeSubCategories()
             observeTowns()
 
             // STEP 3: Now trigger the refresh (ONCE) - DB flows will update automatically
-            Log.d(TAG, "Triggering reference data refresh")
+            Timber.tag(TAG).d("Triggering reference data refresh")
             try {
                 val result = referenceRepository.refreshAllReferenceDataBulk(forceRefresh = false)
                 if (result.isSuccess) {
-                    Log.d(TAG, "✅ Reference data refreshed successfully")
+                    Timber.tag(TAG).d("✅ Reference data refreshed successfully")
                 } else {
-                    Log.w(TAG, "⚠️ Refresh failed, using cached: ${result.exceptionOrNull()?.message}")
+                    Timber.tag(TAG)
+                        .w("⚠️ Refresh failed, using cached: ${result.exceptionOrNull()?.message}")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "⚠️ Refresh error: ${e.message}", e)
+                Timber.tag(TAG).e(e, "⚠️ Refresh error: ${e.message}")
             }
 
             _isLoading.value = false
-            Log.d(TAG, "Loading completed, isLoading=false")
-            Log.d(TAG, "=== ViewModel INIT COMPLETE ===")
+            Timber.tag(TAG).d("Loading completed, isLoading=false")
+            Timber.tag(TAG).d("=== ViewModel INIT COMPLETE ===")
         }
     }
 
@@ -189,17 +197,18 @@ class CreateItemViewModel @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun observeSubCategories() {
         viewModelScope.launch {
-            Log.d(TAG, "observeSubCategories: Starting observation")
+            Timber.tag(TAG).d("observeSubCategories: Starting observation")
             _selectedMainCategoryId
                 .filterNotNull()
                 .flatMapLatest { mainCategoryId ->
-                    Log.d(TAG, "observeSubCategories: Main category ID changed to $mainCategoryId")
+                    Timber.tag(TAG)
+                        .d("observeSubCategories: Main category ID changed to $mainCategoryId")
                     referenceRepository.getSubCategories(mainCategoryId)
                 }
                 .collect { subCats ->
-                    Log.d(TAG, "📦 Received ${subCats.size} subcategories")
+                    Timber.tag(TAG).d("📦 Received ${subCats.size} subcategories")
                     subCats.forEach { subCat ->
-                        Log.d(TAG, "  - Subcategory: ${subCat.name} (ID: ${subCat.id})")
+                        Timber.tag(TAG).d("  - Subcategory: ${subCat.name} (ID: ${subCat.id})")
                     }
                     _subCategories.value = subCats
                 }
@@ -208,17 +217,17 @@ class CreateItemViewModel @Inject constructor(
 
     private fun observeTowns() {
         viewModelScope.launch {
-            Log.d(TAG, "observeTowns: Starting observation")
+            Timber.tag(TAG).d("observeTowns: Starting observation")
             _selectedProvinceId
                 .filterNotNull()
                 .collect { provinceId ->
-                    Log.d(TAG, "🔍 Province selected: $provinceId, refreshing towns")
+                    Timber.tag(TAG).d("🔍 Province selected: $provinceId, refreshing towns")
                     referenceRepository.refreshTowns(provinceId)
                     referenceRepository.getTowns(provinceId).collect { townList ->
                         _towns.value = townList
-                        Log.d(TAG, "Loaded ${townList.size} towns for province $provinceId")
+                        Timber.tag(TAG).d("Loaded ${townList.size} towns for province $provinceId")
                         townList.forEach { town ->
-                            Log.d(TAG, "  - Town: ${town.name} (ID: ${town.id})")
+                            Timber.tag(TAG).d("  - Town: ${town.name} (ID: ${town.id})")
                         }
                     }
                 }
@@ -227,67 +236,72 @@ class CreateItemViewModel @Inject constructor(
 
     // ============ SELECTION METHODS ============
     fun onMainCategorySelected(mainCategoryId: Int?) {
-        Log.d(TAG, "onMainCategorySelected: $mainCategoryId")
+        Timber.tag(TAG).d("onMainCategorySelected: $mainCategoryId")
         _selectedMainCategoryId.value = mainCategoryId
     }
 
     fun onProvinceSelected(provinceId: Int?) {
-        Log.d(TAG, "onProvinceSelected: $provinceId")
+        Timber.tag(TAG).d("onProvinceSelected: $provinceId")
         _selectedProvinceId.value = provinceId
     }
 
     // ============ IMAGE METHODS ============
     fun addImage(uri: Uri) {
-        Log.d(TAG, "addImage: $uri")
+        Timber.tag(TAG).d("addImage: $uri")
         val currentImages = _images.value.toMutableList()
-        Log.d(TAG, "Current images count: ${currentImages.size}")
+        Timber.tag(TAG).d("Current images count: ${currentImages.size}")
 
         if (currentImages.size < 3) {
             currentImages.add(uri)
             _images.value = currentImages
-            Log.d(TAG, "✅ Image added. New count: ${currentImages.size}")
+            Timber.tag(TAG).d("✅ Image added. New count: ${currentImages.size}")
         } else {
-            Log.w(TAG, "Cannot add image, max limit reached (3/3)")
+            Timber.tag(TAG).w("Cannot add image, max limit reached (3/3)")
         }
     }
 
     fun removeImage(uri: Uri) {
-        Log.d(TAG, "removeImage: $uri")
+        Timber.tag(TAG).d("removeImage: $uri")
         val currentImages = _images.value.toMutableList()
         val removed = currentImages.remove(uri)
         _images.value = currentImages
-        Log.d(TAG, "Image removed: $removed. Remaining count: ${currentImages.size}")
+        Timber.tag(TAG).d("Image removed: $removed. Remaining count: ${currentImages.size}")
     }
 
     fun clearImages() {
-        Log.d(TAG, "clearImages: Clearing all images")
+        Timber.tag(TAG).d("clearImages: Clearing all images")
         _images.value = emptyList()
     }
     suspend fun hasContactNumber(): Boolean {
         return try {
             val userProfile = authRepository.getServerUser().firstOrNull()
             val hasContactNumber = !userProfile?.mobile.isNullOrEmpty()
-            Log.d(TAG, "Has contact number: $hasContactNumber")
+            Timber.tag(TAG).d("Has contact number: $hasContactNumber")
             hasContactNumber
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking contact number", e)
+            Timber.tag(TAG).e(e, "Error checking contact number")
             false
         }
     }
     fun removeImageAt(index: Int) {
-        Log.d(TAG, "removeImageAt: index=$index")
+        Timber.tag(TAG).d("removeImageAt: index=$index")
         val currentImages = _images.value.toMutableList()
         if (index < currentImages.size) {
             val removed = currentImages.removeAt(index)
             _images.value = currentImages
-            Log.d(TAG, "✅ Removed image at index $index: $removed. Remaining: ${currentImages.size}")
+            Timber.tag(TAG)
+                .d("✅ Removed image at index $index: $removed. Remaining: ${currentImages.size}")
         } else {
-            Log.w(TAG, "Invalid index $index, current size: ${currentImages.size}")
+            Timber.tag(TAG).w("Invalid index $index, current size: ${currentImages.size}")
         }
     }
 
     // ============ CREATE ITEM ============
-    fun createItem(
+    // CreateItemViewModel.kt - Use repository instead of direct DAO
+
+// CreateItemViewModel.kt
+
+    fun createItemOfflineFirst(
         context: Context,
         name: String,
         description: String,
@@ -305,102 +319,83 @@ class CreateItemViewModel @Inject constructor(
         colorId: Int?,
         tagIds: List<Int>? = null
     ) {
-        Log.d(TAG, "=== createItem START ===")
-        Log.d(TAG, "Name: '$name'")
-        Log.d(TAG, "Description: '$description'")
-        Log.d(TAG, "Price: $price")
-        Log.d(TAG, "Quantity: $quantity")
-        Log.d(TAG, "mainCategoryId: $mainCategoryId")
-        Log.d(TAG, "subCategoryId: $subCategoryId")
-        Log.d(TAG, "brandId: $brandId")
-        Log.d(TAG, "sizeId: $sizeId")
-        Log.d(TAG, "schoolId: $schoolId")
-        Log.d(TAG, "conditionId: $conditionId")
-        Log.d(TAG, "locationId: $locationId")
-        Log.d(TAG, "provinceId: $provinceId")
-        Log.d(TAG, "genderId: $genderId")
-        Log.d(TAG, "colorId: $colorId")
-        Log.d(TAG, "tagIds: $tagIds")
-        Log.d(TAG, "Images to upload: ${_images.value.size}")
-
-        _images.value.forEachIndexed { index, uri ->
-            Log.d(TAG, "  Image $index: $uri")
-        }
-
-        Log.d(TAG, "Setting UI state to Loading")
-        _uiState.value = CreateItemUiState.Loading
-
         viewModelScope.launch {
-            Log.d(TAG, "Launching coroutine for createItemWithImages")
+            try {
+                _uiState.value = CreateItemUiState.Loading
 
-            val result = itemRepository.createItemWithImages(
-                context = context,
-                name = name,
-                description = description,
-                mainCategoryId = mainCategoryId,
-                subCategoryId = subCategoryId,
-                brandId = brandId,
-                price = price,
-                quantity = quantity,
-                itemConditionId = conditionId,
-                provinceId = provinceId,
-                locationId = locationId,
-                genderId = genderId,
-                schoolId = schoolId,
-                sizeId = sizeId,
-                colorId = colorId,
-                tagIds = tagIds,
-                imageUris = _images.value
-            )
+                // 1. Generate local ID
+                val localId = UUID.randomUUID().toString()
 
-            Log.d(TAG, "createItemWithImages completed")
-            Log.d(TAG, "Result isSuccess: ${result.isSuccess}")
+                // 2. Get current images BEFORE clearing
+                val currentImageUris = _images.value  // This is List<Uri>
 
-            result.fold(
-                onSuccess = { item ->
-                    Log.d(TAG, "✅ Item created successfully!")
-                    Log.d(TAG, "Item details:")
-                    Log.d(TAG, "  - ID: ${item.id}")
-                    Log.d(TAG, "  - Name: ${item.name}")
-                    Log.d(TAG, "  - Status: ${item.status}")
-                    Log.d(TAG, "  - Price: ${item.price}")
-                    Log.d(TAG, "  - Quantity: ${item.quantity}")
-                    Log.d(TAG, "  - Images count: ${item.images.size}")
-                    Log.d(TAG, "  - Created at: ${item.createdAt}")
+                // 3. Create local item
+                val localItem = Item(
+                    id = localId,
+                    shopId = 0L,
+                    name = name,
+                    description = description,
+                    price = price,
+                    quantity = quantity,
+                    status = "active",
+                    mainCategoryId = mainCategoryId,
+                    subCategoryId = subCategoryId,
+                    brandId = brandId,
+                    sizeId = sizeId,
+                    schoolId = schoolId,
+                    itemConditionId = conditionId,
+                    locationId = locationId,
+                    provinceId = provinceId,
+                    genderId = genderId,
+                    colorId = colorId,
+                    createdAt = System.currentTimeMillis().toString(),
+                    images = currentImageUris.map { uri ->
+                        ItemImage(id = 0, url = uri.toString(), isCover = false)
+                    },
+                    syncStatus = "UPLOADING",
+                    syncError = null,
+                    retryCount = 0,
+                    shop = null,
+                    meta = null,
+                    label = null,
+                    reserved = 0,
+                    itemTypeId = null,
+                    sizeName = null,
+                    colorName = null,
+                    brandName = null,
+                    conditionName = null,
+                    locationName = null,
+                    viewCount = 0
+                )
 
-                    item.images.forEachIndexed { index, image ->
-                        Log.d(TAG, "  - Image $index URL: ${image.url}")
-                    }
-
-                    _createdItem.value = ItemState.Success(item)
-                    _uiState.value = CreateItemUiState.Success("Item created successfully!")
-                    Log.d(TAG, "UI state set to Success")
-
-                    clearImages()
-                    Log.d(TAG, "Images cleared")
-                    Log.d(TAG, "=== createItem END (SUCCESS) ===")
-                },
-                onFailure = { error ->
-                    Log.e(TAG, "❌ Item creation failed!", error)
-                    Log.e(TAG, "Error message: ${error.message}")
-                    Log.e(TAG, "Error cause: ${error.cause}")
-
-                    error.stackTrace.forEach { stack ->
-                        Log.e(TAG, "  at $stack")
-                    }
-
-                    _createdItem.value = ItemState.Error(error.message ?: "Failed to create item")
-                    _uiState.value = CreateItemUiState.Error(error.message ?: "Failed to create item")
-                    Log.d(TAG, "UI state set to Error")
-                    Log.d(TAG, "=== createItem END (FAILURE) ===")
+                // Save to repository
+                val saveResult = itemRepository.saveLocalItem(localItem)
+                if (saveResult.isFailure) {
+                    _uiState.value = CreateItemUiState.Error("Failed to save item locally")
+                    return@launch
                 }
-            )
+
+                // 4. Navigate immediately
+                _uiState.value = CreateItemUiState.Success("Item saved locally, uploading in background")
+
+                // 5. Clear UI images
+                clearImages()
+
+                // 6. Enqueue background upload - Pass List<Uri> directly
+                val worker = ItemCreationWorker.createOneTimeRequest(localId, currentImageUris)
+                WorkManager.getInstance(context).enqueue(worker)
+
+                Timber.tag(TAG).d("✅ Item saved locally with ID: $localId, worker enqueued with ${currentImageUris.size} images")
+
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "❌ Failed to create item locally")
+                _uiState.value = CreateItemUiState.Error(e.message ?: "Failed to create item")
+            }
         }
-        Log.d(TAG, "createItem function completed (coroutine launched)")
     }
 
     fun resetState() {
-        Log.d(TAG, "resetState: Resetting to Idle")
+        Timber.tag(TAG).d("resetState: Resetting to Idle")
         _uiState.value = CreateItemUiState.Idle
         _createdItem.value = null
     }
