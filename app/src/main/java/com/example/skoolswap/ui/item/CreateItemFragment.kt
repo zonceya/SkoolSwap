@@ -28,6 +28,8 @@ import com.example.skoolswap.databinding.FragmentCreateItemBinding
 import com.example.skoolswap.domain.model.reference.*
 import com.example.skoolswap.ui.component.ColorPickerBottomSheet
 import com.example.skoolswap.ui.component.OptionsPickerBottomSheet
+import com.example.skoolswap.utils.DialogAction
+import com.example.skoolswap.utils.DialogHelper
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
@@ -156,6 +158,9 @@ class CreateItemFragment : Fragment() {
         setupClickListeners()
         setupDefaultSelections()
         restoreState(savedInstanceState)
+        binding.deleteCover.visibility = View.GONE
+        binding.deleteAngle2.visibility = View.GONE
+        binding.deleteAngle3.visibility = View.GONE
     }
 
     private fun hideFab() {
@@ -897,26 +902,52 @@ class CreateItemFragment : Fragment() {
             return
         }
 
-        Log.d(TAG, "Calling ViewModel.createItem...")
-        viewModel.createItem(
+        lifecycleScope.launch {
+            val hasContactNumber = viewModel.hasContactNumber()
+
+            if (hasContactNumber) {
+                // User HAS contact number - create item directly
+                Log.d(TAG, "User has contact number, creating item...")
+                viewModel.createItem(
+                    context = requireContext(),
+                    name = name,
+                    description = description,
+                    price = price,
+                    quantity = selectedQuantity,
+                    mainCategoryId = selectedMainCategoryId!!,
+                    subCategoryId = selectedSubCategoryId!!,
+                    brandId = selectedBrandId,
+                    sizeId = selectedSizeId,
+                    schoolId = selectedSchoolId,
+                    conditionId = selectedConditionId,
+                    locationId = selectedTownId,
+                    provinceId = selectedProvinceId,
+                    genderId = selectedGenderId,
+                    colorId = selectedColorId,
+                    tagIds = null
+                )
+                Log.d(TAG, "createItem called on ViewModel")
+            } else {
+                // User has NO contact number - show dialog to add contact number
+                Log.d(TAG, "User does NOT have contact number, showing dialog")
+                showMissingContactDialog()
+            }
+        }
+    }
+
+    private fun showMissingContactDialog() {
+        DialogHelper.showConfirmationDialog(
             context = requireContext(),
-            name = name,
-            description = description,
-            price = price,
-            quantity = selectedQuantity,
-            mainCategoryId = selectedMainCategoryId!!,
-            subCategoryId = selectedSubCategoryId!!,
-            brandId = selectedBrandId,
-            sizeId = selectedSizeId,
-            schoolId = selectedSchoolId,
-            conditionId = selectedConditionId,
-            locationId = selectedTownId,
-            provinceId = selectedProvinceId,
-            genderId = selectedGenderId,
-            colorId = selectedColorId,
-            tagIds = null
+            action = DialogAction.MissingContactNumber,
+            onConfirm = {
+                // User wants to add contact number - navigate to profile
+                findNavController().navigate(R.id.action_createItemFragment_to_profileFragment)
+            },
+            onCancel = {
+                // User chose not to add contact number
+                Toast.makeText(requireContext(), "Please add a contact number to list items", Toast.LENGTH_LONG).show()
+            }
         )
-        Log.d(TAG, "createItem called on ViewModel")
     }
 
     private fun updateImagePreview(uris: List<Uri>) {

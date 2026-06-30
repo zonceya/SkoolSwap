@@ -111,18 +111,92 @@ class ProfileFragment : Fragment() {
     private fun setupMobileInput() {
         binding.contactNumber.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val mobile = s.toString().trim()
+
+                // Show real-time visual feedback without triggering full validation chain
+                when {
+                    mobile.isEmpty() -> {
+                        // Clear error when empty
+                        binding.contactNumber.error = null
+                        binding.mobileTextInputLayout.error = null
+                        binding.mobileTextInputLayout.isErrorEnabled = false
+                    }
+                    mobile.length < 10 -> {
+                        // Show "incomplete" but don't block UI
+                        binding.contactNumber.error = "Need ${10 - mobile.length} more digit(s)"
+                        binding.mobileTextInputLayout.error = "Need ${10 - mobile.length} more digit(s)"
+                        binding.mobileTextInputLayout.isErrorEnabled = true
+                    }
+                    mobile.length == 10 -> {
+                        // Full validation only for complete numbers
+                        if (MobileValidator.isValidSouthAfricanMobile(mobile)) {
+                            // Valid - clear errors
+                            binding.contactNumber.error = null
+                            binding.mobileTextInputLayout.error = null
+                            binding.mobileTextInputLayout.isErrorEnabled = false
+                        } else {
+                            // Invalid 10-digit number
+                            val error = MobileValidator.getErrorMessage(mobile)
+                            binding.contactNumber.error = error
+                            binding.mobileTextInputLayout.error = error
+                            binding.mobileTextInputLayout.isErrorEnabled = true
+                        }
+                    }
+                    mobile.length > 10 -> {
+                        binding.contactNumber.error = "Mobile number must be 10 digits"
+                        binding.mobileTextInputLayout.error = "Mobile number must be 10 digits"
+                        binding.mobileTextInputLayout.isErrorEnabled = true
+                    }
+                }
+            }
+
             override fun afterTextChanged(s: Editable?) {
                 val mobile = s.toString().trim()
 
-                // Only process if different from original
+                // Only preview and mark as changed if different from original
                 if (mobile != viewModel._originalMobile.value) {
-                    validateMobileNumber(mobile)
-                    viewModel.previewMobile(mobile)
-                    showUnsavedIndicator()
+                    // Only consider valid numbers for "unsaved" state
+                    if (mobile.isEmpty() || (mobile.length == 10 && MobileValidator.isValidSouthAfricanMobile(mobile))) {
+                        viewModel.previewMobile(mobile)
+                        showUnsavedIndicator()
+                    } else {
+                        // Still preview but don't mark as unsaved
+                        viewModel.previewMobile(mobile)
+                    }
                 }
             }
         })
+
+        // Clear error when focus changes and field is valid
+        binding.contactNumber.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                val mobile = binding.contactNumber.text.toString().trim()
+                when {
+                    mobile.isEmpty() -> {
+                        binding.contactNumber.error = null
+                        binding.mobileTextInputLayout.error = null
+                        binding.mobileTextInputLayout.isErrorEnabled = false
+                    }
+                    mobile.length == 10 && MobileValidator.isValidSouthAfricanMobile(mobile) -> {
+                        binding.contactNumber.error = null
+                        binding.mobileTextInputLayout.error = null
+                        binding.mobileTextInputLayout.isErrorEnabled = false
+                    }
+                    mobile.length in 1..9 -> {
+                        binding.contactNumber.error = "Mobile number must be 10 digits (${mobile.length}/10)"
+                        binding.mobileTextInputLayout.error = "Mobile number must be 10 digits (${mobile.length}/10)"
+                        binding.mobileTextInputLayout.isErrorEnabled = true
+                    }
+                    mobile.length > 10 -> {
+                        binding.contactNumber.error = "Mobile number must be 10 digits"
+                        binding.mobileTextInputLayout.error = "Mobile number must be 10 digits"
+                        binding.mobileTextInputLayout.isErrorEnabled = true
+                    }
+                }
+            }
+        }
     }
 
     private fun setupProvinceDropdown() {
@@ -227,6 +301,7 @@ class ProfileFragment : Fragment() {
             adapter = schoolAdapter
         }
     }
+
     private fun showUnsavedIndicator() {
         if (_binding == null) return
         if (!viewModel.isInitialized.value) return  // ← GUARD - don't show until initialized
@@ -284,8 +359,6 @@ class ProfileFragment : Fragment() {
                                 val matchingProvince = provinces.find { it.id == school.provinceId }
                                 matchingProvince?.let {
                                     setText(it.name, false)
-                                    // ✅ Only set province, don't call selectProvince here
-                                    // viewModel.selectProvince(it)  // REMOVED - causes issues
                                 }
                             }
                         }
@@ -337,14 +410,6 @@ class ProfileFragment : Fragment() {
                     binding.schoolSearch.setText(school.name)
                     binding.schoolResultsRecyclerView.visibility = View.GONE
                     binding.schoolSearchLayout.error = null
-
-                    // ✅ REMOVE THIS ENTIRE BLOCK - causes unnecessary state changes
-                    // if (viewModel.provinces.value.isNotEmpty() && school.provinceId != null) {
-                    //     val matchingProvince = viewModel.provinces.value.find { it.id == school.provinceId }
-                    //     matchingProvince?.let {
-                    //         viewModel.selectProvince(it)
-                    //     }
-                    // }
                 } else {
                     binding.selectedSchoolCard.visibility = View.GONE
                     binding.selectedSchoolText.visibility = View.VISIBLE
@@ -476,9 +541,53 @@ class ProfileFragment : Fragment() {
     }
 
     private fun validateMobileNumber(mobile: String): Boolean {
-        val error = MobileValidator.getErrorMessage(mobile)
-        binding.contactNumber.error = error
-        return error == null
+        // Clear previous errors
+        binding.contactNumber.error = null
+        binding.mobileTextInputLayout.error = null
+        binding.mobileTextInputLayout.isErrorEnabled = false
+
+        // Empty is allowed (optional field)
+        if (mobile.isEmpty()) {
+            return true
+        }
+
+        // Check length
+        if (mobile.length != 10) {
+            val message = if (mobile.length < 10) {
+                "Mobile number must be 10 digits (${mobile.length}/10)"
+            } else {
+                "Mobile number must be 10 digits"
+            }
+            binding.contactNumber.error = message
+            binding.mobileTextInputLayout.error = message
+            binding.mobileTextInputLayout.isErrorEnabled = true
+            return false
+        }
+
+        // Check if all digits
+        if (!mobile.all { it.isDigit() }) {
+            val message = "Only numbers allowed (no spaces or dashes)"
+            binding.contactNumber.error = message
+            binding.mobileTextInputLayout.error = message
+            binding.mobileTextInputLayout.isErrorEnabled = true
+            return false
+        }
+
+        // Check SA prefix
+        if (!MobileValidator.isValidSouthAfricanMobile(mobile)) {
+            val prefix = mobile.substring(0, 3)
+            val message = "Invalid SA prefix: $prefix. Must start with 060-089"
+            binding.contactNumber.error = message
+            binding.mobileTextInputLayout.error = message
+            binding.mobileTextInputLayout.isErrorEnabled = true
+            return false
+        }
+
+        // Valid - clear errors
+        binding.contactNumber.error = null
+        binding.mobileTextInputLayout.error = null
+        binding.mobileTextInputLayout.isErrorEnabled = false
+        return true
     }
 
     private fun completeProfile() {
@@ -491,7 +600,10 @@ class ProfileFragment : Fragment() {
         // Validate mobile if provided
         val mobile = binding.contactNumber.text.toString().trim()
         if (mobile.isNotEmpty() && !validateMobileNumber(mobile)) {
-            binding.mobileTextInputLayout.error = "Invalid mobile number"
+            binding.mobileTextInputLayout.error = "Please enter a valid 10-digit SA mobile number"
+            binding.mobileTextInputLayout.isErrorEnabled = true
+            binding.contactNumber.requestFocus()
+            Toast.makeText(requireContext(), "Please fix the mobile number error above", Toast.LENGTH_LONG).show()
             return
         }
 

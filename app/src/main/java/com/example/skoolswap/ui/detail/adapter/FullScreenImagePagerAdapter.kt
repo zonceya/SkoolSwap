@@ -27,15 +27,22 @@ class FullScreenImagePagerAdapter(
     inner class ViewHolder(val binding: ItemFullScreenImageBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
-        // Keep a reference to cancel Glide on recycle
         private var currentTarget: CustomTarget<Bitmap>? = null
+        private var isTapHandled = false
 
         private val gestureDetector = GestureDetector(
             binding.root.context,
             object : GestureDetector.SimpleOnGestureListener() {
                 override fun onDown(e: MotionEvent) = true
+
                 override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                    onSingleTap()
+                    // ✅ Only trigger if we're not mid-dismissal
+                    if (!isTapHandled) {
+                        isTapHandled = true
+                        onSingleTap()
+                        // Reset after a short delay to allow re-tap if needed
+                        binding.root.postDelayed({ isTapHandled = false }, 300)
+                    }
                     return true
                 }
             }
@@ -48,20 +55,30 @@ class FullScreenImagePagerAdapter(
                 setPanLimit(SubsamplingScaleImageView.PAN_LIMIT_INSIDE)
             }
 
-            binding.photoView.setOnTouchListener { _, event ->
-                gestureDetector.onTouchEvent(event)
-                false // let SSIV still handle pan/zoom
+            // ✅ Combined touch handling
+            binding.photoView.setOnTouchListener { view, event ->
+                // Let gesture detector process the event first
+                val handled = gestureDetector.onTouchEvent(event)
+
+                // If gesture detector didn't handle it (e.g., pan/zoom), let SSIV handle it
+                if (!handled) {
+                    // SSIV will handle pan/zoom gestures
+                    view.performClick()
+                }
+
+                // Return false to let SSIV continue processing for pan/zoom
+                false
             }
         }
 
         fun bind(url: String) {
             Timber.tag(TAG).d("Binding URL: $url")
+            isTapHandled = false  // ✅ Reset tap state when binding new image
 
             // Cancel any in-flight load for this holder
             currentTarget?.let { Glide.with(binding.root.context).clear(it) }
 
-            // Reset SSIV state cleanly — do NOT call resetScaleAndCenter before setImage,
-            // it can leave SSIV in an inconsistent internal state on recycled views
+            // Reset SSIV state cleanly
             binding.photoView.recycle()
 
             val target = object : CustomTarget<Bitmap>() {
@@ -70,19 +87,17 @@ class FullScreenImagePagerAdapter(
                     transition: Transition<in Bitmap>?
                 ) {
                     Timber.tag(TAG).d("Bitmap ready for: $url, size: ${resource.width}x${resource.height}")
-                    // No isAttachedToWindow check — SSIV handles detached state gracefully
                     binding.photoView.setImage(ImageSource.bitmap(resource))
                 }
 
                 override fun onLoadFailed(errorDrawable: Drawable?) {
                     Timber.tag(TAG).e("Load failed for: $url")
-                    // Show placeholder state — SSIV doesn't show drawables so just leave recycled
+                    // Could set a placeholder drawable if needed
                 }
 
                 override fun onLoadCleared(placeholder: Drawable?) {
-                    // Do NOT call recycle() here — this fires during Glide's
-                    // internal cleanup and the bitmap may still be in use by SSIV
                     Timber.tag(TAG).d("Load cleared for: $url")
+                    // Don't call recycle() - SSIV may still be using the bitmap
                 }
             }
 
@@ -103,6 +118,7 @@ class FullScreenImagePagerAdapter(
             currentTarget?.let { Glide.with(binding.root.context).clear(it) }
             currentTarget = null
             binding.photoView.recycle()
+            isTapHandled = false
         }
     }
 

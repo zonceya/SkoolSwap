@@ -16,5 +16,8 @@ data class UserEntity(
     val token: String,
     val createdAt: String,
     val updatedAt: String,
-    val lastSyncTime: Long = System.currentTimeMillis()
+    val lastSyncTime: Long = System.currentTimeMillis(),
+    val schoolMapped: Boolean = false,
+    val schoolId: Int? = null,
+    val schoolName: String? = null
 )

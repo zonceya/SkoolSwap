@@ -3,9 +3,9 @@ package com.example.skoolswap.data.local.database.entities
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "favorites")
+@Entity(tableName = "favorites", primaryKeys = ["userId", "itemId"])
 data class FavoriteEntity(
-    @PrimaryKey
+    val userId: Int,
     val itemId: String,
     val addedAt: Long = System.currentTimeMillis()
 )

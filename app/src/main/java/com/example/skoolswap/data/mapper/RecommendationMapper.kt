@@ -1,7 +1,11 @@
 // data/mapper/RecommendationMapper.kt
 package com.example.skoolswap.data.mapper
 
+import android.util.Log
+import com.example.skoolswap.data.local.database.dao.ItemDao
+import com.example.skoolswap.data.local.database.dao.ItemImageDao
 import com.example.skoolswap.data.local.database.entities.HomeFeedEntity
+import com.example.skoolswap.data.local.database.entities.ItemImageEntity
 import com.example.skoolswap.data.remote.models.response.home.EssentialsSectionsDto
 import com.example.skoolswap.data.remote.models.response.home.HomeRecommendationResponse
 import com.example.skoolswap.data.remote.models.response.home.HomeSectionDto
@@ -23,7 +27,56 @@ import com.example.skoolswap.domain.model.homefeed.SportSection
 import com.example.skoolswap.domain.model.homefeed.UniformFeed
 import com.example.skoolswap.domain.model.homefeed.UniformSection
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import com.google.gson.JsonDeserializationContext
+import com.google.gson.JsonDeserializer
+import com.google.gson.JsonElement
+import com.google.gson.JsonSerializationContext
+import com.google.gson.JsonSerializer
+import timber.log.Timber
+import java.lang.reflect.Type
 
+
+// Replace the existing `private val gson = ...` at the top of RecommendationMapper.kt
+
+private val gson = GsonBuilder()
+    .registerTypeAdapter(Section::class.java, object : JsonDeserializer<Section>,
+        JsonSerializer<Section> {
+
+        override fun serialize(
+            src: Section,
+            typeOfSrc: Type,
+            context: JsonSerializationContext
+        ): JsonElement {
+            // Serialize the concrete subtype, then make sure "type" field is present
+            val element = when (src) {
+                is Section.Recommended -> context.serialize(src, Section.Recommended::class.java)
+                is Section.Essentials  -> context.serialize(src, Section.Essentials::class.java)
+                is Section.Trending    -> context.serialize(src, Section.Trending::class.java)
+                is Section.Recent      -> context.serialize(src, Section.Recent::class.java)
+            }.asJsonObject
+            // Ensure the "type" discriminator survives the round-trip
+            if (!element.has("type")) element.addProperty("type", src.type)
+            return element
+        }
+
+        override fun deserialize(
+            json: JsonElement,
+            typeOfT: Type,
+            context: JsonDeserializationContext
+        ): Section {
+            val obj  = json.asJsonObject
+            val type = obj.get("type")?.asString ?: "recommended"
+            return when (type) {
+                "recommended", "nearby"                   -> context.deserialize(json, Section.Recommended::class.java)
+                "essentials", "nearby_essentials"         -> context.deserialize(json, Section.Essentials::class.java)
+                "trending", "nearby_trending"             -> context.deserialize(json, Section.Trending::class.java)
+                "recent", "nearby_recent"                 -> context.deserialize(json, Section.Recent::class.java)
+                else                                      -> context.deserialize(json, Section.Recommended::class.java)
+            }
+        }
+    })
+    .create()
 // ============ HOME RESPONSE TO DOMAIN ============
 fun HomeRecommendationResponse.toDomain(): HomeFeed {
     return HomeFeed(
@@ -144,16 +197,75 @@ fun RecentSectionDto.toDomain(): RecentSection {
 }
 // ============ LOCAL CACHE ============
 fun HomeFeed.toEntity(): HomeFeedEntity {
-    return HomeFeedEntity(
-        id = "home_feed",
-        sectionsJson = Gson().toJson(this)
-    )
+    return try {
+        val json = gson.toJson(this)   // ← was Gson().toJson(this)
+        Timber.tag("Mapper").d("Converting HomeFeed to JSON, sections: ${sections.size}")
+        HomeFeedEntity(
+            id = "home_feed",
+            sectionsJson = json,
+            cachedAt = System.currentTimeMillis()
+        )
+    } catch (e: Exception) {
+        Timber.tag("Mapper").e(e, "Failed to convert HomeFeed to JSON: ${e.message}")
+        HomeFeedEntity(id = "home_feed", sectionsJson = "{}", cachedAt = System.currentTimeMillis())
+    }
 }
 
 fun HomeFeedEntity.toDomain(): HomeFeed {
     return try {
-        Gson().fromJson(sectionsJson, HomeFeed::class.java)
+        Timber.tag("Mapper").d("Parsing JSON, length: ${sectionsJson.length}")
+        val feed = gson.fromJson(sectionsJson, HomeFeed::class.java)  // ← was Gson().fromJson(...)
+        Timber.tag("Mapper").d("Parsed feed, sections: ${feed.sections.size}")
+        feed
     } catch (e: Exception) {
+        Timber.tag("Mapper").e(e, "Failed to parse HomeFeed from JSON: ${e.message}")
+        Timber.tag("Mapper").e("JSON: ${sectionsJson.take(500)}")
         HomeFeed(success = false, schoolId = 0, message = null, sections = emptyList())
     }
+}
+fun HomeFeed.getAllItems(): List<Item> {
+    val allItems = mutableListOf<Item>()
+
+    sections.forEach { section ->
+        when (section) {
+            is Section.Recommended -> allItems.addAll(section.items)
+            is Section.Trending -> allItems.addAll(section.items)
+            is Section.Recent -> allItems.addAll(section.items)
+            is Section.Essentials -> {
+                allItems.addAll(section.sections.uniforms)
+                allItems.addAll(section.sections.sports)
+                allItems.addAll(section.sections.accessories)
+            }
+        }
+    }
+
+    return allItems.distinctBy { it.id }
+}
+suspend fun HomeFeed.saveItemsToCache(itemDao: ItemDao, itemImageDao: ItemImageDao) {
+    val allItems = getAllItems()
+
+    allItems.forEach { item ->
+        try {
+            // Save item entity
+            val itemEntity = item.toEntity()
+            itemDao.insertOrReplace(itemEntity)
+
+            // Save images
+            val imageEntities = item.images.mapIndexed { index, image ->
+                ItemImageEntity(
+                    itemId = item.id,
+                    url = image.url,
+                    isCover = index == 0,
+                    position = index
+                )
+            }
+            if (imageEntities.isNotEmpty()) {
+                itemImageDao.updateImagesForItem(item.id, imageEntities)
+            }
+        } catch (e: Exception) {
+            Timber.tag("HomeFeed").e("Failed to cache item ${item.id}: ${e.message}")
+        }
+    }
+
+    Timber.tag("HomeFeed").d("✅ Cached ${allItems.size} individual items to Room")
 }

@@ -10,7 +10,7 @@ data class UserSchoolEntity(
     val id: String,  // UUID from server
     val userId: Int,
     val schoolId: Int,
-    val schoolName: String,  // Denormalized for quick access
+    val schoolName: String,  // DAenormalized for quick access
     val mappedAt: String?,
     val updatedAt: String?
 )

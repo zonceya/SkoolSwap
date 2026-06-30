@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.google.services)
     id("kotlin-kapt")
     alias(libs.plugins.hilt.android)
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 android {
@@ -89,7 +90,7 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.ui.auth)
-
+    implementation(libs.firebase.crashlytics)
     // Authentication
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
@@ -116,6 +117,8 @@ dependencies {
     implementation(libs.navigation.ui.ktx)
     implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.androidx.compose.remote.creation.core)
+    implementation(libs.androidx.hilt.work)
+    kapt(libs.androidx.hilt.compiler)
     kapt(libs.room.compiler)
     implementation(libs.kotlinx.datetime)
     implementation(libs.play.services.cast.framework)
@@ -124,6 +127,9 @@ dependencies {
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
     implementation(libs.hilt.navigation.fragment)
+    implementation(libs.androidx.hilt.work)
+    kapt(libs.hilt.compiler)
+
 
     // Work Manager
     implementation(libs.work.runtime)

@@ -36,7 +36,10 @@ fun User.toEntity(): UserEntity {
         role = role,
         token = token,
         createdAt = createdAt,
-        updatedAt = updatedAt
+        updatedAt = updatedAt,
+        schoolMapped = schoolMapped,  // ✅ ADD THIS
+        schoolId = schoolId,          // ✅ ADD THIS
+        schoolName = schoolName       // ✅ ADD THIS
     )
 }
 
@@ -53,9 +56,9 @@ fun UserEntity.toDomain(): User {
         token = token,
         createdAt = createdAt,
         updatedAt = updatedAt,
-        schoolMapped = false,
-        schoolId = null,
-        schoolName = null
+        schoolMapped = schoolMapped,  // ✅ FIXED - use actual value
+        schoolId = schoolId,          // ✅ FIXED - use actual value
+        schoolName = schoolName       // ✅ FIXED - use actual value
     )
 }
 fun SignInResponse.toDomain(): User {

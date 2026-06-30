@@ -62,6 +62,7 @@ class ProductsRepository @Inject constructor(
     override suspend fun getEssentialsAll(
         page: Int,
         category: String?,
+        subCategoryId: Int?,
         perPage: Int,
         conditionId: Int?,
         minPrice: Float?,
@@ -76,6 +77,7 @@ class ProductsRepository @Inject constructor(
             val response = api.getEssentialsAll(
                 schoolId = schoolId,
                 category = category,
+                subCategoryId = subCategoryId,
                 page = page,
                 perPage = perPage,
                 conditionId = conditionId,

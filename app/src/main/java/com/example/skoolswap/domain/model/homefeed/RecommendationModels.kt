@@ -12,27 +12,29 @@ data class HomeFeed(
 )
 
 sealed class Section {
+    abstract val type: String
+
     data class Recommended(
         val title: String,
-        val type: String,
+        override val type: String,
         val items: List<Item>
     ) : Section()
 
     data class Essentials(
         val title: String,
-        val type: String,
+        override val type: String,
         val sections: EssentialsSections
     ) : Section()
 
     data class Trending(
         val title: String,
-        val type: String,
+        override val type: String,
         val items: List<Item>
     ) : Section()
 
     data class Recent(
         val title: String,
-        val type: String,
+        override val type: String,
         val items: List<Item>
     ) : Section()
 }
@@ -41,7 +43,15 @@ data class EssentialsSections(
     val uniforms: List<Item>,
     val sports: List<Item>,
     val accessories: List<Item>
-)
+) {
+    companion object {
+        fun empty() = EssentialsSections(
+            uniforms = emptyList(),
+            sports = emptyList(),
+            accessories = emptyList()
+        )
+    }
+}
 
 // ============ UNIFORM FEED ============
 data class UniformFeed(

@@ -82,7 +82,6 @@ class ImageSliderAdapter(
                     try {
                         val fragment = binding.root.findFragment<Fragment>()
                         fragment?.parentFragmentManager?.let { fm ->
-                            // Prevent double-showing if user taps rapidly
                             if (fm.findFragmentByTag("full_screen_viewer") == null) {
                                 dialog.show(fm, "full_screen_viewer")
                             }
@@ -101,7 +100,6 @@ class ImageSliderAdapter(
         init {
             Timber.tag(TAG).d("ViewHolder created with binding: ${binding.root.javaClass.simpleName}")
 
-            // Set touch listener once - returns true only when gesture detector consumes the event
             binding.imageView.setOnTouchListener { _, event ->
                 gestureDetector.onTouchEvent(event)
             }
@@ -109,23 +107,26 @@ class ImageSliderAdapter(
 
         fun bind(url: String, position: Int) {
             currentPosition = position
+            Timber.tag(TAG).d("📸 Binding image $position: $url")
 
+            // Clear any previous image
             Glide.with(binding.root.context).clear(binding.imageView)
 
+            // ✅ Use FIT_CENTER instead of CENTER_CROP to show the full image
             Glide.with(binding.root.context)
                 .load(url)
                 .placeholder(R.drawable.ic_create_item_placeholder)
                 .error(R.drawable.ic_create_item_placeholder)
                 .diskCacheStrategy(DiskCacheStrategy.ALL)
                 .skipMemoryCache(false)
-                .centerCrop()
+                .fitCenter()  // ✅ Changed from centerCrop() to fitCenter()
                 .listener(object : com.bumptech.glide.request.RequestListener<android.graphics.drawable.Drawable> {
                     override fun onLoadFailed(
                         e: GlideException?, model: Any?,
                         target: com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable>?,
                         isFirstResource: Boolean
                     ): Boolean {
-                        Timber.tag(TAG).e("Load failed pos $position: ${e?.message}")
+                        Timber.tag(TAG).e("❌ Load failed pos $position: ${e?.message}")
                         return false
                     }
 
@@ -135,7 +136,7 @@ class ImageSliderAdapter(
                         dataSource: com.bumptech.glide.load.DataSource?,
                         isFirstResource: Boolean
                     ): Boolean {
-                        Timber.tag(TAG).d("Loaded pos $position from $dataSource")
+                        Timber.tag(TAG).d("✅ Loaded pos $position from $dataSource")
                         return false
                     }
                 })

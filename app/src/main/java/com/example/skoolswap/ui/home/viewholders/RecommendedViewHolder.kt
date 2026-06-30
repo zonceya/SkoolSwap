@@ -10,6 +10,7 @@ import com.example.skoolswap.databinding.ItemRecommendedRowBinding
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.homefeed.Section
 import com.example.skoolswap.ui.home.adapter.HorizontalItemsAdapter
+import timber.log.Timber
 
 class RecommendedViewHolder(
     private val binding: ItemRecommendedRowBinding,
@@ -19,16 +20,16 @@ class RecommendedViewHolder(
 
     fun bind(section: Section.Recommended) {
         // Log what data we received
-        android.util.Log.d("RecommendedViewHolder", "========== RECOMMENDED SECTION ==========")
-        android.util.Log.d("RecommendedViewHolder", "Title: ${section.title}")
-        android.util.Log.d("RecommendedViewHolder", "Items count: ${section.items.size}")
+        Timber.tag("RecommendedViewHolder").d("========== RECOMMENDED SECTION ==========")
+        Timber.tag("RecommendedViewHolder").d("Title: ${section.title}")
+        Timber.tag("RecommendedViewHolder").d("Items count: ${section.items.size}")
 
         section.items.forEachIndexed { index, item ->
-            android.util.Log.d("RecommendedViewHolder", "Item $index: ${item.name}")
-            android.util.Log.d("RecommendedViewHolder", "  coverImage: ${item.coverImage}")
-            android.util.Log.d("RecommendedViewHolder", "  images size: ${item.images.size}")
+            Timber.tag("RecommendedViewHolder").d("Item $index: ${item.name}")
+            Timber.tag("RecommendedViewHolder").d("  coverImage: ${item.coverImage}")
+            Timber.tag("RecommendedViewHolder").d("  images size: ${item.images.size}")
             item.images.forEach { image ->
-                android.util.Log.d("RecommendedViewHolder", "    image url: ${image.url}")
+                Timber.tag("RecommendedViewHolder").d("    image url: ${image.url}")
             }
         }
         val sectionTitle = binding.root.findViewById<TextView>(R.id.sectionTitle)

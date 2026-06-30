@@ -32,8 +32,13 @@ class ShopFragment : Fragment() {
     private val binding get() = _binding!!
     private val viewModel: ShopViewModel by viewModels()
 
-    private lateinit var productAdapter: ProductAdapter
-    private lateinit var categoryGridAdapter: CategoryGridAdapter  // ← FIXED: Use CategoryGridAdapter
+    // ✅ Use ShopProductAdapter for All Items (view count, no toggle)
+    private lateinit var shopProductAdapter: ShopProductAdapter
+
+    // ✅ Use CategoryGridAdapter for Categories (view count + toggle)
+    private lateinit var categoryGridAdapter: CategoryGridAdapter
+    private lateinit var categorySectionAdapter: CategorySectionAdapter
+
     @Inject
     lateinit var authRepository: AuthRepositoryInterface
     private var isCategoriesView = false
@@ -54,28 +59,70 @@ class ShopFragment : Fragment() {
         setupRecyclerViews()
         setupTabListeners()
         setupObservers()
-
+        updateTabStyles()
         binding.retryButton.setOnClickListener {
             binding.errorLayout.visibility = View.GONE
             viewModel.refresh()
         }
         viewModel.loadMyShop()
         viewModel.loadMyShopItems()
+
+        findNavController().currentBackStackEntry?.savedStateHandle
+            ?.getLiveData<Boolean>("item_updated")
+            ?.observe(viewLifecycleOwner) { updated ->
+                if (updated == true) {
+                    Timber.d("🔄 Item updated, refreshing immediately")
+                    val updatedItemId = findNavController().currentBackStackEntry
+                        ?.savedStateHandle?.get<String>("updated_item_id")
+
+                    if (updatedItemId != null) {
+                        viewModel.loadMyShopItems()
+                        findNavController().currentBackStackEntry
+                            ?.savedStateHandle?.remove<String>("updated_item_id")
+                    } else {
+                        viewModel.loadMyShopItems()
+                    }
+
+                    findNavController().currentBackStackEntry
+                        ?.savedStateHandle?.remove<Boolean>("item_updated")
+                }
+            }
     }
 
     private fun setupRecyclerViews() {
-        // Adapter for All Items view (simple grid)
-        productAdapter = ProductAdapter { itemId ->
-            Timber.d("Product clicked: $itemId")
+        // ✅ All Items - ShopProductAdapter (view count, no toggle)
+        shopProductAdapter = ShopProductAdapter { itemId ->
+            Timber.d("All items clicked: $itemId")
             navigateToEditItem(itemId)
         }
 
-        // ✅ FIXED: Use CategoryGridAdapter for categories view
-        categoryGridAdapter = CategoryGridAdapter { itemId ->
-            Timber.d("Category grid item clicked: $itemId")
-            navigateToEditItem(itemId)
-        }
+        // ✅ Categories - CategoryGridAdapter (view count + toggle)
+        categoryGridAdapter = CategoryGridAdapter(
+            onItemClick = { itemId ->
+                Timber.d("Category grid item clicked: $itemId")
+                navigateToEditItem(itemId)
+            },
+            onSoldToggle = { itemId, markAsSold ->
+                Timber.d("🔄 Sold toggle: $itemId -> $markAsSold")
+                viewModel.toggleItemSoldStatus(itemId, markAsSold)
+            },
+            isShopMode = true
+        )
 
+        // ✅ Categories Section - CategorySectionAdapter (grouped with toggle)
+        categorySectionAdapter = CategorySectionAdapter(
+            onItemClick = { itemId ->
+                Timber.d("Category section item clicked: $itemId")
+                navigateToEditItem(itemId)
+            },
+            onSoldToggle = { itemId, markAsSold ->
+                Timber.d("🔄 Sold toggle: $itemId -> $markAsSold")
+                viewModel.toggleItemSoldStatus(itemId, markAsSold)
+            },
+            isShopMode = true
+        )
+
+        // Default to GridLayoutManager for All Items
         binding.productRecyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
     }
 
@@ -120,10 +167,43 @@ class ShopFragment : Fragment() {
             binding.emptyStateText.visibility = View.GONE
             binding.productRecyclerView.visibility = View.VISIBLE
 
+            // ✅ All Items - ShopProductAdapter (view count, no toggle)
             binding.productRecyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
-            productAdapter.submitList(allItems)
-            binding.productRecyclerView.adapter = productAdapter
+            shopProductAdapter.submitList(allItems)
+            binding.productRecyclerView.adapter = shopProductAdapter
         }
+    }
+
+    private fun showCategoriesView() {
+        val allItems = viewModel.allItems.value
+        Timber.d("showCategoriesView: ${allItems.size} items")
+
+        if (allItems.isEmpty()) {
+            binding.emptyStateText.visibility = View.VISIBLE
+            binding.productRecyclerView.visibility = View.GONE
+        } else {
+            binding.emptyStateText.visibility = View.GONE
+            binding.productRecyclerView.visibility = View.VISIBLE
+
+            // ✅ Categories - grouped by category with toggle
+            val sections = groupItemsByCategory(allItems)
+            categorySectionAdapter.submitSections(sections)
+
+            // ✅ Use LinearLayoutManager for sections (vertical scrolling)
+            binding.productRecyclerView.layoutManager = LinearLayoutManager(requireContext())
+            binding.productRecyclerView.adapter = categorySectionAdapter
+        }
+    }
+
+    private fun groupItemsByCategory(items: List<Item>): List<ItemCategorySection> {
+        return items.groupBy { item ->
+            viewModel.getCategoryFromTypeId(item.itemTypeId) ?: "Other"
+        }.map { (categoryName, categoryItems) ->
+            ItemCategorySection(
+                categoryName = categoryName,
+                items = categoryItems
+            )
+        }.sortedBy { it.categoryName }
     }
 
     private fun loadProfilePicture(url: String?) {
@@ -139,35 +219,6 @@ class ShopFragment : Fragment() {
             Timber.e(e, "Failed to load profile picture")
             binding.storeProfileImage.setImageResource(R.drawable.ic_user)
         }
-    }
-
-    private fun showCategoriesView() {
-        val allItems = viewModel.allItems.value
-        Timber.d("showCategoriesView: ${allItems.size} items")
-
-        if (allItems.isEmpty()) {
-            binding.emptyStateText.visibility = View.VISIBLE
-            binding.productRecyclerView.visibility = View.GONE
-        } else {
-            binding.emptyStateText.visibility = View.GONE
-            binding.productRecyclerView.visibility = View.VISIBLE
-
-            // ✅ Use GridLayoutManager with 2 columns for categories view
-            binding.productRecyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
-            categoryGridAdapter.submitList(allItems)
-            binding.productRecyclerView.adapter = categoryGridAdapter
-        }
-    }
-
-    private fun groupItemsByCategory(items: List<Item>): List<ItemCategorySection> {
-        return items.groupBy { item ->
-            viewModel.getCategoryFromTypeId(item.itemTypeId) ?: "Other"
-        }.map { (categoryName, categoryItems) ->
-            ItemCategorySection(
-                categoryName = categoryName,
-                items = categoryItems
-            )
-        }.sortedBy { it.categoryName }
     }
 
     private fun setupObservers() {
@@ -224,13 +275,16 @@ class ShopFragment : Fragment() {
                 binding.productRecyclerView.visibility = View.VISIBLE
 
                 if (isCategoriesView) {
-                    categoryGridAdapter.submitList(items)
-                    binding.productRecyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
-                    binding.productRecyclerView.adapter = categoryGridAdapter
+                    // ✅ Categories view - grouped with toggle
+                    val sections = groupItemsByCategory(items)
+                    categorySectionAdapter.submitSections(sections)
+                    binding.productRecyclerView.layoutManager = LinearLayoutManager(requireContext())
+                    binding.productRecyclerView.adapter = categorySectionAdapter
                 } else {
-                    productAdapter.submitList(items)
+                    // ✅ All Items view - flat grid with view count (no toggle)
+                    shopProductAdapter.submitList(items)
                     binding.productRecyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
-                    binding.productRecyclerView.adapter = productAdapter
+                    binding.productRecyclerView.adapter = shopProductAdapter
                 }
 
                 binding.storeStats.text = "${items.size} items"
@@ -260,7 +314,6 @@ class ShopFragment : Fragment() {
     private fun navigateToEditItem(itemId: String) {
         Timber.d("🔍 Navigating to edit item with ID: $itemId")
         try {
-            // ✅ Use action ID instead of direct fragment navigation
             val action = R.id.action_shopFragment_to_editItemFragment
             val bundle = Bundle().apply {
                 putString("itemId", itemId)
@@ -268,7 +321,6 @@ class ShopFragment : Fragment() {
             findNavController().navigate(action, bundle)
         } catch (e: Exception) {
             Timber.e(e, "Failed to navigate to edit item")
-            // Fallback to direct navigation
             try {
                 findNavController().navigate(R.id.editItemFragment, Bundle().apply {
                     putString("itemId", itemId)

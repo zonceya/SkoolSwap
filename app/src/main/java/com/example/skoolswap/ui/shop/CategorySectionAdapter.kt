@@ -10,7 +10,9 @@ import com.example.skoolswap.databinding.ItemCategorySectionBinding
 import com.example.skoolswap.domain.model.ItemCategorySection
 
 class CategorySectionAdapter(
-    private val onItemClick: (String) -> Unit
+    private val onItemClick: (String) -> Unit,
+    private val onSoldToggle: ((String, Boolean) -> Unit)? = null,  // ✅ Add toggle callback
+    private val isShopMode: Boolean = false  // ✅ Add shop mode
 ) : RecyclerView.Adapter<CategorySectionAdapter.SectionViewHolder>() {
 
     private var sections: List<ItemCategorySection> = emptyList()
@@ -24,7 +26,7 @@ class CategorySectionAdapter(
         val binding = ItemCategorySectionBinding.inflate(
             LayoutInflater.from(parent.context), parent, false
         )
-        return SectionViewHolder(binding, onItemClick, this)
+        return SectionViewHolder(binding, onItemClick, onSoldToggle, isShopMode, this)
     }
 
     override fun onBindViewHolder(holder: SectionViewHolder, position: Int) {
@@ -36,6 +38,8 @@ class CategorySectionAdapter(
     class SectionViewHolder(
         private val binding: ItemCategorySectionBinding,
         private val onItemClick: (String) -> Unit,
+        private val onSoldToggle: ((String, Boolean) -> Unit)?,
+        private val isShopMode: Boolean,
         private val adapter: CategorySectionAdapter
     ) : RecyclerView.ViewHolder(binding.root) {
 
@@ -57,10 +61,14 @@ class CategorySectionAdapter(
                 section.items.take(2)
             }
 
-            // Setup grid adapter - sold badge handled inside CategoryGridAdapter
-            val gridAdapter = CategoryGridAdapter { itemId ->
-                onItemClick(itemId)
-            }
+            // ✅ Setup grid adapter with toggle support
+            val gridAdapter = CategoryGridAdapter(
+                onItemClick = { itemId ->
+                    onItemClick(itemId)
+                },
+                onSoldToggle = onSoldToggle,  // Pass toggle callback
+                isShopMode = isShopMode        // Pass shop mode
+            )
 
             binding.categoryGrid.apply {
                 layoutManager = GridLayoutManager(binding.root.context, 2)

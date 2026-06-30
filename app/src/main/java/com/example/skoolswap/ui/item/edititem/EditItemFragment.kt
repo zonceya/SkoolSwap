@@ -170,13 +170,28 @@ class EditItemFragment : Fragment() {
     }
 
     private fun setupObservers() {
+        // Observe reference data loading completion
+        lifecycleScope.launch {
+            viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.isReferenceDataLoaded.collect { loaded ->
+                    Timber.tag(TAG).d("📌 Reference data loaded: $loaded")
+                    if (loaded) {
+                        checkAndHideShimmers()
+                    }
+                }
+            }
+        }
+
         // Observe item loading
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.item.collect { item ->
                     item?.let {
+                        Timber.tag(TAG).d("📦 Item received: ${item.name}")
                         originalItem = it
                         populateItemData(it)
+                        restoreSelectionTexts()
+                        checkAndHideShimmers()  // ← ADD THIS
                     }
                 }
             }
@@ -255,10 +270,23 @@ class EditItemFragment : Fragment() {
         }
 
         // Collect Towns
+        // Collect Towns - WITH RESTORATION AFTER DATA ARRIVES
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.towns.collect { towns ->
+                    Timber.tag(TAG).d("📦 TOWNS received: ${towns.size}")
                     setupTownPicker(towns)
+
+                    // ✅ Force restore town selection AFTER towns are loaded
+                    if (selectedTownId != null && binding.townInput.text.isNullOrEmpty()) {
+                        val town = towns.find { it.id == selectedTownId }
+                        if (town != null) {
+                            binding.townInput.setText(town.name)
+                            Timber.tag(TAG).d("✅ Restored town after towns loaded: ${town.name} (ID: $selectedTownId)")
+                        } else {
+                            Timber.tag(TAG).w("⚠️ Town not found for ID: $selectedTownId, available towns: ${towns.map { it.id }}")
+                        }
+                    }
                     restoreSelectionTexts()
                 }
             }
@@ -288,18 +316,28 @@ class EditItemFragment : Fragment() {
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { uiState ->
+                    Timber.tag(TAG).d("UI State: $uiState")
                     when (uiState) {
                         is EditItemUiState.Success -> {
+                            Timber.tag(TAG).d("✅ Success: ${uiState.message}")
                             hideLoading()
                             showSuccess(uiState.message)
-                            navigateBack()
+                            navigateBack()  // ← This should only happen after delete completes
                         }
                         is EditItemUiState.Error -> {
+                            Timber.tag(TAG).e("❌ Error: ${uiState.message}")
                             hideLoading()
                             showError(uiState.message)
+                            // Don't navigate back on error
                         }
-                        is EditItemUiState.Loading -> showLoading()
-                        is EditItemUiState.Idle -> hideLoading()
+                        is EditItemUiState.Loading -> {
+                            Timber.tag(TAG).d("Loading state")
+                            showLoading()
+                        }
+                        is EditItemUiState.Idle -> {
+                            Timber.tag(TAG).d("Idle state")
+                            hideLoading()
+                        }
                     }
                 }
             }
@@ -700,7 +738,8 @@ class EditItemFragment : Fragment() {
         selectedTownId = item.locationId
         selectedSchoolId = item.schoolId
         selectedGenderId = item.genderId
-
+        selectedTownId = item.locationId
+        Timber.tag(TAG).d("📍 Selected Town ID from locationId: $selectedTownId")
         Timber.tag(TAG).d("Selected IDs - MainCat: $selectedMainCategoryId, SubCat: $selectedSubCategoryId, Size: $selectedSizeId")
 
         // Trigger dependent data loading
@@ -717,7 +756,7 @@ class EditItemFragment : Fragment() {
     }
 
     private fun restoreSelectionTexts() {
-        Timber.tag(TAG).d("Restoring selection texts")
+        Timber.tag(TAG).d("restoreSelectionTexts called - MainCat: $selectedMainCategoryId, SubCat: $selectedSubCategoryId")
 
         // Restore Main Category
         selectedMainCategoryId?.let { id ->
@@ -788,12 +827,15 @@ class EditItemFragment : Fragment() {
         // Restore Town
         selectedTownId?.let { id ->
             if (binding.townInput.text.isNullOrEmpty()) {
-                viewModel.towns.value.find { it.id == id }?.let {
-                    binding.townInput.setText(it.name)
+                val town = viewModel.towns.value.find { it.id == id }
+                if (town != null) {
+                    binding.townInput.setText(town.name)
+                    Timber.tag(TAG).d("✅ Restored town in restoreSelectionTexts: ${town.name} (ID: $id)")
+                } else {
+                    Timber.tag(TAG).w("⚠️ Town not found in restoreSelectionTexts for ID: $id, towns available: ${viewModel.towns.value.map { it.id }}")
                 }
             }
         }
-
         // Restore School
         selectedSchoolId?.let { id ->
             if (binding.schoolInput.text.isNullOrEmpty()) {
@@ -849,30 +891,137 @@ class EditItemFragment : Fragment() {
         val description = binding.description.text.toString()
         val price = binding.price.text.toString().toDoubleOrNull() ?: 0.0
 
+        // Get the actual selected names for better display
+        val newCategoryName = viewModel.mainCategories.value.find { it.id == selectedMainCategoryId }?.name ?: "Unknown"
+        val originalCategoryName = originalItem?.mainCategoryId?.let { id ->
+            viewModel.mainCategories.value.find { it.id == id }?.name
+        } ?: "Unknown"
+
+        val newSubCategoryName = viewModel.subCategories.value.find { it.id == selectedSubCategoryId }?.name ?: "Unknown"
+        val originalSubCategoryName = originalItem?.subCategoryId?.let { id ->
+            viewModel.subCategories.value.find { it.id == id }?.name
+        } ?: "Unknown"
+
+        val newBrandName = viewModel.brands.value.find { it.id == selectedBrandId }?.name ?: "None"
+        val originalBrandName = originalItem?.brandId?.let { id ->
+            viewModel.brands.value.find { it.id == id }?.name
+        } ?: "None"
+
+        val newSizeName = viewModel.sizes.value.find { it.id == selectedSizeId }?.name ?: "None"
+        val originalSizeName = originalItem?.sizeId?.let { id ->
+            viewModel.sizes.value.find { it.id == id }?.name
+        } ?: "None"
+
+        val newColorName = viewModel.colors.value.find { it.id == selectedColorId }?.name ?: "None"
+        val originalColorName = originalItem?.colorId?.let { id ->
+            viewModel.colors.value.find { it.id == id }?.name
+        } ?: "None"
+
+        val newConditionName = viewModel.conditions.value.find { it.id == selectedConditionId }?.name ?: "None"
+        val originalConditionName = originalItem?.itemConditionId?.let { id ->
+            viewModel.conditions.value.find { it.id == id }?.name
+        } ?: "None"
+
+        val newProvinceName = viewModel.provinces.value.find { it.id == selectedProvinceId }?.name ?: "None"
+        val originalProvinceName = originalItem?.provinceId?.let { id ->
+            viewModel.provinces.value.find { it.id == id }?.name
+        } ?: "None"
+
+        val newTownName = viewModel.towns.value.find { it.id == selectedTownId }?.name ?: "None"
+        val originalTownName = originalItem?.locationId?.let { id ->
+            viewModel.towns.value.find { it.id == id }?.name
+        } ?: "None"
+
+        val newSchoolName = viewModel.schools.value.find { it.id == selectedSchoolId }?.name ?: "None"
+        val originalSchoolName = originalItem?.schoolId?.let { id ->
+            viewModel.schools.value.find { it.id == id }?.name
+        } ?: "None"
+
+        val newGenderName = viewModel.genders.value.find { it.id == selectedGenderId }?.name ?: "None"
+        val originalGenderName = originalItem?.genderId?.let { id ->
+            viewModel.genders.value.find { it.id == id }?.name
+        } ?: "None"
+
+        // Build changes summary
         val changes = mutableListOf<String>()
+
+        // ✅ PRICE - Format nicely
+        if (price != originalPrice) {
+            changes.add("• Price: R${String.format("%.2f", originalPrice)} → R${String.format("%.2f", price)}")
+        }
+
         if (name != originalName) changes.add("• Name: \"$originalName\" → \"$name\"")
         if (description != originalDescription) changes.add("• Description changed")
-        if (price != originalPrice) changes.add("• Price: R$originalPrice → R$price")
         if (selectedQuantity != originalQuantity) changes.add("• Quantity: $originalQuantity → $selectedQuantity")
-        if (selectedMainCategoryId != originalItem?.mainCategoryId) changes.add("• Category changed")
-        if (selectedSubCategoryId != originalItem?.subCategoryId) changes.add("• Subcategory changed")
-        if (selectedConditionId != originalItem?.itemConditionId) changes.add("• Condition changed")
-        if (selectedSizeId != originalItem?.sizeId) changes.add("• Size changed")
-        if (selectedBrandId != originalItem?.brandId) changes.add("• Brand changed")
-        if (selectedColorId != originalItem?.colorId) changes.add("• Color changed")
-        if (viewModel.getDeletionIds().isNotEmpty()) changes.add("• ${viewModel.getDeletionIds().size} image(s) removed")
-        if (viewModel.getImagesForUpload().isNotEmpty()) changes.add("• ${viewModel.getImagesForUpload().size} new image(s) added")
 
-        val changesSummary = if (changes.isEmpty()) "No changes detected" else changes.joinToString("\n")
+        // ✅ Compare IDs, not objects
+        if (selectedMainCategoryId != originalItem?.mainCategoryId) {
+            changes.add("• Category: $originalCategoryName → $newCategoryName")
+        }
 
-        DialogHelper.showConfirmationDialog(
-            context = requireContext(),
-            action = DialogAction.SaveChanges(changesSummary),
-            onConfirm = {
-                Timber.tag(TAG).d("User confirmed update")
-                updateItem()
-            }
-        )
+        if (selectedSubCategoryId != originalItem?.subCategoryId) {
+            changes.add("• Subcategory: $originalSubCategoryName → $newSubCategoryName")
+        }
+
+        if (selectedBrandId != originalItem?.brandId) {
+            changes.add("• Brand: $originalBrandName → $newBrandName")
+        }
+
+        if (selectedSizeId != originalItem?.sizeId) {
+            changes.add("• Size: $originalSizeName → $newSizeName")
+        }
+
+        if (selectedColorId != originalItem?.colorId) {
+            changes.add("• Color: $originalColorName → $newColorName")
+        }
+
+        if (selectedConditionId != originalItem?.itemConditionId) {
+            changes.add("• Condition: $originalConditionName → $newConditionName")
+        }
+
+        if (selectedProvinceId != originalItem?.provinceId) {
+            changes.add("• Province: $originalProvinceName → $newProvinceName")
+        }
+
+        if (selectedTownId != originalItem?.locationId) {
+            changes.add("• Town: $originalTownName → $newTownName")
+        }
+
+        if (selectedSchoolId != originalItem?.schoolId) {
+            changes.add("• School: $originalSchoolName → $newSchoolName")
+        }
+
+        if (selectedGenderId != originalItem?.genderId) {
+            changes.add("• Gender: $originalGenderName → $newGenderName")
+        }
+
+        if (viewModel.getDeletionIds().isNotEmpty()) {
+            changes.add("• ${viewModel.getDeletionIds().size} image(s) removed")
+        }
+
+        if (viewModel.getImagesForUpload().isNotEmpty()) {
+            changes.add("• ${viewModel.getImagesForUpload().size} new image(s) added")
+        }
+
+        val changesSummary = if (changes.isEmpty()) {
+            "No changes detected"
+        } else {
+            changes.joinToString("\n")
+        }
+
+        // Only show dialog if there are changes
+        if (changes.isNotEmpty()) {
+            DialogHelper.showConfirmationDialog(
+                context = requireContext(),
+                action = DialogAction.SaveChanges(changesSummary),
+                onConfirm = {
+                    Timber.tag(TAG).d("User confirmed update")
+                    updateItem()
+                }
+            )
+        } else {
+            Toast.makeText(requireContext(), "No changes to save", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun showDeleteConfirmationDialog() {
@@ -881,6 +1030,8 @@ class EditItemFragment : Fragment() {
             action = DialogAction.DeleteItem,
             onConfirm = {
                 Timber.tag(TAG).d("User confirmed delete for item: $itemId")
+                // Show loading indicator
+                showLoading()
                 viewModel.deleteItem(itemId)
             }
         )
@@ -1041,13 +1192,29 @@ class EditItemFragment : Fragment() {
     }
 
     private fun navigateBack() {
-        lifecycleScope.launch {
-            delay(1500)
-            findNavController().previousBackStackEntry?.savedStateHandle?.set("item_updated", true)
-            findNavController().navigateUp()
+        Timber.tag(TAG).d("Navigating back after success")
+        findNavController().previousBackStackEntry?.savedStateHandle?.apply {
+            set("item_updated", true)
+            if (originalItem?.status != "sold") {
+                set("updated_item_id", itemId)
+            } else {
+                set("deleted_item_id", itemId)
+            }
+        }
+        findNavController().navigateUp()
+    }
+    private fun checkAndHideShimmers() {
+        // Check if both reference data is loaded AND item is loaded
+        val referenceLoaded = viewModel.isReferenceDataLoaded.value
+        val itemLoaded = viewModel.item.value != null
+
+        Timber.tag(TAG).d("checkAndHideShimmers - referenceLoaded: $referenceLoaded, itemLoaded: $itemLoaded")
+
+        if (referenceLoaded && itemLoaded) {
+            hideAllShimmers()
+            Timber.tag(TAG).d("✅ All data loaded, shimmer hidden")
         }
     }
-
     override fun onResume() {
         super.onResume()
         isCameraLaunched = false

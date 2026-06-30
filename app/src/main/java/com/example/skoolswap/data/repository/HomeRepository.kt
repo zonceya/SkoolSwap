@@ -1,8 +1,13 @@
 package com.example.skoolswap.data.repository
 
 import android.util.Log
+import com.example.skoolswap.data.local.database.dao.HomeFeedDao
+import com.example.skoolswap.data.local.database.dao.ItemDao
+import com.example.skoolswap.data.local.database.dao.ItemImageDao
 import com.example.skoolswap.data.local.datastore.AppPreferences
+import com.example.skoolswap.data.mapper.saveItemsToCache
 import com.example.skoolswap.data.mapper.toDomain
+import com.example.skoolswap.data.mapper.toEntity
 import com.example.skoolswap.data.remote.api.RecommendationsApiService
 import com.example.skoolswap.domain.model.homefeed.HomeFeed
 import com.example.skoolswap.domain.model.homefeed.RecentFeed
@@ -27,7 +32,10 @@ import javax.inject.Singleton
 class HomeRepository @Inject constructor(
     private val recommendationsApiService: RecommendationsApiService,
     private val authRepository: AuthRepositoryInterface,
-    private val appPreferences: AppPreferences
+    private val appPreferences: AppPreferences,
+    private val homeFeedDao: HomeFeedDao,
+    private val itemDao: ItemDao,           // ← ADD THIS
+    private val itemImageDao: ItemImageDao
 ) : HomeRepositoryInterface {
 
     private companion object {
@@ -41,21 +49,77 @@ class HomeRepository @Inject constructor(
     override val homeFeed: StateFlow<HomeFeed?> = _homeFeed.asStateFlow()
 
     override suspend fun getHomeFeed(schoolId: Int): Result<HomeFeed> {
+        Log.d(TAG, "🔄 getHomeFeed called for schoolId: $schoolId")
+
         return safeApiCall(
-            call = { recommendationsApiService.getHomeFeed(schoolId) },
+            call = {
+                Log.d(TAG, "📡 Calling API...")
+                recommendationsApiService.getHomeFeed(schoolId)
+            },
             errorMessage = "Failed to load home feed",
             onSuccess = { response ->
+                Log.d(TAG, "📥 API Response received")
+                Log.d(TAG, "   success: ${response.success}")
+                Log.d(TAG, "   sections count: ${response.sections?.size ?: 0}")
+
                 if (response.success) {
                     val feed = response.toDomain()
+                    Log.d(TAG, "   Domain sections: ${feed.sections.size}")
+
+                    saveHomeFeedToCache(feed)
+                    feed.saveItemsToCache(itemDao, itemImageDao)
                     _homeFeed.value = feed
                     Result.Success(feed)
                 } else {
-                    Result.Error(Exception(response.message ?: "Unknown error"))
+                    Log.e(TAG, "API returned success=false: ${response.message}")
+                    loadHomeFeedFromCache() ?: Result.Error(Exception(response.message ?: "Unknown error"))
                 }
+            },
+            onError = {
+                Log.e(TAG, "API call failed, loading from cache")
+                loadHomeFeedFromCache()
             }
         )
     }
+    private suspend fun saveHomeFeedToCache(feed: HomeFeed) {
+        try {
+            // Log what we're saving
+            Log.d(TAG, "📝 Saving home feed to cache")
+            Log.d(TAG, "   Sections count: ${feed.sections.size}")
+            feed.sections.forEachIndexed { index, section ->
+                Log.d(TAG, "   Section $index: ${section.javaClass.simpleName}")
+            }
 
+            val entity = feed.toEntity()
+            homeFeedDao.insertHomeFeed(entity)
+            Log.d(TAG, "✅ Home feed cached to Room successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to cache home feed: ${e.message}", e)
+        }
+    }
+
+    private suspend fun loadHomeFeedFromCache(): Result<HomeFeed>? {
+        return try {
+            val cached = homeFeedDao.getHomeFeed()
+            if (cached != null) {
+                Log.d(TAG, "📖 Loading home feed from cache")
+                Log.d(TAG, "   Cached at: ${java.util.Date(cached.cachedAt)}")
+                Log.d(TAG, "   JSON length: ${cached.sectionsJson.length}")
+
+                val feed = cached.toDomain()
+                Log.d(TAG, "   Sections count after parsing: ${feed.sections.size}")
+
+                _homeFeed.value = feed
+                Result.Success(feed)
+            } else {
+                Log.d(TAG, "No cached home feed found")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to load cached home feed: ${e.message}", e)
+            null
+        }
+    }
     override suspend fun getUniforms(schoolId: Int, gender: String?): Result<UniformFeed> {
         return safeApiCall(
             call = { recommendationsApiService.getUniforms(schoolId, gender) },
@@ -108,15 +172,15 @@ class HomeRepository @Inject constructor(
     private suspend fun <T, R> safeApiCall(
         call: suspend () -> Response<T>,
         errorMessage: String,
-        onSuccess: (T) -> Result<R>
+        onSuccess: suspend (T) -> Result<R>,  // ← Changed to suspend
+        onError: (suspend () -> Result<R>?)? = null
     ): Result<R> {
         return try {
-       
             val token = authRepository.getAuthToken().first()
                 ?: appPreferences.authToken.first()
             if (token.isNullOrBlank()) {
                 Log.e(TAG, "No auth token available")
-                return Result.Error(Exception("Authentication required. Please sign in again."))
+                return onError?.invoke() ?: Result.Error(Exception("Authentication required"))
             }
 
             val response = call.invoke()
@@ -126,14 +190,14 @@ class HomeRepository @Inject constructor(
                     onSuccess(body)
                 } ?: Result.Error(Exception("Empty response body"))
             } else {
-                handleErrorResponse(response, errorMessage)
+                onError?.invoke() ?: handleErrorResponse(response, errorMessage)
             }
         } catch (e: IOException) {
             Log.e(TAG, "Network error: ${e.message}", e)
-            Result.Error(Exception("Network error. Please check your connection."))
+            onError?.invoke() ?: Result.Error(Exception("Network error. Please check your connection."))
         } catch (e: Exception) {
             Log.e(TAG, "Unexpected error: ${e.message}", e)
-            Result.Error(Exception("Unexpected error: ${e.message}"))
+            onError?.invoke() ?: Result.Error(Exception("Unexpected error: ${e.message}"))
         }
     }
 

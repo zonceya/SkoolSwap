@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.reference.*
+import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.domain.repository.ReferenceDataRepositoryInterface
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -22,11 +24,12 @@ import javax.inject.Inject
 @HiltViewModel
 class CreateItemViewModel @Inject constructor(
     private val itemRepository: ItemRepositoryInterface,
-    private val referenceRepository: ReferenceDataRepositoryInterface
+    private val referenceRepository: ReferenceDataRepositoryInterface,
+    private val authRepository: AuthRepositoryInterface
 ) : ViewModel() {
 
     companion object {
-        private const val TAG = "CreateItemViewModel"
+        const val TAG = "CreateItemViewModel"
     }
 
     // ============ UI STATES ============
@@ -260,7 +263,17 @@ class CreateItemViewModel @Inject constructor(
         Log.d(TAG, "clearImages: Clearing all images")
         _images.value = emptyList()
     }
-
+    suspend fun hasContactNumber(): Boolean {
+        return try {
+            val userProfile = authRepository.getServerUser().firstOrNull()
+            val hasContactNumber = !userProfile?.mobile.isNullOrEmpty()
+            Log.d(TAG, "Has contact number: $hasContactNumber")
+            hasContactNumber
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking contact number", e)
+            false
+        }
+    }
     fun removeImageAt(index: Int) {
         Log.d(TAG, "removeImageAt: index=$index")
         val currentImages = _images.value.toMutableList()

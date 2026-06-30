@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -48,18 +49,30 @@ class ShopViewModel @Inject constructor(
     }
 
     fun loadMyShopItems() {
+        Timber.d("loadMyShopItems called")
         viewModelScope.launch {
+            _isLoading.value = true  // ← Set loading to true before network call
             val result = itemRepository.getMyShopItems()
             result.onSuccess { items ->
                 _allItems.value = items
                 extractCategoriesFromItems(items)
                 filterItemsByCategory()
+                Timber.d("Loaded ${items.size} items")
+                _error.value = null
             }.onFailure { e ->
                 _error.value = e.message
+                Timber.e(e, "Failed to load items")
             }
+            _isLoading.value = false  // ← Set loading to false after completion
         }
     }
-
+    // Add this method to ShopViewModel
+    fun removeItemLocally(itemId: String) {
+        val currentItems = _allItems.value
+        val updatedItems = currentItems.filter { it.id != itemId }
+        _allItems.value = updatedItems
+        Timber.d("Removed item $itemId locally, remaining: ${updatedItems.size}")
+    }
     private fun extractCategoriesFromItems(items: List<Item>) {
         // Get actual categories from items based on itemTypeId
         val actualCategories = items.mapNotNull { item ->
@@ -129,7 +142,37 @@ class ShopViewModel @Inject constructor(
         loadMyShop(showLoading = true)
         loadMyShopItems()
     }
+    fun toggleItemSoldStatus(itemId: String, markAsSold: Boolean) {
+        viewModelScope.launch {
+            Timber.d("🔄 Toggling item $itemId to sold=$markAsSold")
 
+            // Update local list immediately for UI
+            val currentItems = _allItems.value.toMutableList()
+            val index = currentItems.indexOfFirst { it.id == itemId }
+
+            if (index != -1) {
+                val newStatus = if (markAsSold) "sold" else "available"
+                val newQuantity = if (markAsSold) 0 else 1
+
+                val updatedItem = currentItems[index].copy(
+                    status = newStatus,
+                    quantity = newQuantity
+                )
+                currentItems[index] = updatedItem
+                _allItems.value = currentItems
+
+                // ✅ Now this will work
+                itemRepository.updateItemStatus(itemId, newStatus)
+                    .onSuccess {
+                        Timber.d("✅ Successfully updated status to $newStatus")
+                    }
+                    .onFailure { error ->
+                        Timber.e(error, "❌ Failed to update status")
+                        loadMyShopItems()  // Revert on failure
+                    }
+            }
+        }
+    }
     fun clearError() { _error.value = null }
 
 }

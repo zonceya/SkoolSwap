@@ -4,7 +4,6 @@ package com.example.skoolswap.ui.intro
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -17,6 +16,8 @@ import com.example.skoolswap.databinding.FragmentIntroBinding
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -45,6 +46,18 @@ class IntroFragment : Fragment() {
     private var videoStartTime: Long = 0
     private val MIN_DISPLAY_MS = 3000L // 3 seconds minimum
     private val FORCE_SCHOOL_ONBOARDING = false
+
+    // ✅ Absolute ceiling on how long we wait for the video pipeline
+    // (MediaPlayer/VideoView/audioserver) before giving up and moving on.
+    // Protects against onPrepared/onCompletion/onError never firing — e.g.
+    // audioserver crashing/restarting underneath MediaPlayer, a corrupt
+    // video resource, or a slow/low-memory device. Without this, app
+    // startup can hang indefinitely since navigation is gated on
+    // videoFinished. This is intentionally independent of MIN_DISPLAY_MS
+    // and of MediaPlayer's own callbacks.
+    private val VIDEO_WATCHDOG_TIMEOUT_MS = 8000L
+    private var videoWatchdogJob: Job? = null
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -75,91 +88,47 @@ class IntroFragment : Fragment() {
 
         // Start video
         setupVideo()
+        startVideoWatchdog()
     }
 
     private fun determineDestination() {
         lifecycleScope.launch {
             try {
-                Log.e("IntroFragment", "🎯 === DETERMINING DESTINATION ===")
-
-                // 🔴 Remove force testing flag
-                val forceOnboarding = false
-
-                if (forceOnboarding) {
-                    Log.e("IntroFragment", "🚨 FORCE ONBOARDING enabled")
-                    onDestinationDetermined(R.id.schoolOnboardingFragment)
-                    return@launch
-                }
-
-                // Check if onboarding was ever completed
-                val isOnboardingFinished = appPreferences.isOnboardingFinished.first()
-                Log.e("IntroFragment", "📱 isOnboardingFinished: $isOnboardingFinished")
-
-                if (!isOnboardingFinished) {
-                    Log.e("IntroFragment", "➡️ First time user - go to onboarding")
-                    onDestinationDetermined(R.id.viewPagerFragment)
-                    return@launch
-                }
-
-                // Check login status
+                // Quick check: If user is already properly logged in → go straight to home
                 val isLoggedIn = appPreferences.isLoggedIn.first()
-                val authToken = appPreferences.authToken.first()
-                val userId = appPreferences.getUserId()
-                val cachedSchoolId = appPreferences.schoolId.first()
-                val cachedSchoolMapped = appPreferences.hasSchoolMapped()
+                val roomUser = authRepository.getRoomUser()
 
-                Log.e("IntroFragment", "🔐 isLoggedIn: $isLoggedIn")
-                Log.e("IntroFragment", "🔐 authToken exists: ${!authToken.isNullOrEmpty()}")
-                Log.e("IntroFragment", "🔐 userId: $userId")
-                Log.e("IntroFragment", "🏫 cachedSchoolId: $cachedSchoolId")
-                Log.e("IntroFragment", "🏫 cachedSchoolMapped: $cachedSchoolMapped")
+                if (isLoggedIn && roomUser != null && !roomUser.token.isNullOrEmpty()) {
+                    Timber.tag(TAG).i("✅ User already logged in (Room + Preferences)")
 
-                val isValidSession = isLoggedIn && !authToken.isNullOrEmpty() && userId != null
-
-                if (!isValidSession) {
-                    Log.e("IntroFragment", "➡️ Not logged in - go to login")
-                    onDestinationDetermined(R.id.loginFragment)
-                    return@launch
-                }
-
-                // User is logged in, check session validity with backend
-                Log.e("IntroFragment", "🔄 Refreshing user profile from backend...")
-                val refreshResult = authRepository.refreshUserProfile()
-
-                if (refreshResult.isFailure) {
-                    Log.e("IntroFragment", "❌ Session invalid - clearing data and going to login")
-                    Log.e("IntroFragment", "❌ Error: ${refreshResult.exceptionOrNull()?.message}")
-                    appPreferences.clearUserData()
-                    onDestinationDetermined(R.id.loginFragment)
-                    return@launch
-                }
-
-                val user = authRepository.getServerUser().first()
-                Log.e("IntroFragment", "👤 User from backend: ${user?.name}")
-                Log.e("IntroFragment", "👤 User school_mapped: ${user?.schoolMapped}")
-                Log.e("IntroFragment", "👤 User school_id: ${user?.schoolId}")
-
-                if (user != null) {
-                    // ✅ CRITICAL: Use BACKEND data, not cached data
-                    val hasValidSchoolMapping = user.schoolMapped == true && user.schoolId != null
-
-                    Log.e("IntroFragment", "🎯 hasValidSchoolMapping from BACKEND: $hasValidSchoolMapping")
-
-                    val destination = if (hasValidSchoolMapping) {
-                        Log.e("IntroFragment", "➡️ User has valid school mapping - go to HOME")
+                    val destination = if (roomUser.schoolMapped) {
                         R.id.nav_home
                     } else {
-                        Log.e("IntroFragment", "➡️ User has NO school mapping - go to ONBOARDING")
-                        R.id.schoolOnboardingFragment
+                        R.id.nav_profile
                     }
                     onDestinationDetermined(destination)
-                } else {
-                    Log.e("IntroFragment", "❌ User is null - clearing data and going to login")
-                    appPreferences.clearUserData()
-                    onDestinationDetermined(R.id.loginFragment)
+                    return@launch
                 }
+
+                // Fallback: Try full session recovery
+                val restored = authRepository.restoreSession()
+                if (restored) {
+                    val updatedUser = authRepository.getRoomUser()
+                    val destination = if (updatedUser?.schoolMapped == true) {
+                        R.id.nav_home
+                    } else {
+                        R.id.nav_profile
+                    }
+                    onDestinationDetermined(destination)
+                    return@launch
+                }
+
+                // No valid session → go to login
+                Timber.tag(TAG).i("❌ No valid session found → login")
+                onDestinationDetermined(R.id.loginFragment)
+
             } catch (e: Exception) {
-                Log.e("IntroFragment", "❌ Exception in determineDestination: ${e.message}", e)
+                Timber.tag(TAG).e(e, "Error determining destination")
                 onDestinationDetermined(R.id.loginFragment)
             }
         }
@@ -174,6 +143,12 @@ class IntroFragment : Fragment() {
 
     private fun onVideoFinished() {
         Timber.tag(TAG).e("Video finished or failed")
+        videoWatchdogJob?.cancel()
+        videoWatchdogJob = null
+        if (videoFinished) {
+            // Already finished (e.g. watchdog fired first) — ignore late callback.
+            return
+        }
         videoFinished = true
         maybeNavigate()
     }
@@ -186,6 +161,31 @@ class IntroFragment : Fragment() {
             navigateToDestination()
         } else {
             Timber.tag(TAG).e("Waiting for both conditions to be true")
+        }
+    }
+
+    /**
+     * Independent safety net: if the video pipeline (MediaPlayer/VideoView/
+     * audioserver) never calls back — e.g. audioserver dies/restarts mid
+     * prepare, a codec hangs, or the device is under heavy load — this
+     * forces onVideoFinished() after a fixed timeout so app startup is
+     * never held hostage by the splash video.
+     */
+    private fun startVideoWatchdog() {
+        videoWatchdogJob?.cancel()
+        videoWatchdogJob = lifecycleScope.launch {
+            delay(VIDEO_WATCHDOG_TIMEOUT_MS)
+            if (!videoFinished) {
+                Timber.tag(TAG).e(
+                    "⏱️ Video watchdog fired after ${VIDEO_WATCHDOG_TIMEOUT_MS}ms — " +
+                            "video pipeline did not call back, forcing navigation"
+                )
+                if (_binding != null) {
+                    binding.splashPlaceholder.visibility = View.GONE
+                    binding.progressBar.visibility = View.GONE
+                }
+                onVideoFinished()
+            }
         }
     }
 
@@ -324,7 +324,6 @@ class IntroFragment : Fragment() {
                 }
                 R.id.schoolOnboardingFragment -> {
                     Timber.tag(TAG).e("🔴 Navigating to school onboarding")
-                    // You need to add this action to nav_graph.xml
                     findNavController().navigate(R.id.action_introFragment_to_schoolOnboardingFragment)
                 }
                 R.id.nav_home -> {
@@ -366,7 +365,7 @@ class IntroFragment : Fragment() {
     override fun onPause() {
         super.onPause()
         Timber.tag(TAG).e("onPause called")
-        if (binding.videoView.isPlaying) {
+        if (_binding != null && binding.videoView.isPlaying) {
             binding.videoView.pause()
             Timber.tag(TAG).e("Video paused")
         }
@@ -374,6 +373,9 @@ class IntroFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+
+        videoWatchdogJob?.cancel()
+        videoWatchdogJob = null
 
         // Restore system UI
         @Suppress("DEPRECATION")

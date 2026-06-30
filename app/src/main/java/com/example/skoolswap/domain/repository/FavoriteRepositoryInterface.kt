@@ -4,10 +4,11 @@ import com.example.skoolswap.domain.model.Item
 import kotlinx.coroutines.flow.Flow
 
 interface FavoriteRepositoryInterface {
-    fun getAllFavorites(): Flow<List<Item>>
-    suspend fun isFavorite(itemId: String): Boolean
-    suspend fun addFavorite(itemId: String)
-    suspend fun removeFavorite(itemId: String)
-    suspend fun toggleFavorite(itemId: String): Boolean
-    suspend fun getFavoritesCount(): Int
+    fun getAllFavorites(userId: Int): Flow<List<Item>>
+    suspend fun isFavorite(userId: Int, itemId: String): Boolean
+    suspend fun addFavorite(userId: Int, itemId: String)
+    suspend fun removeFavorite(userId: Int, itemId: String)
+    suspend fun toggleFavorite(userId: Int, itemId: String): Boolean
+    suspend fun getFavoritesCount(userId: Int): Int
+
 }

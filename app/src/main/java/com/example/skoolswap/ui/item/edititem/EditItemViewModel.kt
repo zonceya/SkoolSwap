@@ -94,11 +94,14 @@ class EditItemViewModel @Inject constructor(
 
     private val _selectedProvinceId = MutableStateFlow<Int?>(null)
     val selectedProvinceId: StateFlow<Int?> = _selectedProvinceId.asStateFlow()
+    private val _isReferenceDataLoaded = MutableStateFlow(false)
+    val isReferenceDataLoaded: StateFlow<Boolean> = _isReferenceDataLoaded.asStateFlow()
 
     init {
         Timber.tag(TAG).d("=== EditItemViewModel INIT ===")
         viewModelScope.launch {
             _isLoading.value = true
+            Timber.tag(TAG).d("Loading started")
 
             // Start collecting from DB FIRST
             launch {
@@ -167,6 +170,7 @@ class EditItemViewModel @Inject constructor(
             observeTowns()
 
             // Trigger refresh
+            Timber.tag(TAG).d("Refreshing reference data...")
             try {
                 val result = referenceRepository.refreshAllReferenceDataBulk(forceRefresh = false)
                 if (result.isSuccess) {
@@ -175,13 +179,16 @@ class EditItemViewModel @Inject constructor(
                     Timber.tag(TAG).w("⚠️ Refresh failed: ${result.exceptionOrNull()?.message}")
                 }
             } catch (e: Exception) {
-                Timber.tag(TAG).w("⚠️ Refresh error: ${e.message}")
+                Timber.tag(TAG).e(e, "⚠️ Refresh error")
+            } finally {
+                // ✅ ALWAYS set loading to false when reference data loading completes
+                _isLoading.value = false
+                _isReferenceDataLoaded.value = true
+                Timber.tag(TAG).d("Reference data loading completed, isLoading=false")
             }
-
-            _isLoading.value = false
-            Timber.tag(TAG).d("Reference data loading completed")
         }
     }
+
 
     // ============ OBSERVE DEPENDENT DATA ============
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -190,11 +197,12 @@ class EditItemViewModel @Inject constructor(
             _selectedMainCategoryId
                 .filterNotNull()
                 .flatMapLatest { mainCategoryId ->
+                    Timber.tag(TAG).d("Fetching subcategories for mainCategoryId: $mainCategoryId")
                     referenceRepository.getSubCategories(mainCategoryId)
                 }
                 .collect { subCats ->
                     _subCategories.value = subCats
-                    Timber.tag(TAG).d("📦 Received ${subCats.size} subcategories")
+                    Timber.tag(TAG).d("Received ${subCats.size} subcategories")
                 }
         }
     }

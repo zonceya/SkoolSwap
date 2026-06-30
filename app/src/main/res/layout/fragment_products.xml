@@ -11,7 +11,7 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Sort / Filter Bar (FIXED - doesn't pull) -->
+        <!-- Sort / Filter Bar -->
         <LinearLayout
             android:id="@+id/sortFilterBar"
             android:layout_width="match_parent"
@@ -74,6 +74,47 @@
 
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/emptyBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/white"
+            android:padding="12dp"
+            android:visibility="gone"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- Info Icon as ImageView -->
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_info_outline"
+                app:tint="#000000" />
+
+            <TextView
+                android:id="@+id/bannerMessage"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:paddingStart="12dp"
+                android:paddingEnd="8dp"
+                android:text="No items found. Similar items are displayed."
+                android:textSize="14sp"
+                android:textColor="#000000" />
+
+            <!-- Close Button as ImageView -->
+            <ImageView
+                android:id="@+id/btnCloseBanner"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_close"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                app:tint="#000000" />
+
+        </LinearLayout>
+
         <!-- Pull-to-Refresh ONLY wraps content (not sort bar) -->
         <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
             android:id="@+id/swipeRefreshLayout"
@@ -85,18 +126,19 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent">
 
-                <!-- Shimmer Layout (shows while loading) -->
-                <LinearLayout
+                <!-- ShimmerFrameLayout (shows while loading) -->
+                <com.facebook.shimmer.ShimmerFrameLayout
                     android:id="@+id/shimmerLayout"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:orientation="vertical"
                     android:visibility="gone"
-                    android:padding="16dp">
+                    android:padding="16dp"
+                    app:shimmer_duration="1200"
+                    app:shimmer_auto_start="false">
 
                     <include layout="@layout/shimmer_grid" />
 
-                </LinearLayout>
+                </com.facebook.shimmer.ShimmerFrameLayout>
 
                 <!-- Products Grid (normal mode) -->
                 <androidx.recyclerview.widget.RecyclerView
@@ -116,13 +158,15 @@
                     android:visibility="gone"
                     android:padding="32dp">
 
-                    <ImageView
-                        android:layout_width="120dp"
-                        android:layout_height="120dp"
-                        android:src="@drawable/ic_error_placeholder" />
+                    <TextView
+                        android:layout_width="80dp"
+                        android:layout_height="80dp"
+                        android:text="😕"
+                        android:textSize="64sp"
+                        android:gravity="center" />
 
                     <TextView
-                        android:id="@+id/errorMessage"
+                        android:id="@+id/errorText"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Failed to load items"
@@ -211,12 +255,17 @@
             android:visibility="gone"
             android:layout_marginBottom="16dp">
 
-            <ImageView
+            <TextView
                 android:id="@+id/backToMain"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                app:tint="?attr/colorOnSurface"
-                android:src="@drawable/ic_back" />
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:text="←"
+                android:textSize="20sp"
+                android:textColor="?attr/colorOnSurface"
+                android:gravity="center"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true" />
 
             <TextView
                 android:id="@+id/optionsTitle"

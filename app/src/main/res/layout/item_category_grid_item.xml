@@ -19,22 +19,24 @@
             android:layout_height="match_parent"
             android:scaleType="centerCrop" />
 
-        <!-- SOLD BADGE -->
+        <!-- SOLD BADGE - Single background, clickable -->
         <TextView
             android:id="@+id/soldBadge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="SOLD"
             android:textColor="@android:color/white"
-            android:background="@android:color/holo_red_dark"
-            android:padding="4dp"
+            android:background="@drawable/badge_sold_selector"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp"
             android:textSize="10sp"
             android:textStyle="bold"
             android:layout_gravity="top|end"
             android:layout_margin="4dp"
-            android:visibility="gone" />
+            android:clickable="true"
+            android:focusable="true" />
 
-        <!-- VIEW COUNT BADGE - ADD THIS -->
+        <!-- VIEW COUNT BADGE -->
         <LinearLayout
             android:id="@+id/viewCountContainer"
             android:layout_width="wrap_content"

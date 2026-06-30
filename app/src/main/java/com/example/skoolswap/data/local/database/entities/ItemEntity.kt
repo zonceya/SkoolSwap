@@ -38,7 +38,8 @@ data class ItemEntity(
     val imageCount: Int = 0,
     val lastCacheTime: Long = System.currentTimeMillis(),
     val imagesJson: String = "[]",
-    val coverImage: String? = null  // ADD THIS FIELD
+    val coverImage: String? = null,
+    val viewCount: Int = 0 // ADD THIS FIELD
 )
 
 // Extension functions (outside the data class)

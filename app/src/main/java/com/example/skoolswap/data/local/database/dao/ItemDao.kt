@@ -39,4 +39,13 @@ interface ItemDao {
 
     @Query("DELETE FROM items")
     suspend fun clearAllItems()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrReplace(item: ItemEntity)
+
+    @Query("DELETE FROM items WHERE lastCacheTime < :expiryTime")
+    suspend fun deleteExpiredItems(expiryTime: Long)
+
+    @Query("SELECT * FROM items WHERE id = :itemId AND lastCacheTime > :expiryTime")
+    suspend fun getValidItemById(itemId: String, expiryTime: Long): ItemEntity?
 }
