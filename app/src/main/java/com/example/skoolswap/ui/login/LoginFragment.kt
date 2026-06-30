@@ -1,10 +1,13 @@
 package com.example.skoolswap.ui.login
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -33,6 +36,7 @@ class LoginFragment : Fragment() {
     lateinit var authRepository: AuthRepositoryInterface
 
     private var isSigningIn = false
+    private var isGoogleSignIn = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -46,16 +50,8 @@ class LoginFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        Timber.tag("LoginFragment").e("🔥 onViewCreated")
-
-        // Check if we came from IntroFragment
         val fromIntro = arguments?.getBoolean("from_intro", false) ?: false
-
-        if (fromIntro) {
-            Timber.tag("LoginFragment").d("Coming from IntroFragment - session already validated")
-            binding.root.visibility = View.VISIBLE
-        } else {
-            Timber.tag("LoginFragment").d("Direct navigation - checking session")
+        if (!fromIntro) {
             checkExistingSession()
         }
 
@@ -69,25 +65,31 @@ class LoginFragment : Fragment() {
         setBoxStrokeColor(binding.emailLayout, ContextCompat.getColor(requireContext(), R.color.white))
         setBoxStrokeColor(binding.passwordLayout, ContextCompat.getColor(requireContext(), R.color.white))
 
-        // Google Sign-In Button
+        // Google Sign-In
         binding.signInButton.setOnClickListener {
             if (isSigningIn) return@setOnClickListener
 
             isSigningIn = true
+            isGoogleSignIn = true
             binding.signInButton.isEnabled = false
+
+            // 🔥 Show loading overlay immediately (this will be visible after Google sheet dismisses)
+            showLoadingOverlay(true, "Signing in with Google...")
+
             viewModel.signInWithGoogle(requireActivity())
 
             binding.signInButton.postDelayed({
                 if (isSigningIn) {
                     isSigningIn = false
+                    isGoogleSignIn = false
                     if (_binding != null) {
                         binding.signInButton.isEnabled = true
                     }
                 }
-            }, 5000)
+            }, 15000) // 15 seconds timeout for Google
         }
 
-        // Email/Password Login Button
+        // Email/Password Login
         binding.loginButton.setOnClickListener {
             if (isSigningIn) return@setOnClickListener
 
@@ -115,7 +117,9 @@ class LoginFragment : Fragment() {
             isSigningIn = true
             binding.loginButton.isEnabled = false
 
-            // Call Firebase email sign in
+            // Show loading for email/password
+            showLoadingOverlay(true, "Signing in...")
+
             viewModel.signInWithEmail(email, password)
 
             binding.loginButton.postDelayed({
@@ -128,9 +132,8 @@ class LoginFragment : Fragment() {
             }, 10000)
         }
 
-        // Forgot Password Link - Add this TextView to your login XML
         binding.textForgotPassword?.setOnClickListener {
-            navigateToForgotPassword()
+            findNavController().navigate(R.id.action_loginFragment_to_forgotPasswordFragment)
         }
 
         binding.textSignUpLink.setOnClickListener {
@@ -140,8 +143,39 @@ class LoginFragment : Fragment() {
         }
     }
 
-    private fun navigateToForgotPassword() {
-        findNavController().navigate(R.id.action_loginFragment_to_forgotPasswordFragment)
+    /**
+     * Show/hide loading overlay with smooth fade animation
+     */
+    private fun showLoadingOverlay(show: Boolean, message: String? = null) {
+        if (_binding == null) return
+
+        val overlay = binding.loadingOverlay
+
+        // Update message if provided
+        message?.let {
+            overlay.findViewById<TextView>(R.id.loadingMessage)?.text = it
+        }
+
+        if (show) {
+            // Make visible but start from alpha 0
+            overlay.visibility = View.VISIBLE
+            overlay.alpha = 0f
+            overlay.animate()
+                .alpha(1f)
+                .setDuration(300) // 300ms smooth fade in
+                .start()
+        } else {
+            // Fade out and hide
+            overlay.animate()
+                .alpha(0f)
+                .setDuration(300)
+                .setListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        overlay.visibility = View.GONE
+                    }
+                })
+                .start()
+        }
     }
 
     private fun setBoxStrokeColor(textInputLayout: TextInputLayout, color: Int) {
@@ -164,22 +198,26 @@ class LoginFragment : Fragment() {
     }
 
     private fun observeViewModel() {
+        // For email/password loading
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
             if (_binding == null) return@observe
 
-            if (isLoading) {
-                binding.signInButton.isEnabled = false
-                binding.loginButton.isEnabled = false
-                binding.progressBar.visibility = View.VISIBLE
-            } else {
-                binding.signInButton.isEnabled = !isSigningIn
-                binding.loginButton.isEnabled = !isSigningIn
-                binding.progressBar.visibility = View.GONE
+            if (!isGoogleSignIn) {
+                // Only manage email/password loading here
+                if (isLoading) {
+                    binding.loginButton.isEnabled = false
+                } else {
+                    binding.loginButton.isEnabled = !isSigningIn
+                }
             }
         }
 
         viewModel.error.observe(viewLifecycleOwner) { error ->
             if (error != null && _binding != null) {
+                // Hide loading on error
+                showLoadingOverlay(false)
+                binding.progressBar.visibility = View.GONE
+
                 Snackbar.make(
                     binding.root,
                     error,
@@ -187,27 +225,33 @@ class LoginFragment : Fragment() {
                 ).show()
 
                 isSigningIn = false
+                isGoogleSignIn = false
                 binding.signInButton.isEnabled = true
                 binding.loginButton.isEnabled = true
-                binding.progressBar.visibility = View.GONE
             }
         }
 
         viewModel.loginSuccess.observe(viewLifecycleOwner) { user ->
             if (user != null && _binding != null) {
-                navigateAfterLogin(user)
+                // 🔥 Hide loading with fade before navigating
+                showLoadingOverlay(false)
+
+                // Small delay for the fade animation to complete
+                binding.loadingOverlay.postDelayed({
+                    navigateAfterLogin(user)
+                }, 350)
             }
         }
     }
 
     private fun checkExistingSession() {
-        Timber.tag("LoginFragment").d("LoginFragment - no session restore, just showing UI")
         binding.root.visibility = View.VISIBLE
     }
 
     private fun navigateAfterLogin(user: com.example.skoolswap.domain.model.User) {
         if (!isAdded || isDetached) return
         try {
+            // ✅ Remove the delay - overlay handles the transition now
             if (user.schoolMapped) {
                 val bundle = Bundle().apply {
                     user.schoolId?.let { putInt("schoolId", it) }
@@ -223,6 +267,7 @@ class LoginFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        showLoadingOverlay(false)
         _binding = null
     }
 }
