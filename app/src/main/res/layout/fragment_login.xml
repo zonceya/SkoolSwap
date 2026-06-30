@@ -28,7 +28,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
 
-    <!-- Loading Indicator -->
+    <!-- Loading Indicator (for email/password) -->
     <ProgressBar
         android:id="@+id/progressBar"
         android:layout_width="wrap_content"
@@ -39,7 +39,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Google Sign In Button (Now on top) -->
+    <!-- Google Sign In Button -->
     <LinearLayout
         android:id="@+id/google_sign_in_container"
         android:layout_width="match_parent"
@@ -60,8 +60,7 @@
             android:layout_height="match_parent"
             android:layout_marginStart="15dp"
             android:layout_marginTop="10dp"
-            android:orientation="horizontal"
-        >
+            android:orientation="horizontal">
 
             <ImageView
                 android:layout_width="24dp"
@@ -211,7 +210,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/password_layout" />
 
-    <!-- Forgot Password Link - ADD THIS -->
+    <!-- Forgot Password Link -->
     <TextView
         android:id="@+id/textForgotPassword"
         android:layout_width="wrap_content"
@@ -257,5 +256,46 @@
             android:clickable="true"
             android:focusable="true" />
     </LinearLayout>
+
+    <!-- ✅ OVERLAY - MUST BE LAST, COVERS EVERYTHING -->
+    <FrameLayout
+        android:id="@+id/loadingOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#CC000000"
+        android:visibility="gone"
+        android:alpha="0"
+        android:clickable="true"
+        android:focusable="true"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ProgressBar
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:indeterminateTint="@color/white" />
+
+            <TextView
+                android:id="@+id/loadingMessage"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="Signing in with Google..."
+                android:textColor="@color/white"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+    </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
