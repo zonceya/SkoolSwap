@@ -9,6 +9,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -133,21 +134,33 @@ class HomeFragment : Fragment() {
         binding.swipeRefreshLayout.visibility = View.VISIBLE
         binding.homeRecycler.visibility = View.VISIBLE
 
+        // ✅ Hide filter bar when exiting search
         binding.filterBar.visibility = View.GONE
         binding.searchResultsContainer.visibility = View.GONE
         binding.searchResultsRecycler.visibility = View.GONE
         binding.emptySearchResults.visibility = View.GONE
 
-        clearFilterState()
+        // Reset filters
+        selectedGender = null
+        selectedCondition = null
+        selectedSize = null
+        selectedColor = null
+        selectedBrand = null
+
+        // ✅ Close drawer if open
+        binding.drawerLayout.closeDrawers()
     }
 
     private fun enterSearchMode() {
+        isInSearchMode = true
+
         binding.topTabs.visibility = View.GONE
         binding.bannerViewPager.visibility = View.GONE
         binding.indicatorDots.visibility = View.GONE
         binding.homeRecycler.visibility = View.GONE
         binding.swipeRefreshLayout.visibility = View.GONE
 
+        // ✅ Show filter bar when entering search
         binding.filterBar.visibility = View.VISIBLE
         binding.searchResultsContainer.visibility = View.VISIBLE
         binding.searchResultsRecycler.visibility = View.VISIBLE
@@ -190,25 +203,50 @@ class HomeFragment : Fragment() {
     // ====================== SORT ======================
 
     private fun setupFilterBar() {
-        binding.sortBtn.setOnClickListener { showSortMenu() }
-        binding.filterBtn.setOnClickListener {
-            rebuildLocalFilters()
-            binding.drawerLayout.openDrawer(GravityCompat.END)
+        binding.sortBtn.setOnClickListener {
+            if (isInSearchMode) {
+                showSortMenu()
+            }
         }
 
+        binding.filterBtn.setOnClickListener {
+            // ✅ Only open filter drawer when in search mode
+            if (isInSearchMode) {
+                rebuildLocalFilters()
+                binding.drawerLayout.openDrawer(GravityCompat.END)
+            }
+        }
+
+        // Apply theme colors
         val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
                 android.content.res.Configuration.UI_MODE_NIGHT_YES
 
         if (isDarkMode) {
-            binding.sortBtn.setBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.dark_surface))
-            binding.filterBtn.setBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.dark_surface))
-            binding.sortBtn.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white))
-            binding.filterBtn.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white))
+            binding.sortBtn.setBackgroundColor(
+                ContextCompat.getColor(requireContext(), R.color.dark_surface)
+            )
+            binding.filterBtn.setBackgroundColor(
+                ContextCompat.getColor(requireContext(), R.color.dark_surface)
+            )
+            binding.sortBtn.setTextColor(
+                ContextCompat.getColor(requireContext(), R.color.white)
+            )
+            binding.filterBtn.setTextColor(
+                ContextCompat.getColor(requireContext(), R.color.white)
+            )
         } else {
-            binding.sortBtn.setBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.light_background))
-            binding.filterBtn.setBackgroundColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.light_background))
-            binding.sortBtn.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.black))
-            binding.filterBtn.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.black))
+            binding.sortBtn.setBackgroundColor(
+                ContextCompat.getColor(requireContext(), R.color.light_background)
+            )
+            binding.filterBtn.setBackgroundColor(
+                ContextCompat.getColor(requireContext(), R.color.light_background)
+            )
+            binding.sortBtn.setTextColor(
+                ContextCompat.getColor(requireContext(), R.color.black)
+            )
+            binding.filterBtn.setTextColor(
+                ContextCompat.getColor(requireContext(), R.color.black)
+            )
         }
     }
 
