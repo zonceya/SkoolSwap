@@ -19,6 +19,7 @@ import com.example.skoolswap.data.local.database.dao.UserDao
 import com.example.skoolswap.data.local.database.dao.UserSchoolDao
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.remote.api.FilterApiService
+import com.example.skoolswap.data.remote.api.ImageApiService
 import com.example.skoolswap.data.remote.api.ItemApiService
 import com.example.skoolswap.data.remote.api.ProvinceApiService
 import com.example.skoolswap.data.remote.api.RecommendationsApiService
@@ -32,6 +33,7 @@ import com.example.skoolswap.data.repository.AuthRepository
 import com.example.skoolswap.data.repository.FavoriteRepository
 import com.example.skoolswap.data.repository.FilterRepository
 import com.example.skoolswap.data.repository.HomeRepository
+import com.example.skoolswap.data.repository.ImageUploadRepository
 import com.example.skoolswap.data.repository.ItemRepository
 import com.example.skoolswap.data.repository.ProductsCacheRepository
 import com.example.skoolswap.data.repository.SchoolRepository
@@ -129,18 +131,6 @@ object AppModule {
         return database.favoriteDao()
     }
 
- /*   @Provides
-    @Singleton
-    fun provideItemDao(database: SkoolSwapDatabase): ItemDao {
-        return database.itemDao()
-    }*/
-
-//    @Provides
-//    @Singleton
-//    fun provideItemImageDao(database: SkoolSwapDatabase): ItemImageDao {
-//        return database.itemImageDao()
-//    }
-
     // ========== API SERVICES ==========
     @Provides
     @Singleton
@@ -188,6 +178,11 @@ object AppModule {
     @Singleton
     fun provideFilterApiService(retrofit: Retrofit): FilterApiService {
         return retrofit.create(FilterApiService::class.java)
+    }
+    @Provides
+    @Singleton
+    fun provideImageApiService(retrofit: Retrofit): ImageApiService {
+        return retrofit.create(ImageApiService::class.java)
     }
 
     // ========== OTHER DEPENDENCIES ==========
@@ -268,14 +263,14 @@ object AppModule {
         itemDao: ItemDao,
         itemImageDao: ItemImageDao,
         authRepository: AuthRepositoryInterface,
-        appPreferences: AppPreferences
+        imageUploadRepository:  ImageUploadRepository
     ): ItemRepositoryInterface {
         return ItemRepository(
             itemApiService = itemApiService,
             itemDao = itemDao,
             itemImageDao = itemImageDao,
             authRepository = authRepository,
-            appPreferences = appPreferences
+            imageUploadRepository =  imageUploadRepository
         )
     }
 

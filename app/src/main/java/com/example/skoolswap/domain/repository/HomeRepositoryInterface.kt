@@ -1,11 +1,19 @@
 package com.example.skoolswap.domain.repository
 
+import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.homefeed.HomeFeed
 import com.example.skoolswap.domain.model.homefeed.RecentFeed
 import com.example.skoolswap.domain.model.homefeed.SportFeed
 import com.example.skoolswap.domain.model.homefeed.UniformFeed
 import com.example.skoolswap.utils.Result
 import kotlinx.coroutines.flow.StateFlow
+
+data class RankedItemsResult(
+    val items: List<Item>,
+    val totalCount: Int,
+    val currentPage: Int,
+    val totalPages: Int
+)
 
 interface HomeRepositoryInterface {
     // StateFlow for home feed data
@@ -17,12 +25,78 @@ interface HomeRepositoryInterface {
     // Get uniforms
     suspend fun getUniforms(schoolId: Int, gender: String? = null): Result<UniformFeed>
 
-    // Get sport items
     suspend fun getSportItems(schoolId: Int, sportType: String? = null): Result<SportFeed>
 
-    // Get recent items
     suspend fun getRecentItems(schoolId: Int, period: String? = null): Result<RecentFeed>
 
-    // Clear home data (on logout/school change)
+    suspend fun searchItemsRanked(
+        query: String,
+        schoolId: Int,
+        categoryId: Int? = null,
+        subCategoryId: Int? = null,
+        minPrice: Float? = null,
+        maxPrice: Float? = null,
+        page: Int = 1,
+        perPage: Int = 20
+    ): Result<RankedItemsResult>
+
+    suspend fun getUniformsRanked(
+        schoolId: Int,
+        gender: String? = null,
+        subCategoryId: Int? = null,
+        minPrice: Float? = null,
+        maxPrice: Float? = null,
+        page: Int = 1,
+        perPage: Int = 20
+    ): Result<RankedItemsResult>
+
+    suspend fun getSportItemsRanked(
+        schoolId: Int,
+        sportType: String? = null,
+        subCategoryId: Int? = null,
+        minPrice: Float? = null,
+        maxPrice: Float? = null,
+        page: Int = 1,
+        perPage: Int = 20
+    ): Result<RankedItemsResult>
+
+    suspend fun getRecentItemsRanked(
+        schoolId: Int,
+        period: String? = null,
+        minPrice: Float? = null,
+        maxPrice: Float? = null,
+        page: Int = 1,
+        perPage: Int = 20
+    ): Result<RankedItemsResult>
+
+    suspend fun getRecommendedRanked(
+        schoolId: Int,
+        categoryId: Int? = null,
+        period: String? = null,
+        minPrice: Float? = null,
+        maxPrice: Float? = null,
+        page: Int = 1,
+        perPage: Int = 20
+    ): Result<RankedItemsResult>
+
+    suspend fun getTrendingRanked(
+        schoolId: Int,
+        period: String = "today",
+        minPrice: Float? = null,
+        maxPrice: Float? = null,
+        page: Int = 1,
+        perPage: Int = 20
+    ): Result<RankedItemsResult>
+
+    suspend fun getEssentialsRanked(
+        schoolId: Int,
+        category: String? = null,
+        subCategoryId: Int? = null,
+        minPrice: Float? = null,
+        maxPrice: Float? = null,
+        page: Int = 1,
+        perPage: Int = 20
+    ): Result<RankedItemsResult>
+
     suspend fun clearHomeData()
 }

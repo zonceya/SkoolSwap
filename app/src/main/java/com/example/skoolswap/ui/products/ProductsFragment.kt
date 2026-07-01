@@ -134,6 +134,8 @@ class ProductsFragment : Fragment() {
 
     // ====================== SEARCH ======================
 
+    // ProductsFragment.kt - Update performLiveSearch
+
     fun performLiveSearch(query: String) {
         Timber.tag(TAG).d("🔍 performLiveSearch called with: $query")
         if (query.length >= 2) {
@@ -142,7 +144,11 @@ class ProductsFragment : Fragment() {
             searchJob?.cancel()
             searchJob = viewLifecycleOwner.lifecycleScope.launch {
                 delay(300)
-                viewModel.searchInCurrentSection(query)
+                // 🔥 Use ranked search instead of local search
+                viewModel.searchItemsRanked(
+                    query = query,
+                    categoryId = arguments?.getInt("CATEGORY_ID")
+                )
             }
         } else if (query.isEmpty()) {
             exitSearchMode()

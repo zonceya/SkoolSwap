@@ -293,21 +293,9 @@ fun ShopItemDto.toDomain(shopId: Long): Item {
 
 // ============ DOMAIN TO ENTITY (WITH IMAGES JSON) ============
 fun Item.toEntity(): ItemEntity {
-    // Convert images to JSON string
     val imagesJson = if (images.isNotEmpty()) {
-        val imagesData = images.map { image ->
-            mapOf(
-                "url" to image.url,
-                "isCover" to image.isCover
-            )
-        }
-        Gson().toJson(imagesData)
-    } else {
-        "[]"
-    }
-
-    // Get cover image URL
-    val coverImageUrl = coverImage ?: images.firstOrNull { it.isCover }?.url ?: images.firstOrNull()?.url
+        Gson().toJson(images.map { mapOf("url" to it.url, "isCover" to it.isCover) })
+    } else "[]"
 
     return ItemEntity(
         id = id,
@@ -321,6 +309,10 @@ fun Item.toEntity(): ItemEntity {
         brandId = brandId,
         sizeId = sizeId,
         schoolId = schoolId,
+        sizeName = sizeName,
+        colorName = colorName,
+        brandName = brandName,
+        conditionName = conditionName,
         itemConditionId = itemConditionId,
         locationId = locationId,
         provinceId = provinceId,
@@ -334,12 +326,18 @@ fun Item.toEntity(): ItemEntity {
         deleted = false,
         imageCount = images.size,
         lastCacheTime = System.currentTimeMillis(),
-        sizeName = sizeName,
-        colorName = colorName,
-        brandName = brandName,
-        conditionName = conditionName,
         imagesJson = imagesJson,
-        coverImage = coverImageUrl
+        coverImage = coverImage,
+        viewCount = viewCount,
+        // ✅ New sync fields
+        syncStatus = syncStatus,
+        syncError = syncError,
+        retryCount = retryCount,
+        lastSyncAttempt = lastSyncAttempt,
+        // ✅ Category fields
+        mainCategoryId = mainCategoryId,
+        subCategoryId = subCategoryId,
+        colorId = colorId
     )
 }
 // KEEP THIS VERSION
@@ -387,27 +385,15 @@ fun RecommendationItemDto.toDomain(): com.example.skoolswap.domain.model.Item {
 fun ItemEntity.toDomain(): Item {
     // Parse images from JSON
     val imagesList = mutableListOf<ItemImage>()
-
     try {
         if (imagesJson.isNotEmpty() && imagesJson != "[]") {
             val type = object : TypeToken<List<Map<String, Any>>>() {}.type
             val imagesData: List<Map<String, Any>> = Gson().fromJson(imagesJson, type)
-
-            imagesData.forEachIndexed { index, imageData ->
-                val url = imageData["url"] as? String ?: ""
-                val isCover = imageData["isCover"] as? Boolean ?: (index == 0)
-
+            imagesData.forEachIndexed { index, data ->
+                val url = data["url"] as? String ?: ""
+                val isCover = data["isCover"] as? Boolean ?: (index == 0)
                 if (url.isNotEmpty()) {
-                    imagesList.add(
-                        ItemImage(
-                            id = 0,
-                            url = url,
-                            filename = null,
-                            contentType = null,
-                            createdAt = null,
-                            isCover = isCover
-                        )
-                    )
+                    imagesList.add(ItemImage(id = 0, url = url, isCover = isCover))
                 }
             }
         }
@@ -415,18 +401,9 @@ fun ItemEntity.toDomain(): Item {
         e.printStackTrace()
     }
 
-    // Fallback: If no images parsed and there's a coverImage field, use it
+    // Fallback to coverImage if no images parsed
     if (imagesList.isEmpty() && coverImage != null && coverImage!!.isNotEmpty()) {
-        imagesList.add(
-            ItemImage(
-                id = 0,
-                url = coverImage!!,
-                filename = null,
-                contentType = null,
-                createdAt = null,
-                isCover = true
-            )
-        )
+        imagesList.add(ItemImage(id = 0, url = coverImage!!, isCover = true))
     }
 
     return Item(
@@ -458,6 +435,15 @@ fun ItemEntity.toDomain(): Item {
         sizeName = sizeName,
         colorName = colorName,
         brandName = brandName,
-        conditionName = conditionName
+        conditionName = conditionName,
+        // ✅ New sync fields
+        syncStatus = syncStatus,
+        syncError = syncError,
+        retryCount = retryCount,
+        lastSyncAttempt = lastSyncAttempt,
+        // ✅ Category fields
+        mainCategoryId = mainCategoryId,
+        subCategoryId = subCategoryId,
+        colorId = colorId
     )
 }

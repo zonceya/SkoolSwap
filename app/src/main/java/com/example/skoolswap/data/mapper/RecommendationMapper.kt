@@ -9,9 +9,9 @@ import com.example.skoolswap.data.local.database.entities.ItemImageEntity
 import com.example.skoolswap.data.remote.models.response.home.EssentialsSectionsDto
 import com.example.skoolswap.data.remote.models.response.home.HomeRecommendationResponse
 import com.example.skoolswap.data.remote.models.response.home.HomeSectionDto
+import com.example.skoolswap.data.remote.models.response.home.RankedItemDto
 import com.example.skoolswap.data.remote.models.response.home.RecentRecommendationResponse
 import com.example.skoolswap.data.remote.models.response.home.RecentSectionDto
-import com.example.skoolswap.data.remote.models.response.home.RecommendationItemDto
 import com.example.skoolswap.data.remote.models.response.home.SportRecommendationResponse
 import com.example.skoolswap.data.remote.models.response.home.SportSectionDto
 import com.example.skoolswap.data.remote.models.response.home.UniformRecommendationResponse
@@ -86,7 +86,75 @@ fun HomeRecommendationResponse.toDomain(): HomeFeed {
         sections = sections.map { it.toDomain() }
     )
 }
+fun RankedItemDto.toDomain(): Item {
+    // Build image list
+    val imageList = mutableListOf<ItemImage>()
 
+    // Add cover photo if exists
+    coverPhoto?.takeIf { it.isNotBlank() }?.let { url ->
+        imageList.add(ItemImage(
+            id = 0,
+            url = url,
+            filename = null,
+            contentType = null,
+            createdAt = null,
+            isCover = true
+        ))
+    }
+
+    // Add additional images
+    images?.forEach { url ->
+        if (url != coverPhoto && url.isNotBlank()) {
+            imageList.add(ItemImage(
+                id = 0,
+                url = url,
+                filename = null,
+                contentType = null,
+                createdAt = null,
+                isCover = false
+            ))
+        }
+    }
+
+    // If no images but we have a cover photo from the list
+    if (imageList.isEmpty() && images?.isNotEmpty() == true) {
+        images.firstOrNull()?.let { url ->
+            imageList.add(ItemImage(
+                id = 0,
+                url = url,
+                filename = null,
+                contentType = null,
+                createdAt = null,
+                isCover = true
+            ))
+        }
+    }
+
+    return Item(
+        id = id.toString(),
+        shopId = 0L,
+        name = name,
+        description = description ?: "",
+        price = price,
+        quantity = 1,
+        status = "active",
+        createdAt = createdAt,
+        images = imageList,
+        coverImage = coverPhoto ?: images?.firstOrNull(),
+        schoolId = schoolId,
+        schoolName = schoolName,
+        mainCategoryId = mainCategoryId,
+        subCategoryId = subCategoryId,
+        genderId = genderId,
+        gender = gender,
+        brandName = brand,
+        conditionName = condition,
+        viewCount = viewCount,
+        // Store relevance as a separate field (you'll need to add this to Item model)
+        // For now, we'll store it in a temporary way or ignore it
+        // If you want to keep relevance, you can add it to the Item model
+    )
+}
 fun HomeSectionDto.toDomain(): Section {
     return when (type) {
         "recommended", "nearby" -> {

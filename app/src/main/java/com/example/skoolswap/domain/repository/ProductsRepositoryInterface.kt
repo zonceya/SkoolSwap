@@ -66,4 +66,14 @@ interface ProductsRepositoryInterface {
         source: String,
         position: Int
     )
+    suspend fun searchItemsRanked(
+        query: String,
+        schoolId: Int,
+        categoryId: Int? = null,
+        subCategoryId: Int? = null,
+        minPrice: Float? = null,
+        maxPrice: Float? = null,
+        page: Int = 1,
+        perPage: Int = 30
+    ): Result<RankedItemsResult>
 }

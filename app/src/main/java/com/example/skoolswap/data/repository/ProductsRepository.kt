@@ -7,6 +7,7 @@ import com.example.skoolswap.data.remote.api.RecommendationsApiService
 import com.example.skoolswap.data.remote.models.response.home.PaginatedResponse
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.repository.ProductsRepositoryInterface
+import com.example.skoolswap.domain.repository.RankedItemsResult
 import com.example.skoolswap.utils.Result
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -253,6 +254,52 @@ class ProductsRepository @Inject constructor(
             api.trackClick(itemId, source, position)
         } catch (e: Exception) {
             // Log but don't fail
+        }
+    }
+
+    // ProductsRepository.kt
+    override suspend fun searchItemsRanked(
+        query: String,
+        schoolId: Int,
+        categoryId: Int?,
+        subCategoryId: Int?,
+        minPrice: Float?,
+        maxPrice: Float?,
+        page: Int,
+        perPage: Int
+    ): Result<RankedItemsResult> {
+        return try {
+            val response = api.searchItemsRanked(
+                query = query,
+                schoolId = schoolId,
+                categoryId = categoryId,
+                subCategoryId = subCategoryId,
+                minPrice = minPrice,
+                maxPrice = maxPrice,
+                page = page,
+                perPage = perPage
+            )
+
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body?.success == true) {
+                    val items = body.items.map { it.toDomain() }
+                    Result.Success(
+                        RankedItemsResult(
+                            items = items,
+                            totalCount = body.totalCount,
+                            currentPage = body.pagination?.currentPage ?: page,
+                            totalPages = body.pagination?.totalPages ?: 1
+                        )
+                    )
+                } else {
+                    Result.Error(Exception("Failed to search items"))
+                }
+            } else {
+                Result.Error(Exception("Server error: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Result.Error(e)
         }
     }
 

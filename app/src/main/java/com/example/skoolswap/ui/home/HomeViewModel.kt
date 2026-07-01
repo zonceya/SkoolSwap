@@ -2,6 +2,7 @@ package com.example.skoolswap.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.skoolswap.domain.model.RelevanceGroups
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.homefeed.HomeFeed
 import com.example.skoolswap.domain.model.homefeed.Section
@@ -9,6 +10,7 @@ import com.example.skoolswap.domain.model.homefeed.getAllItems
 import com.example.skoolswap.domain.repository.HomeRepositoryInterface
 import com.example.skoolswap.domain.repository.ProductsCacheRepositoryInterface
 import com.example.skoolswap.domain.repository.ProductsRepositoryInterface
+import com.example.skoolswap.domain.repository.RankedItemsResult
 import com.example.skoolswap.domain.repository.UserSchoolRepositoryInterface
 import com.example.skoolswap.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeout
 import timber.log.Timber
 import javax.inject.Inject
@@ -41,6 +44,15 @@ class HomeViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
+    // 🔥 NEW: Ranked search results
+    private val _rankedSearchResults = MutableStateFlow<List<Item>>(emptyList())
+    val rankedSearchResults: StateFlow<List<Item>> = _rankedSearchResults.asStateFlow()
+
+    // 🔥 NEW: Relevance groups for debugging/UI
+    private val _searchRelevanceGroups = MutableStateFlow(RelevanceGroups(emptyList(), emptyList(), emptyList()))
+    val searchRelevanceGroups: StateFlow<RelevanceGroups> = _searchRelevanceGroups.asStateFlow()
+
+    // Legacy (keep for backward compatibility)
     private val _searchResults = MutableStateFlow<List<Item>>(emptyList())
     val searchResults: StateFlow<List<Item>> = _searchResults.asStateFlow()
 
@@ -56,7 +68,6 @@ class HomeViewModel @Inject constructor(
     private val _serverItemsCount = MutableStateFlow(0)
     val serverItemsCount: StateFlow<Int> = _serverItemsCount.asStateFlow()
 
-    // ✅ Cache state
     private val _isFromCache = MutableStateFlow(false)
     val isFromCache: StateFlow<Boolean> = _isFromCache.asStateFlow()
 
@@ -64,19 +75,17 @@ class HomeViewModel @Inject constructor(
     private var cachedHomeFeed: HomeFeed? = null
     private var knownSchoolId: Int? = null
 
-    // ✅ FIX: Mutex for re-entrancy protection
     private val loadMutex = Mutex()
 
-    fun setKnownSchoolId(schoolId: Int) {
-        Timber.tag("HomeViewModel")
-            .d("🔑 setKnownSchoolId called with: $schoolId, previous: $knownSchoolId")
-        knownSchoolId = schoolId
-    }
 
     // ==================== LOAD HOME FEED ====================
 
+    fun setKnownSchoolId(schoolId: Int) {
+        Timber.tag("HomeViewModel").d("🔑 setKnownSchoolId called with: $schoolId, previous: $knownSchoolId")
+        knownSchoolId = schoolId
+    }
+
     fun loadHomeFeed(forceRefresh: Boolean = false) {
-        // Use cached feed if available and not forcing refresh
         if (!forceRefresh && cachedHomeFeed != null) {
             Timber.tag("HomeViewModel").d("📦 Using cached feed")
             _homeFeed.value = cachedHomeFeed
@@ -84,9 +93,7 @@ class HomeViewModel @Inject constructor(
             return
         }
 
-        // ✅ FIX: Launch coroutine and use Mutex for proper re-entrancy protection
         viewModelScope.launch {
-            // Try to acquire lock - if already loading, skip
             if (!loadMutex.tryLock()) {
                 Timber.tag("HomeViewModel").d("⏳ Already loading, skipping")
                 return@launch
@@ -123,16 +130,72 @@ class HomeViewModel @Inject constructor(
                     }
                 }
             } finally {
-                // ✅ FIX: Always reset loading state and unlock mutex
                 _isLoading.value = false
                 loadMutex.unlock()
                 Timber.tag("HomeViewModel").d("🔓 Loading complete, mutex unlocked")
             }
         }
     }
+    fun searchLocalOnly(query: String, categoryId: Int?) {
+        _searchQuery.value = query
 
-    // ==================== LOAD WITH CACHE ====================
+        val localResults = searchLocalCache(query, categoryId)
+        if (localResults.isNotEmpty()) {
+            Timber.tag("HomeViewModel").d("⚡ Showing ${localResults.size} LOCAL results immediately")
+            val grouped = groupByRelevance(localResults, knownSchoolId)
+            _searchRelevanceGroups.value = grouped
+            _rankedSearchResults.value = localResults
+            _isShowingLocalResults.value = true
+        } else {
+            _rankedSearchResults.value = emptyList()
+        }
+    }
 
+    fun searchServer(query: String, categoryId: Int?) {
+        searchJob?.cancel() // Cancel any previous server job
+
+        searchJob = viewModelScope.launch {
+            if (query != _searchQuery.value || !isActive) return@launch
+
+            _isLoadingMore.value = true
+
+            try {
+                val schoolId = knownSchoolId ?: getSchoolIdFromDb() ?: return@launch
+
+                val serverResult = homeRepository.searchItemsRanked(
+                    query = query,
+                    schoolId = schoolId,
+                    categoryId = if (categoryId != null && categoryId > 0) categoryId else null,
+                    page = 1,
+                    perPage = 30
+                )
+
+                if (query != _searchQuery.value || !isActive) return@launch
+
+                when (serverResult) {
+                    is Result.Success -> {
+                        val serverItems = serverResult.data.items
+                        Timber.d("✅ Server returned ${serverItems.size} items")
+
+                        val current = _rankedSearchResults.value.toMutableList()
+                        val existingIds = current.map { it.id }.toSet()
+                        val newItems = serverItems.filter { it.id !in existingIds }
+
+                        if (newItems.isNotEmpty()) {
+                            current.addAll(newItems)
+                            _rankedSearchResults.value = current
+                            _searchRelevanceGroups.value = groupByRelevance(current, schoolId)
+                        }
+                    }
+                    is Result.Error -> {
+                        Timber.e("Server search failed: ${serverResult.exception.message}")
+                    }
+                }
+            } finally {
+                _isLoadingMore.value = false
+            }
+        }
+    }
     private suspend fun loadFeedWithCache(schoolId: Int, forceRefresh: Boolean) {
         Timber.tag("HomeViewModel").d("🔄 Loading feed for school $schoolId (forceRefresh=$forceRefresh)")
 
@@ -149,15 +212,12 @@ class HomeViewModel @Inject constructor(
                 cachedHomeFeed = cachedFeed
                 _homeFeed.value = cachedFeed
                 _isFromCache.value = true
-                // ✅ Don't reset _isLoading here - let the caller handle it via finally
                 Timber.tag("HomeViewModel").d("📦 Loaded ${cachedSections.size} sections from cache")
             }
         }
 
         // STEP 2: Fetch from API in background (fresh data)
-        // ✅ FIX: Wrap in try-catch with timeout and finally block
         try {
-            // ✅ FIX: Add timeout to prevent infinite hangs
             val result = withTimeout(15_000L) {
                 homeRepository.getHomeFeed(schoolId)
             }
@@ -180,7 +240,6 @@ class HomeViewModel @Inject constructor(
                         _error.value = result.exception.message
                         Timber.tag("HomeViewModel").e("❌ Feed error: ${result.exception.message}")
                     } else {
-                        // We have cached data, so don't show error
                         Timber.tag("HomeViewModel").d("⚠️ Feed error but showing cached data")
                     }
                 }
@@ -189,25 +248,18 @@ class HomeViewModel @Inject constructor(
             Timber.tag("HomeViewModel").e("⏱️ getHomeFeed timed out after 15s")
             if (_homeFeed.value == null) {
                 _error.value = "Request timed out. Please try again."
-            } else {
-                // We have cached data, so don't show error
-                Timber.tag("HomeViewModel").d("⚠️ Feed timeout but showing cached data")
             }
         } catch (e: Exception) {
-            Timber.tag("HomeViewModel").e("❌ Unexpected error in loadFeedWithCache: ${e.message}")
+            Timber.tag("HomeViewModel").e("❌ Unexpected error: ${e.message}")
             if (_homeFeed.value == null) {
                 _error.value = "Failed to load feed: ${e.message}"
             }
         }
-        // ✅ _isLoading reset is handled by the caller's finally block
     }
-
-    // ==================== LOAD CACHED SECTIONS ====================
 
     private suspend fun loadCachedSections(schoolId: Int): List<Section> {
         val sections = mutableListOf<Section>()
 
-        // Try to load each section from cache
         val recommended = productsCacheRepository.getCachedSection("recommended", schoolId)
         val trending = productsCacheRepository.getCachedSection("trending", schoolId)
         val recent = productsCacheRepository.getCachedSection("recent", schoolId)
@@ -240,7 +292,6 @@ class HomeViewModel @Inject constructor(
         }
 
         if (!essentials.isNullOrEmpty()) {
-            // Split essentials into categories
             val uniforms = essentials.filter { it.mainCategoryId == 1 }
             val sports = essentials.filter { it.mainCategoryId == 2 }
             val accessories = essentials.filter { it.mainCategoryId == 3 }
@@ -258,8 +309,6 @@ class HomeViewModel @Inject constructor(
 
         return sections
     }
-
-    // ==================== CACHE SECTIONS ====================
 
     private suspend fun cacheSections(feed: HomeFeed, schoolId: Int) {
         try {
@@ -293,7 +342,6 @@ class HomeViewModel @Inject constructor(
             Timber.tag("HomeViewModel").d("✅ Cached ${sectionsMap.size} sections to Room")
         } catch (e: Exception) {
             Timber.tag("HomeViewModel").e("❌ Failed to cache sections: ${e.message}")
-            // Non-critical, don't propagate
         }
     }
 
@@ -314,14 +362,20 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // ==================== SEARCH ====================
+    // ==================== 🔥 RANKED SEARCH ====================
 
-    fun searchItems(query: String, categoryId: Int?) {
+    // HomeViewModel.kt - Updated searchItemsRanked
+
+    fun searchItemsRanked(query: String, categoryId: Int?) {
         _searchQuery.value = query
+
+        // ✅ Cancel any existing search job immediately
         searchJob?.cancel()
 
         if (query.length < 2) {
             Timber.tag("HomeViewModel").d("Query too short (< 2 chars), clearing results")
+            _rankedSearchResults.value = emptyList()
+            _searchRelevanceGroups.value = RelevanceGroups(emptyList(), emptyList(), emptyList())
             _searchResults.value = emptyList()
             _isShowingLocalResults.value = false
             _serverItemsCount.value = 0
@@ -329,31 +383,65 @@ class HomeViewModel @Inject constructor(
         }
 
         searchJob = viewModelScope.launch {
-            delay(300)
+            // ✅ Increase debounce delay to 500ms to reduce cancellations
+            delay(500)
 
-            Timber.tag("HomeViewModel").d("🔍 Searching for: $query")
+            // ✅ Check if this job is still active
+            if (!isActive) {
+                Timber.tag("HomeViewModel").d("⏹️ Search cancelled before starting")
+                return@launch
+            }
 
-            _serverItemsCount.value = 0
+            // ✅ Check if this is still the latest query
+            val currentQuery = _searchQuery.value
+            if (query != currentQuery) {
+                Timber.tag("HomeViewModel").d("⏭️ Skipping stale search: $query (current: $currentQuery)")
+                return@launch
+            }
 
+            Timber.tag("HomeViewModel").d("🔍 Ranked search for: $query")
+
+            // STEP 1: Search local cache first (instant results)
             val localResults = searchLocalCache(query, categoryId)
-
             if (localResults.isNotEmpty()) {
                 Timber.tag("HomeViewModel").d("⚡ ${localResults.size} results from LOCAL CACHE")
-                _searchResults.value = localResults
+                val grouped = groupByRelevance(localResults, knownSchoolId)
+                _searchRelevanceGroups.value = grouped
+                _rankedSearchResults.value = localResults
                 _isShowingLocalResults.value = true
             } else {
-                _searchResults.value = emptyList()
+                _rankedSearchResults.value = emptyList()
                 _isShowingLocalResults.value = false
             }
 
-            // STEP 2: Search server in background
+            // STEP 2: Fetch from server with ranking
             _isLoadingMore.value = true
 
             try {
-                // ✅ Add timeout to server search
-                val serverResult = withTimeout(10_000L) {
-                    productsRepository.searchItems(
+                val schoolId = knownSchoolId ?: getSchoolIdFromDb()
+                if (schoolId == null) {
+                    Timber.tag("HomeViewModel").e("❌ No school ID available for ranked search")
+                    _isLoadingMore.value = false
+                    return@launch
+                }
+
+                // ✅ Check cancellation before API call
+                if (!isActive) {
+                    Timber.tag("HomeViewModel").d("⏹️ Search cancelled before API call")
+                    _isLoadingMore.value = false
+                    return@launch
+                }
+
+                // ✅ Increase timeout to 30 seconds
+                val serverResult = withTimeout(30_000L) {
+                    // ✅ Check cancellation inside timeout
+                    if (!isActive) {
+                        _isLoadingMore.value = false
+                        return@withTimeout Result.Error(Exception("Cancelled"))
+                    }
+                    homeRepository.searchItemsRanked(
                         query = query,
+                        schoolId = schoolId,
                         categoryId = categoryId,
                         page = 1,
                         perPage = 30
@@ -362,49 +450,149 @@ class HomeViewModel @Inject constructor(
 
                 _isLoadingMore.value = false
 
+                // ✅ Check if this is still the latest query
+                if (query != _searchQuery.value) {
+                    Timber.tag("HomeViewModel").d("⏭️ Skipping stale results for: $query")
+                    return@launch
+                }
+
+                // ✅ Check if job was cancelled during API call
+                if (!isActive) {
+                    Timber.tag("HomeViewModel").d("⏹️ Search cancelled after API call")
+                    return@launch
+                }
+
                 when (serverResult) {
                     is Result.Success -> {
-                        val serverItems = serverResult.data.items
+                        val rankedResult = serverResult.data
+                        val serverItems = rankedResult.items
                         _serverItemsCount.value = serverItems.size
-                        Timber.tag("HomeViewModel").d("✅ Server returned ${serverItems.size} results")
+
+                        Timber.tag("HomeViewModel").d("✅ Ranked search returned ${serverItems.size} items")
 
                         if (serverItems.isNotEmpty()) {
-                            val currentResults = _searchResults.value.toMutableList()
+                            val currentResults = _rankedSearchResults.value.toMutableList()
                             val existingIds = currentResults.map { it.id }.toSet()
                             val newItems = serverItems.filter { it.id !in existingIds }
 
                             if (newItems.isNotEmpty()) {
                                 val merged = currentResults + newItems
-                                _searchResults.value = merged
+                                val grouped = groupByRelevance(merged, schoolId)
+                                _searchRelevanceGroups.value = grouped
+                                _rankedSearchResults.value = merged
                                 Timber.tag("HomeViewModel").d("📦 Added ${newItems.size} new items")
+                            } else {
+                                val grouped = groupByRelevance(currentResults, schoolId)
+                                _searchRelevanceGroups.value = grouped
                             }
                             _isShowingLocalResults.value = false
-                        } else if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
-                            _searchResults.value = emptyList()
+                        } else if (!_isShowingLocalResults.value && _rankedSearchResults.value.isEmpty()) {
+                            _rankedSearchResults.value = emptyList()
+                            _searchRelevanceGroups.value = RelevanceGroups(emptyList(), emptyList(), emptyList())
                         }
                     }
                     is Result.Error -> {
                         Timber.tag("HomeViewModel").e("❌ Server search failed: ${serverResult.exception.message}")
-                        if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
+                        if (!_isShowingLocalResults.value && _rankedSearchResults.value.isEmpty()) {
                             _error.value = "Failed to load results"
                         }
                     }
                 }
             } catch (e: TimeoutCancellationException) {
                 _isLoadingMore.value = false
-                Timber.tag("HomeViewModel").e("⏱️ Server search timed out")
-                if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
+                Timber.tag("HomeViewModel").e("⏱️ Server search timed out after 30s")
+                if (!_isShowingLocalResults.value && _rankedSearchResults.value.isEmpty()) {
                     _error.value = "Search timed out. Please try again."
                 }
             } catch (e: Exception) {
                 _isLoadingMore.value = false
                 Timber.tag("HomeViewModel").e("❌ Search error: ${e.message}")
-                if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
+                if (!_isShowingLocalResults.value && _rankedSearchResults.value.isEmpty()) {
                     _error.value = "Failed to load results: ${e.message}"
                 }
             }
         }
     }
+
+    // HomeViewModel.kt - Add retry logic
+
+    private suspend fun searchWithRetry(
+        query: String,
+        schoolId: Int,
+        categoryId: Int?,
+        maxRetries: Int = 2
+    ): Result<RankedItemsResult> {
+        var lastError: Exception? = null
+
+        repeat(maxRetries + 1) { attempt ->
+            try {
+                return withTimeout(30_000L) {
+                    homeRepository.searchItemsRanked(
+                        query = query,
+                        schoolId = schoolId,
+                        categoryId = categoryId,
+                        page = 1,
+                        perPage = 30
+                    )
+                }
+            } catch (e: TimeoutCancellationException) {
+                lastError = e
+                if (attempt < maxRetries) {
+                    Timber.tag("HomeViewModel").d("⏱️ Search attempt ${attempt + 1} timed out, retrying...")
+                    delay(1000L * (attempt + 1)) // Exponential backoff
+                }
+            } catch (e: Exception) {
+                lastError = e
+            }
+        }
+
+        return Result.Error(lastError ?: Exception("All retries failed"))
+    }
+
+    private fun groupByRelevance(items: List<Item>, schoolId: Int?): RelevanceGroups {
+        if (schoolId == null) {
+            return RelevanceGroups(emptyList(), emptyList(), items)
+        }
+
+        val schoolMatch = mutableListOf<Item>()
+        val nearbyMatch = mutableListOf<Item>()
+        val other = mutableListOf<Item>()
+
+        // Get nearby school IDs (if we have them)
+        val nearbyIds = getNearbySchoolIds() ?: emptyList()
+
+        items.forEach { item ->
+            when {
+                item.schoolId == schoolId -> schoolMatch.add(item)
+                nearbyIds.contains(item.schoolId) -> nearbyMatch.add(item)
+                else -> other.add(item)
+            }
+        }
+
+        return RelevanceGroups(
+            schoolMatch = schoolMatch,
+            nearbyMatch = nearbyMatch,
+            other = other
+        )
+    }
+
+    private fun getNearbySchoolIds(): List<Int>? {
+        // This would come from your repository
+        // For now, return null (will treat as 'other')
+        return null
+    }
+
+    private suspend fun getSchoolIdFromDb(): Int? {
+        return when (val result = userSchoolRepository.getCurrentSchoolMapping()) {
+            is Result.Success -> result.data?.schoolId
+            is Result.Error -> {
+                Timber.tag("HomeViewModel").e("❌ Failed to get school ID: ${result.exception.message}")
+                null
+            }
+        }
+    }
+
+    // ==================== LEGACY SEARCH (Keep for compatibility) ====================
 
     private fun searchLocalCache(query: String, categoryId: Int?): List<Item> {
         val currentFeed = _homeFeed.value
@@ -430,22 +618,91 @@ class HomeViewModel @Inject constructor(
 
         Timber.tag("HomeViewModel").d("📚 Total cached items: ${allItems.size}")
 
-        val filteredByCategory = if (categoryId != null) {
-            allItems.filter { it.mainCategoryId == categoryId }
-        } else {
-            allItems
-        }
+        val searchLower = query.lowercase().trim()
 
-        val searchLower = query.lowercase()
-        val results = filteredByCategory
+        val results = allItems
             .filter { item ->
+                // More flexible matching
                 item.name.lowercase().contains(searchLower) ||
-                        item.description.lowercase().contains(searchLower)
+                        (item.description?.lowercase()?.contains(searchLower) == true) ||
+                        (item.brandName?.lowercase()?.contains(searchLower) == true)
+            }
+            .let { list ->
+                if (categoryId != null && categoryId > 0) {
+                    list.filter { it.mainCategoryId == categoryId }
+                } else {
+                    list
+                }
             }
             .distinctBy { it.id }
             .take(30)
 
-        Timber.tag("HomeViewModel").d("🔍 Local search found ${results.size} matches")
+        Timber.tag("HomeViewModel").d("🔍 Local search found ${results.size} matches for '$query'")
         return results
     }
+
+    fun clearSearch() {
+        _searchQuery.value = null
+        _rankedSearchResults.value = emptyList()
+        _searchRelevanceGroups.value = RelevanceGroups(emptyList(), emptyList(), emptyList())
+        _searchResults.value = emptyList()
+        _isShowingLocalResults.value = false
+        _serverItemsCount.value = 0
+    }
+    // Legacy search method (keep for backward compatibility)
+    fun searchItems(query: String, categoryId: Int?) {
+        // Forward to ranked search
+        searchItemsRanked(query, categoryId)
+    }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -35,7 +35,7 @@ import com.example.skoolswap.data.local.database.entities.*
         ProductsCacheEntity::class,
         PendingActionEntity::class
     ],
-    version = 19,  // ✅ BUMPED from 17 to 18
+    version = 21,  // ✅ BUMPED to 21
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -62,6 +62,7 @@ abstract class SkoolSwapDatabase : RoomDatabase() {
     abstract fun homeFeedDao(): HomeFeedDao
     abstract fun pendingActionDao(): PendingActionDao
     abstract fun productsCacheDao(): ProductsCacheDao
+
     companion object {
         @Volatile
         private var INSTANCE: SkoolSwapDatabase? = null
@@ -86,7 +87,6 @@ abstract class SkoolSwapDatabase : RoomDatabase() {
         // ✅ Migration 15 → 16 (Add PendingActionEntity table + createdAt to item_images)
         private val MIGRATION_15_16 = object : Migration(15, 16) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                // 1. Create pending_actions table
                 database.execSQL("""
                     CREATE TABLE IF NOT EXISTS `pending_actions` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -101,7 +101,6 @@ abstract class SkoolSwapDatabase : RoomDatabase() {
                     )
                 """)
 
-                // 2. Add createdAt column to item_images
                 try {
                     database.execSQL("ALTER TABLE item_images ADD COLUMN createdAt INTEGER NOT NULL DEFAULT 0")
                 } catch (e: Exception) { /* Column might already exist */ }
@@ -121,7 +120,7 @@ abstract class SkoolSwapDatabase : RoomDatabase() {
             }
         }
 
-        // ✅ Migration 17 → 18 (Add missing isCover column to item_images)
+        // ✅ Migration 17 → 18 (Add isCover column to item_images)
         private val MIGRATION_17_18 = object : Migration(17, 18) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 try {
@@ -129,6 +128,70 @@ abstract class SkoolSwapDatabase : RoomDatabase() {
                 } catch (e: Exception) {
                     // Column might already exist - ignore
                 }
+            }
+        }
+
+        // ✅ Migration 18 → 19 (Add sync fields to items table)
+        private val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                try {
+                    database.execSQL("ALTER TABLE items ADD COLUMN syncStatus TEXT NOT NULL DEFAULT 'ACTIVE'")
+                } catch (e: Exception) { /* Column might already exist */ }
+
+                try {
+                    database.execSQL("ALTER TABLE items ADD COLUMN syncError TEXT DEFAULT NULL")
+                } catch (e: Exception) { /* Column might already exist */ }
+
+                try {
+                    database.execSQL("ALTER TABLE items ADD COLUMN retryCount INTEGER NOT NULL DEFAULT 0")
+                } catch (e: Exception) { /* Column might already exist */ }
+
+                try {
+                    database.execSQL("ALTER TABLE items ADD COLUMN lastSyncAttempt INTEGER DEFAULT NULL")
+                } catch (e: Exception) { /* Column might already exist */ }
+
+                try {
+                    database.execSQL("ALTER TABLE items ADD COLUMN mainCategoryId INTEGER DEFAULT NULL")
+                } catch (e: Exception) { /* Column might already exist */ }
+
+                try {
+                    database.execSQL("ALTER TABLE items ADD COLUMN subCategoryId INTEGER DEFAULT NULL")
+                } catch (e: Exception) { /* Column might already exist */ }
+
+                try {
+                    database.execSQL("ALTER TABLE items ADD COLUMN colorId INTEGER DEFAULT NULL")
+                } catch (e: Exception) { /* Column might already exist */ }
+            }
+        }
+
+        // ✅ Migration 19 → 20 (Add products_cache table)
+        private val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `products_cache` (
+                        `cacheKey` TEXT NOT NULL PRIMARY KEY,
+                        `itemsJson` TEXT NOT NULL,
+                        `cachedAt` INTEGER NOT NULL,
+                        `schoolId` INTEGER,
+                        `sectionType` TEXT,
+                        `period` TEXT,
+                        `categoryId` INTEGER
+                    )
+                """)
+            }
+        }
+
+        // ✅ NEW: Migration 20 → 21 (Add any new columns or tables here)
+        private val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Add any new schema changes for version 21 here
+                // Example: Add a new column to items table
+                // try {
+                //     database.execSQL("ALTER TABLE items ADD COLUMN newColumn TEXT DEFAULT NULL")
+                // } catch (e: Exception) { /* Column might already exist */ }
+
+                // If no changes needed, this migration can be empty
+                // It just tells Room the schema changed
             }
         }
 
@@ -143,27 +206,15 @@ abstract class SkoolSwapDatabase : RoomDatabase() {
                         MIGRATION_14_15,
                         MIGRATION_15_16,
                         MIGRATION_16_17,
-                        MIGRATION_17_18  // ✅ REGISTER THE NEW MIGRATION
+                        MIGRATION_17_18,
+                        MIGRATION_18_19,
+                        MIGRATION_19_20,
+                        MIGRATION_20_21  // ✅ ADD THIS
                     )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration()  // ⚠️ For development only
                     .build()
                 INSTANCE = instance
                 instance
-            }
-        }
-        private val MIGRATION_19_20 = object : Migration(19, 20) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("""
-            CREATE TABLE IF NOT EXISTS `products_cache` (
-                `cacheKey` TEXT NOT NULL PRIMARY KEY,
-                `itemsJson` TEXT NOT NULL,
-                `cachedAt` INTEGER NOT NULL,
-                `schoolId` INTEGER,
-                `sectionType` TEXT,
-                `period` TEXT,
-                `categoryId` INTEGER
-            )
-        """)
             }
         }
     }

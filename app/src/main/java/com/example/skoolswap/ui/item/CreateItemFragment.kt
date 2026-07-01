@@ -908,7 +908,7 @@ class CreateItemFragment : Fragment() {
             if (hasContactNumber) {
                 // User HAS contact number - create item directly
                 Log.d(TAG, "User has contact number, creating item...")
-                viewModel.createItem(
+                viewModel.createItemOfflineFirst(
                     context = requireContext(),
                     name = name,
                     description = description,
