@@ -588,6 +588,9 @@ class ProductsFragment : Fragment() {
         }
 
         // 2. Search results observer
+        // ProductsFragment.kt - Update the search results observer (around line 450-480)
+
+// 2. Search results observer
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.searchResults.collect { results ->
@@ -615,6 +618,7 @@ class ProductsFragment : Fragment() {
                         binding.emptySearchResults.visibility = View.VISIBLE
                         binding.searchResultsContainer.visibility = View.VISIBLE
                         binding.productsRecycler.visibility = View.GONE
+                        binding.emptyBanner.visibility = View.GONE  // ✅ Hide banner on empty
                     } else {
                         // ✅ Show search results, hide shimmer
                         binding.shimmerLayout.visibility = View.GONE
@@ -623,6 +627,44 @@ class ProductsFragment : Fragment() {
                         binding.searchResultsContainer.visibility = View.VISIBLE
                         binding.productsRecycler.visibility = View.VISIBLE
                         productsAdapter.submitList(results.toList())
+
+                        // ✅ 🔥 NEW: Check if there are items from user's school
+                        val userSchoolId = viewModel.getUserSchoolId()
+                        val hasSchoolItems = if (userSchoolId != null) {
+                            results.any { it.schoolId == userSchoolId }
+                        } else {
+                            false
+                        }
+
+                        // ✅ Check if there are items from nearby schools
+                        val nearbyIds = viewModel.getNearbySchoolIds()
+                        val hasNearbyItems = if (nearbyIds.isNotEmpty()) {
+                            results.any { nearbyIds.contains(it.schoolId) }
+                        } else {
+                            false
+                        }
+
+                        // ✅ Show banner only if items exist BUT none are from user's school
+                        if (results.isNotEmpty() && !hasSchoolItems) {
+                            var bannerMessage = ""
+
+                            if (hasNearbyItems) {
+                                bannerMessage = "No items found at your school. Showing items from nearby schools."
+                            } else {
+                                bannerMessage = "No items found at your school or nearby. Showing items from other schools."
+                            }
+
+                            Timber.tag(TAG).d("🔔 Showing search banner: $bannerMessage")
+                            binding.bannerMessage.text = bannerMessage
+                            binding.emptyBanner.visibility = View.VISIBLE
+
+                            // ✅ Close button dismisses banner
+                            binding.btnCloseBanner.setOnClickListener {
+                                binding.emptyBanner.visibility = View.GONE
+                            }
+                        } else {
+                            binding.emptyBanner.visibility = View.GONE
+                        }
 
                         // ✅ CRITICAL: Rebuild filters when search results load
                         Timber.tag(TAG).d("🔧 Calling rebuildLocalFilters() from search collector")
