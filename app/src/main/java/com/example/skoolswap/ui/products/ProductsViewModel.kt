@@ -86,7 +86,8 @@ class ProductsViewModel @Inject constructor(
     private var _currentSortType: String? = null
     private var currentSubCategoryId: Int? = null
     // ==================== Public Methods ====================
-// ProductsViewModel.kt - Add these with other state variables
+    private var userSchoolId: Int? = null
+    private var nearbySchoolIds: List<Int> = emptyList()
 
     private val _isShowingLocalResults = MutableStateFlow(false)
     val isShowingLocalResults: StateFlow<Boolean> = _isShowingLocalResults.asStateFlow()
@@ -202,6 +203,12 @@ class ProductsViewModel @Inject constructor(
             }
         }
     }
+    fun setUserSchoolContext(schoolId: Int, nearbyIds: List<Int>) {
+        userSchoolId = schoolId
+        nearbySchoolIds = nearbyIds
+    }
+    fun getUserSchoolId(): Int? = userSchoolId
+    fun getNearbySchoolIds(): List<Int> = nearbySchoolIds
     private fun getValidCategoryId(): Int? {
         val categoryId = currentCategoryId ?: _appliedFilters.value.categoryId
         // Convert -1 or 0 to null (meaning "all categories")
