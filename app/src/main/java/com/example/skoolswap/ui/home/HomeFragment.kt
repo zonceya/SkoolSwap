@@ -11,6 +11,7 @@ import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -33,7 +34,9 @@ import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -82,7 +85,7 @@ class HomeFragment : Fragment() {
 
         val fab = activity?.findViewById<FloatingActionButton>(R.id.fab)
         fab?.visibility = View.VISIBLE
-
+        binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
         setupCustomTabs()
         setupBannerSlider()
         setupIndicatorDots()
@@ -115,40 +118,29 @@ class HomeFragment : Fragment() {
         return binding.root
     }
 
-    // ====================== SEARCH ======================
-
     fun performLiveSearch(query: String) {
-        Timber.tag("HomeFragment").d("🔍 performLiveSearch called with: $query")
+        Timber.d("🔍 performLiveSearch: $query")
+
+        searchJob?.cancel()
+
+        if (query.length < 2) {
+            exitSearchMode()
+            return
+        }
+
         isInSearchMode = true
         enterSearchMode()
-        // Always null — home search covers full catalogue across all sections
-        viewModel.searchItems(query, categoryId = null)
-    }
 
-    fun exitSearchMode() {
-        isInSearchMode = false
+        searchJob = viewLifecycleOwner.lifecycleScope.launch {
+            // Instant local
+            viewModel.searchLocalOnly(query, arguments?.getInt("CATEGORY_ID"))
 
-        binding.topTabs.visibility = View.VISIBLE
-        binding.bannerViewPager.visibility = View.VISIBLE
-        binding.indicatorDots.visibility = View.VISIBLE
-        binding.swipeRefreshLayout.visibility = View.VISIBLE
-        binding.homeRecycler.visibility = View.VISIBLE
+            delay(400)
 
-        // ✅ Hide filter bar when exiting search
-        binding.filterBar.visibility = View.GONE
-        binding.searchResultsContainer.visibility = View.GONE
-        binding.searchResultsRecycler.visibility = View.GONE
-        binding.emptySearchResults.visibility = View.GONE
+            if (query != viewModel.searchQuery.value || !isActive) return@launch
 
-        // Reset filters
-        selectedGender = null
-        selectedCondition = null
-        selectedSize = null
-        selectedColor = null
-        selectedBrand = null
-
-        // ✅ Close drawer if open
-        binding.drawerLayout.closeDrawers()
+            viewModel.searchServer(query, arguments?.getInt("CATEGORY_ID"))
+        }
     }
 
     private fun enterSearchMode() {
@@ -165,8 +157,39 @@ class HomeFragment : Fragment() {
         binding.searchResultsContainer.visibility = View.VISIBLE
         binding.searchResultsRecycler.visibility = View.VISIBLE
         binding.emptySearchResults.visibility = View.GONE
+
+        // ✅ UNLOCK the drawer when in search mode
+        binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
     }
 
+    fun exitSearchMode() {
+        isInSearchMode = false
+
+        binding.topTabs.visibility = View.VISIBLE
+        binding.bannerViewPager.visibility = View.VISIBLE
+        binding.indicatorDots.visibility = View.VISIBLE
+        binding.swipeRefreshLayout.visibility = View.VISIBLE
+        binding.homeRecycler.visibility = View.VISIBLE
+
+        // Hide filter bar when exiting search
+        binding.filterBar.visibility = View.GONE
+        binding.searchResultsContainer.visibility = View.GONE
+        binding.searchResultsRecycler.visibility = View.GONE
+        binding.emptySearchResults.visibility = View.GONE
+
+        // Reset filters
+        selectedGender = null
+        selectedCondition = null
+        selectedSize = null
+        selectedColor = null
+        selectedBrand = null
+
+        binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+        binding.drawerLayout.closeDrawer(GravityCompat.END)
+
+        // ✅ Clear search results and query
+        viewModel.clearSearch()
+    }
     // ====================== RECYCLER ======================
 
     private fun setupRecyclerView() {
@@ -210,12 +233,15 @@ class HomeFragment : Fragment() {
         }
 
         binding.filterBtn.setOnClickListener {
-            // ✅ Only open filter drawer when in search mode
+            // Only open filter drawer when in search mode
             if (isInSearchMode) {
                 rebuildLocalFilters()
                 binding.drawerLayout.openDrawer(GravityCompat.END)
             }
         }
+
+        // ✅ LOCK the drawer initially (not in search mode)
+        binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
 
         // Apply theme colors
         val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
@@ -518,7 +544,7 @@ class HomeFragment : Fragment() {
             43 -> "Girls"
             27 -> "Unisex"
             in 1..26 -> if (item.genderId?.rem(2) == 0) "Girls" else "Boys"
-            else -> item.gender?.takeIf { it.isNotBlank() }  // null if no gender
+            else -> item.gender?.takeIf { it.isNotBlank() }
         }
     }
 
@@ -545,7 +571,7 @@ class HomeFragment : Fragment() {
         findNavController().navigate(R.id.action_homeFragment_to_productsFragment, bundle)
     }
 
-    // ====================== OBSERVERS ======================
+    // ====================== OBSERVERS (UPDATED) ======================
 
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
@@ -597,7 +623,6 @@ class HomeFragment : Fragment() {
                     binding.noSchoolLayout.visibility = View.GONE
                     binding.swipeRefreshLayout.isRefreshing = false
                     homeAdapter.submitList(it.sections)
-                    // FIX: Show Snackbar only if fragment is attached
                     if (isAdded && view != null && binding.root.isAttachedToWindow) {
                         val message = if (it.message == "Cached data") "Using cached data" else "Data updated"
                         try {
@@ -612,7 +637,6 @@ class HomeFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.isFromCache.collect { fromCache ->
-                // FIX: Check if fragment is attached and view is available
                 if (isAdded && view != null && binding.root.isAttachedToWindow) {
                     val message = if (fromCache) "Using cached data" else "Data updated"
                     try {
@@ -624,8 +648,9 @@ class HomeFragment : Fragment() {
             }
         }
 
+        // 🔥 UPDATED: Observe ranked search results
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.searchResults.collect { results ->
+            viewModel.rankedSearchResults.collect { results ->
                 if (!isInSearchMode) return@collect
 
                 if (results.isEmpty()) {
@@ -645,6 +670,13 @@ class HomeFragment : Fragment() {
                     categorySearchAdapter.submitList(currentSearchResults.toList())
                     rebuildLocalFilters()
                 }
+            }
+        }
+
+        // 🔥 NEW: Observe relevance groups for debugging
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.searchRelevanceGroups.collect { groups ->
+                Timber.tag("HomeFragment").d("📊 Relevance groups: school=${groups.schoolMatch.size}, nearby=${groups.nearbyMatch.size}, other=${groups.other.size}")
             }
         }
     }

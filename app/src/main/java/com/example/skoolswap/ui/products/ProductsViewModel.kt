@@ -3,27 +3,34 @@ package com.example.skoolswap.ui.products
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.skoolswap.common.constants.ItemConstants.getSchoolId
+import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.remote.models.response.home.PaginatedResponse
+import com.example.skoolswap.domain.model.RelevanceGroups
 import com.example.skoolswap.domain.model.AppliedFilters
 import com.example.skoolswap.domain.model.FilterConfig
 import com.example.skoolswap.domain.model.FilterGroup
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.repository.FilterRepositoryInterface
 import com.example.skoolswap.domain.repository.ProductsRepositoryInterface
+import com.example.skoolswap.ui.home.HomeViewModel
 import com.example.skoolswap.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import timber.log.Timber
 import javax.inject.Inject
-
+import kotlinx.coroutines.flow.first
 @HiltViewModel
 class ProductsViewModel @Inject constructor(
     private val productsRepository: ProductsRepositoryInterface,
+    private val appPreferences: AppPreferences,
     private val filterRepository: FilterRepositoryInterface
 ) : ViewModel() {
     // Add this flag to block stale data replay
@@ -89,7 +96,8 @@ class ProductsViewModel @Inject constructor(
 
     private val _serverItemsCount = MutableStateFlow(0)
     val serverItemsCount: StateFlow<Int> = _serverItemsCount.asStateFlow()
-
+    private val _searchRelevanceGroups = MutableStateFlow(RelevanceGroups(emptyList(), emptyList(), emptyList()))
+    val searchRelevanceGroups: StateFlow<RelevanceGroups> = _searchRelevanceGroups.asStateFlow()
     private val _searchQuery = MutableStateFlow<String?>(null)
     val searchQuery: StateFlow<String?> = _searchQuery.asStateFlow()
     fun getSavedCategoryId(): Int? = savedCategoryId
@@ -303,7 +311,112 @@ class ProductsViewModel @Inject constructor(
             }
         }
     }
+    fun searchItemsRanked(query: String, categoryId: Int?) {
+        _searchQuery.value = query
+        searchJob?.cancel()
 
+        if (query.length < 2) {
+            Timber.tag("ProductsViewModel").d("Query too short, clearing results")
+            _searchResults.value = emptyList()
+            _searchRelevanceGroups.value =
+                RelevanceGroups(emptyList(), emptyList(), emptyList())
+            _isShowingLocalResults.value = false
+            _serverItemsCount.value = 0
+            return
+        }
+
+        searchJob = viewModelScope.launch {
+            delay(300)
+
+            Timber.tag("ProductsViewModel").d("🔍 Ranked search for: $query")
+
+            // STEP 1: Search local cache first (instant results)
+            val localResults = searchLocalCache(query, getValidCategoryId())
+            if (localResults.isNotEmpty()) {
+                Timber.tag("ProductsViewModel").d("⚡ ${localResults.size} results from LOCAL CACHE")
+                _searchResults.value = localResults
+                _isShowingLocalResults.value = true
+            } else {
+                _searchResults.value = emptyList()
+                _isShowingLocalResults.value = false
+            }
+
+            // STEP 2: Fetch from server with ranking
+            _isLoadingMore.value = true
+
+            try {
+                // Get school ID (you need to inject UserSchoolRepository or pass it)
+                val schoolId = getSchoolId() // You'll need to add this method
+                if (schoolId == null) {
+                    Timber.tag("ProductsViewModel").e("❌ No school ID available")
+                    _isLoadingMore.value = false
+                    return@launch
+                }
+
+                val validCategoryId = getValidCategoryId()
+                val serverResult = withTimeout(10_000L) {
+                    productsRepository.searchItemsRanked(
+                        query = query,
+                        schoolId = schoolId,
+                        categoryId = validCategoryId,
+                        subCategoryId = currentSubCategoryId,
+                        minPrice = _appliedFilters.value.minPrice,
+                        maxPrice = _appliedFilters.value.maxPrice,
+                        page = 1,
+                        perPage = 30
+                    )
+                }
+
+                _isLoadingMore.value = false
+
+                when (serverResult) {
+                    is Result.Success -> {
+                        val rankedResult = serverResult.data
+                        val serverItems = rankedResult.items
+                        _serverItemsCount.value = serverItems.size
+
+                        Timber.tag("ProductsViewModel").d("✅ Ranked search returned ${serverItems.size} items")
+
+                        if (serverItems.isNotEmpty()) {
+                            val currentResults = _searchResults.value.toMutableList()
+                            val existingIds = currentResults.map { it.id }.toSet()
+                            val newItems = serverItems.filter { it.id !in existingIds }
+
+                            if (newItems.isNotEmpty()) {
+                                val merged = currentResults + newItems
+                                _searchResults.value = merged
+                                Timber.tag("ProductsViewModel").d("📦 Added ${newItems.size} new items")
+                            }
+                            _isShowingLocalResults.value = false
+                        } else if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
+                            _searchResults.value = emptyList()
+                        }
+                    }
+                    is Result.Error -> {
+                        Timber.tag("ProductsViewModel").e("❌ Server search failed: ${serverResult.exception.message}")
+                        if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
+                            _error.value = "Failed to load results"
+                        }
+                    }
+                }
+            } catch (e: TimeoutCancellationException) {
+                _isLoadingMore.value = false
+                Timber.tag("ProductsViewModel").e("⏱️ Server search timed out")
+                if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
+                    _error.value = "Search timed out. Please try again."
+                }
+            } catch (e: Exception) {
+                _isLoadingMore.value = false
+                Timber.tag("ProductsViewModel").e("❌ Search error: ${e.message}")
+                if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
+                    _error.value = "Failed to load results: ${e.message}"
+                }
+            }
+        }
+    }
+    private suspend fun getSchoolId(): Int? {
+        return appPreferences.schoolId.first()
+    }
     fun updateFilter(key: String, value: Any?) {
         val updated = when (key) {
             "category" -> {

@@ -40,6 +40,7 @@ data class Item(
     val syncStatus: String = "ACTIVE",
     val syncError: String? = null,
     val retryCount: Int = 0,
+    val relevance: String? = null,
     val lastSyncAttempt: Long? = null
 ) {
     val availableQuantity: Int

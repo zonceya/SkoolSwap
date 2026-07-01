@@ -15,6 +15,7 @@ import com.example.skoolswap.domain.model.homefeed.SportFeed
 import com.example.skoolswap.domain.model.homefeed.UniformFeed
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.domain.repository.HomeRepositoryInterface
+import com.example.skoolswap.domain.repository.RankedItemsResult
 import com.example.skoolswap.utils.Result
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +35,7 @@ class HomeRepository @Inject constructor(
     private val authRepository: AuthRepositoryInterface,
     private val appPreferences: AppPreferences,
     private val homeFeedDao: HomeFeedDao,
-    private val itemDao: ItemDao,           // ← ADD THIS
+    private val itemDao: ItemDao,
     private val itemImageDao: ItemImageDao
 ) : HomeRepositoryInterface {
 
@@ -47,6 +48,10 @@ class HomeRepository @Inject constructor(
     // StateFlow for home feed
     private val _homeFeed = MutableStateFlow<HomeFeed?>(null)
     override val homeFeed: StateFlow<HomeFeed?> = _homeFeed.asStateFlow()
+
+    // ================================================================
+    // LEGACY ENDPOINTS
+    // ================================================================
 
     override suspend fun getHomeFeed(schoolId: Int): Result<HomeFeed> {
         Log.d(TAG, "🔄 getHomeFeed called for schoolId: $schoolId")
@@ -81,45 +86,7 @@ class HomeRepository @Inject constructor(
             }
         )
     }
-    private suspend fun saveHomeFeedToCache(feed: HomeFeed) {
-        try {
-            // Log what we're saving
-            Log.d(TAG, "📝 Saving home feed to cache")
-            Log.d(TAG, "   Sections count: ${feed.sections.size}")
-            feed.sections.forEachIndexed { index, section ->
-                Log.d(TAG, "   Section $index: ${section.javaClass.simpleName}")
-            }
 
-            val entity = feed.toEntity()
-            homeFeedDao.insertHomeFeed(entity)
-            Log.d(TAG, "✅ Home feed cached to Room successfully")
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to cache home feed: ${e.message}", e)
-        }
-    }
-
-    private suspend fun loadHomeFeedFromCache(): Result<HomeFeed>? {
-        return try {
-            val cached = homeFeedDao.getHomeFeed()
-            if (cached != null) {
-                Log.d(TAG, "📖 Loading home feed from cache")
-                Log.d(TAG, "   Cached at: ${java.util.Date(cached.cachedAt)}")
-                Log.d(TAG, "   JSON length: ${cached.sectionsJson.length}")
-
-                val feed = cached.toDomain()
-                Log.d(TAG, "   Sections count after parsing: ${feed.sections.size}")
-
-                _homeFeed.value = feed
-                Result.Success(feed)
-            } else {
-                Log.d(TAG, "No cached home feed found")
-                null
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to load cached home feed: ${e.message}", e)
-            null
-        }
-    }
     override suspend fun getUniforms(schoolId: Int, gender: String?): Result<UniformFeed> {
         return safeApiCall(
             call = { recommendationsApiService.getUniforms(schoolId, gender) },
@@ -162,6 +129,293 @@ class HomeRepository @Inject constructor(
         )
     }
 
+    // ================================================================
+    // 🔥 NEW RANKED ENDPOINTS
+    // ================================================================
+
+    override suspend fun searchItemsRanked(
+        query: String,
+        schoolId: Int,
+        categoryId: Int?,
+        subCategoryId: Int?,
+        minPrice: Float?,
+        maxPrice: Float?,
+        page: Int,
+        perPage: Int
+    ): Result<RankedItemsResult> {
+        return safeApiCall(
+            call = {
+                recommendationsApiService.searchItemsRanked(
+                    query = query,
+                    schoolId = schoolId,
+                    categoryId = categoryId,
+                    subCategoryId = subCategoryId,
+                    minPrice = minPrice,
+                    maxPrice = maxPrice,
+                    page = page,
+                    perPage = perPage
+                )
+            },
+            errorMessage = "Failed to search items",
+            onSuccess = { response ->
+                if (response.success) {
+                    // ✅ Convert RankedItemDto to Item using the mapper
+                    val items = response.items.map { it.toDomain() }
+                    Result.Success(
+                        RankedItemsResult(
+                            items = items,
+                            totalCount = response.totalCount,
+                            currentPage = response.pagination?.currentPage ?: page,
+                            totalPages = response.pagination?.totalPages ?: 1
+                        )
+                    )
+                } else {
+                    Result.Error(Exception("Failed to search items"))
+                }
+            }
+        )
+    }
+
+    override suspend fun getUniformsRanked(
+        schoolId: Int,
+        gender: String?,
+        subCategoryId: Int?,
+        minPrice: Float?,
+        maxPrice: Float?,
+        page: Int,
+        perPage: Int
+    ): Result<RankedItemsResult> {
+        return safeApiCall(
+            call = {
+                recommendationsApiService.getUniformsRanked(
+                    schoolId = schoolId,
+                    gender = gender,
+                    subCategoryId = subCategoryId,
+                    minPrice = minPrice,
+                    maxPrice = maxPrice,
+                    page = page,
+                    perPage = perPage
+                )
+            },
+            errorMessage = "Failed to load uniforms",
+            onSuccess = { response ->
+                if (response.success) {
+                    val items = response.items.map { it.toDomain() }
+                    Result.Success(
+                        RankedItemsResult(
+                            items = items,
+                            totalCount = response.totalCount,
+                            currentPage = response.pagination?.currentPage ?: page,
+                            totalPages = response.pagination?.totalPages ?: 1
+                        )
+                    )
+                } else {
+                    Result.Error(Exception("Failed to load uniforms"))
+                }
+            }
+        )
+    }
+
+    override suspend fun getSportItemsRanked(
+        schoolId: Int,
+        sportType: String?,
+        subCategoryId: Int?,
+        minPrice: Float?,
+        maxPrice: Float?,
+        page: Int,
+        perPage: Int
+    ): Result<RankedItemsResult> {
+        return safeApiCall(
+            call = {
+                recommendationsApiService.getSportItemsRanked(
+                    schoolId = schoolId,
+                    sportType = sportType,
+                    subCategoryId = subCategoryId,
+                    minPrice = minPrice,
+                    maxPrice = maxPrice,
+                    page = page,
+                    perPage = perPage
+                )
+            },
+            errorMessage = "Failed to load sport items",
+            onSuccess = { response ->
+                if (response.success) {
+                    val items = response.items.map { it.toDomain() }
+                    Result.Success(
+                        RankedItemsResult(
+                            items = items,
+                            totalCount = response.totalCount,
+                            currentPage = response.pagination?.currentPage ?: page,
+                            totalPages = response.pagination?.totalPages ?: 1
+                        )
+                    )
+                } else {
+                    Result.Error(Exception("Failed to load sport items"))
+                }
+            }
+        )
+    }
+
+    override suspend fun getRecentItemsRanked(
+        schoolId: Int,
+        period: String?,
+        minPrice: Float?,
+        maxPrice: Float?,
+        page: Int,
+        perPage: Int
+    ): Result<RankedItemsResult> {
+        return safeApiCall(
+            call = {
+                recommendationsApiService.getRecentItemsRanked(
+                    schoolId = schoolId,
+                    period = period,
+                    minPrice = minPrice,
+                    maxPrice = maxPrice,
+                    page = page,
+                    perPage = perPage
+                )
+            },
+            errorMessage = "Failed to load recent items",
+            onSuccess = { response ->
+                if (response.success) {
+                    val items = response.items.map { it.toDomain() }
+                    Result.Success(
+                        RankedItemsResult(
+                            items = items,
+                            totalCount = response.totalCount,
+                            currentPage = response.pagination?.currentPage ?: page,
+                            totalPages = response.pagination?.totalPages ?: 1
+                        )
+                    )
+                } else {
+                    Result.Error(Exception("Failed to load recent items"))
+                }
+            }
+        )
+    }
+
+    override suspend fun getRecommendedRanked(
+        schoolId: Int,
+        categoryId: Int?,
+        period: String?,
+        minPrice: Float?,
+        maxPrice: Float?,
+        page: Int,
+        perPage: Int
+    ): Result<RankedItemsResult> {
+        return safeApiCall(
+            call = {
+                recommendationsApiService.getRecommendedRanked(
+                    schoolId = schoolId,
+                    categoryId = categoryId,
+                    period = period,
+                    minPrice = minPrice,
+                    maxPrice = maxPrice,
+                    page = page,
+                    perPage = perPage
+                )
+            },
+            errorMessage = "Failed to load recommended items",
+            onSuccess = { response ->
+                if (response.success) {
+                    val items = response.items.map { it.toDomain() }
+                    Result.Success(
+                        RankedItemsResult(
+                            items = items,
+                            totalCount = response.totalCount,
+                            currentPage = response.pagination?.currentPage ?: page,
+                            totalPages = response.pagination?.totalPages ?: 1
+                        )
+                    )
+                } else {
+                    Result.Error(Exception("Failed to load recommended items"))
+                }
+            }
+        )
+    }
+
+    override suspend fun getTrendingRanked(
+        schoolId: Int,
+        period: String,
+        minPrice: Float?,
+        maxPrice: Float?,
+        page: Int,
+        perPage: Int
+    ): Result<RankedItemsResult> {
+        return safeApiCall(
+            call = {
+                recommendationsApiService.getTrendingRanked(
+                    schoolId = schoolId,
+                    period = period,
+                    minPrice = minPrice,
+                    maxPrice = maxPrice,
+                    page = page,
+                    perPage = perPage
+                )
+            },
+            errorMessage = "Failed to load trending items",
+            onSuccess = { response ->
+                if (response.success) {
+                    val items = response.items.map { it.toDomain() }
+                    Result.Success(
+                        RankedItemsResult(
+                            items = items,
+                            totalCount = response.totalCount,
+                            currentPage = response.pagination?.currentPage ?: page,
+                            totalPages = response.pagination?.totalPages ?: 1
+                        )
+                    )
+                } else {
+                    Result.Error(Exception("Failed to load trending items"))
+                }
+            }
+        )
+    }
+
+    override suspend fun getEssentialsRanked(
+        schoolId: Int,
+        category: String?,
+        subCategoryId: Int?,
+        minPrice: Float?,
+        maxPrice: Float?,
+        page: Int,
+        perPage: Int
+    ): Result<RankedItemsResult> {
+        return safeApiCall(
+            call = {
+                recommendationsApiService.getEssentialsRanked(
+                    schoolId = schoolId,
+                    category = category,
+                    subCategoryId = subCategoryId,
+                    minPrice = minPrice,
+                    maxPrice = maxPrice,
+                    page = page,
+                    perPage = perPage
+                )
+            },
+            errorMessage = "Failed to load essentials",
+            onSuccess = { response ->
+                if (response.success) {
+                    val items = response.items.map { it.toDomain() }
+                    Result.Success(
+                        RankedItemsResult(
+                            items = items,
+                            totalCount = response.totalCount,
+                            currentPage = response.pagination?.currentPage ?: page,
+                            totalPages = response.pagination?.totalPages ?: 1
+                        )
+                    )
+                } else {
+                    Result.Error(Exception("Failed to load essentials"))
+                }
+            }
+        )
+    }
+
+    // ================================================================
+    // CLEAR HOME DATA
+    // ================================================================
+
     override suspend fun clearHomeData() {
         coroutineScope.launch {
             _homeFeed.value = null
@@ -169,10 +423,50 @@ class HomeRepository @Inject constructor(
         }
     }
 
+    // ================================================================
+    // PRIVATE HELPERS
+    // ================================================================
+
+    private suspend fun saveHomeFeedToCache(feed: HomeFeed) {
+        try {
+            Log.d(TAG, "📝 Saving home feed to cache")
+            Log.d(TAG, "   Sections count: ${feed.sections.size}")
+
+            val entity = feed.toEntity()
+            homeFeedDao.insertHomeFeed(entity)
+            Log.d(TAG, "✅ Home feed cached to Room successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to cache home feed: ${e.message}", e)
+        }
+    }
+
+    private suspend fun loadHomeFeedFromCache(): Result<HomeFeed>? {
+        return try {
+            val cached = homeFeedDao.getHomeFeed()
+            if (cached != null) {
+                Log.d(TAG, "📖 Loading home feed from cache")
+                Log.d(TAG, "   Cached at: ${java.util.Date(cached.cachedAt)}")
+                Log.d(TAG, "   JSON length: ${cached.sectionsJson.length}")
+
+                val feed = cached.toDomain()
+                Log.d(TAG, "   Sections count after parsing: ${feed.sections.size}")
+
+                _homeFeed.value = feed
+                Result.Success(feed)
+            } else {
+                Log.d(TAG, "No cached home feed found")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to load cached home feed: ${e.message}", e)
+            null
+        }
+    }
+
     private suspend fun <T, R> safeApiCall(
         call: suspend () -> Response<T>,
         errorMessage: String,
-        onSuccess: suspend (T) -> Result<R>,  // ← Changed to suspend
+        onSuccess: suspend (T) -> Result<R>,
         onError: (suspend () -> Result<R>?)? = null
     ): Result<R> {
         return try {
