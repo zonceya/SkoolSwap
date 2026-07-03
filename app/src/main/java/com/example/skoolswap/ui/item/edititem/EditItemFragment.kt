@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -32,9 +33,11 @@ import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.reference.*
 import com.example.skoolswap.ui.component.ColorPickerBottomSheet
 import com.example.skoolswap.ui.component.OptionsPickerBottomSheet
+import com.example.skoolswap.ui.item.CreateItemFragment
 import com.example.skoolswap.utils.DialogAction
 import com.example.skoolswap.utils.DialogHelper
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
@@ -154,7 +157,7 @@ class EditItemFragment : Fragment() {
 
         itemId = arguments?.getString("itemId") ?: ""
         Timber.tag(TAG).d("onViewCreated - Item ID: $itemId")
-
+        hideFab()
         showAllShimmers()
         setupObservers()
         setupClickListeners()
@@ -1058,12 +1061,14 @@ class EditItemFragment : Fragment() {
         return true
     }
 
+    // In EditItemFragment.kt - replace the updateItem() method
+
     private fun updateItem() {
         val name = binding.itemName.text.toString()
         val description = binding.description.text.toString()
         val price = binding.price.text.toString().toDoubleOrNull() ?: 0.0
 
-        viewModel.updateItem(
+        viewModel.updateItemOfflineFirst(
             context = requireContext(),
             itemId = itemId,
             name = if (name != originalName) name else null,
@@ -1215,9 +1220,15 @@ class EditItemFragment : Fragment() {
             Timber.tag(TAG).d("✅ All data loaded, shimmer hidden")
         }
     }
+    private fun hideFab() {
+        val fab = activity?.findViewById<FloatingActionButton>(R.id.fab)
+        fab?.visibility = View.GONE
+        Log.d(CreateItemFragment.Companion.TAG, "FAB hidden")
+    }
     override fun onResume() {
         super.onResume()
         isCameraLaunched = false
+        hideFab()
     }
 
     override fun onDestroyView() {

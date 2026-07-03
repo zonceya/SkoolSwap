@@ -301,6 +301,8 @@ class CreateItemViewModel @Inject constructor(
 
 // CreateItemViewModel.kt
 
+    // CreateItemViewModel.kt - Update createItemOfflineFirst
+
     fun createItemOfflineFirst(
         context: Context,
         name: String,
@@ -323,69 +325,48 @@ class CreateItemViewModel @Inject constructor(
             try {
                 _uiState.value = CreateItemUiState.Loading
 
-                // 1. Generate local ID
-                val localId = UUID.randomUUID().toString()
+                val currentImageUris = _images.value
 
-                // 2. Get current images BEFORE clearing
-                val currentImageUris = _images.value  // This is List<Uri>
-
-                // 3. Create local item
-                val localItem = Item(
-                    id = localId,
-                    shopId = 0L,
+                // Create item offline-first
+                val result = itemRepository.createItemOfflineFirst(
+                    context = context,
                     name = name,
                     description = description,
-                    price = price,
-                    quantity = quantity,
-                    status = "active",
                     mainCategoryId = mainCategoryId,
                     subCategoryId = subCategoryId,
                     brandId = brandId,
-                    sizeId = sizeId,
-                    schoolId = schoolId,
+                    price = price,
+                    quantity = quantity,
                     itemConditionId = conditionId,
-                    locationId = locationId,
                     provinceId = provinceId,
+                    locationId = locationId,
                     genderId = genderId,
+                    schoolId = schoolId,
+                    sizeId = sizeId,
                     colorId = colorId,
-                    createdAt = System.currentTimeMillis().toString(),
-                    images = currentImageUris.map { uri ->
-                        ItemImage(id = 0, url = uri.toString(), isCover = false)
-                    },
-                    syncStatus = "UPLOADING",
-                    syncError = null,
-                    retryCount = 0,
-                    shop = null,
-                    meta = null,
-                    label = null,
-                    reserved = 0,
-                    itemTypeId = null,
-                    sizeName = null,
-                    colorName = null,
-                    brandName = null,
-                    conditionName = null,
-                    locationName = null,
-                    viewCount = 0
+                    tagIds = tagIds,
+                    imageUris = currentImageUris
                 )
 
-                // Save to repository
-                val saveResult = itemRepository.saveLocalItem(localItem)
-                if (saveResult.isFailure) {
-                    _uiState.value = CreateItemUiState.Error("Failed to save item locally")
+                if (result.isFailure) {
+                    _uiState.value = CreateItemUiState.Error(
+                        result.exceptionOrNull()?.message ?: "Failed to save item"
+                    )
                     return@launch
                 }
 
-                // 4. Navigate immediately
-                _uiState.value = CreateItemUiState.Success("Item saved locally, uploading in background")
+                // Success - navigate immediately
+                _uiState.value = CreateItemUiState.Success("Item saved, uploading in background")
 
-                // 5. Clear UI images
+                // Clear images
                 clearImages()
 
-                // 6. Enqueue background upload - Pass List<Uri> directly
-                val worker = ItemCreationWorker.createOneTimeRequest(localId, currentImageUris)
+                // Enqueue worker
+                val localItem = result.getOrNull()!!
+                val worker = ItemCreationWorker.createOneTimeRequest(localItem.id)
                 WorkManager.getInstance(context).enqueue(worker)
 
-                Timber.tag(TAG).d("✅ Item saved locally with ID: $localId, worker enqueued with ${currentImageUris.size} images")
+                Timber.tag(TAG).d("✅ Item saved locally, worker enqueued")
 
             } catch (e: Exception) {
                 Timber.tag(TAG).e(e, "❌ Failed to create item locally")

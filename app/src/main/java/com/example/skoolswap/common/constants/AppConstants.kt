@@ -43,4 +43,13 @@ object AppConstants {
         const val DATABASE = "Database"
         const val UI = "UI"
     }
+    object SyncStatus {
+        const val ACTIVE = "ACTIVE"
+        const val UPLOADING = "UPLOADING"
+        const val UPDATING = "UPDATING"      // ✅ For edits
+        const val UPDATE_FAILED = "UPDATE_FAILED"
+        const val SYNCED = "SYNCED"
+        const val FAILED = "FAILED"
+    }
+
 }

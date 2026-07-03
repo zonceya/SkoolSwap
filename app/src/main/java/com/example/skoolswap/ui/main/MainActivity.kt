@@ -72,6 +72,7 @@ class MainActivity : AppCompatActivity() {
     private val MIN_REFRESH_INTERVAL_MS = 30_000L
     @Inject
     lateinit var workerManager: WorkerManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = ContextCompat.getColor(this, R.color.white)
@@ -281,15 +282,12 @@ class MainActivity : AppCompatActivity() {
     private fun setupNavigationListener() {
         val navView: NavigationView = binding.navView
         binding.appBarMain.fab.setOnClickListener {
-            // Check if user has contact number before navigating
             lifecycleScope.launch {
+                authRepository.refreshUserProfile()
                 val hasContactNumber = viewModel.hasContactNumber()
-
                 if (hasContactNumber) {
-                    // User has contact number - allow navigation to create item
                     navController.navigate(R.id.createItemFragment)
                 } else {
-                    // User doesn't have contact number - show dialog
                     showMissingContactDialog()
                 }
             }
@@ -657,9 +655,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+    // In MainActivity.kt - update onResume()
     override fun onResume() {
         super.onResume()
         Timber.tag("MainActivity").d("🔄 onResume - refreshing toolbar")
+
+        // ✅ CRITICAL: Check flag FIRST and return early
+        if (viewModel.suppressNextResumeRefresh) {
+            viewModel.suppressNextResumeRefresh = false
+            Timber.tag("MainActivity").d("⏭️ Skipping resume refresh - returning from camera/gallery")
+            refreshToolbarVisibility()
+            updateStatusBar()
+            return  // ← EARLY RETURN - skip everything else
+        }
+
         refreshToolbarVisibility()
         updateStatusBar()
         navHeaderViewModel.refresh()
@@ -668,16 +677,17 @@ class MainActivity : AppCompatActivity() {
         if (now - lastForegroundRefreshAt > MIN_REFRESH_INTERVAL_MS) {
             lastForegroundRefreshAt = now
 
+            // ✅ Run concurrently for better performance
             lifecycleScope.launch {
-                workerManager.refreshTokenNow()
-                workerManager.syncHomeFeedNow()
-                workerManager.scheduleProductsSync()
-                workerManager.cleanupImagesNow()
+                launch { workerManager.refreshTokenNow() }
+                launch { workerManager.syncHomeFeedNow() }
+                launch { workerManager.scheduleProductsSync() }
+                launch { workerManager.cleanupImagesNow() }
             }
         }
-
-
     }
+
+
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         // ✅ Update status bar when theme changes

@@ -118,6 +118,7 @@ dependencies {
     implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.androidx.compose.remote.creation.core)
     implementation(libs.androidx.hilt.work)
+    implementation(libs.identity.jvm)
     kapt(libs.androidx.hilt.compiler)
     kapt(libs.room.compiler)
     implementation(libs.kotlinx.datetime)

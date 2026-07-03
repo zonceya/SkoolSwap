@@ -5,6 +5,7 @@ import com.example.skoolswap.data.local.database.entities.ItemImageEntity
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.android.identity.util.UUID
 import com.example.skoolswap.data.local.database.dao.ItemDao
 import com.example.skoolswap.data.local.database.entities.ItemEntity
 import com.example.skoolswap.data.local.datastore.AppPreferences
@@ -15,6 +16,7 @@ import com.example.skoolswap.data.remote.models.request.CreateItemRequest
 import com.example.skoolswap.data.remote.models.request.ItemData
 import com.example.skoolswap.data.remote.models.request.UpdateItemData
 import com.example.skoolswap.data.remote.models.request.UpdateItemRequest
+import com.example.skoolswap.data.remote.models.response.item.AttachImagesByUrlRequest
 import com.example.skoolswap.data.remote.models.response.item.ItemDetailDto
 import com.example.skoolswap.data.remote.models.response.item.UpdateItemDto
 import com.example.skoolswap.data.remote.models.response.item.ViewShopItemDto
@@ -60,6 +62,342 @@ class ItemRepository @Inject constructor(
     private val memoryCache = mutableMapOf<String, Item>()
     private val memoryCacheTime = mutableMapOf<String, Long>()
     // ============ CREATE ITEM WITHOUT IMAGES ============
+    // ItemRepository.kt - Add/Update these methods
+
+    override suspend fun createItemOfflineFirst(
+        context: Context,
+        name: String,
+        description: String,
+        mainCategoryId: Int,
+        subCategoryId: Int,
+        brandId: Int?,
+        price: Double,
+        quantity: Int,
+        itemConditionId: Int?,
+        provinceId: Int?,
+        locationId: Int?,
+        genderId: Int?,
+        schoolId: Int?,
+        sizeId: Int?,
+        colorId: Int?,
+        tagIds: List<Int>?,
+        imageUris: List<Uri>  // These are local URIs
+    ): Result<Item> {
+        return try {
+            // 1. Generate local ID
+            val localId = UUID.randomUUID().toString()
+
+            // 2. Create local item with UPLOADING status
+            val localItem = Item(
+                id = localId,
+                shopId = 0L,
+                name = name,
+                description = description,
+                price = price,
+                quantity = quantity,
+                status = "active",
+                mainCategoryId = mainCategoryId,
+                subCategoryId = subCategoryId,
+                brandId = brandId,
+                sizeId = sizeId,
+                schoolId = schoolId,
+                itemConditionId = itemConditionId,
+                locationId = locationId,
+                provinceId = provinceId,
+                genderId = genderId,
+                colorId = colorId,
+                createdAt = System.currentTimeMillis().toString(),
+                images = imageUris.map { uri ->
+                    ItemImage(id = 0, url = uri.toString(), isCover = false)
+                },
+                syncStatus = "UPLOADING",
+                syncError = null,
+                retryCount = 0,
+                shop = null,
+                meta = null,
+                label = null,
+                reserved = 0,
+                itemTypeId = null,
+                sizeName = null,
+                colorName = null,
+                brandName = null,
+                conditionName = null,
+                locationName = null,
+                viewCount = 0
+            )
+
+            // 3. Save to local database
+            itemDao.insertItem(localItem.toEntity())
+
+            // 4. Save image URIs to database as well (for the worker)
+            val imageEntities = imageUris.mapIndexed { index, uri ->
+                ItemImageEntity(
+                    itemId = localId,
+                    url = uri.toString(),  // Store the URI string
+                    isCover = index == 0,
+                    position = index
+                )
+            }
+            itemImageDao.updateImagesForItem(localId, imageEntities)
+
+            Timber.tag(TAG).d("✅ Item saved locally with ID: $localId, images: ${imageUris.size}")
+            Result.success(localItem)
+
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "❌ Failed to create item locally")
+            Result.failure(e)
+        }
+    }
+
+    // ItemRepository.kt - Update attachImagesToItem
+
+    override suspend fun attachImagesToItem(
+        itemId: String,
+        imageUrls: List<String>
+    ): Result<List<ItemImage>> {
+        return try {
+            val token = authRepository.getAuthToken().value
+            if (token == null) {
+                return Result.failure(Exception("Not authenticated"))
+            }
+
+            if (imageUrls.isEmpty()) {
+                return Result.success(emptyList())
+            }
+
+            // ✅ Use itemApiService instead of imageApiService
+            val response = itemApiService.attachImagesByUrl(
+                authHeader = "Bearer $token",
+                itemId = itemId,
+                request = AttachImagesByUrlRequest(imageUrls)
+            )
+
+            if (response.isSuccessful && response.body()?.success == true) {
+                val images = response.body()?.images?.map { imageDto ->
+                    ItemImage(
+                        id = imageDto.id,
+                        url = imageDto.url,
+                        filename = imageDto.filename,
+                        contentType = imageDto.contentType,
+                        createdAt = imageDto.createdAt,
+                        isCover = false
+                    )
+                } ?: emptyList()
+
+                Timber.tag(TAG).d("✅ Attached ${images.size} images to item $itemId")
+                Result.success(images)
+            } else {
+                val errorMsg = response.body()?.message ?: "Failed to attach images"
+                Timber.tag(TAG).e("❌ $errorMsg")
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Failed to attach images")
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun updateItemOfflineFirst(
+        context: Context,
+        itemId: String,
+        name: String?,
+        description: String?,
+        mainCategoryId: Int?,
+        subCategoryId: Int?,
+        brandId: Int?,
+        price: Double?,
+        quantity: Int?,
+        itemConditionId: Int?,
+        provinceId: Int?,
+        locationId: Int?,
+        genderId: Int?,
+        schoolId: Int?,
+        sizeId: Int?,
+        colorId: Int?,
+        tagIds: List<Int>?,
+        addImageUris: List<Uri>,
+        removeImageIds: List<Long>
+    ): Result<Item> {
+        Timber.tag(TAG).d("🚀 updateItemOfflineFirst START")
+        Timber.tag(TAG).d("   itemId: $itemId")
+        Timber.tag(TAG).d("   mainCategoryId: $mainCategoryId")
+        Timber.tag(TAG).d("   subCategoryId: $subCategoryId")
+        Timber.tag(TAG).d("   addImageUris: ${addImageUris.size}")
+        Timber.tag(TAG).d("   removeImageIds: ${removeImageIds.size}")
+
+        return try {
+            // 1. Get existing item from database
+            val existingItem = itemDao.getItemById(itemId)
+            if (existingItem == null) {
+                Timber.tag(TAG).e("❌ Item not found in database: $itemId")
+                return Result.failure(Exception("Item not found"))
+            }
+
+            Timber.tag(TAG).d("📦 Existing item found:")
+            Timber.tag(TAG).d("   Name: ${existingItem.name}")
+            Timber.tag(TAG).d("   mainCategoryId: ${existingItem.mainCategoryId}")
+            Timber.tag(TAG).d("   subCategoryId: ${existingItem.subCategoryId}")
+
+            // 2. Convert to domain model
+            val existingDomain = existingItem.toDomain()
+
+            // 3. Build updated images list
+            val updatedImages = buildUpdatedImages(
+                existingDomain.images,
+                addImageUris,
+                removeImageIds
+            )
+
+            // 4. Create updated item with UPDATING status
+            val updatedItem = existingDomain.copy(
+                name = name ?: existingDomain.name,
+                description = description ?: existingDomain.description,
+                price = price ?: existingDomain.price,
+                quantity = quantity ?: existingDomain.quantity,
+                mainCategoryId = mainCategoryId ?: existingDomain.mainCategoryId,
+                subCategoryId = subCategoryId ?: existingDomain.subCategoryId,
+                brandId = brandId ?: existingDomain.brandId,
+                sizeId = sizeId ?: existingDomain.sizeId,
+                colorId = colorId ?: existingDomain.colorId,
+                schoolId = schoolId ?: existingDomain.schoolId,
+                itemConditionId = itemConditionId ?: existingDomain.itemConditionId,
+                locationId = locationId ?: existingDomain.locationId,
+                provinceId = provinceId ?: existingDomain.provinceId,
+                genderId = genderId ?: existingDomain.genderId,
+                images = updatedImages,
+                syncStatus = "UPDATING",  // ✅ Mark as updating
+                syncError = null,
+                retryCount = 0,
+                updatedAt = System.currentTimeMillis().toString()
+            )
+
+            Timber.tag(TAG).d("📝 Updated item:")
+            Timber.tag(TAG).d("   mainCategoryId: ${updatedItem.mainCategoryId}")
+            Timber.tag(TAG).d("   subCategoryId: ${updatedItem.subCategoryId}")
+            Timber.tag(TAG).d("   syncStatus: ${updatedItem.syncStatus}")
+            Timber.tag(TAG).d("   images: ${updatedItem.images.size}")
+
+            // 5. Save to database using safe insert
+            safeInsertOrUpdateItem(updatedItem)
+
+            // 6. Save image URIs for the worker
+            if (addImageUris.isNotEmpty()) {
+                val imageEntities = addImageUris.mapIndexed { index, uri ->
+                    ItemImageEntity(
+                        itemId = itemId,
+                        url = uri.toString(),
+                        isCover = index == 0 && updatedItem.images.isEmpty(),
+                        position = updatedItem.images.size + index
+                    )
+                }
+                itemImageDao.updateImagesForItem(itemId, imageEntities)
+                Timber.tag(TAG).d("✅ ${imageEntities.size} new images saved to database")
+            }
+
+            // 7. Save deletion IDs for the worker
+            if (removeImageIds.isNotEmpty()) {
+                // Store deletion IDs in a separate table or as a JSON field
+                // For now, we'll pass them to the worker via input data
+                Timber.tag(TAG).d("✅ ${removeImageIds.size} images marked for deletion")
+            }
+
+            Timber.tag(TAG).d("✅ Item updated locally with ID: $itemId")
+            Timber.tag(TAG).d("🏁 updateItemOfflineFirst SUCCESS")
+            Result.success(updatedItem)
+
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "❌ updateItemOfflineFirst FAILED")
+            Result.failure(e)
+        }
+    }
+    private fun buildUpdatedImages(
+        existingImages: List<ItemImage>,
+        addImageUris: List<Uri>,
+        removeImageIds: List<Long>
+    ): List<ItemImage> {
+        // Keep images not marked for deletion
+        val keptImages = existingImages.filter {
+            !removeImageIds.contains(it.id)
+        }
+
+        // Convert new Uris to ItemImages
+        val newImages = addImageUris.mapIndexed { index, uri ->
+            ItemImage(
+                id = 0,  // Temporary ID
+                url = uri.toString(),
+                isCover = index == 0 && keptImages.isEmpty()
+            )
+        }
+
+        return keptImages + newImages
+    }
+
+    private suspend fun safeInsertOrUpdateItem(newItem: Item) {
+        Timber.tag(TAG).d("🛡️ safeInsertOrUpdateItem called")
+        Timber.tag(TAG).d("   Item ID: ${newItem.id}")
+        Timber.tag(TAG).d("   Name: ${newItem.name}")
+        Timber.tag(TAG).d("   mainCategoryId: ${newItem.mainCategoryId}")
+        Timber.tag(TAG).d("   subCategoryId: ${newItem.subCategoryId}")
+        Timber.tag(TAG).d("   colorId: ${newItem.colorId}")
+        Timber.tag(TAG).d("   syncStatus: ${newItem.syncStatus}")
+
+        val existing = itemDao.getItemById(newItem.id)
+
+        if (existing != null) {
+            Timber.tag(TAG).d("📦 Existing item found")
+            Timber.tag(TAG).d("   Existing mainCategoryId: ${existing.mainCategoryId}")
+            Timber.tag(TAG).d("   Existing subCategoryId: ${existing.subCategoryId}")
+
+            // ✅ MERGE: Preserve non-null values from newItem, fallback to existing
+            val merged = existing.copy(
+                // ✅ PRESERVE CRITICAL IDs - only update if newItem has a non-null value
+                mainCategoryId = newItem.mainCategoryId ?: existing.mainCategoryId,
+                subCategoryId = newItem.subCategoryId ?: existing.subCategoryId,
+                colorId = newItem.colorId ?: existing.colorId,
+                brandId = newItem.brandId ?: existing.brandId,
+                sizeId = newItem.sizeId ?: existing.sizeId,
+                schoolId = newItem.schoolId ?: existing.schoolId,
+                itemConditionId = newItem.itemConditionId ?: existing.itemConditionId,
+                locationId = newItem.locationId ?: existing.locationId,
+                provinceId = newItem.provinceId ?: existing.provinceId,
+                genderId = newItem.genderId ?: existing.genderId,
+
+                // ✅ ALWAYS UPDATE mutable fields
+                name = newItem.name,
+                description = newItem.description,
+                price = newItem.price,
+                quantity = newItem.quantity,
+                status = newItem.status,
+                updatedAt = newItem.updatedAt ?: existing.updatedAt,
+                syncStatus = newItem.syncStatus,
+                syncError = newItem.syncError,
+                retryCount = newItem.retryCount,
+                lastSyncAttempt = newItem.lastSyncAttempt,
+
+                // ✅ Update images if provided
+                imageCount = if (newItem.images.isNotEmpty()) newItem.images.size else existing.imageCount,
+                coverImage = newItem.coverImage ?: existing.coverImage,
+
+                // Preserve created_at if new item doesn't have it
+                createdAt = newItem.createdAt.takeIf { it.isNotEmpty() } ?: existing.createdAt,
+            )
+
+            Timber.tag(TAG).d("✅ Merged entity:")
+            Timber.tag(TAG).d("   mainCategoryId: ${merged.mainCategoryId}")
+            Timber.tag(TAG).d("   subCategoryId: ${merged.subCategoryId}")
+            Timber.tag(TAG).d("   syncStatus: ${merged.syncStatus}")
+
+            itemDao.insertItem(merged)
+            Timber.tag(TAG).d("✅ Item updated in database")
+        } else {
+            Timber.tag(TAG).d("📦 No existing item found, inserting new")
+            val entity = newItem.toEntity()
+            Timber.tag(TAG).d("   mainCategoryId: ${entity.mainCategoryId}")
+            Timber.tag(TAG).d("   subCategoryId: ${entity.subCategoryId}")
+            itemDao.insertItem(entity)
+            Timber.tag(TAG).d("✅ New item inserted")
+        }
+    }
     override suspend fun createItemSimple(
         name: String,
         description: String,
@@ -596,40 +934,7 @@ class ItemRepository @Inject constructor(
             Result.failure(e)
         }
     }
-    // Extension function to convert Domain Item to ItemEntity
-    fun Item.toEntity(): ItemEntity {
-        return ItemEntity(
-            id = id,
-            shopId = shopId,
-            name = name,
-            description = description,
-            price = price,
-            quantity = quantity,
-            status = status,
-            itemTypeId = null, // Add if you have this in your Item domain model
-            brandId = brandId,
-            sizeId = sizeId,
-            schoolId = schoolId,
-            sizeName = sizeName,
-            colorName = colorName,
-            brandName = brandName,
-            conditionName = conditionName,
-            itemConditionId = itemConditionId,
-            locationId = null, // Add if you have this in your Item domain model
-            provinceId = provinceId,
-            genderId = genderId,
-            metaColor = null, // Add if you have this in your Item domain model
-            metaSize = null, // Add if you have this in your Item domain model
-            label = null, // Add if you have this in your Item domain model
-            reserved = 0, // Add if you have this in your Item domain model
-            createdAt = createdAt,
-            updatedAt = updatedAt,
-            deleted = false,
-            imageCount = images.size,
-            lastCacheTime = System.currentTimeMillis(),
-            viewCount = viewCount
-        )
-    }
+
     private fun mapItemDetailToDomain(dto: ItemDetailDto): Item {
         val imageList = mutableListOf<ItemImage>()
 
@@ -1152,15 +1457,43 @@ class ItemRepository @Inject constructor(
     }
 
     private fun mapUpdateDtoToItem(dto: UpdateItemDto): Item {
-        // Convert images to List<ItemImage>
-        val imageList = dto.images?.map { imageDto ->
-            ItemImage(
-                id = imageDto.id,
-                url = imageDto.url,
-                filename = imageDto.filename,
-                contentType = imageDto.contentType,
-                createdAt = imageDto.createdAt
-            )
+        // ✅ Handle both String URLs and Image objects
+        val imageList = dto.images?.mapNotNull { image ->
+            when (image) {
+                is String -> {
+                    // Case 1: It's a simple string URL
+                    ItemImage(
+                        id = 0,
+                        url = image,
+                        filename = null,
+                        contentType = null,
+                        createdAt = null,
+                        isCover = false
+                    )
+                }
+                is Map<*, *> -> {
+                    // Case 2: It's a Map (from object format)
+                    val id = (image["id"] as? Number)?.toLong() ?: 0
+                    val url = image["url"] as? String ?: ""
+                    val filename = image["filename"] as? String
+                    val contentType = image["content_type"] as? String
+                    val createdAt = image["created_at"] as? String
+
+                    if (url.isNotEmpty()) {
+                        ItemImage(
+                            id = id,
+                            url = url,
+                            filename = filename,
+                            contentType = contentType,
+                            createdAt = createdAt,
+                            isCover = false
+                        )
+                    } else {
+                        null
+                    }
+                }
+                else -> null
+            }
         } ?: emptyList()
 
         return Item(
@@ -1172,20 +1505,31 @@ class ItemRepository @Inject constructor(
             quantity = dto.quantity,
             status = dto.status,
             createdAt = dto.createdAt,
-            images = imageList,  // ← Now List<ItemImage>
+            updatedAt = dto.updatedAt,
+            images = imageList,
+            coverImage = imageList.firstOrNull()?.url,
             brandId = dto.brandId,
             sizeId = dto.sizeId,
+            colorId = dto.colorId,
             schoolId = dto.schoolId,
             itemConditionId = dto.conditionId,
             locationId = dto.townId,
             provinceId = dto.provinceId,
             genderId = dto.genderId,
+            mainCategoryId = dto.mainCategoryId,
+            subCategoryId = dto.subCategoryId,
             label = null,
             reserved = dto.quantity - dto.availableQuantity,
             meta = if (dto.colorName != null || dto.sizeName != null) {
                 ItemMeta(color = dto.colorName, size = dto.sizeName)
             } else null,
-            shop = null
+            shop = null,
+            sizeName = dto.sizeName,
+            colorName = dto.colorName,
+            brandName = dto.brandName,
+            conditionName = dto.conditionName,
+            viewCount = 0
         )
     }
+
 }

@@ -79,7 +79,12 @@ interface ItemApiService {
         @Path("item_id") itemId: String
     ): Response<MarkAsSoldResponse>
 
-
+    @POST("api/v1/items/{item_id}/attach_images_by_url")
+    suspend fun attachImagesByUrl(
+        @Header("Authorization") authHeader: String,
+        @Path("item_id") itemId: String,
+        @Body request: AttachImagesByUrlRequest
+    ): Response<AddImagesResponse>
 
 }
 
