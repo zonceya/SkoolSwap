@@ -1,6 +1,5 @@
 package com.example.skoolswap.ui.intro
 
-
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -8,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.annotation.RequiresApi
+import androidx.core.net.toUri
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
-import androidx.core.net.toUri
 
 @AndroidEntryPoint
 class IntroFragment : Fragment() {
@@ -47,14 +46,7 @@ class IntroFragment : Fragment() {
     private val MIN_DISPLAY_MS = 3000L // 3 seconds minimum
     private val FORCE_SCHOOL_ONBOARDING = false
 
-    // ✅ Absolute ceiling on how long we wait for the video pipeline
-    // (MediaPlayer/VideoView/audioserver) before giving up and moving on.
-    // Protects against onPrepared/onCompletion/onError never firing — e.g.
-    // audioserver crashing/restarting underneath MediaPlayer, a corrupt
-    // video resource, or a slow/low-memory device. Without this, app
-    // startup can hang indefinitely since navigation is gated on
-    // videoFinished. This is intentionally independent of MIN_DISPLAY_MS
-    // and of MediaPlayer's own callbacks.
+    // Absolute ceiling on how long we wait for the video pipeline
     private val VIDEO_WATCHDOG_TIMEOUT_MS = 8000L
     private var videoWatchdogJob: Job? = null
 
@@ -72,14 +64,10 @@ class IntroFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         Timber.tag(TAG).e("onViewCreated called")
-        requireActivity().window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                        or View.SYSTEM_UI_FLAG_FULLSCREEN
-                        or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                )
+
+        // ✅ SHOW STATUS BAR IMMEDIATELY on initial load
+        showSystemUI()
+
         // Show placeholder splash immediately
         binding.splashPlaceholder.visibility = View.VISIBLE
 
@@ -90,6 +78,61 @@ class IntroFragment : Fragment() {
         setupVideo()
         startVideoWatchdog()
     }
+
+    // ==================== SYSTEM UI CONTROLS ====================
+
+    /**
+     * Show both status bar (network/battery/time) and navigation bar
+     * This ensures users can see network and battery indicators
+     */
+    private fun showSystemUI() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                requireActivity().window.insetsController?.let { controller ->
+                    controller.show(android.view.WindowInsets.Type.statusBars())
+                    controller.show(android.view.WindowInsets.Type.navigationBars())
+                    controller.systemBarsBehavior =
+                        android.view.WindowInsetsController.BEHAVIOR_SHOW_BARS_BY_TOUCH
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                requireActivity().window.decorView.systemUiVisibility =
+                    View.SYSTEM_UI_FLAG_VISIBLE
+            }
+            Timber.tag(TAG).e("✅ System UI shown (status bar visible)")
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Error showing system UI")
+        }
+    }
+
+    /**
+     * Hide system UI for immersive video experience
+     * Only used if you want full-screen video
+     */
+    private fun hideSystemUIForVideo() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                requireActivity().window.insetsController?.let { controller ->
+                    controller.hide(android.view.WindowInsets.Type.statusBars())
+                    controller.hide(android.view.WindowInsets.Type.navigationBars())
+                    controller.systemBarsBehavior =
+                        android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                requireActivity().window.decorView.systemUiVisibility = (
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                                or View.SYSTEM_UI_FLAG_FULLSCREEN
+                                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        )
+            }
+            Timber.tag(TAG).e("🎬 System UI hidden for video")
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Error hiding system UI")
+        }
+    }
+
+    // ==================== DESTINATION LOGIC ====================
 
     private fun determineDestination() {
         lifecycleScope.launch {
@@ -150,6 +193,8 @@ class IntroFragment : Fragment() {
             return
         }
         videoFinished = true
+        // ✅ Show status bar when video finishes
+        showSystemUI()
         maybeNavigate()
     }
 
@@ -164,13 +209,8 @@ class IntroFragment : Fragment() {
         }
     }
 
-    /**
-     * Independent safety net: if the video pipeline (MediaPlayer/VideoView/
-     * audioserver) never calls back — e.g. audioserver dies/restarts mid
-     * prepare, a codec hangs, or the device is under heavy load — this
-     * forces onVideoFinished() after a fixed timeout so app startup is
-     * never held hostage by the splash video.
-     */
+    // ==================== VIDEO WATCHDOG ====================
+
     private fun startVideoWatchdog() {
         videoWatchdogJob?.cancel()
         videoWatchdogJob = lifecycleScope.launch {
@@ -184,10 +224,14 @@ class IntroFragment : Fragment() {
                     binding.splashPlaceholder.visibility = View.GONE
                     binding.progressBar.visibility = View.GONE
                 }
+                // ✅ Show status bar when watchdog fires
+                showSystemUI()
                 onVideoFinished()
             }
         }
     }
+
+    // ==================== VIDEO SETUP ====================
 
     @RequiresApi(Build.VERSION_CODES.R)
     private fun setupVideo() {
@@ -241,6 +285,9 @@ class IntroFragment : Fragment() {
                 Timber.tag(TAG)
                     .e("Video displayed for ${elapsed}ms, minimum required: ${MIN_DISPLAY_MS}ms")
 
+                // ✅ Show status bar when video completes
+                showSystemUI()
+
                 if (remaining > 0) {
                     Timber.tag(TAG).e("Waiting additional ${remaining}ms before finishing")
                     binding.root.postDelayed({
@@ -259,6 +306,9 @@ class IntroFragment : Fragment() {
                 // Hide placeholder and progress bar on error
                 binding.splashPlaceholder.visibility = View.GONE
                 binding.progressBar.visibility = View.GONE
+
+                // ✅ Show status bar on error
+                showSystemUI()
 
                 // Apply minimum display time even on error
                 val elapsed = SystemClock.elapsedRealtime() - videoStartTime
@@ -282,9 +332,13 @@ class IntroFragment : Fragment() {
             Timber.tag(TAG).e(e, "Exception in setupVideo: ${e.message}")
             binding.splashPlaceholder.visibility = View.GONE
             binding.progressBar.visibility = View.GONE
+            // ✅ Show status bar on exception
+            showSystemUI()
             onVideoFinished()
         }
     }
+
+    // ==================== NAVIGATION ====================
 
     private fun navigateToDestination() {
         Timber.tag(TAG).e("navigateToDestination called")
@@ -294,6 +348,9 @@ class IntroFragment : Fragment() {
             Timber.tag(TAG).e("Fragment not in valid state, skipping navigation")
             return
         }
+
+        // ✅ Show system UI before navigation
+        showSystemUI()
 
         val destination = targetDestination ?: R.id.loginFragment
         Timber.tag(TAG).e("Target destination ID: $destination")
@@ -357,18 +414,35 @@ class IntroFragment : Fragment() {
         }
     }
 
+    // ==================== LIFECYCLE ====================
+
     override fun onResume() {
         super.onResume()
         Timber.tag(TAG).e("onResume called")
+
+        // ✅ ALWAYS show status bar when resuming - this ensures network/battery signs appear
+        showSystemUI()
     }
 
     override fun onPause() {
         super.onPause()
         Timber.tag(TAG).e("onPause called")
+
+        // ✅ Show system UI before pausing (when navigating away)
+        showSystemUI()
+
         if (_binding != null && binding.videoView.isPlaying) {
             binding.videoView.pause()
             Timber.tag(TAG).e("Video paused")
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        Timber.tag(TAG).e("onStop called")
+
+        // ✅ Ensure status bar is visible when stopped
+        showSystemUI()
     }
 
     override fun onDestroyView() {
@@ -377,11 +451,12 @@ class IntroFragment : Fragment() {
         videoWatchdogJob?.cancel()
         videoWatchdogJob = null
 
-        // Restore system UI
-        @Suppress("DEPRECATION")
-        requireActivity().window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+        // ✅ Restore system UI when destroying view
+        showSystemUI()
 
         binding.videoView.suspend()
         _binding = null
+
+        Timber.tag(TAG).e("onDestroyView completed")
     }
 }
