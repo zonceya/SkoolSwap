@@ -28,6 +28,8 @@ import com.example.skoolswap.databinding.FragmentCreateItemBinding
 import com.example.skoolswap.domain.model.reference.*
 import com.example.skoolswap.ui.component.ColorPickerBottomSheet
 import com.example.skoolswap.ui.component.OptionsPickerBottomSheet
+import com.example.skoolswap.ui.main.MainActivity
+import com.example.skoolswap.ui.main.MainViewModel
 import com.example.skoolswap.utils.DialogAction
 import com.example.skoolswap.utils.DialogHelper
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -44,7 +46,7 @@ import java.util.Locale
 class CreateItemFragment : Fragment() {
 
     companion object {
-        private const val TAG = "CreateItemFragment"
+        const val TAG = "CreateItemFragment"
     }
 
     private var _binding: FragmentCreateItemBinding? = null
@@ -72,6 +74,10 @@ class CreateItemFragment : Fragment() {
     private val simpleCameraLauncher = registerForActivityResult(
         ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
+        (activity as? MainActivity)?.let {
+            val mainViewModel: MainViewModel by viewModels()
+            mainViewModel.suppressNextResumeRefresh = false
+        }
         Log.d(TAG, "📸 Camera callback received, bitmap = ${if (bitmap != null) "not null" else "null"}")
         isCameraLaunched = false
 
@@ -105,6 +111,10 @@ class CreateItemFragment : Fragment() {
         ActivityResultContracts.GetMultipleContents()
     ) { uris: List<Uri>? ->
         Log.d(TAG, "📷 Gallery callback, uris = ${uris?.size ?: 0} images")
+        (activity as? MainActivity)?.let {
+            val mainViewModel: MainViewModel by viewModels()
+            mainViewModel.suppressNextResumeRefresh = false
+        }
         if (uris.isNullOrEmpty()) {
             Log.w(TAG, "No images selected from gallery")
             return@registerForActivityResult
@@ -357,16 +367,21 @@ class CreateItemFragment : Fragment() {
 
         // Set click listener
         binding.mainCategoryInput.setOnClickListener {
-            Log.d(TAG, "Main category input clicked, showing ${categories.size} options")
-
             OptionsPickerBottomSheet(
                 title = "Select Category",
                 options = categories.map { it.name }
             ) { selectedName, position ->
                 val selectedCategory = categories[position]
-                selectedMainCategoryId = selectedCategory.id
+
+                // Update BOTH places
+                selectedMainCategoryId = selectedCategory.id                    // Fragment variable
                 binding.mainCategoryInput.setText(selectedName)
-                Log.d(TAG, "✅ Selected category: ${selectedCategory.name} (ID: ${selectedCategory.id})")
+
+                viewModel.onMainCategorySelected(selectedCategory.id)           // ViewModel
+
+                Log.d(TAG, "✅ MAIN CATEGORY SELECTED → ID: ${selectedCategory.id} | Name: ${selectedCategory.name}")
+
+                // Force refresh subcategories
                 viewModel.onMainCategorySelected(selectedCategory.id)
             }.show(childFragmentManager, "category_picker")
         }
@@ -668,18 +683,30 @@ class CreateItemFragment : Fragment() {
 
     private fun launchCameraSafely() {
         Log.d(TAG, "launchCameraSafely called, isCameraLaunched=$isCameraLaunched")
-
+        (activity as? MainActivity)?.let { mainActivity ->
+            val mainViewModel: MainViewModel by viewModels() // Get reference
+            mainViewModel.suppressNextResumeRefresh = true
+            Log.d(TAG, "🔒 Suppressed next resume refresh")
+        }
+        (activity as? MainActivity)?.let {
+            val mainViewModel: MainViewModel by viewModels()
+            mainViewModel.suppressNextResumeRefresh = true
         if (!isCameraLaunched) {
             isCameraLaunched = true
 
             // Check if camera hardware exists
-            val hasCamera = requireContext().packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
+            val hasCamera =
+                requireContext().packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
             Log.d(TAG, "Device has camera: $hasCamera")
 
             if (!hasCamera) {
                 isCameraLaunched = false
                 Log.e(TAG, "No camera hardware on device")
-                Toast.makeText(requireContext(), "Your device doesn't have a camera", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    requireContext(),
+                    "Your device doesn't have a camera",
+                    Toast.LENGTH_SHORT
+                ).show()
                 return
             }
 
@@ -690,11 +717,17 @@ class CreateItemFragment : Fragment() {
             } catch (e: Exception) {
                 isCameraLaunched = false
                 Log.e(TAG, "❌ Failed to launch camera", e)
-                Toast.makeText(requireContext(), "Failed to launch camera: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    requireContext(),
+                    "Failed to launch camera: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         } else {
             Log.w(TAG, "Camera already launching, skipping")
         }
+    }
+
     }
 
     private fun setupClickListeners() {
@@ -876,46 +909,51 @@ class CreateItemFragment : Fragment() {
     }
 
     private fun createItem() {
-        val name = binding.itemName.text.toString()
-        val description = binding.description.text.toString()
+        val name = binding.itemName.text.toString().trim()
+        val description = binding.description.text.toString().trim()
         val price = binding.price.text.toString().toDoubleOrNull() ?: 0.0
 
-        Log.d(TAG, "=== createItem START ===")
-        Log.d(TAG, "Name: $name")
-        Log.d(TAG, "Description: $description")
-        Log.d(TAG, "Price: $price")
-        Log.d(TAG, "Quantity: $selectedQuantity")
-        Log.d(TAG, "MainCategoryId: $selectedMainCategoryId")
-        Log.d(TAG, "SubCategoryId: $selectedSubCategoryId")
-        Log.d(TAG, "BrandId: $selectedBrandId")
-        Log.d(TAG, "SizeId: $selectedSizeId")
-        Log.d(TAG, "SchoolId: $selectedSchoolId")
-        Log.d(TAG, "ConditionId: $selectedConditionId")
-        Log.d(TAG, "LocationId: $selectedTownId")
-        Log.d(TAG, "ProvinceId: $selectedProvinceId")
-        Log.d(TAG, "GenderId: $selectedGenderId")
-        Log.d(TAG, "ColorId: $selectedColorId")
+        // Read latest values from ViewModel (most reliable)
+        val mainId = viewModel.selectedMainCategoryId.value
+        val subId = selectedSubCategoryId   // fallback to local for now
 
-        if (selectedMainCategoryId == null || selectedSubCategoryId == null) {
-            Log.e(TAG, "Category or subcategory not selected")
-            Toast.makeText(requireContext(), "Please select category and subcategory", Toast.LENGTH_SHORT).show()
+        Log.d(TAG, "🚀 Submit attempt - MainCat from VM: $mainId | Local: $selectedMainCategoryId")
+        Log.d(TAG, "🚀 SubCat: $subId")
+
+        if (name.isEmpty()) {
+            Toast.makeText(requireContext(), "Please enter item name", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (description.isEmpty()) {
+            Toast.makeText(requireContext(), "Please enter description", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (price <= 0) {
+            Toast.makeText(requireContext(), "Please enter valid price", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (mainId == null || mainId == 0) {
+            Toast.makeText(requireContext(), "Please select a main category", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (subId == null || subId == 0) {
+            Toast.makeText(requireContext(), "Please select a sub category", Toast.LENGTH_SHORT).show()
             return
         }
 
-        lifecycleScope.launch {
-            val hasContactNumber = viewModel.hasContactNumber()
+        Log.d(TAG, "✅ All checks passed - Using Main: $mainId, Sub: $subId")
 
-            if (hasContactNumber) {
-                // User HAS contact number - create item directly
-                Log.d(TAG, "User has contact number, creating item...")
+        lifecycleScope.launch {
+            val hasContact = viewModel.hasContactNumber()
+            if (hasContact) {
                 viewModel.createItemOfflineFirst(
                     context = requireContext(),
                     name = name,
                     description = description,
                     price = price,
                     quantity = selectedQuantity,
-                    mainCategoryId = selectedMainCategoryId!!,
-                    subCategoryId = selectedSubCategoryId!!,
+                    mainCategoryId = mainId,
+                    subCategoryId = subId!!,
                     brandId = selectedBrandId,
                     sizeId = selectedSizeId,
                     schoolId = selectedSchoolId,
@@ -926,10 +964,7 @@ class CreateItemFragment : Fragment() {
                     colorId = selectedColorId,
                     tagIds = null
                 )
-                Log.d(TAG, "createItem called on ViewModel")
             } else {
-                // User has NO contact number - show dialog to add contact number
-                Log.d(TAG, "User does NOT have contact number, showing dialog")
                 showMissingContactDialog()
             }
         }
@@ -1001,31 +1036,30 @@ class CreateItemFragment : Fragment() {
     }
 
     private fun validateForm(): Boolean {
-        Log.d(TAG, "Validating form")
+        Log.d(TAG, "Validating form - MainCat: $selectedMainCategoryId, SubCat: $selectedSubCategoryId")
 
         if (binding.itemName.text.isNullOrEmpty()) {
-            Log.w(TAG, "Item name is empty")
             Toast.makeText(requireContext(), "Please enter item name", Toast.LENGTH_SHORT).show()
             return false
         }
         if (binding.description.text.isNullOrEmpty()) {
-            Log.w(TAG, "Description is empty")
             Toast.makeText(requireContext(), "Please enter description", Toast.LENGTH_SHORT).show()
             return false
         }
         if (binding.price.text.isNullOrEmpty()) {
-            Log.w(TAG, "Price is empty")
             Toast.makeText(requireContext(), "Please enter price", Toast.LENGTH_SHORT).show()
             return false
         }
-        val price = binding.price.text.toString().toDoubleOrNull()
-        if (price == null || price <= 0) {
-            Log.w(TAG, "Invalid price: ${binding.price.text}")
-            Toast.makeText(requireContext(), "Please enter a valid price", Toast.LENGTH_SHORT).show()
+        if (selectedMainCategoryId == null) {
+            Toast.makeText(requireContext(), "Please select a main category", Toast.LENGTH_SHORT).show()
+            return false
+        }
+        if (selectedSubCategoryId == null) {
+            Toast.makeText(requireContext(), "Please select a sub category", Toast.LENGTH_SHORT).show()
             return false
         }
 
-        Log.d(TAG, "Form validation passed")
+        Log.d(TAG, "✅ Validation PASSED - Main: $selectedMainCategoryId | Sub: $selectedSubCategoryId")
         return true
     }
 
@@ -1154,6 +1188,7 @@ class CreateItemFragment : Fragment() {
         super.onResume()
         Log.d(TAG, "onResume - resetting camera flag")
         isCameraLaunched = false
+        hideFab()
     }
 
     override fun onPause() {

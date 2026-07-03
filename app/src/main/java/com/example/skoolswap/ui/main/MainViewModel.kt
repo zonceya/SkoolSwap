@@ -23,7 +23,7 @@ class MainViewModel @Inject constructor(
     private val preferences: AppPreferences,
     private val authRepository: AuthRepositoryInterface
 ) : ViewModel() {
-
+    var suppressNextResumeRefresh = false
     private val _forceNavigation = MutableLiveData<NavigationDestination?>()
     val forceNavigation: MutableLiveData<NavigationDestination?> = _forceNavigation
 

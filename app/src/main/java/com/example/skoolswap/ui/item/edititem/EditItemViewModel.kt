@@ -4,11 +4,13 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.WorkManager
 import com.example.skoolswap.domain.model.EditImage
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.reference.*
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.domain.repository.ReferenceDataRepositoryInterface
+import com.example.skoolswap.workers.EditItemWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -234,10 +236,12 @@ class EditItemViewModel @Inject constructor(
     }
 
     // ============ LOAD ITEM ============
+    // In EditItemViewModel.kt - Update loadItem
+
     fun loadItem(itemId: String) {
         Timber.tag(TAG).d("🔄 loadItem() called for: $itemId")
         viewModelScope.launch {
-            Timber.tag(TAG).d("Fetching item from repository...")
+            _isLoading.value = true
             val result = itemRepository.getShopItemForEdit(itemId)
 
             result.fold(
@@ -245,15 +249,22 @@ class EditItemViewModel @Inject constructor(
                     Timber.tag(TAG).d("✅ SUCCESS - Item loaded:")
                     Timber.tag(TAG).d("   ID: ${item.id}")
                     Timber.tag(TAG).d("   Name: ${item.name}")
-                    Timber.tag(TAG).d("   Price: ${item.price}")
-                    Timber.tag(TAG).d("   Quantity: ${item.quantity}")
-                    Timber.tag(TAG).d("   Images count: ${item.images.size}")
-
-                    item.images.forEachIndexed { index, image ->
-                        Timber.tag(TAG).d("   Image $index: ${image.url.take(100)}...")
-                    }
+                    Timber.tag(TAG).d("   mainCategoryId: ${item.mainCategoryId}")
+                    Timber.tag(TAG).d("   subCategoryId: ${item.subCategoryId}")
+                    Timber.tag(TAG).d("   Images: ${item.images.size}")
 
                     _item.value = item
+
+                    // ✅ Set selected IDs for dropdowns
+                    item.mainCategoryId?.let {
+                        _selectedMainCategoryId.value = it
+                        Timber.tag(TAG).d("🔑 Set selectedMainCategoryId: $it")
+                    }
+                    item.provinceId?.let {
+                        _selectedProvinceId.value = it
+                        Timber.tag(TAG).d("🔑 Set selectedProvinceId: $it")
+                    }
+
                     val existingImages = item.images.map { image ->
                         EditImage.Existing(image.id, image.url)
                     }
@@ -427,7 +438,95 @@ class EditItemViewModel @Inject constructor(
         Timber.tag(TAG).d("showDeleteConfirmation called")
         _showDeleteConfirmation.value = true
     }
+// In EditItemViewModel.kt
 
+    fun updateItemOfflineFirst(
+        context: Context,
+        itemId: String,
+        name: String?,
+        description: String?,
+        price: Double?,
+        quantity: Int?,
+        mainCategoryId: Int?,
+        subCategoryId: Int?,
+        brandId: Int?,
+        sizeId: Int?,
+        schoolId: Int?,
+        conditionId: Int?,
+        locationId: Int?,
+        provinceId: Int?,
+        genderId: Int?,
+        colorId: Int?,
+        addImageUris: List<Uri>,
+        removeImageIds: List<Long>
+    ) {
+        Timber.tag(TAG).d("=== updateItemOfflineFirst START ===")
+        Timber.tag(TAG).d("itemId: $itemId")
+        Timber.tag(TAG).d("mainCategoryId: $mainCategoryId")
+        Timber.tag(TAG).d("subCategoryId: $subCategoryId")
+        Timber.tag(TAG).d("addImageUris: ${addImageUris.size}")
+        Timber.tag(TAG).d("removeImageIds: ${removeImageIds.size}")
+
+        _uiState.value = EditItemUiState.Loading
+
+        viewModelScope.launch {
+            try {
+                // ✅ Save locally first (offline-first)
+                val result = itemRepository.updateItemOfflineFirst(
+                    context = context,
+                    itemId = itemId,
+                    name = name,
+                    description = description,
+                    mainCategoryId = mainCategoryId,
+                    subCategoryId = subCategoryId,
+                    brandId = brandId,
+                    price = price,
+                    quantity = quantity,
+                    itemConditionId = conditionId,
+                    provinceId = provinceId,
+                    locationId = locationId,
+                    genderId = genderId,
+                    schoolId = schoolId,
+                    sizeId = sizeId,
+                    colorId = colorId,
+                    tagIds = null,
+                    addImageUris = addImageUris,
+                    removeImageIds = removeImageIds
+                )
+
+                if (result.isFailure) {
+                    val error = result.exceptionOrNull()?.message ?: "Failed to save changes"
+                    Timber.tag(TAG).e("❌ Local save failed: $error")
+                    _uiState.value = EditItemUiState.Error(error)
+                    return@launch
+                }
+
+                val updatedItem = result.getOrNull()!!
+                Timber.tag(TAG).d("✅ Item saved locally, updating in background")
+
+                // ✅ Navigate immediately
+                _uiState.value = EditItemUiState.Success("Item updated, syncing in background")
+
+                // ✅ Clear deletion tracking
+                _imagesToDelete.value = emptySet()
+
+                // ✅ Enqueue worker for background sync
+                val worker = EditItemWorker.createOneTimeRequest(
+                    itemId = itemId,
+                    addImageUris = addImageUris,
+                    removeImageIds = removeImageIds
+                )
+                WorkManager.getInstance(context).enqueue(worker)
+
+                Timber.tag(TAG).d("✅ Worker enqueued")
+                Timber.tag(TAG).d("🏁 updateItemOfflineFirst SUCCESS")
+
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "❌ updateItemOfflineFirst FAILED")
+                _uiState.value = EditItemUiState.Error(e.message ?: "Failed to update item")
+            }
+        }
+    }
     fun deleteConfirmationShown() {
         Timber.tag(TAG).d("deleteConfirmationShown called")
         _showDeleteConfirmation.value = false

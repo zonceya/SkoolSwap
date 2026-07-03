@@ -132,5 +132,51 @@ interface ItemRepositoryInterface {
     suspend fun clearItems()
     suspend fun updateItemStatus(itemId: String, status: String): Result<Unit>
     suspend fun saveLocalItem(item: Item): Result<Unit>
+    suspend fun createItemOfflineFirst(
+        context: Context,
+        name: String,
+        description: String,
+        mainCategoryId: Int,
+        subCategoryId: Int,
+        brandId: Int?,
+        price: Double,
+        quantity: Int,
+        itemConditionId: Int?,
+        provinceId: Int?,
+        locationId: Int?,
+        genderId: Int?,
+        schoolId: Int?,
+        sizeId: Int?,
+        colorId: Int?,
+        tagIds: List<Int>? = null,
+        imageUris: List<Uri> = emptyList()
+    ): Result<Item>
+    suspend fun attachImagesToItem(
+        itemId: String,
+        imageUrls: List<String>
+    ): Result<List<ItemImage>>
+    suspend fun updateItemOfflineFirst(
+        context: Context,
+        itemId: String,
+        name: String?,
+        description: String?,
+        mainCategoryId: Int?,
+        subCategoryId: Int?,
+        brandId: Int?,
+        price: Double?,
+        quantity: Int?,
+        itemConditionId: Int?,
+        provinceId: Int?,
+        locationId: Int?,
+        genderId: Int?,
+        schoolId: Int?,
+        sizeId: Int?,
+        colorId: Int?,
+        tagIds: List<Int>?,
+        addImageUris: List<Uri>,
+        removeImageIds: List<Long>
+    ): Result<Item>
+
+
 
 }

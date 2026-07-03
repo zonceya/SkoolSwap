@@ -56,6 +56,8 @@ import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.example.skoolswap.data.remote.models.response.user.FirebaseAuthResponse
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.sync.withLock
 
 
 @Singleton
@@ -73,9 +75,9 @@ class AuthRepository @Inject constructor(
     private companion object {
         private const val TAG = "AuthRepository"
     }
-
+    private val refreshMutex = kotlinx.coroutines.sync.Mutex()
     private val userDao = database.userDao()
-
+    private val signOutMutex = kotlinx.coroutines.sync.Mutex()
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
 
     // Firebase user flow (property)
@@ -91,7 +93,8 @@ class AuthRepository @Inject constructor(
 
     private val _loading = MutableStateFlow(false)
     override val loading: StateFlow<Boolean> = _loading.asStateFlow()
-
+    private var lastRefreshTime = 0L
+    private val REFRESH_DEBOUNCE_MS = 10_000L
     private val _error = MutableStateFlow<String?>(null)
     override val error: StateFlow<String?> = _error.asStateFlow()
     override suspend fun signInWithEmail(email: String, password: String): Result<User> {
@@ -118,7 +121,21 @@ class AuthRepository @Inject constructor(
             _loading.value = false
         }
     }
+    private fun isRecentlyRefreshed(): Boolean {
+        return System.currentTimeMillis() - lastRefreshTime < REFRESH_DEBOUNCE_MS
+    }
+    private suspend fun updateTokenAcrossAllLayers(newToken: String) {
+        lastRefreshTime = System.currentTimeMillis()
 
+        _authToken.value = newToken
+        appPreferences.setAuthToken(newToken)
+
+        _serverUser.value?.let { user ->
+            val updated = user.copy(token = newToken)
+            _serverUser.value = updated
+            userDao.insertUser(updated.toEntity())
+        }
+    }
     override suspend fun signUpWithEmail(
         name: String,
         email: String,
@@ -272,7 +289,8 @@ class AuthRepository @Inject constructor(
                 }
             } catch (e: retrofit2.HttpException) {
                 if (e.code() in 500..599 && attempt < maxRetries) {
-                    Log.e(TAG, "⚠️ Server error ${e.code()} on attempt $attempt, retrying...")
+                    Timber.tag(TAG)
+                        .e("⚠️ Server error ${e.code()} on attempt $attempt, retrying...")
                     val delay = baseDelayMs * (1L shl (attempt - 1))
                     delay(delay)
                 } else {
@@ -311,9 +329,9 @@ class AuthRepository @Inject constructor(
                 appPreferences.setSchoolMapped(false)
             }
 
-            Log.i(TAG, "✅ User cached after Firebase auth: ${user.name}")
+            Timber.tag(TAG).i("✅ User cached after Firebase auth: ${user.name}")
         } catch (e: Exception) {
-            Log.e(TAG, "Error caching user after Firebase auth", e)
+            Timber.tag(TAG).e(e, "Error caching user after Firebase auth")
         }
     }
     // AuthRepository.kt - add this method
@@ -331,8 +349,8 @@ class AuthRepository @Inject constructor(
             cachedUser?.let {
                 _serverUser.value = it.toDomain()
                 _authToken.value = it.token
-                Log.e("DEBUG", "User.schoolMapped: ${cachedUser?.schoolMapped}")
-                Log.e("DEBUG", "User.schoolName: ${cachedUser?.schoolName}")
+                Timber.tag("DEBUG").e("User.schoolMapped: ${cachedUser?.schoolMapped}")
+                Timber.tag("DEBUG").e("User.schoolName: ${cachedUser?.schoolName}")
 
             }
         } catch (e: Exception) {
@@ -373,7 +391,7 @@ class AuthRepository @Inject constructor(
         val firebaseUser = firebaseAuth.currentUser ?: return false
 
         try {
-            Log.e(TAG, "🔄 Attempting session recovery...")
+            Timber.tag(TAG).e("🔄 Attempting session recovery...")
             val idToken = firebaseUser.getIdToken(false).await().token ?: return false
 
             val user = syncWithRailsApiWithRetry(
@@ -385,11 +403,11 @@ class AuthRepository @Inject constructor(
             )
 
             cacheUserAfterFirebaseAuth(user, user.token)
-            Log.e(TAG, "✅ Session recovery successful")
+            Timber.tag(TAG).e("✅ Session recovery successful")
             return true
 
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Session recovery failed: ${e.message}")
+            Timber.tag(TAG).e("❌ Session recovery failed: ${e.message}")
             return false
         }
     }
@@ -468,12 +486,12 @@ class AuthRepository @Inject constructor(
             // 5. Cache the user
             cacheUserAfterFirebaseAuth(user, user.token)
 
-            Log.e(TAG, "✅ Google Sign-In successful for: ${user.email}")
+            Timber.tag(TAG).e("✅ Google Sign-In successful for: ${user.email}")
             Result.success(user)
 
         } catch (e: Exception) {
             _error.value = "Sign-in failed: ${e.localizedMessage}"
-            Log.e(TAG, "Google sign-in failed", e)
+            Timber.tag(TAG).e(e, "Google sign-in failed")
             Result.failure(e)
         } finally {
             _loading.value = false
@@ -535,43 +553,78 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    override suspend fun refreshToken(): Result<String> {
+    private suspend fun checkForValidSession(): Boolean {
         return try {
-            val currentToken = _authToken.value ?: appPreferences.getAuthTokenSync()
-            ?: return Result.failure(Exception("No token available"))
-
-            val response = userApiService.refreshToken("Bearer $currentToken")
-
-            if (response.isSuccessful) {
-                val body = response.body()
-                if (body?.success == true && !body.token.isNullOrEmpty()) {
-                    val newToken = body.token!!
-
-                    _authToken.value = newToken
-                    appPreferences.setAuthToken(newToken)
-
-                    _serverUser.value?.let { user ->
-                        val updated = user.copy(token = newToken)
-                        _serverUser.value = updated
-                        userDao.insertUser(updated.toEntity())
-                    }
-
-                    Result.success(newToken)
-                } else {
-                    Result.failure(Exception(body?.message ?: "Refresh failed"))
-                }
-            } else {
-                if (response.code() == 401) {
-                    Timber.tag(TAG).w("Refresh failed with 401 → forcing logout")
-                    signOut()   // This is important
-                }
-                Result.failure(Exception("Refresh failed: ${response.code()}"))
-            }
+            // Check if we have a valid user session
+            val user = getServerUser().firstOrNull()
+            user != null && !user.email.isNullOrEmpty()
         } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "Refresh exception")
-            Result.failure(e)
+            false
         }
     }
+
+    override suspend fun refreshToken(): Result<String> {
+        // ✅ Serialize all refresh attempts
+        return refreshMutex.withLock {
+            Timber.tag(TAG).d("🔒 Acquired refresh lock")
+
+            val currentToken = getCurrentToken()
+            if (currentToken == null) {
+                Timber.tag(TAG).w("No token available for refresh")
+                return@withLock Result.failure(Exception("No token"))
+            }
+
+            // ✅ Check if we've refreshed recently
+            if (isRecentlyRefreshed()) {
+                Timber.tag(TAG).d("⏭️ Token recently refreshed, using existing token")
+                return@withLock Result.success(currentToken)
+            }
+
+            try {
+                Timber.tag(TAG).d("🔄 Attempting token refresh...")
+                val response = userApiService.refreshToken("Bearer $currentToken")
+
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    val newToken = body?.token
+
+                    if (body?.success == true && !newToken.isNullOrEmpty()) {
+                        Timber.tag(TAG).d("✅ Token refreshed successfully")
+                        updateTokenAcrossAllLayers(newToken)
+                        lastRefreshTime = System.currentTimeMillis()
+                        return@withLock Result.success(newToken)
+                    } else {
+                        val message = body?.message ?: "Refresh failed - invalid response"
+                        Timber.tag(TAG).w("⚠️ Refresh failed: $message")
+                        return@withLock Result.failure(Exception(message))
+                    }
+                } else {
+                    // ❌ DON'T signOut() here - just report failure
+                    val errorMsg = "Refresh failed: ${response.code()}"
+                    Timber.tag(TAG).w("⚠️ $errorMsg")
+
+                    // Only sign out if it's a specific server-side invalid token
+                    // and we know the token is truly dead
+                    if (response.code() == 401) {
+                        // Check if we have a valid session elsewhere
+                        val hasValidSession = checkForValidSession()
+                        if (!hasValidSession) {
+                            Timber.tag(TAG).w("🔴 No valid session found, signing out")
+                            signOut()
+                        } else {
+                            Timber.tag(TAG).d("ℹ️ Valid session exists elsewhere, not signing out")
+                        }
+                    }
+
+                    return@withLock Result.failure(Exception(errorMsg))
+                }
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "❌ Exception during token refresh")
+                return@withLock Result.failure(e)
+            }
+        }
+    }
+
 
     override suspend fun validateToken(token: String): Boolean {
         return try {
@@ -857,34 +910,32 @@ class AuthRepository @Inject constructor(
     }
     // In AuthRepository.kt - update signOut method
     override suspend fun signOut() {
-        try {
-            // Firebase sign out
-            firebaseAuth.signOut()
+        if (!signOutMutex.tryLock()) {
+            Timber.tag(TAG).d("Sign-out already in progress")
+            return   // ✅ no finally to worry about, we never locked it
+        }
 
-            // Clear all local data
+        try {
+            firebaseAuth.signOut()
             clearUserData()
 
-            // Clear database
             userDao.clearAllUsers()
-
-            // Clear preferences including token cache
             appPreferences.setLoggedIn(false)
             appPreferences.clearUserData()
             appPreferences.clearAuthToken()
 
-            // Clear memory state
             _authToken.value = null
             _serverUser.value = null
 
             Timber.tag(TAG).i("User signed out successfully")
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Error during sign out")
-            // Even if there's an error, we should continue with clearing
-            _authToken.value = null
-            _serverUser.value = null
-            appPreferences.clearAuthToken()
+        } finally {
+            signOutMutex.unlock()   // ✅ only reached if we actually locked it
         }
     }
+
+
 
     private fun clearUserData() {
         _currentUser.value = null
@@ -930,7 +981,8 @@ class AuthRepository @Inject constructor(
                 handleCredentialException(e)
             } catch (e: GetCredentialException) {
                 lastException = e
-                Log.w(TAG, "Credential attempt ${attempt + 1} failed: ${e.javaClass.simpleName}")
+                Timber.tag(TAG)
+                    .w("Credential attempt ${attempt + 1} failed: ${e.javaClass.simpleName}")
                 if (attempt < 2) {
                     // Wait before retrying: 500ms, then 1500ms
                     kotlinx.coroutines.delay(500L * (attempt + 1))
@@ -942,7 +994,7 @@ class AuthRepository @Inject constructor(
     }
 
     private fun handleCredentialException(e: GetCredentialException): Nothing {
-        Log.e(TAG, "Credential exception: ${e.javaClass.simpleName} - ${e.message}")
+        Timber.tag(TAG).e("Credential exception: ${e.javaClass.simpleName} - ${e.message}")
 
         when (e) {
             is androidx.credentials.exceptions.NoCredentialException -> {

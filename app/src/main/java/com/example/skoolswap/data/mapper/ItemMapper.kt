@@ -13,6 +13,7 @@ import com.example.skoolswap.domain.model.ItemMeta
 import com.example.skoolswap.domain.model.Shop
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import timber.log.Timber
 
 // ============ ITEM DTO TO DOMAIN ============
 fun ItemDto.toDomain(): Item {
@@ -292,12 +293,23 @@ fun ShopItemDto.toDomain(shopId: Long): Item {
 }
 
 // ============ DOMAIN TO ENTITY (WITH IMAGES JSON) ============
+// ============ DOMAIN TO ENTITY (WITH IMAGES JSON) ============
 fun Item.toEntity(): ItemEntity {
+    Timber.tag("ItemMapper").d("🔄 Item.toEntity() called")
+    Timber.tag("ItemMapper").d("   Item ID: $id")
+    Timber.tag("ItemMapper").d("   Name: $name")
+    Timber.tag("ItemMapper").d("   mainCategoryId: $mainCategoryId")
+    Timber.tag("ItemMapper").d("   subCategoryId: $subCategoryId")
+    Timber.tag("ItemMapper").d("   colorId: $colorId")
+    Timber.tag("ItemMapper").d("   locationId: $locationId")
+    Timber.tag("ItemMapper").d("   syncStatus: $syncStatus")
+    Timber.tag("ItemMapper").d("   retryCount: $retryCount")
+
     val imagesJson = if (images.isNotEmpty()) {
         Gson().toJson(images.map { mapOf("url" to it.url, "isCover" to it.isCover) })
     } else "[]"
 
-    return ItemEntity(
+    val entity = ItemEntity(
         id = id,
         shopId = shopId,
         name = name,
@@ -329,16 +341,23 @@ fun Item.toEntity(): ItemEntity {
         imagesJson = imagesJson,
         coverImage = coverImage,
         viewCount = viewCount,
-        // ✅ New sync fields
         syncStatus = syncStatus,
         syncError = syncError,
         retryCount = retryCount,
         lastSyncAttempt = lastSyncAttempt,
-        // ✅ Category fields
         mainCategoryId = mainCategoryId,
         subCategoryId = subCategoryId,
         colorId = colorId
     )
+
+    Timber.tag("ItemMapper").d("✅ ItemEntity created:")
+    Timber.tag("ItemMapper").d("   mainCategoryId: ${entity.mainCategoryId}")
+    Timber.tag("ItemMapper").d("   subCategoryId: ${entity.subCategoryId}")
+    Timber.tag("ItemMapper").d("   colorId: ${entity.colorId}")
+    Timber.tag("ItemMapper").d("   locationId: ${entity.locationId}")
+    Timber.tag("ItemMapper").d("   syncStatus: ${entity.syncStatus}")
+
+    return entity
 }
 // KEEP THIS VERSION
 fun RecommendationItemDto.toDomain(): com.example.skoolswap.domain.model.Item {
@@ -382,7 +401,18 @@ fun RecommendationItemDto.toDomain(): com.example.skoolswap.domain.model.Item {
     )
 }
 // ============ ENTITY TO DOMAIN (WITH IMAGES FROM JSON) ============
+
 fun ItemEntity.toDomain(): Item {
+    Timber.tag("ItemMapper").d("🔄 ItemEntity.toDomain() called")
+    Timber.tag("ItemMapper").d("   Entity ID: $id")
+    Timber.tag("ItemMapper").d("   Name: $name")
+    Timber.tag("ItemMapper").d("   mainCategoryId: $mainCategoryId")
+    Timber.tag("ItemMapper").d("   subCategoryId: $subCategoryId")
+    Timber.tag("ItemMapper").d("   colorId: $colorId")
+    Timber.tag("ItemMapper").d("   locationId: $locationId")
+    Timber.tag("ItemMapper").d("   syncStatus: $syncStatus")
+    Timber.tag("ItemMapper").d("   retryCount: $retryCount")
+
     // Parse images from JSON
     val imagesList = mutableListOf<ItemImage>()
     try {
@@ -406,7 +436,7 @@ fun ItemEntity.toDomain(): Item {
         imagesList.add(ItemImage(id = 0, url = coverImage!!, isCover = true))
     }
 
-    return Item(
+    val item = Item(
         id = id,
         shopId = shopId,
         name = name,
@@ -436,14 +466,21 @@ fun ItemEntity.toDomain(): Item {
         colorName = colorName,
         brandName = brandName,
         conditionName = conditionName,
-        // ✅ New sync fields
         syncStatus = syncStatus,
         syncError = syncError,
         retryCount = retryCount,
         lastSyncAttempt = lastSyncAttempt,
-        // ✅ Category fields
         mainCategoryId = mainCategoryId,
         subCategoryId = subCategoryId,
         colorId = colorId
     )
+
+    Timber.tag("ItemMapper").d("✅ Item created:")
+    Timber.tag("ItemMapper").d("   mainCategoryId: ${item.mainCategoryId}")
+    Timber.tag("ItemMapper").d("   subCategoryId: ${item.subCategoryId}")
+    Timber.tag("ItemMapper").d("   colorId: ${item.colorId}")
+    Timber.tag("ItemMapper").d("   locationId: ${item.locationId}")
+    Timber.tag("ItemMapper").d("   syncStatus: ${item.syncStatus}")
+
+    return item
 }

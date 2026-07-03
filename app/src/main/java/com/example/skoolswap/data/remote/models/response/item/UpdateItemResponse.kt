@@ -99,7 +99,7 @@ data class UpdateItemDto(
     val townName: String?,
 
     @SerializedName("images")
-    val images: List<ItemImageDto>?,
+    val images: List<Any>? = null,
 
     @SerializedName("tags")
     val tags: List<TagDto>?,
