@@ -1,5 +1,3 @@
-// Create new file: workers/EditItemWorker.kt
-
 package com.example.skoolswap.workers
 
 import android.content.Context
@@ -8,6 +6,8 @@ import androidx.work.CoroutineWorker
 import androidx.work.ListenableWorker
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkerParameters
+import com.example.skoolswap.common.constants.AppConstants
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.data.local.database.dao.ItemDao
 import com.example.skoolswap.data.local.database.dao.ItemImageDao
 import com.example.skoolswap.data.mapper.toDomain
@@ -19,6 +19,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
+
+// Private constants - internal to this file only
+private const val BACKOFF_DELAY_MINUTES = 30L
+private const val WORKER_TAG = "edit_item"
 
 class EditItemWorker(
     context: Context,
@@ -37,7 +41,7 @@ class EditItemWorker(
 
     override suspend fun doWork(): ListenableWorker.Result {
         val itemId = inputData.getString(KEY_ITEM_ID) ?: run {
-            Timber.tag(TAG).e("❌ No item ID provided")
+            Timber.tag(LogTags.SERVICE).e("❌ No item ID provided")
             return ListenableWorker.Result.failure()
         }
 
@@ -48,76 +52,69 @@ class EditItemWorker(
             try { Uri.parse(it) } catch (e: Exception) { null }
         } ?: emptyList()
 
-        Timber.tag(TAG).d("🚀 EditItemWorker.doWork() START")
-        Timber.tag(TAG).d("   Item ID: $itemId")
-        Timber.tag(TAG).d("   Add images: ${addImageUris.size}")
-        Timber.tag(TAG).d("   Remove image IDs: ${removeImageIds.size}")
+        Timber.tag(LogTags.SERVICE).d("🚀 EditItemWorker.doWork() START")
+        Timber.tag(LogTags.SERVICE).d("   Item ID: $itemId")
+        Timber.tag(LogTags.SERVICE).d("   Add images: ${addImageUris.size}")
+        Timber.tag(LogTags.SERVICE).d("   Remove image IDs: ${removeImageIds.size}")
 
         return try {
-            // 1. Get local item
-            Timber.tag(TAG).d("🔍 Step 1: Fetching local item...")
+            Timber.tag(LogTags.SERVICE).d("🔍 Step 1: Fetching local item...")
             val localItem = itemDao.getItemById(itemId)
             if (localItem == null) {
-                Timber.tag(TAG).e("❌ Item not found")
+                Timber.tag(LogTags.SERVICE).e("❌ Item not found")
                 return ListenableWorker.Result.failure()
             }
 
-            Timber.tag(TAG).d("✅ Local item found:")
-            Timber.tag(TAG).d("   Name: ${localItem.name}")
-            Timber.tag(TAG).d("   mainCategoryId: ${localItem.mainCategoryId}")
-            Timber.tag(TAG).d("   subCategoryId: ${localItem.subCategoryId}")
-            Timber.tag(TAG).d("   syncStatus: ${localItem.syncStatus}")
+            Timber.tag(LogTags.SERVICE).d("✅ Local item found:")
+            Timber.tag(LogTags.SERVICE).d("   Name: ${localItem.name}")
+            Timber.tag(LogTags.SERVICE).d("   mainCategoryId: ${localItem.mainCategoryId}")
+            Timber.tag(LogTags.SERVICE).d("   subCategoryId: ${localItem.subCategoryId}")
+            Timber.tag(LogTags.SERVICE).d("   syncStatus: ${localItem.syncStatus}")
 
-            // 2. Upload new images (if any)
             var uploadedUrls = emptyList<String>()
             if (addImageUris.isNotEmpty()) {
-                Timber.tag(TAG).d("📤 Step 2: Uploading ${addImageUris.size} images...")
+                Timber.tag(LogTags.SERVICE).d("📤 Step 2: Uploading ${addImageUris.size} images...")
                 try {
                     uploadedUrls = imageUploadRepository.uploadImages(
                         context = applicationContext,
                         imageUris = addImageUris
                     )
-                    Timber.tag(TAG).d("✅ Uploaded ${uploadedUrls.size}/${addImageUris.size} images")
+                    Timber.tag(LogTags.SERVICE).d("✅ Uploaded ${uploadedUrls.size}/${addImageUris.size} images")
                 } catch (e: Exception) {
-                    Timber.tag(TAG).e(e, "❌ Image upload failed")
-                    // Continue with update, images can be uploaded later
+                    Timber.tag(LogTags.SERVICE).e(e, "❌ Image upload failed")
                 }
             } else {
-                Timber.tag(TAG).d("📤 Step 2: No images to upload")
+                Timber.tag(LogTags.SERVICE).d("📤 Step 2: No images to upload")
             }
 
-            // 3. Delete images from server (if any)
             if (removeImageIds.isNotEmpty()) {
-                Timber.tag(TAG).d("🗑️ Removing ${removeImageIds.size} images from server...")
+                Timber.tag(LogTags.SERVICE).d("🗑️ Removing ${removeImageIds.size} images from server...")
                 removeImageIds.forEach { imageId ->
                     try {
                         val result = itemRepository.removeItemImage(itemId, imageId)
                         if (result.isSuccess) {
-                            Timber.tag(TAG).d("✅ Removed image ID: $imageId")
+                            Timber.tag(LogTags.SERVICE).d("✅ Removed image ID: $imageId")
                         } else {
-                            Timber.tag(TAG).w("⚠️ Failed to remove image $imageId: ${result.exceptionOrNull()?.message}")
+                            Timber.tag(LogTags.SERVICE).w("⚠️ Failed to remove image $imageId: ${result.exceptionOrNull()?.message}")
                         }
                     } catch (e: Exception) {
-                        Timber.tag(TAG).e(e, "❌ Failed to remove image $imageId")
+                        Timber.tag(LogTags.SERVICE).e(e, "❌ Failed to remove image $imageId")
                     }
                 }
             }
 
-            // 4. Attach new images
             if (uploadedUrls.isNotEmpty()) {
-                Timber.tag(TAG).d("🔄 Attaching ${uploadedUrls.size} images to item...")
+                Timber.tag(LogTags.SERVICE).d("🔄 Attaching ${uploadedUrls.size} images to item...")
                 val attachResult = itemRepository.attachImagesToItem(itemId, uploadedUrls)
                 if (attachResult.isFailure) {
-                    Timber.tag(TAG).w("⚠️ Failed to attach images: ${attachResult.exceptionOrNull()?.message}")
+                    Timber.tag(LogTags.SERVICE).w("⚠️ Failed to attach images: ${attachResult.exceptionOrNull()?.message}")
                 } else {
-                    Timber.tag(TAG).d("✅ Images attached")
+                    Timber.tag(LogTags.SERVICE).d("✅ Images attached")
                 }
             }
 
-            // 5. Update item on server
-            Timber.tag(TAG).d("🔄 Step 3: Updating item on server...")
+            Timber.tag(LogTags.SERVICE).d("🔄 Step 3: Updating item on server...")
 
-            // Convert to domain for update
             val domainItem = localItem.toDomain()
 
             val updateResult = itemRepository.updateItemSimple(
@@ -142,28 +139,26 @@ class EditItemWorker(
 
             if (updateResult.isFailure) {
                 val error = updateResult.exceptionOrNull()?.message ?: "Unknown error"
-                Timber.tag(TAG).e("❌ API update failed: $error")
-                updateItemStatus(itemId, "UPDATE_FAILED", error)
+                Timber.tag(LogTags.SERVICE).e("❌ API update failed: $error")
+                updateItemStatus(itemId, AppConstants.SyncStatus.UPDATE_FAILED, error)
 
-                // Retry on network errors
                 if (error.contains("network", ignoreCase = true) ||
                     error.contains("timeout", ignoreCase = true) ||
                     error.contains("502", ignoreCase = true)) {
-                    Timber.tag(TAG).d("🔁 Retryable error")
+                    Timber.tag(LogTags.SERVICE).d("🔁 Retryable error")
                     return ListenableWorker.Result.retry()
                 }
                 return ListenableWorker.Result.failure()
             }
 
             val serverItem = updateResult.getOrNull()!!
-            Timber.tag(TAG).d("✅ Item updated on server:")
-            Timber.tag(TAG).d("   Server ID: ${serverItem.id}")
-            Timber.tag(TAG).d("   Status: ${serverItem.status}")
+            Timber.tag(LogTags.SERVICE).d("✅ Item updated on server:")
+            Timber.tag(LogTags.SERVICE).d("   Server ID: ${serverItem.id}")
+            Timber.tag(LogTags.SERVICE).d("   Status: ${serverItem.status}")
 
-            // 6. Update local item with server data
-            Timber.tag(TAG).d("🔄 Step 4: Updating local item...")
+            Timber.tag(LogTags.SERVICE).d("🔄 Step 4: Updating local item...")
             val updatedEntity = localItem.copy(
-                syncStatus = "SYNCED",
+                syncStatus = AppConstants.SyncStatus.SYNCED,
                 syncError = null,
                 retryCount = 0,
                 lastSyncAttempt = System.currentTimeMillis(),
@@ -173,24 +168,24 @@ class EditItemWorker(
                 status = serverItem.status
             )
             itemDao.insertItem(updatedEntity)
-            Timber.tag(TAG).d("✅ Local item updated, syncStatus: SYNCED")
+            Timber.tag(LogTags.SERVICE).d("✅ Local item updated, syncStatus: ${AppConstants.SyncStatus.SYNCED}")
 
-            Timber.tag(TAG).d("🏁 EditItemWorker.doWork() SUCCESS")
+            Timber.tag(LogTags.SERVICE).d("🏁 EditItemWorker.doWork() SUCCESS")
             ListenableWorker.Result.success()
 
         } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "❌ Worker failed with exception")
-            updateItemStatus(itemId, "UPDATE_FAILED", e.message)
+            Timber.tag(LogTags.SERVICE).e(e, "❌ Worker failed with exception")
+            updateItemStatus(itemId, AppConstants.SyncStatus.UPDATE_FAILED, e.message)
 
             when {
                 e.message?.contains("network", ignoreCase = true) == true ||
                         e.message?.contains("timeout", ignoreCase = true) == true ||
                         e.message?.contains("502", ignoreCase = true) == true -> {
-                    Timber.tag(TAG).d("🔁 Retryable error, will retry")
+                    Timber.tag(LogTags.SERVICE).d("🔁 Retryable error, will retry")
                     ListenableWorker.Result.retry()
                 }
                 else -> {
-                    Timber.tag(TAG).d("❌ Non-retryable error")
+                    Timber.tag(LogTags.SERVICE).d("❌ Non-retryable error")
                     ListenableWorker.Result.failure()
                 }
             }
@@ -209,16 +204,15 @@ class EditItemWorker(
                         retryCount = item.retryCount + 1
                     )
                     itemDao.insertItem(updated)
-                    Timber.tag(TAG).d("📝 Updated item status: $status (retry: ${updated.retryCount})")
+                    Timber.tag(LogTags.SERVICE).d("📝 Updated item status: $status (retry: ${updated.retryCount})")
                 }
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Failed to update status")
+                Timber.tag(LogTags.SERVICE).e(e, "Failed to update status")
             }
         }
     }
 
     companion object {
-        private const val TAG = "EditItemWorker"
         const val KEY_ITEM_ID = "item_id"
         const val KEY_ADD_IMAGE_URIS = "add_image_uris"
         const val KEY_REMOVE_IMAGE_IDS = "remove_image_ids"
@@ -228,9 +222,9 @@ class EditItemWorker(
             addImageUris: List<Uri> = emptyList(),
             removeImageIds: List<Long> = emptyList()
         ): OneTimeWorkRequest {
-            Timber.tag(TAG).d("📦 Creating EditItemWorker for: $itemId")
-            Timber.tag(TAG).d("   Add images: ${addImageUris.size}")
-            Timber.tag(TAG).d("   Remove image IDs: ${removeImageIds.size}")
+            Timber.tag(LogTags.SERVICE).d("📦 Creating EditItemWorker for: $itemId")
+            Timber.tag(LogTags.SERVICE).d("   Add images: ${addImageUris.size}")
+            Timber.tag(LogTags.SERVICE).d("   Remove image IDs: ${removeImageIds.size}")
 
             val inputData = androidx.work.Data.Builder()
                 .putString(KEY_ITEM_ID, itemId)
@@ -253,10 +247,10 @@ class EditItemWorker(
                 )
                 .setBackoffCriteria(
                     androidx.work.BackoffPolicy.EXPONENTIAL,
-                    30,
+                    BACKOFF_DELAY_MINUTES,
                     TimeUnit.SECONDS
                 )
-                .addTag("edit_item")
+                .addTag(WORKER_TAG)
                 .build()
         }
     }

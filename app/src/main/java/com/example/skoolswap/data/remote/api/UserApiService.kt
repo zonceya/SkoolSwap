@@ -1,5 +1,7 @@
 package com.example.skoolswap.data.remote.api
 
+import com.example.skoolswap.common.constants.NetworkConstants.Endpoints
+import com.example.skoolswap.data.remote.models.request.AssignSchoolRequest
 import com.example.skoolswap.data.remote.models.request.SignInRequest
 import com.example.skoolswap.data.remote.models.request.SignUpRequest
 import com.example.skoolswap.data.remote.models.request.UpdateMobileRequest
@@ -25,51 +27,84 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 
 interface UserApiService {
-    @POST("api/v1/users/firebase_auth")
+
+    // ============ AUTHENTICATION ============
+    @POST(Endpoints.User.FIREBASE_AUTH)
     suspend fun firebaseAuth(
         @Body request: Map<String, String>
     ): Response<FirebaseAuthResponse>
-    @POST("api/v1/users/sign_in")
+
+    @POST(Endpoints.User.SIGN_IN)
     suspend fun signIn(
         @Body request: SignInRequest
     ): Response<SignInResponse>
-    @POST("api/v1/auth/refresh")
+
+    @POST(Endpoints.User.SIGN_UP)
+    suspend fun signUp(
+        @Body request: SignUpRequest
+    ): Response<SendOtpResponse>
+
+    // ============ OTP ============
+    @POST(Endpoints.User.SEND_LOGIN_OTP)
+    suspend fun sendLoginOtp(
+        @Body body: Map<String, String>
+    ): Response<SendOtpResponse>
+
+    @POST(Endpoints.User.VERIFY_SIGNUP)
+    suspend fun verifySignUp(
+        @Body request: VerifySignUpRequest
+    ): Response<VerifyOtpResponse>
+
+    @POST(Endpoints.User.VERIFY_LOGIN)
+    suspend fun verifyLogin(
+        @Body request: VerifyLoginRequest
+    ): Response<VerifyOtpResponse>
+
+    @POST(Endpoints.User.RESEND_SIGNUP_OTP)
+    suspend fun resendSignUpOtp(
+        @Body body: Map<String, String>
+    ): Response<SendOtpResponse>
+
+    @POST(Endpoints.User.RESEND_LOGIN_OTP)
+    suspend fun resendLoginOtp(
+        @Body body: Map<String, String>
+    ): Response<SendOtpResponse>
+
+    // ============ TOKEN ============
+    @POST(Endpoints.Auth.REFRESH_TOKEN)
     suspend fun refreshToken(
         @Header("Authorization") token: String
     ): Response<RefreshTokenResponse>
-    @PUT("api/v1/users/update_mobile")
+
+    // ============ PROFILE ============
+    @GET(Endpoints.User.PROFILE)
+    suspend fun getProfile(
+        @Header("Authorization") authToken: String
+    ): Response<ProfileResponse>
+
+    @PUT(Endpoints.User.UPDATE_MOBILE)
     suspend fun updateMobile(
         @Header("Authorization") authToken: String,
         @Body request: UpdateMobileRequest
     ): Response<UpdateMobileResponse>
-    @GET("api/v1/users/profile")
-    suspend fun getProfile(
-        @Header("Authorization") authToken: String
-    ): Response<ProfileResponse>
-    @DELETE("api/v1/users/disable")
+
+    // ============ ACCOUNT MANAGEMENT ============
+    @DELETE(Endpoints.User.DISABLE_USER)
     suspend fun deleteProfile(
         @Header("Authorization") authToken: String
     ): Response<DeleteProfileResponse>
 
-    @GET("api/v1/users/{userId}")
+    // ============ USER DATA ============
+    @GET(Endpoints.User.GET_USER)
     suspend fun getUserById(
         @Header("Authorization") authToken: String,
         @Path("userId") userId: Long
     ): Response<UserResponse>
-    // Add to UserApiService.kt
-    @POST("api/v1/users/signup")  // Change from "api/auth/signup"
-    suspend fun signUp(@Body request: SignUpRequest): Response<SendOtpResponse>
 
-    @POST("api/v1/users/send_login_otp")  // Change from "api/auth/send_login_otp"
-    suspend fun sendLoginOtp(@Body body: Map<String, String>): Response<SendOtpResponse>
-    @POST("api/auth/verify_signup")
-    suspend fun verifySignUp(@Body request: VerifySignUpRequest): Response<VerifyOtpResponse>
-
-    @POST("api/v1/users/verify_login_otp")  // Change from "api/auth/verify_login"
-    suspend fun verifyLogin(@Body request: VerifyLoginRequest): Response<VerifyOtpResponse>
-    @POST("api/auth/resend_signup_otp")
-    suspend fun resendSignUpOtp(@Body body: Map<String, String>): Response<SendOtpResponse>
-
-    @POST("api/auth/resend_login_otp")
-    suspend fun resendLoginOtp(@Body body: Map<String, String>): Response<SendOtpResponse>
+    // ============ SCHOOL ============
+    @POST(Endpoints.User.ASSIGN_SCHOOL)
+    suspend fun assignSchool(
+        @Header("Authorization") authToken: String,
+        @Body request: AssignSchoolRequest
+    ): Response<AssignSchoolResponse>
 }

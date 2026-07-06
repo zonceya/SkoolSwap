@@ -9,8 +9,10 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.databinding.FragmentForgotPasswordBinding
 import dagger.hilt.android.AndroidEntryPoint
+import timber.log.Timber
 
 @AndroidEntryPoint
 class ForgotPasswordFragment : Fragment() {
@@ -33,6 +35,14 @@ class ForgotPasswordFragment : Fragment() {
 
         setupClickListeners()
         observeViewModel()
+        setupStrings()
+    }
+
+    private fun setupStrings() {
+        // Set strings from resources
+        binding.buttonSendReset.text = getString(R.string.forgot_password_send_button)
+        binding.editEmail.hint = getString(R.string.forgot_password_email_hint)
+        binding.textBackToLogin.text = getString(R.string.forgot_password_back_to_login)
     }
 
     private fun setupClickListeners() {
@@ -40,12 +50,12 @@ class ForgotPasswordFragment : Fragment() {
             val email = binding.editEmail.text.toString().trim()
 
             if (email.isEmpty()) {
-                binding.editEmail.error = "Email is required"
+                binding.editEmail.error = getString(R.string.error_email_required)
                 return@setOnClickListener
             }
 
             if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-                binding.editEmail.error = "Invalid email format"
+                binding.editEmail.error = getString(R.string.error_invalid_email)
                 return@setOnClickListener
             }
 
@@ -60,7 +70,11 @@ class ForgotPasswordFragment : Fragment() {
     private fun observeViewModel() {
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
             binding.buttonSendReset.isEnabled = !isLoading
-            binding.buttonSendReset.text = if (isLoading) "Sending..." else "Send Reset Email"
+            binding.buttonSendReset.text = if (isLoading) {
+                getString(R.string.forgot_password_sending)
+            } else {
+                getString(R.string.forgot_password_send_button)
+            }
             binding.progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
         }
 
@@ -74,7 +88,7 @@ class ForgotPasswordFragment : Fragment() {
             if (sent) {
                 Toast.makeText(
                     requireContext(),
-                    "Password reset email sent! Check your inbox/spam folder.",
+                    getString(R.string.reset_email_sent),
                     Toast.LENGTH_LONG
                 ).show()
                 findNavController().popBackStack()

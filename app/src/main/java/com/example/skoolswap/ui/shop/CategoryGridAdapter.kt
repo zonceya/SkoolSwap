@@ -1,6 +1,5 @@
 package com.example.skoolswap.ui.shop
 
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -8,9 +7,11 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.databinding.ItemCategoryGridItemBinding
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.utils.extensions.formatViewCount
+import timber.log.Timber
 
 class CategoryGridAdapter(
     private val onItemClick: (String) -> Unit,
@@ -46,39 +47,34 @@ class CategoryGridAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(item: Item) {
-            Log.d("CategoryGridAdapter", "Binding grid item: ${item.name}, viewCount: ${item.viewCount}, status: ${item.status}")
+            Timber.tag(LogTags.UI).d("Binding grid item: ${item.name}, viewCount: ${item.viewCount}, status: ${item.status}")
 
             binding.productName.text = item.name
             binding.productPrice.text = "R${item.price}"
 
-            // ✅ SHOW VIEW COUNT BADGE (Eye icon + count)
             if (item.viewCount > 0) {
-                Log.d("CategoryGridAdapter", "  ✅ Showing view count: ${item.viewCount}")
+                Timber.tag(LogTags.UI).d("  ✅ Showing view count: ${item.viewCount}")
                 binding.viewCountContainer.visibility = View.VISIBLE
                 binding.viewCount.text = item.viewCount.formatViewCount()
             } else {
-                Log.d("CategoryGridAdapter", "  ❌ Hiding view count (value: ${item.viewCount})")
+                Timber.tag(LogTags.UI).d("  ❌ Hiding view count (value: ${item.viewCount})")
                 binding.viewCountContainer.visibility = View.GONE
             }
 
-            // Check if item is sold
             val isSold = item.status == "sold" || item.quantity <= 0
 
-            // ===== SOLD BADGE =====
             if (isShopMode) {
-                // SHOP MODE: Always visible, acts as toggle
                 binding.soldBadge.visibility = View.VISIBLE
 
                 if (isSold) {
-                    binding.soldBadge.text = "SOLD"
+                    binding.soldBadge.text = binding.root.context.getString(R.string.shop_badge_sold)
                     binding.soldBadge.setBackgroundColor(
                         ContextCompat.getColor(binding.root.context, android.R.color.holo_red_dark)
                     )
-                    // Gray out text for sold items
                     binding.productName.alpha = 0.5f
                     binding.productPrice.alpha = 0.5f
                 } else {
-                    binding.soldBadge.text = "MARK SOLD"
+                    binding.soldBadge.text = binding.root.context.getString(R.string.shop_badge_mark_sold)
                     binding.soldBadge.setBackgroundColor(
                         ContextCompat.getColor(binding.root.context, R.color.green_dark)
                     )
@@ -86,19 +82,17 @@ class CategoryGridAdapter(
                     binding.productPrice.alpha = 1f
                 }
 
-                // Click to toggle
                 if (onSoldToggle != null) {
                     binding.soldBadge.setOnClickListener {
                         val newSoldStatus = !isSold
-                        Log.d("CategoryGridAdapter", "🔄 Toggling sold status for ${item.name}: $newSoldStatus")
+                        Timber.tag(LogTags.UI).d("🔄 Toggling sold status for ${item.name}: $newSoldStatus")
                         onSoldToggle(item.id, newSoldStatus)
                     }
                 }
             } else {
-                // HOME MODE: Only show if sold
                 if (isSold) {
                     binding.soldBadge.visibility = View.VISIBLE
-                    binding.soldBadge.text = "SOLD"
+                    binding.soldBadge.text = binding.root.context.getString(R.string.shop_badge_sold)
                     binding.soldBadge.setBackgroundColor(
                         ContextCompat.getColor(binding.root.context, android.R.color.holo_red_dark)
                     )
@@ -112,7 +106,6 @@ class CategoryGridAdapter(
                 }
             }
 
-            // Load image
             val imageUrl = item.images.firstOrNull()?.url ?: ""
             if (imageUrl.isNotEmpty()) {
                 Glide.with(binding.root.context)
@@ -125,9 +118,8 @@ class CategoryGridAdapter(
                 binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
             }
 
-            // Click listener for entire card
             binding.root.setOnClickListener {
-                Log.d("CategoryGridAdapter", "✅ Grid item clicked: ${item.name} (ID: ${item.id})")
+                Timber.tag(LogTags.UI).d("✅ Grid item clicked: ${item.name} (ID: ${item.id})")
                 onItemClick(item.id)
             }
         }

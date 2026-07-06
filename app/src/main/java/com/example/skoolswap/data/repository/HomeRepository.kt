@@ -1,6 +1,7 @@
 package com.example.skoolswap.data.repository
 
-import android.util.Log
+import com.example.skoolswap.common.constants.AppConstants
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.data.local.database.dao.HomeFeedDao
 import com.example.skoolswap.data.local.database.dao.ItemDao
 import com.example.skoolswap.data.local.database.dao.ItemImageDao
@@ -28,6 +29,7 @@ import retrofit2.Response
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import timber.log.Timber
 
 @Singleton
 class HomeRepository @Inject constructor(
@@ -39,49 +41,54 @@ class HomeRepository @Inject constructor(
     private val itemImageDao: ItemImageDao
 ) : HomeRepositoryInterface {
 
-    private companion object {
-        private const val TAG = "HomeRepository"
-    }
-
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
 
     // StateFlow for home feed
     private val _homeFeed = MutableStateFlow<HomeFeed?>(null)
     override val homeFeed: StateFlow<HomeFeed?> = _homeFeed.asStateFlow()
 
+    companion object {
+        private const val PER_PAGE_DEFAULT = 30
+        private const val PAGE_DEFAULT = 1
+        private const val TIMEOUT_DURATION_MS = 15000L
+        private const val TIMEOUT_SEARCH_MS = 30000L
+        private const val MAX_RETRIES = 2
+        private const val RETRY_DELAY_MS = 1000L
+    }
+
     // ================================================================
     // LEGACY ENDPOINTS
     // ================================================================
 
     override suspend fun getHomeFeed(schoolId: Int): Result<HomeFeed> {
-        Log.d(TAG, "🔄 getHomeFeed called for schoolId: $schoolId")
+        Timber.tag(LogTags.REPOSITORY).d("🔄 getHomeFeed called for schoolId: $schoolId")
 
         return safeApiCall(
             call = {
-                Log.d(TAG, "📡 Calling API...")
+                Timber.tag(LogTags.REPOSITORY).d("📡 Calling API...")
                 recommendationsApiService.getHomeFeed(schoolId)
             },
             errorMessage = "Failed to load home feed",
             onSuccess = { response ->
-                Log.d(TAG, "📥 API Response received")
-                Log.d(TAG, "   success: ${response.success}")
-                Log.d(TAG, "   sections count: ${response.sections?.size ?: 0}")
+                Timber.tag(LogTags.REPOSITORY).d("📥 API Response received")
+                Timber.tag(LogTags.REPOSITORY).d("   success: ${response.success}")
+                Timber.tag(LogTags.REPOSITORY).d("   sections count: ${response.sections?.size ?: 0}")
 
                 if (response.success) {
                     val feed = response.toDomain()
-                    Log.d(TAG, "   Domain sections: ${feed.sections.size}")
+                    Timber.tag(LogTags.REPOSITORY).d("   Domain sections: ${feed.sections.size}")
 
                     saveHomeFeedToCache(feed)
                     feed.saveItemsToCache(itemDao, itemImageDao)
                     _homeFeed.value = feed
                     Result.Success(feed)
                 } else {
-                    Log.e(TAG, "API returned success=false: ${response.message}")
+                    Timber.tag(LogTags.REPOSITORY).e("API returned success=false: ${response.message}")
                     loadHomeFeedFromCache() ?: Result.Error(Exception(response.message ?: "Unknown error"))
                 }
             },
             onError = {
-                Log.e(TAG, "API call failed, loading from cache")
+                Timber.tag(LogTags.REPOSITORY).e("API call failed, loading from cache")
                 loadHomeFeedFromCache()
             }
         )
@@ -159,7 +166,6 @@ class HomeRepository @Inject constructor(
             errorMessage = "Failed to search items",
             onSuccess = { response ->
                 if (response.success) {
-                    // ✅ Convert RankedItemDto to Item using the mapper
                     val items = response.items.map { it.toDomain() }
                     Result.Success(
                         RankedItemsResult(
@@ -419,7 +425,7 @@ class HomeRepository @Inject constructor(
     override suspend fun clearHomeData() {
         coroutineScope.launch {
             _homeFeed.value = null
-            Log.d(TAG, "Home data cleared")
+            Timber.tag(LogTags.REPOSITORY).d("Home data cleared")
         }
     }
 
@@ -429,14 +435,14 @@ class HomeRepository @Inject constructor(
 
     private suspend fun saveHomeFeedToCache(feed: HomeFeed) {
         try {
-            Log.d(TAG, "📝 Saving home feed to cache")
-            Log.d(TAG, "   Sections count: ${feed.sections.size}")
+            Timber.tag(LogTags.REPOSITORY).d("📝 Saving home feed to cache")
+            Timber.tag(LogTags.REPOSITORY).d("   Sections count: ${feed.sections.size}")
 
             val entity = feed.toEntity()
             homeFeedDao.insertHomeFeed(entity)
-            Log.d(TAG, "✅ Home feed cached to Room successfully")
+            Timber.tag(LogTags.REPOSITORY).d("✅ Home feed cached to Room successfully")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to cache home feed: ${e.message}", e)
+            Timber.tag(LogTags.REPOSITORY).e(e, "❌ Failed to cache home feed")
         }
     }
 
@@ -444,21 +450,21 @@ class HomeRepository @Inject constructor(
         return try {
             val cached = homeFeedDao.getHomeFeed()
             if (cached != null) {
-                Log.d(TAG, "📖 Loading home feed from cache")
-                Log.d(TAG, "   Cached at: ${java.util.Date(cached.cachedAt)}")
-                Log.d(TAG, "   JSON length: ${cached.sectionsJson.length}")
+                Timber.tag(LogTags.REPOSITORY).d("📖 Loading home feed from cache")
+                Timber.tag(LogTags.REPOSITORY).d("   Cached at: ${java.util.Date(cached.cachedAt)}")
+                Timber.tag(LogTags.REPOSITORY).d("   JSON length: ${cached.sectionsJson.length}")
 
                 val feed = cached.toDomain()
-                Log.d(TAG, "   Sections count after parsing: ${feed.sections.size}")
+                Timber.tag(LogTags.REPOSITORY).d("   Sections count after parsing: ${feed.sections.size}")
 
                 _homeFeed.value = feed
                 Result.Success(feed)
             } else {
-                Log.d(TAG, "No cached home feed found")
+                Timber.tag(LogTags.REPOSITORY).d("No cached home feed found")
                 null
             }
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to load cached home feed: ${e.message}", e)
+            Timber.tag(LogTags.REPOSITORY).e(e, "❌ Failed to load cached home feed")
             null
         }
     }
@@ -473,7 +479,7 @@ class HomeRepository @Inject constructor(
             val token = authRepository.getAuthToken().first()
                 ?: appPreferences.authToken.first()
             if (token.isNullOrBlank()) {
-                Log.e(TAG, "No auth token available")
+                Timber.tag(LogTags.REPOSITORY).e("No auth token available")
                 return onError?.invoke() ?: Result.Error(Exception("Authentication required"))
             }
 
@@ -487,10 +493,10 @@ class HomeRepository @Inject constructor(
                 onError?.invoke() ?: handleErrorResponse(response, errorMessage)
             }
         } catch (e: IOException) {
-            Log.e(TAG, "Network error: ${e.message}", e)
+            Timber.tag(LogTags.REPOSITORY).e(e, "Network error")
             onError?.invoke() ?: Result.Error(Exception("Network error. Please check your connection."))
         } catch (e: Exception) {
-            Log.e(TAG, "Unexpected error: ${e.message}", e)
+            Timber.tag(LogTags.REPOSITORY).e(e, "Unexpected error")
             onError?.invoke() ?: Result.Error(Exception("Unexpected error: ${e.message}"))
         }
     }
@@ -500,7 +506,7 @@ class HomeRepository @Inject constructor(
         errorMessage: String
     ): Result.Error {
         val errorBody = response.errorBody()?.string()
-        Log.e(TAG, "API error: ${response.code()} - $errorBody")
+        Timber.tag(LogTags.REPOSITORY).e("API error: ${response.code()} - $errorBody")
 
         val message = when (response.code()) {
             401 -> "Session expired. Please sign in again."

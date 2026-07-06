@@ -1,11 +1,9 @@
-// ui/profile/ProfileFragment.kt
 package com.example.skoolswap.ui.profile
 
 import android.content.Context
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -23,6 +21,7 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.databinding.FragmentProfileBinding
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.utils.extensions.MobileValidator
@@ -36,6 +35,7 @@ import javax.inject.Inject
 import androidx.activity.OnBackPressedCallback
 import com.example.skoolswap.utils.DialogAction
 import com.example.skoolswap.utils.DialogHelper
+import timber.log.Timber
 
 @AndroidEntryPoint
 class ProfileFragment : Fragment() {
@@ -50,6 +50,11 @@ class ProfileFragment : Fragment() {
     private lateinit var schoolAdapter: SchoolAdapter
     private var searchDebounceJob: kotlinx.coroutines.Job? = null
 
+    companion object {
+        private const val SEARCH_DEBOUNCE_DELAY_MS = 500L
+        private const val MOBILE_LENGTH_REQUIRED = 10
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -61,7 +66,7 @@ class ProfileFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        Log.d("ProfileFragment", "🔥 onViewCreated")
+        Timber.tag(LogTags.UI).d("🔥 onViewCreated")
         hideFab()
         setupUI()
         setupObservers()
@@ -70,39 +75,27 @@ class ProfileFragment : Fragment() {
     }
 
     private fun setupUI() {
-        // Mobile number input
         setupMobileInput()
-
-        // Province dropdown
         setupProvinceDropdown()
-
-        // School search
         setupSchoolSearch()
-
-        // School results RecyclerView
         setupSchoolResults()
 
-        // Submit button
         binding.submitButton.setOnClickListener {
             completeProfile()
         }
 
-        // Delete button (hidden for first-time setup)
         binding.deleteButton.setOnClickListener {
             showDeleteConfirmationDialog()
         }
     }
 
     private fun setupBackButton() {
-        // Handle system back button
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (viewModel.hasExistingSchool.value) {
-                    // Returning user - go back
                     findNavController().navigateUp()
                 } else {
-                    // First-time user - block back
-                    Toast.makeText(requireContext(), "Please complete your profile setup first", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), getString(R.string.profile_complete_setup), Toast.LENGTH_SHORT).show()
                 }
             }
         })
@@ -115,38 +108,34 @@ class ProfileFragment : Fragment() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 val mobile = s.toString().trim()
 
-                // Show real-time visual feedback without triggering full validation chain
                 when {
                     mobile.isEmpty() -> {
-                        // Clear error when empty
                         binding.contactNumber.error = null
                         binding.mobileTextInputLayout.error = null
                         binding.mobileTextInputLayout.isErrorEnabled = false
                     }
-                    mobile.length < 10 -> {
-                        // Show "incomplete" but don't block UI
-                        binding.contactNumber.error = "Need ${10 - mobile.length} more digit(s)"
-                        binding.mobileTextInputLayout.error = "Need ${10 - mobile.length} more digit(s)"
+                    mobile.length < MOBILE_LENGTH_REQUIRED -> {
+                        val message = getString(R.string.profile_mobile_incomplete, MOBILE_LENGTH_REQUIRED - mobile.length)
+                        binding.contactNumber.error = message
+                        binding.mobileTextInputLayout.error = message
                         binding.mobileTextInputLayout.isErrorEnabled = true
                     }
-                    mobile.length == 10 -> {
-                        // Full validation only for complete numbers
+                    mobile.length == MOBILE_LENGTH_REQUIRED -> {
                         if (MobileValidator.isValidSouthAfricanMobile(mobile)) {
-                            // Valid - clear errors
                             binding.contactNumber.error = null
                             binding.mobileTextInputLayout.error = null
                             binding.mobileTextInputLayout.isErrorEnabled = false
                         } else {
-                            // Invalid 10-digit number
                             val error = MobileValidator.getErrorMessage(mobile)
                             binding.contactNumber.error = error
                             binding.mobileTextInputLayout.error = error
                             binding.mobileTextInputLayout.isErrorEnabled = true
                         }
                     }
-                    mobile.length > 10 -> {
-                        binding.contactNumber.error = "Mobile number must be 10 digits"
-                        binding.mobileTextInputLayout.error = "Mobile number must be 10 digits"
+                    mobile.length > MOBILE_LENGTH_REQUIRED -> {
+                        val message = getString(R.string.profile_mobile_required)
+                        binding.contactNumber.error = message
+                        binding.mobileTextInputLayout.error = message
                         binding.mobileTextInputLayout.isErrorEnabled = true
                     }
                 }
@@ -154,22 +143,17 @@ class ProfileFragment : Fragment() {
 
             override fun afterTextChanged(s: Editable?) {
                 val mobile = s.toString().trim()
-
-                // Only preview and mark as changed if different from original
                 if (mobile != viewModel._originalMobile.value) {
-                    // Only consider valid numbers for "unsaved" state
-                    if (mobile.isEmpty() || (mobile.length == 10 && MobileValidator.isValidSouthAfricanMobile(mobile))) {
+                    if (mobile.isEmpty() || (mobile.length == MOBILE_LENGTH_REQUIRED && MobileValidator.isValidSouthAfricanMobile(mobile))) {
                         viewModel.previewMobile(mobile)
                         showUnsavedIndicator()
                     } else {
-                        // Still preview but don't mark as unsaved
                         viewModel.previewMobile(mobile)
                     }
                 }
             }
         })
 
-        // Clear error when focus changes and field is valid
         binding.contactNumber.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) {
                 val mobile = binding.contactNumber.text.toString().trim()
@@ -179,19 +163,21 @@ class ProfileFragment : Fragment() {
                         binding.mobileTextInputLayout.error = null
                         binding.mobileTextInputLayout.isErrorEnabled = false
                     }
-                    mobile.length == 10 && MobileValidator.isValidSouthAfricanMobile(mobile) -> {
+                    mobile.length == MOBILE_LENGTH_REQUIRED && MobileValidator.isValidSouthAfricanMobile(mobile) -> {
                         binding.contactNumber.error = null
                         binding.mobileTextInputLayout.error = null
                         binding.mobileTextInputLayout.isErrorEnabled = false
                     }
                     mobile.length in 1..9 -> {
-                        binding.contactNumber.error = "Mobile number must be 10 digits (${mobile.length}/10)"
-                        binding.mobileTextInputLayout.error = "Mobile number must be 10 digits (${mobile.length}/10)"
+                        val message = getString(R.string.profile_mobile_incomplete, MOBILE_LENGTH_REQUIRED - mobile.length)
+                        binding.contactNumber.error = message
+                        binding.mobileTextInputLayout.error = message
                         binding.mobileTextInputLayout.isErrorEnabled = true
                     }
-                    mobile.length > 10 -> {
-                        binding.contactNumber.error = "Mobile number must be 10 digits"
-                        binding.mobileTextInputLayout.error = "Mobile number must be 10 digits"
+                    mobile.length > MOBILE_LENGTH_REQUIRED -> {
+                        val message = getString(R.string.profile_mobile_required)
+                        binding.contactNumber.error = message
+                        binding.mobileTextInputLayout.error = message
                         binding.mobileTextInputLayout.isErrorEnabled = true
                     }
                 }
@@ -213,15 +199,11 @@ class ProfileFragment : Fragment() {
 
         binding.provinceSpinner.setOnItemClickListener { _, _, position, _ ->
             val province = viewModel.provinces.value[position]
-
-            // Don't clear school if user already has one selected
             val shouldClear = viewModel.selectedSchool.value == null
             viewModel.selectProvince(province, shouldClearSchool = shouldClear)
 
-            // Immediately show selected province
             binding.provinceSpinner.setText(province.name, false)
 
-            // Only clear UI if we're actually clearing the school
             if (shouldClear) {
                 binding.selectedSchoolText.visibility = View.GONE
                 binding.schoolSearch.text?.clear()
@@ -229,8 +211,8 @@ class ProfileFragment : Fragment() {
 
             binding.provinceTextInputLayout.error = null
             binding.schoolSearch.isEnabled = true
-            binding.schoolSearchLayout.hint = "Search schools in ${province.name}"
-            binding.schoolSearchLayout.placeholderText = "Type at least 2 characters"
+            binding.schoolSearchLayout.hint = getString(R.string.profile_search_in_province, province.name)
+            binding.schoolSearchLayout.placeholderText = getString(R.string.profile_search_hint)
 
             showUnsavedIndicator()
         }
@@ -241,31 +223,27 @@ class ProfileFragment : Fragment() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
-                // Don't search if we're setting text programmatically
                 if (isSettingTextProgrammatically) {
                     isSettingTextProgrammatically = false
                     return
                 }
 
-                // If user is typing and there was a selected school, clear the selection
                 if (viewModel.selectedSchool.value != null) {
-                    Log.d("ProfileFragment", "User typing - clearing school selection")
+                    Timber.tag(LogTags.UI).d("User typing - clearing school selection")
                     viewModel.clearSchoolSelection()
-                    binding.selectedSchoolCard.visibility = View.GONE  // Hide the card
-                    binding.selectedSchoolText.visibility = View.VISIBLE  // Show fallback text
+                    binding.selectedSchoolCard.visibility = View.GONE
+                    binding.selectedSchoolText.visibility = View.VISIBLE
                     showUnsavedIndicator()
                 }
 
-                // Clear error when user starts typing
                 binding.schoolSearchLayout.error = null
-
                 searchDebounceJob?.cancel()
 
                 val query = s?.toString()?.trim() ?: ""
 
                 if (query.length >= 2 && viewModel.selectedProvince.value != null) {
                     searchDebounceJob = lifecycleScope.launch {
-                        delay(500)
+                        delay(SEARCH_DEBOUNCE_DELAY_MS)
                         viewModel.searchSchools(query)
                     }
                 } else {
@@ -277,22 +255,18 @@ class ProfileFragment : Fragment() {
 
     private fun setupSchoolResults() {
         schoolAdapter = SchoolAdapter { school ->
-            // Preview the school
             viewModel.previewSchool(school)
 
-            // Show the card instead of TextView
             binding.selectedSchoolCard.visibility = View.VISIBLE
             binding.selectedSchoolName.text = school.name
-            binding.selectedSchoolLocation.text = school.provinceName ?: "Selected School"
+            binding.selectedSchoolLocation.text = school.provinceName ?: getString(R.string.profile_selected_school)
             binding.selectedSchoolText.visibility = View.GONE
 
-            // Clear search results
             binding.schoolResultsRecyclerView.visibility = View.GONE
             isSettingTextProgrammatically = true
             binding.schoolSearch.setText(school.name)
             hideKeyboard()
 
-            // Show that there are unsaved changes
             showUnsavedIndicator()
         }
 
@@ -304,10 +278,10 @@ class ProfileFragment : Fragment() {
 
     private fun showUnsavedIndicator() {
         if (_binding == null) return
-        if (!viewModel.isInitialized.value) return  // ← GUARD - don't show until initialized
+        if (!viewModel.isInitialized.value) return
 
         if (viewModel.checkForChanges()) {
-            binding.submitButton.text = "Save Changes*"
+            binding.submitButton.text = getString(R.string.profile_save_changes)
             binding.submitButton.setBackgroundTintList(ContextCompat.getColorStateList(requireContext(), R.color.black))
             binding.unsavedBadge.visibility = View.VISIBLE
 
@@ -321,9 +295,9 @@ class ProfileFragment : Fragment() {
 
         } else {
             binding.submitButton.text = if (viewModel.hasExistingSchool.value) {
-                "Update Profile"
+                getString(R.string.profile_update)
             } else {
-                "Submit"
+                getString(R.string.profile_submit)
             }
             binding.submitButton.setBackgroundTintList(ContextCompat.getColorStateList(requireContext(), R.color.black))
             binding.unsavedBadge.visibility = View.GONE
@@ -331,10 +305,9 @@ class ProfileFragment : Fragment() {
     }
 
     private fun setupObservers() {
-        // ========== PROVINCE OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.provinces.collectLatest { provinces ->
-                Log.d("ProfileFragment", "📋 Provinces loaded: ${provinces.size}")
+                Timber.tag(LogTags.UI).d("📋 Provinces loaded: ${provinces.size}")
 
                 val provinceNames = provinces.map { it.name }
                 val adapter = ArrayAdapter(
@@ -367,20 +340,18 @@ class ProfileFragment : Fragment() {
             }
         }
 
-        // ========== SELECTED PROVINCE OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.selectedProvince.collectLatest { province ->
                 province?.let {
                     binding.provinceSpinner.setText(it.name, false)
                     binding.schoolSearch.isEnabled = true
-                    binding.schoolSearchLayout.hint = "Search schools in ${it.name}"
-                    binding.schoolSearchLayout.placeholderText = "Type at least 2 characters"
+                    binding.schoolSearchLayout.hint = getString(R.string.profile_search_in_province, it.name)
+                    binding.schoolSearchLayout.placeholderText = getString(R.string.profile_search_hint)
                     binding.provinceTextInputLayout.error = null
                 }
             }
         }
 
-        // ========== SCHOOL SEARCH RESULTS OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.schools.collectLatest { schools ->
                 if (schools.isNotEmpty()) {
@@ -391,19 +362,18 @@ class ProfileFragment : Fragment() {
                     binding.schoolResultsRecyclerView.visibility = View.GONE
                     if (viewModel.isSearchActive.value) {
                         binding.noResultsText.visibility = View.VISIBLE
+                        binding.noResultsText.text = getString(R.string.profile_no_results)
                     }
                 }
             }
         }
 
-        // ========== SELECTED SCHOOL OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.selectedSchool.collectLatest { school ->
                 if (school != null) {
-                    // Show the MaterialCardView instead of TextView
                     binding.selectedSchoolCard.visibility = View.VISIBLE
                     binding.selectedSchoolName.text = school.name
-                    binding.selectedSchoolLocation.text = school.provinceName ?: "School"
+                    binding.selectedSchoolLocation.text = school.provinceName ?: getString(R.string.profile_selected_school)
                     binding.selectedSchoolText.visibility = View.GONE
 
                     isSettingTextProgrammatically = true
@@ -417,7 +387,6 @@ class ProfileFragment : Fragment() {
             }
         }
 
-        // ========== CONFIRMATION DIALOG OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.showConfirmationDialog.collectLatest { show ->
                 if (show) {
@@ -428,7 +397,6 @@ class ProfileFragment : Fragment() {
             }
         }
 
-        // ========== SEARCH ACTIVE STATE OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.isSearchActive.collectLatest { isActive ->
                 if (isActive) {
@@ -437,14 +405,12 @@ class ProfileFragment : Fragment() {
             }
         }
 
-        // ========== LOADING STATE OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.isLoading.collectLatest { isLoading ->
                 binding.profileProgressLayout.visibility = if (isLoading) View.VISIBLE else View.GONE
             }
         }
 
-        // ========== ERROR HANDLING OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.error.collectLatest { error ->
                 error?.let {
@@ -454,17 +420,15 @@ class ProfileFragment : Fragment() {
             }
         }
 
-        // ========== UPDATE SUCCESS OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.updateSuccess.collectLatest { success ->
                 if (success) {
-                    Snackbar.make(binding.root, "Profile updated successfully!", Snackbar.LENGTH_SHORT).show()
+                    Snackbar.make(binding.root, getString(R.string.profile_update_success), Snackbar.LENGTH_SHORT).show()
                     viewModel.clearSuccess()
                 }
             }
         }
 
-        // ========== HAS EXISTING SCHOOL OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.hasExistingSchool.collectLatest { hasExisting ->
                 if (hasExisting) {
@@ -479,15 +443,14 @@ class ProfileFragment : Fragment() {
             }
         }
 
-        // ========== PROFILE COMPLETE OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.profileComplete.collectLatest { isComplete ->
                 if (isComplete) {
                     binding.profileProgressLayout.visibility = View.GONE
                     val message = if (viewModel.hasExistingSchool.value) {
-                        "School updated successfully!"
+                        getString(R.string.profile_school_updated)
                     } else {
-                        "Profile completed! Welcome to SkoolSwap!"
+                        getString(R.string.profile_complete)
                     }
                     Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
                     findNavController().navigate(R.id.nav_home)
@@ -496,11 +459,10 @@ class ProfileFragment : Fragment() {
             }
         }
 
-        // ========== CURRENT SCHOOL MAPPING OBSERVER ==========
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.currentSchoolMapping.collectLatest { mapping ->
                 mapping?.let {
-                    Log.d("ProfileFragment", "📋 Current mapping: ${it.schoolName} (${it.mappingId})")
+                    Timber.tag(LogTags.UI).d("📋 Current mapping: ${it.schoolName} (${it.mappingId})")
                 }
             }
         }
@@ -533,7 +495,6 @@ class ProfileFragment : Fragment() {
                     binding.contactNumber.setText(displayMobile)
                     loadProfilePicture(it.profilePictureUrl)
 
-                    // ✅ Only pass mobile — school is handled by checkExistingSchoolMapping()
                     viewModel.initializeProfile(displayMobile, null)
                 }
             }
@@ -541,22 +502,19 @@ class ProfileFragment : Fragment() {
     }
 
     private fun validateMobileNumber(mobile: String): Boolean {
-        // Clear previous errors
         binding.contactNumber.error = null
         binding.mobileTextInputLayout.error = null
         binding.mobileTextInputLayout.isErrorEnabled = false
 
-        // Empty is allowed (optional field)
         if (mobile.isEmpty()) {
             return true
         }
 
-        // Check length
-        if (mobile.length != 10) {
-            val message = if (mobile.length < 10) {
-                "Mobile number must be 10 digits (${mobile.length}/10)"
+        if (mobile.length != MOBILE_LENGTH_REQUIRED) {
+            val message = if (mobile.length < MOBILE_LENGTH_REQUIRED) {
+                getString(R.string.profile_mobile_incomplete, MOBILE_LENGTH_REQUIRED - mobile.length)
             } else {
-                "Mobile number must be 10 digits"
+                getString(R.string.profile_mobile_required)
             }
             binding.contactNumber.error = message
             binding.mobileTextInputLayout.error = message
@@ -564,26 +522,23 @@ class ProfileFragment : Fragment() {
             return false
         }
 
-        // Check if all digits
         if (!mobile.all { it.isDigit() }) {
-            val message = "Only numbers allowed (no spaces or dashes)"
+            val message = getString(R.string.profile_mobile_numbers_only)
             binding.contactNumber.error = message
             binding.mobileTextInputLayout.error = message
             binding.mobileTextInputLayout.isErrorEnabled = true
             return false
         }
 
-        // Check SA prefix
         if (!MobileValidator.isValidSouthAfricanMobile(mobile)) {
             val prefix = mobile.substring(0, 3)
-            val message = "Invalid SA prefix: $prefix. Must start with 060-089"
+            val message = getString(R.string.profile_mobile_prefix_invalid, prefix)
             binding.contactNumber.error = message
             binding.mobileTextInputLayout.error = message
             binding.mobileTextInputLayout.isErrorEnabled = true
             return false
         }
 
-        // Valid - clear errors
         binding.contactNumber.error = null
         binding.mobileTextInputLayout.error = null
         binding.mobileTextInputLayout.isErrorEnabled = false
@@ -591,30 +546,26 @@ class ProfileFragment : Fragment() {
     }
 
     private fun completeProfile() {
-        // Check if any changes were made
         if (!viewModel.checkForChanges()) {
-            Toast.makeText(requireContext(), "No changes to save", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), getString(R.string.profile_no_changes), Toast.LENGTH_SHORT).show()
             return
         }
 
-        // Validate mobile if provided
         val mobile = binding.contactNumber.text.toString().trim()
         if (mobile.isNotEmpty() && !validateMobileNumber(mobile)) {
-            binding.mobileTextInputLayout.error = "Please enter a valid 10-digit SA mobile number"
+            binding.mobileTextInputLayout.error = getString(R.string.profile_mobile_invalid)
             binding.mobileTextInputLayout.isErrorEnabled = true
             binding.contactNumber.requestFocus()
-            Toast.makeText(requireContext(), "Please fix the mobile number error above", Toast.LENGTH_LONG).show()
+            Toast.makeText(requireContext(), getString(R.string.profile_mobile_invalid), Toast.LENGTH_LONG).show()
             return
         }
 
-        // Check if school is selected
         if (viewModel.pendingSchool.value == null && viewModel.selectedSchool.value == null) {
-            Toast.makeText(requireContext(), "Please select a school", Toast.LENGTH_LONG).show()
+            Toast.makeText(requireContext(), getString(R.string.profile_select_school_first), Toast.LENGTH_LONG).show()
             binding.schoolSearch.requestFocus()
             return
         }
 
-        // Show confirmation dialog with changes summary
         viewModel.prepareConfirmationDialog()
     }
 
@@ -651,14 +602,15 @@ class ProfileFragment : Fragment() {
             if (result.isSuccess) {
                 Toast.makeText(
                     requireContext(),
-                    "Account deleted successfully",
+                    getString(R.string.profile_delete_success),
                     Toast.LENGTH_LONG
                 ).show()
                 findNavController().navigate(R.id.loginFragment)
             } else {
+                val errorMsg = result.exceptionOrNull()?.message ?: ""
                 Toast.makeText(
                     requireContext(),
-                    "Failed to delete account: ${result.exceptionOrNull()?.message}",
+                    getString(R.string.profile_delete_failed, errorMsg),
                     Toast.LENGTH_LONG
                 ).show()
             }
@@ -683,16 +635,16 @@ class ProfileFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        Log.d("ProfileFragment", "🔥 ProfileFragment onResume")
+        Timber.tag(LogTags.UI).d("🔥 ProfileFragment onResume")
     }
 
     override fun onPause() {
         super.onPause()
-        Log.d("ProfileFragment", "🔥 ProfileFragment onPause")
+        Timber.tag(LogTags.UI).d("🔥 ProfileFragment onPause")
     }
 
     override fun onStop() {
         super.onStop()
-        Log.d("ProfileFragment", "🔥 onStop")
+        Timber.tag(LogTags.UI).d("🔥 onStop")
     }
 }

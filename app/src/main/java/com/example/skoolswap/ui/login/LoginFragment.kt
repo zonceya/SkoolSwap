@@ -13,6 +13,10 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.AppConstants
+import com.example.skoolswap.common.constants.AppConstants.LogTags
+import com.example.skoolswap.common.constants.ErrorConstants
+import com.example.skoolswap.common.constants.ErrorConstantsHelper
 import com.example.skoolswap.databinding.FragmentLoginBinding
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
@@ -37,6 +41,13 @@ class LoginFragment : Fragment() {
 
     private var isSigningIn = false
     private var isGoogleSignIn = false
+
+    companion object {
+        private const val GOOGLE_SIGN_IN_TIMEOUT_MS = 15000L
+        private const val EMAIL_SIGN_IN_TIMEOUT_MS = 10000L
+        private const val FADE_ANIMATION_DURATION_MS = 300L
+        private const val NAVIGATION_DELAY_MS = 350L
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -73,7 +84,7 @@ class LoginFragment : Fragment() {
             isGoogleSignIn = true
             binding.signInButton.isEnabled = false
 
-            // 🔥 Show loading overlay immediately (this will be visible after Google sheet dismisses)
+            // Show loading overlay immediately
             showLoadingOverlay(true, "Signing in with Google...")
 
             viewModel.signInWithGoogle(requireActivity())
@@ -86,7 +97,7 @@ class LoginFragment : Fragment() {
                         binding.signInButton.isEnabled = true
                     }
                 }
-            }, 15000) // 15 seconds timeout for Google
+            }, GOOGLE_SIGN_IN_TIMEOUT_MS)
         }
 
         // Email/Password Login
@@ -117,7 +128,6 @@ class LoginFragment : Fragment() {
             isSigningIn = true
             binding.loginButton.isEnabled = false
 
-            // Show loading for email/password
             showLoadingOverlay(true, "Signing in...")
 
             viewModel.signInWithEmail(email, password)
@@ -129,7 +139,7 @@ class LoginFragment : Fragment() {
                         binding.loginButton.isEnabled = true
                     }
                 }
-            }, 10000)
+            }, EMAIL_SIGN_IN_TIMEOUT_MS)
         }
 
         binding.textForgotPassword?.setOnClickListener {
@@ -143,32 +153,26 @@ class LoginFragment : Fragment() {
         }
     }
 
-    /**
-     * Show/hide loading overlay with smooth fade animation
-     */
     private fun showLoadingOverlay(show: Boolean, message: String? = null) {
         if (_binding == null) return
 
         val overlay = binding.loadingOverlay
 
-        // Update message if provided
         message?.let {
             overlay.findViewById<TextView>(R.id.loadingMessage)?.text = it
         }
 
         if (show) {
-            // Make visible but start from alpha 0
             overlay.visibility = View.VISIBLE
             overlay.alpha = 0f
             overlay.animate()
                 .alpha(1f)
-                .setDuration(300) // 300ms smooth fade in
+                .setDuration(FADE_ANIMATION_DURATION_MS)
                 .start()
         } else {
-            // Fade out and hide
             overlay.animate()
                 .alpha(0f)
-                .setDuration(300)
+                .setDuration(FADE_ANIMATION_DURATION_MS)
                 .setListener(object : AnimatorListenerAdapter() {
                     override fun onAnimationEnd(animation: Animator) {
                         overlay.visibility = View.GONE
@@ -193,7 +197,7 @@ class LoginFragment : Fragment() {
             textInputLayout.hintTextColor = colorStateList
             textInputLayout.defaultHintTextColor = colorStateList
         } catch (e: Exception) {
-            Timber.tag("LoginFragment").e("Error setting box stroke color: ${e.message}")
+            Timber.tag(LogTags.UI).e(e, "Error setting box stroke color")
         }
     }
 
@@ -203,7 +207,6 @@ class LoginFragment : Fragment() {
             if (_binding == null) return@observe
 
             if (!isGoogleSignIn) {
-                // Only manage email/password loading here
                 if (isLoading) {
                     binding.loginButton.isEnabled = false
                 } else {
@@ -214,13 +217,21 @@ class LoginFragment : Fragment() {
 
         viewModel.error.observe(viewLifecycleOwner) { error ->
             if (error != null && _binding != null) {
-                // Hide loading on error
                 showLoadingOverlay(false)
                 binding.progressBar.visibility = View.GONE
 
+                // Use ErrorConstantsHelper for user-friendly message
+                val userMessage = when {
+                    error.contains("530") -> ErrorConstants.Messages.UserFriendly.SESSION_EXPIRED
+                    error.contains("500") || error.contains("503") -> ErrorConstants.Messages.UserFriendly.SERVER_DOWN
+                    error.contains("timeout") || error.contains("timed out") -> ErrorConstants.Messages.UserFriendly.TIMEOUT
+                    error.contains("network") || error.contains("internet") -> ErrorConstants.Messages.UserFriendly.NO_INTERNET
+                    else -> error
+                }
+
                 Snackbar.make(
                     binding.root,
-                    error,
+                    userMessage,
                     Snackbar.LENGTH_LONG
                 ).show()
 
@@ -233,13 +244,11 @@ class LoginFragment : Fragment() {
 
         viewModel.loginSuccess.observe(viewLifecycleOwner) { user ->
             if (user != null && _binding != null) {
-                // 🔥 Hide loading with fade before navigating
                 showLoadingOverlay(false)
 
-                // Small delay for the fade animation to complete
                 binding.loadingOverlay.postDelayed({
                     navigateAfterLogin(user)
-                }, 350)
+                }, NAVIGATION_DELAY_MS)
             }
         }
     }
@@ -251,17 +260,16 @@ class LoginFragment : Fragment() {
     private fun navigateAfterLogin(user: com.example.skoolswap.domain.model.User) {
         if (!isAdded || isDetached) return
         try {
-            // ✅ Remove the delay - overlay handles the transition now
             if (user.schoolMapped) {
                 val bundle = Bundle().apply {
-                    user.schoolId?.let { putInt("schoolId", it) }
+                    user.schoolId?.let { putInt(AppConstants.ARG_SCHOOL_ID, it) }
                 }
                 findNavController().navigate(R.id.action_loginFragment_to_nav_home, bundle)
             } else {
                 findNavController().navigate(R.id.action_loginFragment_to_schoolOnboardingFragment)
             }
         } catch (e: Exception) {
-            Timber.tag("LoginFragment").e("Navigation failed: ${e.message}")
+            Timber.tag(LogTags.UI).e(e, "Navigation failed")
         }
     }
 

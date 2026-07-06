@@ -12,6 +12,7 @@ import androidx.navigation.fragment.findNavController
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentSignUpBinding
 import dagger.hilt.android.AndroidEntryPoint
+import timber.log.Timber
 
 @AndroidEntryPoint
 class SignUpFragment : Fragment() {
@@ -82,14 +83,14 @@ class SignUpFragment : Fragment() {
 
     private fun observeViewModel() {
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
-            Log.e("SignUpFragment", "Loading state: $isLoading")
+            Timber.tag("SignUpFragment").e("Loading state: $isLoading")
             binding.buttonRegister.isEnabled = !isLoading
             binding.buttonRegister.text = if (isLoading) "Creating account..." else "Sign Up"
         }
 
         viewModel.error.observe(viewLifecycleOwner) { error ->
             if (error != null) {
-                Log.e("SignUpFragment", "Error: $error")
+                Timber.tag("SignUpFragment").e("Error: $error")
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show()
             }
         }
@@ -97,20 +98,21 @@ class SignUpFragment : Fragment() {
         // ✅ Changed from otpToken to user object
         viewModel.signUpSuccess.observe(viewLifecycleOwner) { user ->
             if (user != null) {
-                Log.e("SignUpFragment", "✅ Sign up successful!")
-                Log.e("SignUpFragment", "👤 User: ${user.name}")
-                Log.e("SignUpFragment", "🏫 schoolMapped: ${user.schoolMapped}")
-                Log.e("SignUpFragment", "🏫 schoolId: ${user.schoolId}")
+                Timber.tag("SignUpFragment").e("✅ Sign up successful!")
+                Timber.tag("SignUpFragment").e("👤 User: ${user.name}")
+                Timber.tag("SignUpFragment").e("🏫 schoolMapped: ${user.schoolMapped}")
+                Timber.tag("SignUpFragment").e("🏫 schoolId: ${user.schoolId}")
 
                 // Navigate directly - no OTP screen
                 if (user.schoolMapped == true && user.schoolId != null) {
-                    Log.e("SignUpFragment", "➡️ User has school - navigating to HOME")
+                    Timber.tag("SignUpFragment").e("➡️ User has school - navigating to HOME")
                     val bundle = Bundle().apply {
                         putInt("schoolId", user.schoolId)
                     }
                     findNavController().navigate(R.id.action_signUpFragment_to_nav_home, bundle)
                 } else {
-                    Log.e("SignUpFragment", "➡️ User has NO school - navigating to ONBOARDING")
+                    Timber.tag("SignUpFragment")
+                        .e("➡️ User has NO school - navigating to ONBOARDING")
                     findNavController().navigate(R.id.action_signUpFragment_to_schoolOnboardingFragment)
                 }
             }

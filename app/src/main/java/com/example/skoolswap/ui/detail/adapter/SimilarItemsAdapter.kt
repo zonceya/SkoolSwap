@@ -91,7 +91,8 @@ class SimilarItemsAdapter(
                 binding.productSize.visibility = View.GONE
             }
 
-            Log.d(TAG, "Binding item: ${item.name}, imageUrl: $imageUrl, images: ${item.images.size}, cover: ${item.coverImage}")
+            Timber.tag(TAG)
+                .d("Binding item: ${item.name}, imageUrl: $imageUrl, images: ${item.images.size}, cover: ${item.coverImage}")
         }
     }
 }

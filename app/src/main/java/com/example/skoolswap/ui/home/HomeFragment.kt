@@ -1,7 +1,6 @@
 package com.example.skoolswap.ui.home
 
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -20,6 +19,8 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.viewpager2.widget.ViewPager2
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.AppConstants
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.databinding.FragmentHomeBinding
 import com.example.skoolswap.domain.model.BannerItem
@@ -70,6 +71,26 @@ class HomeFragment : Fragment() {
     @Inject
     lateinit var appPreferences: AppPreferences
 
+    companion object {
+        private const val BANNER_AUTO_SCROLL_INTERVAL_MS = 8000L
+        private const val SEARCH_DEBOUNCE_DELAY_MS = 400L
+        private const val MIN_SEARCH_LENGTH = 2
+        private const val PRICE_SLIDER_MIN = 0f
+        private const val PRICE_SLIDER_MAX = 1000f
+        private const val GRID_SPAN_COUNT = 2
+        private const val TAB_UNIFORM_ID = 6
+        private const val TAB_SPORT_ID = 7
+        // Remove BANNER_OFFSCREEN_PAGE_LIMIT - use ViewPager2 constant directly
+        private const val BANNER_INITIAL_POSITION_DIVIDER = 2
+        private const val GENDER_BOYS_ID = 42
+        private const val GENDER_GIRLS_ID = 43
+        private const val GENDER_UNISEX_ID = 27
+        private const val GENDER_ODD_ID = 1
+        private const val GENDER_EVEN_ID = 26
+        private const val GENDER_REM_CHECK = 2
+        private const val GENDER_REM_RESULT = 0
+    }
+
     private val bannerItems = listOf(
         BannerItem(imageUrl = "https://cdn.skoolswap.co.za/banners/home_1.jpg"),
         BannerItem(imageUrl = "https://cdn.skoolswap.co.za/banners/home_2.jpg"),
@@ -97,10 +118,10 @@ class HomeFragment : Fragment() {
         setupSwipeRefresh()
 
         viewLifecycleOwner.lifecycleScope.launch {
-            val argSchoolId = arguments?.getInt("schoolId", -1)?.takeIf { it > 0 }
+            val argSchoolId = arguments?.getInt(AppConstants.ARG_SCHOOL_ID, -1)?.takeIf { it > 0 }
             val prefSchoolId = appPreferences.schoolId.first()?.takeIf { it > 0 }
             val schoolId = argSchoolId ?: prefSchoolId
-            Timber.tag("HomeFragment")
+            Timber.tag(LogTags.UI)
                 .d("🔑 schoolId: arg=$argSchoolId prefs=$prefSchoolId using=$schoolId")
 
             if (schoolId != null) {
@@ -110,7 +131,7 @@ class HomeFragment : Fragment() {
             if (viewModel.homeFeed.value == null && !viewModel.isLoading.value) {
                 viewModel.loadHomeFeed()
             } else if (viewModel.isLoading.value && schoolId != null) {
-                Timber.tag("HomeFragment").d("🔄 Restarting load with correct schoolId: $schoolId")
+                Timber.tag(LogTags.UI).d("🔄 Restarting load with correct schoolId: $schoolId")
                 viewModel.loadHomeFeed(forceRefresh = true)
             }
         }
@@ -119,11 +140,11 @@ class HomeFragment : Fragment() {
     }
 
     fun performLiveSearch(query: String) {
-        Timber.d("🔍 performLiveSearch: $query")
+        Timber.tag(LogTags.UI).d("🔍 performLiveSearch: $query")
 
         searchJob?.cancel()
 
-        if (query.length < 2) {
+        if (query.length < MIN_SEARCH_LENGTH) {
             exitSearchMode()
             return
         }
@@ -132,10 +153,9 @@ class HomeFragment : Fragment() {
         enterSearchMode()
 
         searchJob = viewLifecycleOwner.lifecycleScope.launch {
-            // Instant local
             viewModel.searchLocalOnly(query, arguments?.getInt("CATEGORY_ID"))
 
-            delay(400)
+            delay(SEARCH_DEBOUNCE_DELAY_MS)
 
             if (query != viewModel.searchQuery.value || !isActive) return@launch
 
@@ -152,13 +172,11 @@ class HomeFragment : Fragment() {
         binding.homeRecycler.visibility = View.GONE
         binding.swipeRefreshLayout.visibility = View.GONE
 
-        // ✅ Show filter bar when entering search
         binding.filterBar.visibility = View.VISIBLE
         binding.searchResultsContainer.visibility = View.VISIBLE
         binding.searchResultsRecycler.visibility = View.VISIBLE
         binding.emptySearchResults.visibility = View.GONE
 
-        // ✅ UNLOCK the drawer when in search mode
         binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
     }
 
@@ -171,13 +189,11 @@ class HomeFragment : Fragment() {
         binding.swipeRefreshLayout.visibility = View.VISIBLE
         binding.homeRecycler.visibility = View.VISIBLE
 
-        // Hide filter bar when exiting search
         binding.filterBar.visibility = View.GONE
         binding.searchResultsContainer.visibility = View.GONE
         binding.searchResultsRecycler.visibility = View.GONE
         binding.emptySearchResults.visibility = View.GONE
 
-        // Reset filters
         selectedGender = null
         selectedCondition = null
         selectedSize = null
@@ -187,10 +203,8 @@ class HomeFragment : Fragment() {
         binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
         binding.drawerLayout.closeDrawer(GravityCompat.END)
 
-        // ✅ Clear search results and query
         viewModel.clearSearch()
     }
-    // ====================== RECYCLER ======================
 
     private fun setupRecyclerView() {
         homeAdapter = HomeFeedAdapter(
@@ -211,7 +225,6 @@ class HomeFragment : Fragment() {
             adapter = homeAdapter
         }
 
-        // Single adapter for search results — CategoryGridAdapter only
         categorySearchAdapter = CategoryGridAdapter(
             onItemClick = { itemId ->
                 navigateToItemDetail(itemId, "search")
@@ -219,11 +232,9 @@ class HomeFragment : Fragment() {
             onSoldToggle = null,
             isShopMode = false
         )
-        binding.searchResultsRecycler.layoutManager = GridLayoutManager(requireContext(), 2)
+        binding.searchResultsRecycler.layoutManager = GridLayoutManager(requireContext(), GRID_SPAN_COUNT)
         binding.searchResultsRecycler.adapter = categorySearchAdapter
     }
-
-    // ====================== SORT ======================
 
     private fun setupFilterBar() {
         binding.sortBtn.setOnClickListener {
@@ -233,46 +244,27 @@ class HomeFragment : Fragment() {
         }
 
         binding.filterBtn.setOnClickListener {
-            // Only open filter drawer when in search mode
             if (isInSearchMode) {
                 rebuildLocalFilters()
                 binding.drawerLayout.openDrawer(GravityCompat.END)
             }
         }
 
-        // ✅ LOCK the drawer initially (not in search mode)
         binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
 
-        // Apply theme colors
         val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
                 android.content.res.Configuration.UI_MODE_NIGHT_YES
 
         if (isDarkMode) {
-            binding.sortBtn.setBackgroundColor(
-                ContextCompat.getColor(requireContext(), R.color.dark_surface)
-            )
-            binding.filterBtn.setBackgroundColor(
-                ContextCompat.getColor(requireContext(), R.color.dark_surface)
-            )
-            binding.sortBtn.setTextColor(
-                ContextCompat.getColor(requireContext(), R.color.white)
-            )
-            binding.filterBtn.setTextColor(
-                ContextCompat.getColor(requireContext(), R.color.white)
-            )
+            binding.sortBtn.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.dark_surface))
+            binding.filterBtn.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.dark_surface))
+            binding.sortBtn.setTextColor(ContextCompat.getColor(requireContext(), R.color.white))
+            binding.filterBtn.setTextColor(ContextCompat.getColor(requireContext(), R.color.white))
         } else {
-            binding.sortBtn.setBackgroundColor(
-                ContextCompat.getColor(requireContext(), R.color.light_background)
-            )
-            binding.filterBtn.setBackgroundColor(
-                ContextCompat.getColor(requireContext(), R.color.light_background)
-            )
-            binding.sortBtn.setTextColor(
-                ContextCompat.getColor(requireContext(), R.color.black)
-            )
-            binding.filterBtn.setTextColor(
-                ContextCompat.getColor(requireContext(), R.color.black)
-            )
+            binding.sortBtn.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.light_background))
+            binding.filterBtn.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.light_background))
+            binding.sortBtn.setTextColor(ContextCompat.getColor(requireContext(), R.color.black))
+            binding.filterBtn.setTextColor(ContextCompat.getColor(requireContext(), R.color.black))
         }
     }
 
@@ -304,8 +296,6 @@ class HomeFragment : Fragment() {
         categorySearchAdapter.submitList(currentSearchResults.toList())
     }
 
-    // ====================== FILTER DRAWER ======================
-
     private fun setupFilterDrawer() {
         setupPriceSlider()
 
@@ -321,8 +311,8 @@ class HomeFragment : Fragment() {
     }
 
     private fun setupPriceSlider() {
-        binding.priceSlider.setValues(0f, 1000f)
-        binding.selectedPriceRange.text = "R0 - R1000"
+        binding.priceSlider.setValues(PRICE_SLIDER_MIN, PRICE_SLIDER_MAX)
+        binding.selectedPriceRange.text = "R${PRICE_SLIDER_MIN.toInt()} - R${PRICE_SLIDER_MAX.toInt()}"
 
         binding.priceSlider.addOnChangeListener { slider, _, _ ->
             val values = slider.values
@@ -341,11 +331,176 @@ class HomeFragment : Fragment() {
         }
     }
 
+    private fun getGender(item: Item): String? {
+        return when (item.genderId) {
+            GENDER_BOYS_ID -> "Boys"
+            GENDER_GIRLS_ID -> "Girls"
+            GENDER_UNISEX_ID -> "Unisex"
+            in GENDER_ODD_ID..GENDER_EVEN_ID ->
+                if (item.genderId?.rem(GENDER_REM_CHECK) == GENDER_REM_RESULT) "Girls" else "Boys"
+            else -> item.gender?.takeIf { it.isNotBlank() }
+        }
+    }
+
+    private fun setupBannerSlider() {
+        bannerAdapter = BannerAdapter(bannerItems)
+        binding.bannerViewPager.apply {
+            adapter = bannerAdapter
+            offscreenPageLimit = ViewPager2.OFFSCREEN_PAGE_LIMIT_DEFAULT
+            setCurrentItem(Int.MAX_VALUE / BANNER_INITIAL_POSITION_DIVIDER, false)
+            registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+                override fun onPageSelected(position: Int) {
+                    super.onPageSelected(position)
+                    updateIndicatorDots(position % bannerItems.size)
+                }
+            })
+        }
+        autoScrollHelper = BannerAutoScrollHelper(binding.bannerViewPager, BANNER_AUTO_SCROLL_INTERVAL_MS)
+        autoScrollHelper.startAutoScroll()
+    }
+
+    private fun setupIndicatorDots() {
+        binding.indicatorDots.removeAllViews()
+        bannerItems.forEachIndexed { index, _ ->
+            val dot = ImageView(requireContext()).apply {
+                setImageResource(R.drawable.dot_selector)
+                isSelected = (index == 0)
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                setPadding(8, 0, 8, 0)
+            }
+            binding.indicatorDots.addView(dot)
+        }
+    }
+
+    private fun updateIndicatorDots(currentIndex: Int) {
+        for (i in 0 until binding.indicatorDots.childCount) {
+            val dot = binding.indicatorDots.getChildAt(i) as ImageView
+            dot.isSelected = (i == currentIndex)
+        }
+    }
+
+    private fun setupSwipeRefresh() {
+        binding.swipeRefreshLayout.apply {
+            setColorSchemeColors(
+                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.teal_200)
+            )
+            setOnRefreshListener {
+                viewModel.refreshHomeFeed()
+            }
+        }
+    }
+
+    private fun observeViewModel() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.isLoading.collect { isLoading ->
+                if (isLoading && viewModel.homeFeed.value == null) {
+                    binding.shimmerLayout.visibility = View.VISIBLE
+                    binding.homeRecycler.visibility = View.GONE
+                    binding.errorLayout.visibility = View.GONE
+                    binding.noSchoolLayout.visibility = View.GONE
+                } else {
+                    binding.shimmerLayout.visibility = View.GONE
+                    binding.swipeRefreshLayout.isRefreshing = false
+                    if (viewModel.homeFeed.value != null && !isInSearchMode) {
+                        binding.homeRecycler.visibility = View.VISIBLE
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.error.collect { errorMsg ->
+                val isTechnicalError = errorMsg?.contains("401") == true ||
+                        errorMsg?.contains("token") == true ||
+                        errorMsg?.contains("Authorization") == true ||
+                        errorMsg?.contains("session") == true ||
+                        errorMsg?.contains("retry") == true ||
+                        errorMsg.isNullOrEmpty()
+
+                if (!isTechnicalError && viewModel.homeFeed.value == null) {
+                    binding.errorLayout.visibility = View.VISIBLE
+                    binding.errorMessage.text = errorMsg
+                    binding.homeRecycler.visibility = View.GONE
+                    binding.shimmerLayout.visibility = View.GONE
+                    binding.swipeRefreshLayout.isRefreshing = false
+                } else {
+                    binding.errorLayout.visibility = View.GONE
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.homeFeed.collect { feed ->
+                feed?.let {
+                    Timber.tag(LogTags.UI).d("=== HOME FEED RECEIVED ===")
+                    Timber.tag(LogTags.UI).d("Sections count: ${it.sections.size}")
+                    binding.shimmerLayout.visibility = View.GONE
+                    binding.homeRecycler.visibility = View.VISIBLE
+                    binding.errorLayout.visibility = View.GONE
+                    binding.noSchoolLayout.visibility = View.GONE
+                    binding.swipeRefreshLayout.isRefreshing = false
+                    homeAdapter.submitList(it.sections)
+                    if (isAdded && view != null && binding.root.isAttachedToWindow) {
+                        val message = if (it.message == "Cached data") "Using cached data" else "Data updated"
+                        try {
+                            Snackbar.make(binding.root, message, Snackbar.LENGTH_SHORT).show()
+                        } catch (e: Exception) {
+                            Timber.tag(LogTags.UI).e("Failed to show Snackbar: ${e.message}")
+                        }
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.isFromCache.collect { fromCache ->
+                if (isAdded && view != null && binding.root.isAttachedToWindow) {
+                    val message = if (fromCache) "Using cached data" else "Data updated"
+                    try {
+                        Snackbar.make(binding.root, message, Snackbar.LENGTH_SHORT).show()
+                    } catch (e: Exception) {
+                        Timber.tag(LogTags.UI).e("Failed to show Snackbar: ${e.message}")
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.rankedSearchResults.collect { results ->
+                if (!isInSearchMode) return@collect
+
+                if (results.isEmpty()) {
+                    binding.emptySearchResults.visibility = View.VISIBLE
+                    binding.searchResultsRecycler.visibility = View.GONE
+                } else {
+                    binding.emptySearchResults.visibility = View.GONE
+                    binding.searchResultsRecycler.visibility = View.VISIBLE
+
+                    originalSearchResults.clear()
+                    originalSearchResults.addAll(results)
+                    clearFilterState()
+                    currentSearchResults.clear()
+                    currentSearchResults.addAll(results)
+
+                    categorySearchAdapter.submitList(currentSearchResults.toList())
+                    rebuildLocalFilters()
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.searchRelevanceGroups.collect { groups ->
+                Timber.tag(LogTags.UI).d("📊 Relevance groups: school=${groups.schoolMatch.size}, nearby=${groups.nearbyMatch.size}, other=${groups.other.size}")
+            }
+        }
+    }
+
     private fun rebuildLocalFilters() {
         binding.dynamicFilterContainer.removeAllViews()
 
-        // For each filter group, available options = originalResults filtered by
-        // ALL OTHER active filters (not its own), so it never drains to zero
         fun itemsExcluding(excludeGroup: String): List<Item> {
             var items = originalSearchResults.toList()
             if (excludeGroup != "gender" && selectedGender != null)
@@ -456,8 +611,6 @@ class HomeFragment : Fragment() {
                 }
 
                 applyAllFilters()
-                // Rebuild the options list in place so user can keep filtering
-                // without drawer closing
                 showOptionsDrawer(groupId, groupName, getUpdatedOptions(groupId), getSelection(groupId))
             }
 
@@ -465,10 +618,8 @@ class HomeFragment : Fragment() {
         }
     }
 
-    // Returns updated options for the current group after a filter was applied
     private fun getUpdatedOptions(groupId: String): List<FilterOption> {
         var items = originalSearchResults.toList()
-        // Apply all filters EXCEPT the one for this group
         if (groupId != "gender" && selectedGender != null)
             items = items.filter { getGender(it) == selectedGender }
         if (groupId != "condition" && selectedCondition != null)
@@ -519,8 +670,8 @@ class HomeFragment : Fragment() {
     }
 
     private fun resetLocalFilters() {
-        binding.priceSlider.setValues(0f, 1000f)
-        binding.selectedPriceRange.text = "R0 - R1000"
+        binding.priceSlider.setValues(PRICE_SLIDER_MIN, PRICE_SLIDER_MAX)
+        binding.selectedPriceRange.text = "R${PRICE_SLIDER_MIN.toInt()} - R${PRICE_SLIDER_MAX.toInt()}"
         clearFilterState()
         currentSearchResults.clear()
         currentSearchResults.addAll(originalSearchResults)
@@ -534,18 +685,6 @@ class HomeFragment : Fragment() {
         selectedSize = null
         selectedColor = null
         selectedBrand = null
-    }
-
-    // ====================== HELPERS ======================
-
-    private fun getGender(item: Item): String? {
-        return when (item.genderId) {
-            42 -> "Boys"
-            43 -> "Girls"
-            27 -> "Unisex"
-            in 1..26 -> if (item.genderId?.rem(2) == 0) "Girls" else "Boys"
-            else -> item.gender?.takeIf { it.isNotBlank() }
-        }
     }
 
     private fun navigateToItemDetail(itemId: String, source: String) {
@@ -570,118 +709,6 @@ class HomeFragment : Fragment() {
         }
         findNavController().navigate(R.id.action_homeFragment_to_productsFragment, bundle)
     }
-
-    // ====================== OBSERVERS (UPDATED) ======================
-
-    private fun observeViewModel() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.isLoading.collect { isLoading ->
-                if (isLoading && viewModel.homeFeed.value == null) {
-                    binding.shimmerLayout.visibility = View.VISIBLE
-                    binding.homeRecycler.visibility = View.GONE
-                    binding.errorLayout.visibility = View.GONE
-                    binding.noSchoolLayout.visibility = View.GONE
-                } else {
-                    binding.shimmerLayout.visibility = View.GONE
-                    binding.swipeRefreshLayout.isRefreshing = false
-                    if (viewModel.homeFeed.value != null && !isInSearchMode) {
-                        binding.homeRecycler.visibility = View.VISIBLE
-                    }
-                }
-            }
-        }
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.error.collect { errorMsg ->
-                val isTechnicalError = errorMsg?.contains("401") == true ||
-                        errorMsg?.contains("token") == true ||
-                        errorMsg?.contains("Authorization") == true ||
-                        errorMsg?.contains("session") == true ||
-                        errorMsg?.contains("retry") == true ||
-                        errorMsg.isNullOrEmpty()
-
-                if (!isTechnicalError && viewModel.homeFeed.value == null) {
-                    binding.errorLayout.visibility = View.VISIBLE
-                    binding.errorMessage.text = errorMsg
-                    binding.homeRecycler.visibility = View.GONE
-                    binding.shimmerLayout.visibility = View.GONE
-                    binding.swipeRefreshLayout.isRefreshing = false
-                } else {
-                    binding.errorLayout.visibility = View.GONE
-                }
-            }
-        }
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.homeFeed.collect { feed ->
-                feed?.let {
-                    Timber.tag("HomeFragment").d("=== HOME FEED RECEIVED ===")
-                    Timber.tag("HomeFragment").d("Sections count: ${it.sections.size}")
-                    binding.shimmerLayout.visibility = View.GONE
-                    binding.homeRecycler.visibility = View.VISIBLE
-                    binding.errorLayout.visibility = View.GONE
-                    binding.noSchoolLayout.visibility = View.GONE
-                    binding.swipeRefreshLayout.isRefreshing = false
-                    homeAdapter.submitList(it.sections)
-                    if (isAdded && view != null && binding.root.isAttachedToWindow) {
-                        val message = if (it.message == "Cached data") "Using cached data" else "Data updated"
-                        try {
-                            Snackbar.make(binding.root, message, Snackbar.LENGTH_SHORT).show()
-                        } catch (e: Exception) {
-                            Timber.e("Failed to show Snackbar: ${e.message}")
-                        }
-                    }
-                }
-            }
-        }
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.isFromCache.collect { fromCache ->
-                if (isAdded && view != null && binding.root.isAttachedToWindow) {
-                    val message = if (fromCache) "Using cached data" else "Data updated"
-                    try {
-                        Snackbar.make(binding.root, message, Snackbar.LENGTH_SHORT).show()
-                    } catch (e: Exception) {
-                        Timber.e("Failed to show Snackbar: ${e.message}")
-                    }
-                }
-            }
-        }
-
-        // 🔥 UPDATED: Observe ranked search results
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.rankedSearchResults.collect { results ->
-                if (!isInSearchMode) return@collect
-
-                if (results.isEmpty()) {
-                    binding.emptySearchResults.visibility = View.VISIBLE
-                    binding.searchResultsRecycler.visibility = View.GONE
-                } else {
-                    binding.emptySearchResults.visibility = View.GONE
-                    binding.searchResultsRecycler.visibility = View.VISIBLE
-
-                    // Fresh search — reset everything
-                    originalSearchResults.clear()
-                    originalSearchResults.addAll(results)
-                    clearFilterState()
-                    currentSearchResults.clear()
-                    currentSearchResults.addAll(results)
-
-                    categorySearchAdapter.submitList(currentSearchResults.toList())
-                    rebuildLocalFilters()
-                }
-            }
-        }
-
-        // 🔥 NEW: Observe relevance groups for debugging
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.searchRelevanceGroups.collect { groups ->
-                Timber.tag("HomeFragment").d("📊 Relevance groups: school=${groups.schoolMatch.size}, nearby=${groups.nearbyMatch.size}, other=${groups.other.size}")
-            }
-        }
-    }
-
-    // ====================== TABS ======================
 
     private fun setupCustomTabs() {
         val tabs = listOf(binding.tabHome, binding.tabUniform, binding.tabSport, binding.tabRecent)
@@ -721,8 +748,8 @@ class HomeFragment : Fragment() {
 
     fun getCurrentCategoryId(): Int? {
         return when (currentTabId) {
-            R.id.tabUniform -> 6
-            R.id.tabSport -> 7
+            R.id.tabUniform -> TAB_UNIFORM_ID
+            R.id.tabSport -> TAB_SPORT_ID
             else -> null
         }
     }
@@ -754,59 +781,16 @@ class HomeFragment : Fragment() {
         }
     }
 
-    // ====================== BANNER ======================
-
-    private fun setupBannerSlider() {
-        bannerAdapter = BannerAdapter(bannerItems)
-        binding.bannerViewPager.apply {
-            adapter = bannerAdapter
-            offscreenPageLimit = 1
-            setCurrentItem(Int.MAX_VALUE / 2, false)
-            registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-                override fun onPageSelected(position: Int) {
-                    super.onPageSelected(position)
-                    updateIndicatorDots(position % bannerItems.size)
-                }
-            })
-        }
-        autoScrollHelper = BannerAutoScrollHelper(binding.bannerViewPager, 8000)
-        autoScrollHelper.startAutoScroll()
+    private fun navigateToUniformTab() {
+        findNavController().navigate(R.id.action_homeFragment_to_uniformFragment)
     }
 
-    private fun setupIndicatorDots() {
-        binding.indicatorDots.removeAllViews()
-        bannerItems.forEachIndexed { index, _ ->
-            val dot = ImageView(requireContext()).apply {
-                setImageResource(R.drawable.dot_selector)
-                isSelected = (index == 0)
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-                setPadding(8, 0, 8, 0)
-            }
-            binding.indicatorDots.addView(dot)
-        }
+    private fun navigateToSportTab() {
+        findNavController().navigate(R.id.action_homeFragment_to_sportFragment)
     }
 
-    private fun updateIndicatorDots(currentIndex: Int) {
-        for (i in 0 until binding.indicatorDots.childCount) {
-            val dot = binding.indicatorDots.getChildAt(i) as ImageView
-            dot.isSelected = (i == currentIndex)
-        }
-    }
-
-    // ====================== LIFECYCLE ======================
-
-    private fun setupSwipeRefresh() {
-        binding.swipeRefreshLayout.apply {
-            setColorSchemeColors(
-                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.teal_200)
-            )
-            setOnRefreshListener {
-                viewModel.refreshHomeFeed()
-            }
-        }
+    private fun navigateToRecentTab() {
+        navigateToProducts("recent", "Recently Added", "all", null)
     }
 
     override fun onResume() {
@@ -826,17 +810,5 @@ class HomeFragment : Fragment() {
         super.onDestroyView()
         autoScrollHelper?.stopAutoScroll()
         _binding = null
-    }
-
-    private fun navigateToUniformTab() {
-        findNavController().navigate(R.id.action_homeFragment_to_uniformFragment)
-    }
-
-    private fun navigateToSportTab() {
-        findNavController().navigate(R.id.action_homeFragment_to_sportFragment)
-    }
-
-    private fun navigateToRecentTab() {
-        navigateToProducts("recent", "Recently Added", "all", null)
     }
 }

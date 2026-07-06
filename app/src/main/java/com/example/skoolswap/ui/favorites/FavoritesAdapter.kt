@@ -1,26 +1,26 @@
 package com.example.skoolswap.ui.favorites
 
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.example.skoolswap.R
-import com.example.skoolswap.databinding.ItemFavoriteCardBinding  // New binding
+import com.example.skoolswap.common.constants.AppConstants.LogTags
+import com.example.skoolswap.databinding.ItemFavoriteCardBinding
 import com.example.skoolswap.domain.model.Item
+import timber.log.Timber
 
 class FavoritesAdapter(
     private val onItemClick: (String) -> Unit
 ) : RecyclerView.Adapter<FavoritesAdapter.FavoriteViewHolder>() {
 
     private var items = listOf<Item>()
-    private val TAG = "FavoritesAdapter"
 
     fun submitList(newItems: List<Item>) {
         items = newItems
         notifyDataSetChanged()
-        Log.d(TAG, "Submitted ${newItems.size} favorites")
+        Timber.tag(LogTags.UI).d("Submitted ${newItems.size} favorites")
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FavoriteViewHolder {
@@ -47,7 +47,6 @@ class FavoritesAdapter(
                 productName.text = item.name
                 productPrice.text = "R${String.format("%.2f", item.price)}"
 
-                // Use coverImage first
                 val imageUrl = when {
                     !item.coverImage.isNullOrBlank() -> item.coverImage
                     item.images.isNotEmpty() -> item.images.first().url

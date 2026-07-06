@@ -1,4 +1,3 @@
-// ui/home/BannerAutoScrollHelper.kt
 package com.example.skoolswap.ui.home
 
 import android.os.Handler
@@ -8,7 +7,7 @@ import java.lang.ref.WeakReference
 
 class BannerAutoScrollHelper(
     viewPager: ViewPager2,
-    private val interval: Long = 8000 // 3 seconds
+    private val interval: Long = 8000L
 ) {
     private val weakViewPager = WeakReference(viewPager)
     private val handler = Handler(Looper.getMainLooper())

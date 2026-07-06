@@ -1,7 +1,6 @@
-// data/repository/SchoolRepository.kt
 package com.example.skoolswap.data.repository
 
-import android.util.Log
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.data.local.database.dao.ProvinceDao
 import com.example.skoolswap.data.local.database.entities.ProvinceEntity
 import com.example.skoolswap.data.local.datastore.AppPreferences
@@ -10,12 +9,12 @@ import com.example.skoolswap.data.remote.api.ProvinceApiService
 import com.example.skoolswap.domain.model.Province
 import com.example.skoolswap.domain.model.School
 import com.example.skoolswap.utils.Result
-import com.example.skoolswap.data.mapper.toDomain
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 class SchoolRepository @Inject constructor(
@@ -27,19 +26,17 @@ class SchoolRepository @Inject constructor(
 
     suspend fun getProvinces(): Result<List<Province>> {
         return try {
-            // STEP 1: Check cache with count
             val cacheCount = provinceDao.getCount()
-            Log.d("SchoolRepo", "🔍 Province cache count: $cacheCount")
+            Timber.tag(LogTags.REPOSITORY).d("🔍 Province cache count: $cacheCount")
 
             val cachedProvinces = provinceDao.getAllSync()
 
             if (cachedProvinces.isNotEmpty()) {
-                Log.d("SchoolRepo", "✅ Using CACHED provinces: ${cachedProvinces.size}")
+                Timber.tag(LogTags.REPOSITORY).d("✅ Using CACHED provinces: ${cachedProvinces.size}")
                 cachedProvinces.forEach {
-                    Log.d("SchoolRepo", "  - Cached: ${it.name} (ID: ${it.id})")
+                    Timber.tag(LogTags.REPOSITORY).d("  - Cached: ${it.name} (ID: ${it.id})")
                 }
 
-                // Refresh in background
                 refreshProvincesInBackground()
 
                 return Result.Success(cachedProvinces.map {
@@ -47,8 +44,7 @@ class SchoolRepository @Inject constructor(
                 })
             }
 
-            // STEP 2: No cache - fetch from API
-            Log.d("SchoolRepo", "📡 Fetching provinces from API (cache empty)")
+            Timber.tag(LogTags.REPOSITORY).d("📡 Fetching provinces from API (cache empty)")
             val token = appPreferences.authToken.firstOrNull()
                 ?: return Result.Error(Exception("No auth token"))
 
@@ -56,27 +52,27 @@ class SchoolRepository @Inject constructor(
 
             if (response.isSuccessful) {
                 val provinces = response.body() ?: emptyList()
-                Log.d("SchoolRepo", "📥 Received ${provinces.size} provinces from API")
+                Timber.tag(LogTags.REPOSITORY).d("📥 Received ${provinces.size} provinces from API")
 
-                // Cache them
                 val entities = provinces.map {
                     ProvinceEntity(id = it.id, name = it.name)
                 }
                 provinceDao.insertAll(entities)
 
-                // Verify cache
                 val afterCount = provinceDao.getCount()
-                Log.d("SchoolRepo", "✅ Cached $afterCount provinces")
+                Timber.tag(LogTags.REPOSITORY).d("✅ Cached $afterCount provinces")
 
                 Result.Success(provinces)
             } else {
+                Timber.tag(LogTags.REPOSITORY).e("❌ Failed to load provinces: ${response.code()}")
                 Result.Error(Exception("Failed to load provinces: ${response.code()}"))
             }
         } catch (e: Exception) {
-            Log.e("SchoolRepo", "Error loading provinces", e)
+            Timber.tag(LogTags.REPOSITORY).e(e, "Error loading provinces")
             Result.Error(e)
         }
     }
+
     private fun refreshProvincesInBackground() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -89,13 +85,14 @@ class SchoolRepository @Inject constructor(
                         ProvinceEntity(id = it.id, name = it.name)
                     }
                     provinceDao.insertAll(entities)
-                    Log.d("SchoolRepo", "🔄 Provinces refreshed in background")
+                    Timber.tag(LogTags.REPOSITORY).d("🔄 Provinces refreshed in background")
                 }
             } catch (e: Exception) {
-                Log.e("SchoolRepo", "Background refresh failed", e)
+                Timber.tag(LogTags.REPOSITORY).e(e, "Background refresh failed")
             }
         }
     }
+
     suspend fun searchSchools(provinceId: Int, query: String): Result<List<School>> {
         return try {
             val token = appPreferences.authToken.first() ?: return Result.Error(Exception("No auth token"))
@@ -113,11 +110,15 @@ class SchoolRepository @Inject constructor(
                         schoolType = schoolResponse.school_type
                     )
                 } ?: emptyList()
+
+                Timber.tag(LogTags.REPOSITORY).d("🔍 Found ${schools.size} schools for query: '$query'")
                 Result.Success(schools)
             } else {
+                Timber.tag(LogTags.REPOSITORY).e("❌ Search failed: ${response.code()}")
                 Result.Error(Exception("Search failed: ${response.code()}"))
             }
         } catch (e: Exception) {
+            Timber.tag(LogTags.REPOSITORY).e(e, "❌ Error searching schools")
             Result.Error(e)
         }
     }

@@ -1,13 +1,19 @@
 <resources>
     <string name="app_name">SkoolSwap</string>
+
+    <!-- Navigation -->
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
     <string name="nav_header_title">Android Studio</string>
     <string name="nav_header_subtitle">android.studio@android.com</string>
     <string name="nav_header_desc">Navigation header</string>
     <string name="action_settings">Settings</string>
+
+    <!-- Default Values -->
     <string name="default_email">Sign in to continue</string>
     <string name="profile_image">Profile Image</string>
+
+    <!-- Menu -->
     <string name="menu_home">Home</string>
     <string name="menu_profile">Profile</string>
     <string name="menu_wallet">Wallet</string>
@@ -17,15 +23,18 @@
     <string name="menu_logout">Logout</string>
     <string name="menu_gallery">Gallery</string>
     <string name="menu_slideshow">Slideshow</string>
+
+    <!-- Onboarding -->
     <string name="sell_easily">Sell Easily</string>
-    <string name="sell_easy_disc">Sell your school’s preloved items—from uniforms and accessories to sports gear—all through your phone.</string>
+    <string name="sell_easy_disc">Sell your school\'s preloved items—from uniforms and accessories to sports gear—all through your phone.</string>
     <string name="trusted_community">Trusted Community</string>
     <string name="trust_desc">Buy and Sell with your school community, safely.</string>
     <string name="secure_payments">Secure Payments</string>
     <string name="secure_desc">Trade confidently with secure payments</string>
     <string name="todo">TODO</string>
     <string name="finish">Finish</string>
-    <!-- Strings related to login -->
+
+    <!-- Login -->
     <string name="prompt_email">Email</string>
     <string name="prompt_password">Password</string>
     <string name="action_sign_in">Sign in or register</string>
@@ -36,6 +45,8 @@
     <string name="login_failed">"Login failed"</string>
     <string name="sign_in_with_google">Continue with Google</string>
     <string name="default_web_client_id" translatable="false">63644777044-5ttve1jvt4nr35s31b2gp2b48ev2tp3h.apps.googleusercontent.com</string>
+
+    <!-- Account Management -->
     <string name="delete_account_success">Account deleted successfully</string>
     <string name="delete_account_failed">Failed to delete account</string>
     <string name="delete_account_already_deactivated">Account is already deactivated</string>
@@ -58,16 +69,212 @@
     <string name="btn_keep_account">No, Keep it.</string>
     <string name="btn_delete_account">Yes, Delete It!</string>
     <string name="loading">Loading...</string>
-    <string name="select_province">select province</string>
-    <string name="no_schools_found">no schools found</string>
-    <string name="no_school_selected">no school selected</string>
-    <string name="select_province_first">select province first</string>
-    <string name="search_school">search school</string>
+    <string name="select_province">Select Province</string>
+    <string name="no_schools_found">No schools found</string>
+    <string name="no_school_selected">No school selected</string>
+    <string name="select_province_first">Select province first</string>
+    <string name="search_school">Search School</string>
     <string name="favorites">Favorites</string>
     <string name="search">Search</string>
+    <!-- Forgot Password -->
+    <string name="forgot_password_title">Forgot Password</string>
+    <string name="forgot_password_instruction">Enter your email address and we\'ll send you a link to reset your password.</string>
+    <string name="forgot_password_email_hint">Email</string>
+    <string name="forgot_password_send_button">Send Reset Email</string>
+    <string name="forgot_password_sending">Sending...</string>
+    <string name="forgot_password_back_to_login">Back to Login</string>
 
-    <!-- Categories -->
-    <string-array name="main_categories">
+    <!-- Error Messages -->
+    <string name="error_email_required">Email is required</string>
+    <string name="error_invalid_email">Invalid email format</string>
+    <string name="error_email_not_found">No account found with this email</string>
+
+    <!-- Success Messages -->
+    <string name="reset_email_sent">Password reset email sent! Check your inbox/spam folder.</string>
+    <string name="nav_header_welcome">Welcome</string>
+    <string name="nav_header_sign_in_to_continue">Sign in to continue</string>
+    <string name="nav_header_loading">Loading...</string>
+    <string name="nav_header_error_no_user_data">No user data</string>
+    <string name="nav_header_error_default">Something went wrong</string>
+    <!-- Categories (Keep for display, but data is in ItemConstants) -->
+    <!-- School Onboarding -->
+    <string name="school_onboarding_title">Select Your School</string>
+    <string name="school_onboarding_subtitle">Choose your province and school to get started</string>
+    <string name="school_onboarding_select_province">Select Province</string>
+    <string name="school_onboarding_start_typing">Start typing...</string>
+    <string name="school_onboarding_search_school">Search School</string>
+    <string name="school_onboarding_no_results">No schools found</string>
+    <string name="school_onboarding_select_province_first">Please select a province first</string>
+    <string name="school_onboarding_submit">Submit</string>
+    <string name="school_onboarding_selected_school">Selected School</string>
+    <string name="school_onboarding_success_message">🎉 Well done! You have successfully chosen %s</string>
+    <string name="school_onboarding_error_login_first">Please log in to continue</string>
+    <string name="school_onboarding_error_select_school">Please select a school first</string>
+    <string name="school_onboarding_error_load_provinces">Failed to load provinces</string>
+    <string name="school_onboarding_error_load_schools">Failed to load schools</string>
+    <string name="school_onboarding_error_session_expired">Session expired. Please log in again.</string>
+    <string name="school_onboarding_error_failed_assign">Failed to assign school</string>
+    <!-- Shop Item Badges -->
+    <string name="shop_badge_sold">SOLD</string>
+    <string name="shop_badge_mark_sold">MARK SOLD</string>
+    <!-- Shop Fragment -->
+    <string name="shop_empty_items">No items in your shop yet.\nTap the + button to add your first item!</string>
+    <string name="shop_all_items_tab">All Items</string>
+    <string name="shop_categories_tab">Categories</string>
+    <string name="shop_sold_badge">SOLD</string>
+    <string name="shop_mark_sold_badge">MARK SOLD</string>
+    <string name="shop_items_count">%d items</string>
+    <!-- Profile Fragment -->
+    <string name="profile_title">Profile</string>
+    <string name="profile_name_hint">Name</string>
+    <string name="profile_contact_hint">Contact Number</string>
+    <string name="profile_select_province">Select Province</string>
+    <string name="profile_search_school">Search School</string>
+    <string name="profile_search_hint">Type at least 2 characters</string>
+    <string name="profile_search_in_province">Search schools in %s</string>
+    <string name="profile_no_results">No schools found</string>
+    <string name="profile_selected_school">Selected School</string>
+    <string name="profile_submit">Submit</string>
+    <string name="profile_update">Update Profile</string>
+    <string name="profile_save_changes">Save Changes*</string>
+    <string name="profile_delete_account">Delete Account</string>
+    <string name="profile_mobile_required">Mobile number must be 10 digits</string>
+    <string name="profile_mobile_invalid">Please enter a valid 10-digit SA mobile number</string>
+    <string name="profile_mobile_incomplete">Need %d more digit(s)</string>
+    <string name="profile_mobile_prefix_invalid">Invalid SA prefix: %s. Must start with 060-089</string>
+    <string name="profile_mobile_numbers_only">Only numbers allowed (no spaces or dashes)</string>
+    <string name="profile_no_changes">No changes to save</string>
+    <string name="profile_select_school_first">Please select a school</string>
+    <string name="profile_update_success">Profile updated successfully!</string>
+    <string name="profile_school_updated">School updated successfully!</string>
+    <string name="profile_complete">Profile completed! Welcome to SkoolSwap!</string>
+    <string name="profile_delete_success">Account deleted successfully</string>
+    <string name="profile_delete_failed">Failed to delete account: %s</string>
+    <string name="profile_complete_setup">Please complete your profile setup first</string>
+    <string name="profile_unsaved_changes">You have unsaved changes</string>
+    <!-- Item Repository Messages -->
+    <string name="item_error_not_authenticated">Not authenticated</string>
+    <string name="item_error_create_failed">Failed to create item</string>
+    <string name="item_error_update_failed">Failed to update item</string>
+    <string name="item_error_delete_failed">Failed to delete item</string>
+    <string name="item_error_not_found">Item not found</string>
+    <string name="item_error_image_upload_failed">Failed to upload images</string>
+    <string name="item_error_max_images">Cannot exceed %d images</string>
+    <string name="item_error_validation_failed">Validation failed</string>
+    <string name="item_error_server_unavailable">Server is temporarily unavailable. Please try again.</string>
+    <string name="item_error_server_error">Server error. Please try again later.</string>
+    <string name="item_success_created">Item created successfully</string>
+    <string name="item_success_updated">Item updated successfully</string>
+    <string name="item_success_deleted">Item deleted successfully</string>
+    <string name="item_success_marked_sold">Item marked as sold</string>
+
+    <!-- Create Item -->
+    <string name="create_item_title">Create Item</string>
+    <string name="create_item_name_hint">Item Name</string>
+    <string name="create_item_description_hint">Description</string>
+    <string name="create_item_price_hint">Price (R)</string>
+    <string name="create_item_select_category">Select Category</string>
+    <string name="create_item_select_subcategory">Select Sub Category</string>
+    <string name="create_item_select_condition">Select Condition</string>
+    <string name="create_item_select_size">Select Size</string>
+    <string name="create_item_select_brand">Select Brand</string>
+    <string name="create_item_select_color">Select Color</string>
+    <string name="create_item_select_province">Select Province</string>
+    <string name="create_item_select_town">Select Town/City</string>
+    <string name="create_item_select_gender">Select Gender</string>
+    <string name="create_item_select_school">Select School</string>
+    <string name="create_item_select_quantity">Quantity</string>
+    <string name="create_item_submit">Create Item</string>
+    <string name="create_item_creating">Creating...</string>
+    <string name="create_item_images_subheading">%d/3 images selected</string>
+    <string name="create_item_add_photo">Add Photo</string>
+    <string name="create_item_take_photo">Take Photo</string>
+    <string name="create_item_choose_gallery">Choose from Gallery</string>
+    <string name="create_item_cancel">Cancel</string>
+    <string name="create_item_max_images">Maximum 3 images allowed</string>
+    <string name="create_item_photo_added">Photo added successfully</string>
+    <string name="create_item_photo_failed">Failed to save image</string>
+    <string name="create_item_camera_failed">Failed to capture image</string>
+    <string name="create_item_no_camera">Your device doesn\'t have a camera</string>
+    <string name="create_item_camera_permission_required">Camera permission is required to take photos</string>
+    <string name="create_item_camera_permission_title">Camera Permission Needed</string>
+    <string name="create_item_camera_permission_message">SkoolSwap needs camera permission to let you take photos of items you want to list.</string>
+    <string name="create_item_camera_permission_allow">Allow</string>
+    <string name="create_item_gallery_access_issue">Gallery Access Issue</string>
+    <string name="create_item_gallery_access_message">There\'s a temporary issue accessing your gallery.\n\nYou can use \'Take Photo\' to capture new images.</string>
+    <string name="create_item_gallery_take_photo">Take Photo</string>
+    <string name="create_item_select_category_first">First select a category</string>
+    <string name="create_item_select_province_first">First select a province</string>
+    <string name="create_item_name_required">Please enter item name</string>
+    <string name="create_item_description_required">Please enter description</string>
+    <string name="create_item_price_required">Please enter valid price</string>
+    <string name="create_item_category_required">Please select a main category</string>
+    <string name="create_item_subcategory_required">Please select a sub category</string>
+    <string name="create_item_contact_required">Please add a contact number to list items</string>
+    <string name="create_item_success">Item saved, uploading in background</string>
+    <string name="create_item_error_failed">Failed to create item</string>
+    <!-- Edit Item -->
+    <string name="edit_item_update_button">Update Item</string>
+    <string name="edit_item_delete_button">Delete Item</string>
+    <string name="edit_item_image_replaced">Image replaced</string>
+    <string name="edit_item_image_added">Image added</string>
+    <string name="edit_item_camera_permission_required">Camera permission is required</string>
+    <string name="edit_item_error_no_id">Error: No item ID provided</string>
+    <string name="edit_item_images_count">%d/3 images - Tap to replace, ✕ to remove</string>
+    <string name="edit_item_remove_image_title">Remove Image</string>
+    <string name="edit_item_remove_image_message">Remove this image from your item?</string>
+    <string name="edit_item_remove">Remove</string>
+    <string name="edit_item_cancel">Cancel</string>
+    <string name="edit_item_select_category_title">Select Category</string>
+    <string name="edit_item_select_subcategory_title">Select Sub Category</string>
+    <string name="edit_item_select_condition_title">Select Condition</string>
+    <string name="edit_item_select_size_title">Select Size</string>
+    <string name="edit_item_select_brand_title">Select Brand</string>
+    <string name="edit_item_select_color_title">Select Color</string>
+    <string name="edit_item_select_province_title">Select Province</string>
+    <string name="edit_item_select_town_title">Select Town/City</string>
+    <string name="edit_item_select_gender_title">Select Gender</string>
+    <string name="edit_item_select_school_title">Select School</string>
+    <!-- Edit Item - Additional -->
+    <string name="edit_item_replace_image">Replace Image</string>
+    <string name="edit_item_updating">Updating...</string>
+    <string name="edit_item_error_prefix">Error</string>
+    <string name="edit_item_no_changes">No changes to save</string>
+    <!-- Home Feed -->
+    <string name="home_feed_recommended">Recommended For You</string>
+    <string name="home_feed_trending">Trending Today</string>
+    <string name="home_feed_recent">Recently Added</string>
+    <string name="home_feed_essentials">School Essentials</string>
+    <string name="home_feed_error_load">Failed to load feed</string>
+    <string name="home_feed_error_timeout">Request timed out. Please try again.</string>
+    <string name="home_feed_error_school">Please select a school first</string>
+    <string name="home_feed_error_search">Failed to load results</string>
+    <string name="home_feed_error_search_timeout">Search timed out. Please try again.</string>
+    <string name="home_feed_error_cancelled">Search cancelled</string>
+    <string name="home_feed_error_retry">All retries failed</string>
+    <string name="home_feed_auth_required">Authentication required</string>
+    <string name="home_feed_network_error">Network error. Please check your connection.</string>
+    <!-- Home Fragment -->
+    <string name="home_using_cached_data">Using cached data</string>
+    <string name="home_data_updated">Data updated</string>
+    <string name="home_no_school_selected">Please select a school first</string>
+    <string name="home_error_technical">Something went wrong. Please try again.</string>
+    <string name="home_empty_search">No results found</string>
+    <string name="home_search_placeholder">Search items...</string>
+    <string name="home_price_range_format">R%d - R%d</string>
+    <string name="home_filter_title">Filters</string>
+    <string name="home_reset_filters">Reset</string>
+    <string name="home_apply_filters">Apply Filters</string>
+    <string name="home_sort_recommended">Recommended</string>
+    <string name="home_sort_newest">Newest</string>
+    <string name="home_sort_price_low">Price: Low to High</string>
+    <string name="home_sort_price_high">Price: High to Low</string>
+    <string name="home_tab_home">Home</string>
+    <string name="home_tab_uniform">Uniform</string>
+    <string name="home_tab_sport">Sport</string>
+    <string name="home_tab_recent">Recent</string>
+    <string-array name="main_categories" translatable="false">
+
         <item>Women</item>
         <item>Men</item>
         <item>Kids</item>
@@ -80,7 +287,7 @@
         <item>Other</item>
     </string-array>
 
-    <string-array name="men_subcategories">
+    <string-array name="men_subcategories" translatable="false">
         <item>Tops for men</item>
         <item>Bottoms for men</item>
         <item>Coats &amp; Jackets for men</item>
@@ -91,7 +298,7 @@
         <item>Swimwear for men</item>
     </string-array>
 
-    <string-array name="women_subcategories">
+    <string-array name="women_subcategories" translatable="false">
         <item>Tops for women</item>
         <item>Dresses</item>
         <item>Bottoms for women</item>
@@ -103,7 +310,7 @@
         <item>Swimwear for women</item>
     </string-array>
 
-    <string-array name="kids_subcategories">
+    <string-array name="kids_subcategories" translatable="false">
         <item>Tops for kids</item>
         <item>Bottoms for kids</item>
         <item>Coats &amp; Jackets for kids</item>
@@ -114,15 +321,15 @@
         <item>Swimwear for kids</item>
     </string-array>
 
-    <!-- Filters -->
-    <string-array name="conditions">
+    <!-- Filter Options -->
+    <string-array name="conditions" translatable="false">
         <item>New</item>
         <item>Used - Like New</item>
         <item>Used - Good</item>
         <item>Used - Fair</item>
     </string-array>
 
-    <string-array name="sizes">
+    <string-array name="sizes" translatable="false">
         <item>XS</item>
         <item>S</item>
         <item>M</item>
@@ -130,14 +337,14 @@
         <item>XL</item>
     </string-array>
 
-    <string-array name="brands">
+    <string-array name="brands" translatable="false">
         <item>Brand A</item>
         <item>Brand B</item>
         <item>Brand C</item>
         <item>Brand D</item>
     </string-array>
 
-    <string-array name="colours">
+    <string-array name="colours" translatable="false">
         <item>Red</item>
         <item>Blue</item>
         <item>Green</item>
@@ -145,7 +352,7 @@
         <item>White</item>
     </string-array>
 
-    <string-array name="materials">
+    <string-array name="materials" translatable="false">
         <item>Cotton</item>
         <item>Leather</item>
         <item>Polyester</item>
@@ -161,7 +368,7 @@
         <item>5</item>
     </string-array>
 
-    <string-array name="provinces">
+    <string-array name="provinces" translatable="false">
         <item>Western Cape</item>
         <item>Eastern Cape</item>
         <item>Northern Cape</item>

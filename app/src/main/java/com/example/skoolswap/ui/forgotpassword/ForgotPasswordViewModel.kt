@@ -4,9 +4,12 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.skoolswap.common.constants.AppConstants.LogTags
+import com.example.skoolswap.common.constants.ErrorConstantsHelper
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -28,15 +31,24 @@ class ForgotPasswordViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
 
+            Timber.tag(LogTags.VIEW_MODEL).d("📧 Sending password reset email to: $email")
+
             val result = authRepository.sendPasswordResetEmail(email)
 
             result.onSuccess {
+                Timber.tag(LogTags.VIEW_MODEL).d("✅ Password reset email sent successfully")
                 _resetSent.value = true
             }.onFailure { throwable ->
-                _error.value = throwable.message ?: "Failed to send reset email"
+                val userMessage = ErrorConstantsHelper.getErrorMessage(throwable)
+                Timber.tag(LogTags.VIEW_MODEL).e(throwable, "❌ Failed to send reset email")
+                _error.value = userMessage
             }
 
             _isLoading.value = false
         }
+    }
+
+    fun clearError() {
+        _error.value = null
     }
 }

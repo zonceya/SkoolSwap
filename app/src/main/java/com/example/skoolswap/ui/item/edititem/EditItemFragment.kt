@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -27,20 +26,19 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.databinding.FragmentEditItemBinding
 import com.example.skoolswap.domain.model.EditImage
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.reference.*
 import com.example.skoolswap.ui.component.ColorPickerBottomSheet
 import com.example.skoolswap.ui.component.OptionsPickerBottomSheet
-import com.example.skoolswap.ui.item.CreateItemFragment
 import com.example.skoolswap.utils.DialogAction
 import com.example.skoolswap.utils.DialogHelper
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.io.File
@@ -48,12 +46,17 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+// Private constants - internal to this file only
+private const val MAX_IMAGES = 3
+private const val QUANTITY_MIN = 1
+private const val QUANTITY_MAX = 5
+private const val IMAGE_COMPRESS_QUALITY = 90
+private const val IMAGE_FILENAME_PREFIX = "IMG_"
+private const val IMAGE_FILE_EXTENSION = ".jpg"
+private const val IMAGE_DATE_FORMAT = "yyyyMMdd_HHmmss"
+
 @AndroidEntryPoint
 class EditItemFragment : Fragment() {
-
-    companion object {
-        private const val TAG = "EditItemFragment"
-    }
 
     private var _binding: FragmentEditItemBinding? = null
     private val binding get() = _binding!!
@@ -89,7 +92,7 @@ class EditItemFragment : Fragment() {
     private val simpleCameraLauncher = registerForActivityResult(
         ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
-        Timber.tag(TAG).d("📸 Camera callback")
+        Timber.tag(LogTags.UI).d("📸 Camera callback")
         isCameraLaunched = false
         if (bitmap != null) {
             lifecycleScope.launch {
@@ -99,10 +102,10 @@ class EditItemFragment : Fragment() {
                     val isReplace = pendingIsReplace ?: false
                     if (isReplace) {
                         viewModel.replaceImage(uri, position)
-                        Toast.makeText(requireContext(), "Image replaced", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(requireContext(), getString(R.string.edit_item_image_replaced), Toast.LENGTH_SHORT).show()
                     } else {
                         viewModel.addImage(uri, position)
-                        Toast.makeText(requireContext(), "Image added", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(requireContext(), getString(R.string.edit_item_image_added), Toast.LENGTH_SHORT).show()
                     }
                     pendingImagePosition = null
                     pendingIsReplace = null
@@ -121,10 +124,10 @@ class EditItemFragment : Fragment() {
             lifecycleScope.launch {
                 if (isReplace) {
                     viewModel.replaceImage(uri, position)
-                    Toast.makeText(requireContext(), "Image replaced", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), getString(R.string.edit_item_image_replaced), Toast.LENGTH_SHORT).show()
                 } else {
                     viewModel.addImage(uri, position)
-                    Toast.makeText(requireContext(), "Image added", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), getString(R.string.edit_item_image_added), Toast.LENGTH_SHORT).show()
                 }
                 pendingImagePosition = null
                 pendingIsReplace = null
@@ -139,7 +142,7 @@ class EditItemFragment : Fragment() {
         if (isGranted) {
             launchCameraSafely()
         } else {
-            Toast.makeText(requireContext(), "Camera permission is required", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), getString(R.string.edit_item_camera_permission_required), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -155,8 +158,9 @@ class EditItemFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        setupStrings()
         itemId = arguments?.getString("itemId") ?: ""
-        Timber.tag(TAG).d("onViewCreated - Item ID: $itemId")
+        Timber.tag(LogTags.FRAGMENT).d("onViewCreated - Item ID: $itemId")
         hideFab()
         showAllShimmers()
         setupObservers()
@@ -167,17 +171,35 @@ class EditItemFragment : Fragment() {
         if (itemId.isNotEmpty()) {
             viewModel.loadItem(itemId)
         } else {
-            Toast.makeText(requireContext(), "Error: No item ID provided", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), getString(R.string.edit_item_error_no_id), Toast.LENGTH_SHORT).show()
             findNavController().navigateUp()
         }
     }
 
+    private fun setupStrings() {
+        binding.updateButton.text = getString(R.string.edit_item_update_button)
+        binding.deleteItemButton.text = getString(R.string.edit_item_delete_button)
+        binding.itemName.hint = getString(R.string.create_item_name_hint)
+        binding.description.hint = getString(R.string.create_item_description_hint)
+        binding.price.hint = getString(R.string.create_item_price_hint)
+        binding.mainCategoryInput.hint = getString(R.string.create_item_select_category)
+        binding.subCategoryInput.hint = getString(R.string.create_item_select_subcategory)
+        binding.conditionInput.hint = getString(R.string.create_item_select_condition)
+        binding.sizeInput.hint = getString(R.string.create_item_select_size)
+        binding.brandInput.hint = getString(R.string.create_item_select_brand)
+        binding.colorInput.hint = getString(R.string.create_item_select_color)
+        binding.provinceInput.hint = getString(R.string.create_item_select_province)
+        binding.townInput.hint = getString(R.string.create_item_select_town)
+        binding.genderInput.hint = getString(R.string.create_item_select_gender)
+        binding.schoolInput.hint = getString(R.string.create_item_select_school)
+        binding.imagesCount.text = getString(R.string.edit_item_images_count, 0)
+    }
+
     private fun setupObservers() {
-        // Observe reference data loading completion
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.isReferenceDataLoaded.collect { loaded ->
-                    Timber.tag(TAG).d("📌 Reference data loaded: $loaded")
+                    Timber.tag(LogTags.UI).d("📌 Reference data loaded: $loaded")
                     if (loaded) {
                         checkAndHideShimmers()
                     }
@@ -185,44 +207,40 @@ class EditItemFragment : Fragment() {
             }
         }
 
-        // Observe item loading
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.item.collect { item ->
                     item?.let {
-                        Timber.tag(TAG).d("📦 Item received: ${item.name}")
+                        Timber.tag(LogTags.UI).d("📦 Item received: ${item.name}")
                         originalItem = it
                         populateItemData(it)
                         restoreSelectionTexts()
-                        checkAndHideShimmers()  // ← ADD THIS
+                        checkAndHideShimmers()
                     }
                 }
             }
         }
 
-        // Collect Main Categories
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.mainCategories.collect { categories ->
-                    Timber.tag(TAG).d("📦 MAIN CATEGORIES received: ${categories.size}")
+                    Timber.tag(LogTags.UI).d("📦 MAIN CATEGORIES received: ${categories.size}")
                     setupMainCategoryPicker(categories)
                     restoreSelectionTexts()
                 }
             }
         }
 
-        // Collect Sub Categories
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.subCategories.collect { subCategories ->
-                    Timber.tag(TAG).d("📦 SUBCATEGORIES received: ${subCategories.size}")
+                    Timber.tag(LogTags.UI).d("📦 SUBCATEGORIES received: ${subCategories.size}")
                     setupSubCategoryPicker(subCategories)
                     restoreSelectionTexts()
                 }
             }
         }
 
-        // Collect Conditions
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.conditions.collect { conditions ->
@@ -232,7 +250,6 @@ class EditItemFragment : Fragment() {
             }
         }
 
-        // Collect Sizes
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.sizes.collect { sizes ->
@@ -242,7 +259,6 @@ class EditItemFragment : Fragment() {
             }
         }
 
-        // Collect Brands
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.brands.collect { brands ->
@@ -252,7 +268,6 @@ class EditItemFragment : Fragment() {
             }
         }
 
-        // Collect Colors
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.colors.collect { colors ->
@@ -262,7 +277,6 @@ class EditItemFragment : Fragment() {
             }
         }
 
-        // Collect Provinces
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.provinces.collect { provinces ->
@@ -272,22 +286,19 @@ class EditItemFragment : Fragment() {
             }
         }
 
-        // Collect Towns
-        // Collect Towns - WITH RESTORATION AFTER DATA ARRIVES
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.towns.collect { towns ->
-                    Timber.tag(TAG).d("📦 TOWNS received: ${towns.size}")
+                    Timber.tag(LogTags.UI).d("📦 TOWNS received: ${towns.size}")
                     setupTownPicker(towns)
 
-                    // ✅ Force restore town selection AFTER towns are loaded
                     if (selectedTownId != null && binding.townInput.text.isNullOrEmpty()) {
                         val town = towns.find { it.id == selectedTownId }
                         if (town != null) {
                             binding.townInput.setText(town.name)
-                            Timber.tag(TAG).d("✅ Restored town after towns loaded: ${town.name} (ID: $selectedTownId)")
+                            Timber.tag(LogTags.UI).d("✅ Restored town after towns loaded: ${town.name} (ID: $selectedTownId)")
                         } else {
-                            Timber.tag(TAG).w("⚠️ Town not found for ID: $selectedTownId, available towns: ${towns.map { it.id }}")
+                            Timber.tag(LogTags.UI).w("⚠️ Town not found for ID: $selectedTownId, available towns: ${towns.map { it.id }}")
                         }
                     }
                     restoreSelectionTexts()
@@ -295,7 +306,6 @@ class EditItemFragment : Fragment() {
             }
         }
 
-        // Collect Schools
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.schools.collect { schools ->
@@ -305,7 +315,6 @@ class EditItemFragment : Fragment() {
             }
         }
 
-        // Collect Genders
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.genders.collect { genders ->
@@ -315,30 +324,28 @@ class EditItemFragment : Fragment() {
             }
         }
 
-        // Observe UI State
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { uiState ->
-                    Timber.tag(TAG).d("UI State: $uiState")
+                    Timber.tag(LogTags.UI).d("UI State: $uiState")
                     when (uiState) {
                         is EditItemUiState.Success -> {
-                            Timber.tag(TAG).d("✅ Success: ${uiState.message}")
+                            Timber.tag(LogTags.UI).d("✅ Success: ${uiState.message}")
                             hideLoading()
                             showSuccess(uiState.message)
-                            navigateBack()  // ← This should only happen after delete completes
+                            navigateBack()
                         }
                         is EditItemUiState.Error -> {
-                            Timber.tag(TAG).e("❌ Error: ${uiState.message}")
+                            Timber.tag(LogTags.UI).e("❌ Error: ${uiState.message}")
                             hideLoading()
                             showError(uiState.message)
-                            // Don't navigate back on error
                         }
                         is EditItemUiState.Loading -> {
-                            Timber.tag(TAG).d("Loading state")
+                            Timber.tag(LogTags.UI).d("Loading state")
                             showLoading()
                         }
                         is EditItemUiState.Idle -> {
-                            Timber.tag(TAG).d("Idle state")
+                            Timber.tag(LogTags.UI).d("Idle state")
                             hideLoading()
                         }
                     }
@@ -369,14 +376,14 @@ class EditItemFragment : Fragment() {
 
         binding.mainCategoryInput.setOnClickListener {
             OptionsPickerBottomSheet(
-                title = "Select Category",
+                title = getString(R.string.edit_item_select_category_title),
                 options = categories.map { it.name }
             ) { selectedName, position ->
                 val selectedCategory = categories[position]
                 selectedMainCategoryId = selectedCategory.id
                 binding.mainCategoryInput.setText(selectedName)
                 viewModel.onMainCategorySelected(selectedCategory.id)
-                Timber.tag(TAG).d("Selected main category: ${selectedCategory.name}")
+                Timber.tag(LogTags.UI).d("Selected main category: ${selectedCategory.name}")
             }.show(childFragmentManager, "category_picker")
         }
     }
@@ -390,18 +397,18 @@ class EditItemFragment : Fragment() {
 
         binding.subCategoryInput.setOnClickListener {
             if (selectedMainCategoryId == null) {
-                Toast.makeText(requireContext(), "First select a category", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.create_item_select_category_first), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
             OptionsPickerBottomSheet(
-                title = "Select Sub Category",
+                title = getString(R.string.edit_item_select_subcategory_title),
                 options = subCategories.map { it.name }
             ) { selectedName, position ->
                 val selected = subCategories[position]
                 selectedSubCategoryId = selected.id
                 binding.subCategoryInput.setText(selectedName)
-                Timber.tag(TAG).d("Selected subcategory: ${selected.name}")
+                Timber.tag(LogTags.UI).d("Selected subcategory: ${selected.name}")
             }.show(childFragmentManager, "subcategory_picker")
         }
     }
@@ -415,12 +422,12 @@ class EditItemFragment : Fragment() {
 
         binding.conditionInput.setOnClickListener {
             OptionsPickerBottomSheet(
-                title = "Select Condition",
+                title = getString(R.string.edit_item_select_condition_title),
                 options = conditions.map { it.name }
             ) { selectedName, position ->
                 selectedConditionId = conditions[position].id
                 binding.conditionInput.setText(selectedName)
-                Timber.tag(TAG).d("Selected condition: $selectedName")
+                Timber.tag(LogTags.UI).d("Selected condition: $selectedName")
             }.show(childFragmentManager, "condition_picker")
         }
     }
@@ -434,12 +441,12 @@ class EditItemFragment : Fragment() {
 
         binding.sizeInput.setOnClickListener {
             OptionsPickerBottomSheet(
-                title = "Select Size",
+                title = getString(R.string.edit_item_select_size_title),
                 options = sizes.map { it.name }
             ) { selectedName, position ->
                 selectedSizeId = sizes[position].id
                 binding.sizeInput.setText(selectedName)
-                Timber.tag(TAG).d("Selected size: $selectedName")
+                Timber.tag(LogTags.UI).d("Selected size: $selectedName")
             }.show(childFragmentManager, "size_picker")
         }
     }
@@ -453,12 +460,12 @@ class EditItemFragment : Fragment() {
 
         binding.brandInput.setOnClickListener {
             OptionsPickerBottomSheet(
-                title = "Select Brand",
+                title = getString(R.string.edit_item_select_brand_title),
                 options = brands.map { it.name }
             ) { selectedName, position ->
                 selectedBrandId = brands[position].id
                 binding.brandInput.setText(selectedName)
-                Timber.tag(TAG).d("Selected brand: $selectedName")
+                Timber.tag(LogTags.UI).d("Selected brand: $selectedName")
             }.show(childFragmentManager, "brand_picker")
         }
     }
@@ -474,7 +481,7 @@ class EditItemFragment : Fragment() {
             ColorPickerBottomSheet(colors) { selectedColor, position ->
                 selectedColorId = selectedColor.id
                 binding.colorInput.setText(selectedColor.name)
-                Timber.tag(TAG).d("Selected color: ${selectedColor.name}")
+                Timber.tag(LogTags.UI).d("Selected color: ${selectedColor.name}")
             }.show(childFragmentManager, "color_picker")
         }
     }
@@ -488,14 +495,14 @@ class EditItemFragment : Fragment() {
 
         binding.provinceInput.setOnClickListener {
             OptionsPickerBottomSheet(
-                title = "Select Province",
+                title = getString(R.string.edit_item_select_province_title),
                 options = provinces.map { it.name }
             ) { selectedName, position ->
                 val selectedProvince = provinces[position]
                 selectedProvinceId = selectedProvince.id
                 binding.provinceInput.setText(selectedName)
                 viewModel.onProvinceSelected(selectedProvince.id)
-                Timber.tag(TAG).d("Selected province: ${selectedProvince.name}")
+                Timber.tag(LogTags.UI).d("Selected province: ${selectedProvince.name}")
             }.show(childFragmentManager, "province_picker")
         }
     }
@@ -509,17 +516,17 @@ class EditItemFragment : Fragment() {
 
         binding.townInput.setOnClickListener {
             if (selectedProvinceId == null) {
-                Toast.makeText(requireContext(), "First select a province", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.create_item_select_province_first), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
             OptionsPickerBottomSheet(
-                title = "Select Town/City",
+                title = getString(R.string.edit_item_select_town_title),
                 options = towns.map { it.name }
             ) { selectedName, position ->
                 selectedTownId = towns[position].id
                 binding.townInput.setText(selectedName)
-                Timber.tag(TAG).d("Selected town: $selectedName")
+                Timber.tag(LogTags.UI).d("Selected town: $selectedName")
             }.show(childFragmentManager, "town_picker")
         }
     }
@@ -533,12 +540,12 @@ class EditItemFragment : Fragment() {
 
         binding.genderInput.setOnClickListener {
             OptionsPickerBottomSheet(
-                title = "Select Gender",
+                title = getString(R.string.edit_item_select_gender_title),
                 options = genders.map { it.name }
             ) { selectedName, position ->
                 selectedGenderId = genders[position].id
                 binding.genderInput.setText(selectedName)
-                Timber.tag(TAG).d("Selected gender: $selectedName")
+                Timber.tag(LogTags.UI).d("Selected gender: $selectedName")
             }.show(childFragmentManager, "gender_picker")
         }
     }
@@ -552,12 +559,12 @@ class EditItemFragment : Fragment() {
 
         binding.schoolInput.setOnClickListener {
             OptionsPickerBottomSheet(
-                title = "Select School",
+                title = getString(R.string.edit_item_select_school_title),
                 options = schools.map { it.name }
             ) { selectedName, position ->
                 selectedSchoolId = schools[position].id
                 binding.schoolInput.setText(selectedName)
-                Timber.tag(TAG).d("Selected school: $selectedName")
+                Timber.tag(LogTags.UI).d("Selected school: $selectedName")
             }.show(childFragmentManager, "school_picker")
         }
     }
@@ -591,10 +598,10 @@ class EditItemFragment : Fragment() {
                     itemImage.setOnClickListener { showImageSourceOptions(index, isReplace = true) }
                     deleteButton.setOnClickListener {
                         MaterialAlertDialogBuilder(requireContext())
-                            .setTitle("Remove Image")
-                            .setMessage("Remove this image from your item?")
-                            .setPositiveButton("Remove") { _, _ -> viewModel.removeImage(index) }
-                            .setNegativeButton("Cancel", null)
+                            .setTitle(getString(R.string.edit_item_remove_image_title))
+                            .setMessage(getString(R.string.edit_item_remove_image_message))
+                            .setPositiveButton(getString(R.string.edit_item_remove)) { _, _ -> viewModel.removeImage(index) }
+                            .setNegativeButton(getString(R.string.edit_item_cancel), null)
                             .show()
                     }
                 }
@@ -632,7 +639,7 @@ class EditItemFragment : Fragment() {
     private fun updateImageCountText() {
         val images = viewModel.images.value
         val imageCount = images.count { it !is EditImage.Empty }
-        binding.imagesCount.text = "$imageCount/3 images - Tap to replace, ✕ to remove"
+        binding.imagesCount.text = getString(R.string.edit_item_images_count, imageCount)
     }
 
     private fun showImageSourceOptions(position: Int, isReplace: Boolean) {
@@ -640,8 +647,14 @@ class EditItemFragment : Fragment() {
         pendingIsReplace = isReplace
 
         AlertDialog.Builder(requireContext())
-            .setTitle(if (isReplace) "Replace Image" else "Add Image")
-            .setItems(arrayOf("Take Photo", "Choose from Gallery", "Cancel")) { _, which ->
+            .setTitle(if (isReplace) getString(R.string.edit_item_replace_image) else getString(R.string.create_item_add_photo))
+            .setItems(
+                arrayOf(
+                    getString(R.string.create_item_take_photo),
+                    getString(R.string.create_item_choose_gallery),
+                    getString(R.string.create_item_cancel)
+                )
+            ) { _, which ->
                 when (which) {
                     0 -> checkCameraPermission()
                     1 -> launchGallery()
@@ -656,7 +669,7 @@ class EditItemFragment : Fragment() {
                 if (requireContext().packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)) {
                     launchCameraSafely()
                 } else {
-                    Toast.makeText(requireContext(), "No camera available", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), getString(R.string.create_item_no_camera), Toast.LENGTH_SHORT).show()
                 }
             }
             shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) -> showCameraPermissionExplanation()
@@ -666,10 +679,12 @@ class EditItemFragment : Fragment() {
 
     private fun showCameraPermissionExplanation() {
         AlertDialog.Builder(requireContext())
-            .setTitle("Camera Permission Needed")
-            .setMessage("SkoolSwap needs camera permission to take photos of items")
-            .setPositiveButton("Allow") { _, _ -> requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA) }
-            .setNegativeButton("Cancel", null)
+            .setTitle(getString(R.string.create_item_camera_permission_title))
+            .setMessage(getString(R.string.create_item_camera_permission_message))
+            .setPositiveButton(getString(R.string.create_item_camera_permission_allow)) { _, _ ->
+                requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+            .setNegativeButton(getString(R.string.create_item_cancel), null)
             .show()
     }
 
@@ -680,7 +695,7 @@ class EditItemFragment : Fragment() {
                 simpleCameraLauncher.launch(null)
             } catch (e: Exception) {
                 isCameraLaunched = false
-                Toast.makeText(requireContext(), "Failed to launch camera: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.create_item_camera_failed) + ": ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -689,18 +704,18 @@ class EditItemFragment : Fragment() {
         try {
             galleryLauncher.launch("image/*")
         } catch (e: Exception) {
-            e.printStackTrace()
-            Toast.makeText(requireContext(), "Failed to open gallery", Toast.LENGTH_SHORT).show()
+            Timber.tag(LogTags.UI).e(e, "Failed to launch gallery")
+            Toast.makeText(requireContext(), getString(R.string.create_item_gallery_access_issue), Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun saveBitmapToFile(bitmap: android.graphics.Bitmap): Uri? {
+    private fun saveBitmapToFile(bitmap: Bitmap): Uri? {
         return try {
-            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val filename = "IMG_${timeStamp}.jpg"
+            val timeStamp = SimpleDateFormat(IMAGE_DATE_FORMAT, Locale.getDefault()).format(Date())
+            val filename = "$IMAGE_FILENAME_PREFIX$timeStamp$IMAGE_FILE_EXTENSION"
             val file = File(requireContext().cacheDir, filename)
             file.outputStream().use { out ->
-                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
+                bitmap.compress(Bitmap.CompressFormat.JPEG, IMAGE_COMPRESS_QUALITY, out)
             }
             FileProvider.getUriForFile(
                 requireContext(),
@@ -708,14 +723,14 @@ class EditItemFragment : Fragment() {
                 file
             )
         } catch (e: Exception) {
-            e.printStackTrace()
+            Timber.tag(LogTags.UI).e(e, "Failed to save bitmap to file")
             null
         }
     }
 
     private fun populateItemData(item: Item) {
-        Timber.tag(TAG).d("=== POPULATING ITEM DATA ===")
-        Timber.tag(TAG).d("Item: ${item.name}, Price: ${item.price}")
+        Timber.tag(LogTags.UI).d("=== POPULATING ITEM DATA ===")
+        Timber.tag(LogTags.UI).d("Item: ${item.name}, Price: ${item.price}")
 
         originalName = item.name
         originalDescription = item.description
@@ -727,7 +742,7 @@ class EditItemFragment : Fragment() {
         binding.price.setText(item.price.toString())
 
         selectedQuantity = item.quantity
-        if (selectedQuantity in 1..5) {
+        if (selectedQuantity in QUANTITY_MIN..QUANTITY_MAX) {
             binding.quantitySpinner.setSelection(selectedQuantity - 1)
         }
 
@@ -741,15 +756,13 @@ class EditItemFragment : Fragment() {
         selectedTownId = item.locationId
         selectedSchoolId = item.schoolId
         selectedGenderId = item.genderId
-        selectedTownId = item.locationId
-        Timber.tag(TAG).d("📍 Selected Town ID from locationId: $selectedTownId")
-        Timber.tag(TAG).d("Selected IDs - MainCat: $selectedMainCategoryId, SubCat: $selectedSubCategoryId, Size: $selectedSizeId")
 
-        // Trigger dependent data loading
+        Timber.tag(LogTags.UI).d("📍 Selected Town ID from locationId: $selectedTownId")
+        Timber.tag(LogTags.UI).d("Selected IDs - MainCat: $selectedMainCategoryId, SubCat: $selectedSubCategoryId, Size: $selectedSizeId")
+
         selectedMainCategoryId?.let { viewModel.onMainCategorySelected(it) }
         selectedProvinceId?.let { viewModel.onProvinceSelected(it) }
 
-        // Restore picker display values
         restoreSelectionTexts()
 
         val existingImages = item.images.map { image ->
@@ -759,29 +772,26 @@ class EditItemFragment : Fragment() {
     }
 
     private fun restoreSelectionTexts() {
-        Timber.tag(TAG).d("restoreSelectionTexts called - MainCat: $selectedMainCategoryId, SubCat: $selectedSubCategoryId")
+        Timber.tag(LogTags.UI).d("restoreSelectionTexts called - MainCat: $selectedMainCategoryId, SubCat: $selectedSubCategoryId")
 
-        // Restore Main Category
         selectedMainCategoryId?.let { id ->
             if (binding.mainCategoryInput.text.isNullOrEmpty()) {
                 viewModel.mainCategories.value.find { it.id == id }?.let {
                     binding.mainCategoryInput.setText(it.name)
-                    Timber.tag(TAG).d("Restored main category: ${it.name}")
+                    Timber.tag(LogTags.UI).d("Restored main category: ${it.name}")
                 }
             }
         }
 
-        // Restore Sub Category
         selectedSubCategoryId?.let { id ->
             if (binding.subCategoryInput.text.isNullOrEmpty()) {
                 viewModel.subCategories.value.find { it.id == id }?.let {
                     binding.subCategoryInput.setText(it.name)
-                    Timber.tag(TAG).d("Restored subcategory: ${it.name}")
+                    Timber.tag(LogTags.UI).d("Restored subcategory: ${it.name}")
                 }
             }
         }
 
-        // Restore Condition
         selectedConditionId?.let { id ->
             if (binding.conditionInput.text.isNullOrEmpty()) {
                 viewModel.conditions.value.find { it.id == id }?.let {
@@ -790,17 +800,15 @@ class EditItemFragment : Fragment() {
             }
         }
 
-        // Restore Size
         selectedSizeId?.let { id ->
             if (binding.sizeInput.text.isNullOrEmpty()) {
                 viewModel.sizes.value.find { it.id == id }?.let {
                     binding.sizeInput.setText(it.name)
-                    Timber.tag(TAG).d("Restored size: ${it.name}")
+                    Timber.tag(LogTags.UI).d("Restored size: ${it.name}")
                 }
             }
         }
 
-        // Restore Brand
         selectedBrandId?.let { id ->
             if (binding.brandInput.text.isNullOrEmpty()) {
                 viewModel.brands.value.find { it.id == id }?.let {
@@ -809,7 +817,6 @@ class EditItemFragment : Fragment() {
             }
         }
 
-        // Restore Color
         selectedColorId?.let { id ->
             if (binding.colorInput.text.isNullOrEmpty()) {
                 viewModel.colors.value.find { it.id == id }?.let {
@@ -818,7 +825,6 @@ class EditItemFragment : Fragment() {
             }
         }
 
-        // Restore Province
         selectedProvinceId?.let { id ->
             if (binding.provinceInput.text.isNullOrEmpty()) {
                 viewModel.provinces.value.find { it.id == id }?.let {
@@ -827,19 +833,18 @@ class EditItemFragment : Fragment() {
             }
         }
 
-        // Restore Town
         selectedTownId?.let { id ->
             if (binding.townInput.text.isNullOrEmpty()) {
                 val town = viewModel.towns.value.find { it.id == id }
                 if (town != null) {
                     binding.townInput.setText(town.name)
-                    Timber.tag(TAG).d("✅ Restored town in restoreSelectionTexts: ${town.name} (ID: $id)")
+                    Timber.tag(LogTags.UI).d("✅ Restored town: ${town.name} (ID: $id)")
                 } else {
-                    Timber.tag(TAG).w("⚠️ Town not found in restoreSelectionTexts for ID: $id, towns available: ${viewModel.towns.value.map { it.id }}")
+                    Timber.tag(LogTags.UI).w("⚠️ Town not found for ID: $id")
                 }
             }
         }
-        // Restore School
+
         selectedSchoolId?.let { id ->
             if (binding.schoolInput.text.isNullOrEmpty()) {
                 viewModel.schools.value.find { it.id == id }?.let {
@@ -848,7 +853,6 @@ class EditItemFragment : Fragment() {
             }
         }
 
-        // Restore Gender
         selectedGenderId?.let { id ->
             if (binding.genderInput.text.isNullOrEmpty()) {
                 viewModel.genders.value.find { it.id == id }?.let {
@@ -859,19 +863,19 @@ class EditItemFragment : Fragment() {
     }
 
     private fun setupQuantitySpinner() {
-        val quantities = listOf("1", "2", "3", "4", "5")
+        val quantities = (QUANTITY_MIN..QUANTITY_MAX).map { it.toString() }
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, quantities)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         binding.quantitySpinner.adapter = adapter
 
-        if (selectedQuantity in 1..5) {
+        if (selectedQuantity in QUANTITY_MIN..QUANTITY_MAX) {
             binding.quantitySpinner.setSelection(selectedQuantity - 1)
         }
 
         binding.quantitySpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
                 selectedQuantity = position + 1
-                Timber.tag(TAG).d("Quantity selected: $selectedQuantity")
+                Timber.tag(LogTags.UI).d("Quantity selected: $selectedQuantity")
             }
             override fun onNothingSelected(parent: AdapterView<*>) {}
         }
@@ -948,7 +952,6 @@ class EditItemFragment : Fragment() {
         // Build changes summary
         val changes = mutableListOf<String>()
 
-        // ✅ PRICE - Format nicely
         if (price != originalPrice) {
             changes.add("• Price: R${String.format("%.2f", originalPrice)} → R${String.format("%.2f", price)}")
         }
@@ -957,7 +960,6 @@ class EditItemFragment : Fragment() {
         if (description != originalDescription) changes.add("• Description changed")
         if (selectedQuantity != originalQuantity) changes.add("• Quantity: $originalQuantity → $selectedQuantity")
 
-        // ✅ Compare IDs, not objects
         if (selectedMainCategoryId != originalItem?.mainCategoryId) {
             changes.add("• Category: $originalCategoryName → $newCategoryName")
         }
@@ -1007,23 +1009,22 @@ class EditItemFragment : Fragment() {
         }
 
         val changesSummary = if (changes.isEmpty()) {
-            "No changes detected"
+            getString(R.string.edit_item_no_changes)
         } else {
             changes.joinToString("\n")
         }
 
-        // Only show dialog if there are changes
         if (changes.isNotEmpty()) {
             DialogHelper.showConfirmationDialog(
                 context = requireContext(),
                 action = DialogAction.SaveChanges(changesSummary),
                 onConfirm = {
-                    Timber.tag(TAG).d("User confirmed update")
+                    Timber.tag(LogTags.UI).d("User confirmed update")
                     updateItem()
                 }
             )
         } else {
-            Toast.makeText(requireContext(), "No changes to save", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), getString(R.string.edit_item_no_changes), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1032,8 +1033,7 @@ class EditItemFragment : Fragment() {
             context = requireContext(),
             action = DialogAction.DeleteItem,
             onConfirm = {
-                Timber.tag(TAG).d("User confirmed delete for item: $itemId")
-                // Show loading indicator
+                Timber.tag(LogTags.UI).d("User confirmed delete for item: $itemId")
                 showLoading()
                 viewModel.deleteItem(itemId)
             }
@@ -1042,26 +1042,24 @@ class EditItemFragment : Fragment() {
 
     private fun validateForm(): Boolean {
         if (binding.itemName.text.isNullOrEmpty()) {
-            Toast.makeText(requireContext(), "Please enter item name", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), getString(R.string.create_item_name_required), Toast.LENGTH_SHORT).show()
             return false
         }
         if (binding.description.text.isNullOrEmpty()) {
-            Toast.makeText(requireContext(), "Please enter description", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), getString(R.string.create_item_description_required), Toast.LENGTH_SHORT).show()
             return false
         }
         if (binding.price.text.isNullOrEmpty()) {
-            Toast.makeText(requireContext(), "Please enter price", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), getString(R.string.create_item_price_required), Toast.LENGTH_SHORT).show()
             return false
         }
         val price = binding.price.text.toString().toDoubleOrNull()
         if (price == null || price <= 0) {
-            Toast.makeText(requireContext(), "Please enter a valid price", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), getString(R.string.create_item_price_required), Toast.LENGTH_SHORT).show()
             return false
         }
         return true
     }
-
-    // In EditItemFragment.kt - replace the updateItem() method
 
     private fun updateItem() {
         val name = binding.itemName.text.toString()
@@ -1177,14 +1175,14 @@ class EditItemFragment : Fragment() {
     private fun showLoading() {
         binding.updateButton.isEnabled = false
         binding.deleteItemButton.isEnabled = false
-        binding.updateButton.text = "Updating..."
+        binding.updateButton.text = getString(R.string.edit_item_updating)
         binding.progressBar.visibility = View.VISIBLE
     }
 
     private fun hideLoading() {
         binding.updateButton.isEnabled = true
         binding.deleteItemButton.isEnabled = true
-        binding.updateButton.text = "Update Item"
+        binding.updateButton.text = getString(R.string.edit_item_update_button)
         binding.progressBar.visibility = View.GONE
     }
 
@@ -1193,11 +1191,11 @@ class EditItemFragment : Fragment() {
     }
 
     private fun showError(message: String) {
-        Snackbar.make(binding.root, "Error: $message", Snackbar.LENGTH_LONG).show()
+        Snackbar.make(binding.root, getString(R.string.edit_item_error_prefix) + ": $message", Snackbar.LENGTH_LONG).show()
     }
 
     private fun navigateBack() {
-        Timber.tag(TAG).d("Navigating back after success")
+        Timber.tag(LogTags.UI).d("Navigating back after success")
         findNavController().previousBackStackEntry?.savedStateHandle?.apply {
             set("item_updated", true)
             if (originalItem?.status != "sold") {
@@ -1208,23 +1206,25 @@ class EditItemFragment : Fragment() {
         }
         findNavController().navigateUp()
     }
+
     private fun checkAndHideShimmers() {
-        // Check if both reference data is loaded AND item is loaded
         val referenceLoaded = viewModel.isReferenceDataLoaded.value
         val itemLoaded = viewModel.item.value != null
 
-        Timber.tag(TAG).d("checkAndHideShimmers - referenceLoaded: $referenceLoaded, itemLoaded: $itemLoaded")
+        Timber.tag(LogTags.UI).d("checkAndHideShimmers - referenceLoaded: $referenceLoaded, itemLoaded: $itemLoaded")
 
         if (referenceLoaded && itemLoaded) {
             hideAllShimmers()
-            Timber.tag(TAG).d("✅ All data loaded, shimmer hidden")
+            Timber.tag(LogTags.UI).d("✅ All data loaded, shimmer hidden")
         }
     }
+
     private fun hideFab() {
         val fab = activity?.findViewById<FloatingActionButton>(R.id.fab)
         fab?.visibility = View.GONE
-        Log.d(CreateItemFragment.Companion.TAG, "FAB hidden")
+        Timber.tag(LogTags.UI).d("FAB hidden")
     }
+
     override fun onResume() {
         super.onResume()
         isCameraLaunched = false

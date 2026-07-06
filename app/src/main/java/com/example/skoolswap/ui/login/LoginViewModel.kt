@@ -6,6 +6,9 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.skoolswap.common.constants.AppConstants
+import com.example.skoolswap.common.constants.ErrorConstants
+import com.example.skoolswap.common.constants.ErrorConstantsHelper
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.domain.model.User
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
@@ -20,6 +23,10 @@ class LoginViewModel @Inject constructor(
     private val appPreferences: AppPreferences
 ) : ViewModel() {
 
+    companion object {
+        private const val TAG = "LoginViewModel"
+    }
+
     // Google Sign-In LiveData
     private val _loginSuccess = MutableLiveData<User?>()
     val loginSuccess: LiveData<User?> = _loginSuccess
@@ -32,24 +39,23 @@ class LoginViewModel @Inject constructor(
     val error: LiveData<String?> = _error
 
     init {
-        Log.e("LoginViewModel", "🏁 ViewModel INITIALIZED")
+        Timber.tag(TAG).d("🏁 ViewModel INITIALIZED")
     }
 
     fun setRestoredUser(user: User) {
         _loginSuccess.value = user
     }
-    // In LoginViewModel.kt - add this method
+
     suspend fun refreshUserToken(): Boolean {
         return try {
             val result = authRepository.refreshToken()
             result.isSuccess
         } catch (e: Exception) {
-            Timber.e(e, "Token refresh failed")
+            Timber.tag(AppConstants.LogTags.AUTH).e(e, "Token refresh failed")
             false
         }
     }
 
-    // Optional: Add a method to check token validity
     suspend fun checkTokenValidity(): Boolean {
         return try {
             val token = authRepository.getCurrentToken()
@@ -61,10 +67,11 @@ class LoginViewModel @Inject constructor(
             false
         }
     }
+
     // ==================== GOOGLE SIGN-IN ====================
     fun signInWithGoogle(activity: Activity) {
         viewModelScope.launch {
-            Log.e("LoginViewModel", "📞 signInWithGoogle() STARTED")
+            Timber.tag(TAG).d("📞 signInWithGoogle() STARTED")
 
             _isLoading.value = true
             _error.value = null
@@ -72,12 +79,13 @@ class LoginViewModel @Inject constructor(
             val result = authRepository.signInWithGoogle(activity)
 
             result.onSuccess { user ->
-                Log.e("LoginViewModel", "✅ SUCCESS! User received")
+                Timber.tag(TAG).d("✅ SUCCESS! User received")
                 saveUserToPreferences(user)
                 _loginSuccess.value = user
             }.onFailure { throwable ->
-                Log.e("LoginViewModel", "❌ FAILURE! ${throwable.message}")
-                _error.value = throwable.message ?: "Sign in failed"
+                Timber.tag(TAG).e("❌ FAILURE! ${throwable.message}")
+                val userMessage = ErrorConstantsHelper.getErrorMessage(throwable)
+                _error.value = userMessage
             }
 
             _isLoading.value = false
@@ -90,17 +98,18 @@ class LoginViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
 
-            Log.e("LoginViewModel", "📧 Signing in with email: $email")
+            Timber.tag(TAG).d("📧 Signing in with email: $email")
 
             val result = authRepository.signInWithEmail(email, password)
 
             result.onSuccess { user ->
-                Log.e("LoginViewModel", "✅ Email sign in successful!")
+                Timber.tag(TAG).d("✅ Email sign in successful!")
                 saveUserToPreferences(user)
                 _loginSuccess.value = user
             }.onFailure { throwable ->
-                Log.e("LoginViewModel", "❌ Email sign in failed: ${throwable.message}")
-                _error.value = throwable.message ?: "Sign in failed"
+                Timber.tag(TAG).e("❌ Email sign in failed: ${throwable.message}")
+                val userMessage = ErrorConstantsHelper.getErrorMessage(throwable)
+                _error.value = userMessage
             }
 
             _isLoading.value = false
@@ -124,12 +133,12 @@ class LoginViewModel @Inject constructor(
         appPreferences.setUserId(user.id.toString())
         appPreferences.setUserName(user.name)
         appPreferences.setUserEmail(user.email)
-        appPreferences.setUserProfileImage(user.profilePictureUrl ?: "")
+        appPreferences.setUserProfileImage(user.profilePictureUrl ?: AppConstants.EMPTY_STRING)
 
         if (user.schoolMapped) {
             appPreferences.setSchoolMapped(true)
             user.schoolId?.let { schoolId ->
-                appPreferences.setSchoolInfo(schoolId, user.schoolName ?: "")
+                appPreferences.setSchoolInfo(schoolId, user.schoolName ?: AppConstants.EMPTY_STRING)
             }
         } else {
             appPreferences.setSchoolMapped(false)
@@ -142,6 +151,6 @@ class LoginViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        Log.e("LoginViewModel", "🧹 ViewModel onCleared()")
+        Timber.tag(TAG).d("🧹 ViewModel onCleared()")
     }
 }

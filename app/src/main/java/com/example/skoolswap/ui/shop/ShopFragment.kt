@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.databinding.FragmentShopBinding
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.ItemCategorySection
@@ -32,15 +33,13 @@ class ShopFragment : Fragment() {
     private val binding get() = _binding!!
     private val viewModel: ShopViewModel by viewModels()
 
-    // ✅ Use ShopProductAdapter for All Items (view count, no toggle)
     private lateinit var shopProductAdapter: ShopProductAdapter
-
-    // ✅ Use CategoryGridAdapter for Categories (view count + toggle)
     private lateinit var categoryGridAdapter: CategoryGridAdapter
     private lateinit var categorySectionAdapter: CategorySectionAdapter
 
     @Inject
     lateinit var authRepository: AuthRepositoryInterface
+
     private var isCategoriesView = false
     private var isFirstLoad = true
 
@@ -60,10 +59,12 @@ class ShopFragment : Fragment() {
         setupTabListeners()
         setupObservers()
         updateTabStyles()
+
         binding.retryButton.setOnClickListener {
             binding.errorLayout.visibility = View.GONE
             viewModel.refresh()
         }
+
         viewModel.loadMyShop()
         viewModel.loadMyShopItems()
 
@@ -71,7 +72,7 @@ class ShopFragment : Fragment() {
             ?.getLiveData<Boolean>("item_updated")
             ?.observe(viewLifecycleOwner) { updated ->
                 if (updated == true) {
-                    Timber.d("🔄 Item updated, refreshing immediately")
+                    Timber.tag(LogTags.UI).d("🔄 Item updated, refreshing immediately")
                     val updatedItemId = findNavController().currentBackStackEntry
                         ?.savedStateHandle?.get<String>("updated_item_id")
 
@@ -90,39 +91,35 @@ class ShopFragment : Fragment() {
     }
 
     private fun setupRecyclerViews() {
-        // ✅ All Items - ShopProductAdapter (view count, no toggle)
         shopProductAdapter = ShopProductAdapter { itemId ->
-            Timber.d("All items clicked: $itemId")
+            Timber.tag(LogTags.UI).d("All items clicked: $itemId")
             navigateToEditItem(itemId)
         }
 
-        // ✅ Categories - CategoryGridAdapter (view count + toggle)
         categoryGridAdapter = CategoryGridAdapter(
             onItemClick = { itemId ->
-                Timber.d("Category grid item clicked: $itemId")
+                Timber.tag(LogTags.UI).d("Category grid item clicked: $itemId")
                 navigateToEditItem(itemId)
             },
             onSoldToggle = { itemId, markAsSold ->
-                Timber.d("🔄 Sold toggle: $itemId -> $markAsSold")
+                Timber.tag(LogTags.UI).d("🔄 Sold toggle: $itemId -> $markAsSold")
                 viewModel.toggleItemSoldStatus(itemId, markAsSold)
             },
             isShopMode = true
         )
 
-        // ✅ Categories Section - CategorySectionAdapter (grouped with toggle)
         categorySectionAdapter = CategorySectionAdapter(
             onItemClick = { itemId ->
-                Timber.d("Category section item clicked: $itemId")
+                Timber.tag(LogTags.UI).d("Category section item clicked: $itemId")
                 navigateToEditItem(itemId)
             },
             onSoldToggle = { itemId, markAsSold ->
-                Timber.d("🔄 Sold toggle: $itemId -> $markAsSold")
+                Timber.tag(LogTags.UI).d("🔄 Sold toggle: $itemId -> $markAsSold")
                 viewModel.toggleItemSoldStatus(itemId, markAsSold)
             },
             isShopMode = true
         )
 
-        // Default to GridLayoutManager for All Items
         binding.productRecyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
     }
 
@@ -143,31 +140,34 @@ class ShopFragment : Fragment() {
     }
 
     private fun updateTabStyles() {
+        val blackColor = ContextCompat.getColor(requireContext(), android.R.color.black)
+        val whiteColor = ContextCompat.getColor(requireContext(), android.R.color.white)
+
         if (isCategoriesView) {
-            binding.categoriesTab.setBackgroundColor(ContextCompat.getColor(requireContext(), android.R.color.black))
-            binding.categoriesTab.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.white))
-            binding.allItemsTab.setBackgroundColor(ContextCompat.getColor(requireContext(), android.R.color.white))
-            binding.allItemsTab.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.black))
+            binding.categoriesTab.setBackgroundColor(blackColor)
+            binding.categoriesTab.setTextColor(whiteColor)
+            binding.allItemsTab.setBackgroundColor(whiteColor)
+            binding.allItemsTab.setTextColor(blackColor)
         } else {
-            binding.allItemsTab.setBackgroundColor(ContextCompat.getColor(requireContext(), android.R.color.black))
-            binding.allItemsTab.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.white))
-            binding.categoriesTab.setBackgroundColor(ContextCompat.getColor(requireContext(), android.R.color.white))
-            binding.categoriesTab.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.black))
+            binding.allItemsTab.setBackgroundColor(blackColor)
+            binding.allItemsTab.setTextColor(whiteColor)
+            binding.categoriesTab.setBackgroundColor(whiteColor)
+            binding.categoriesTab.setTextColor(blackColor)
         }
     }
 
     private fun showAllItemsView() {
         val allItems = viewModel.allItems.value
-        Timber.d("showAllItemsView: ${allItems.size} items")
+        Timber.tag(LogTags.UI).d("showAllItemsView: ${allItems.size} items")
 
         if (allItems.isEmpty()) {
             binding.emptyStateText.visibility = View.VISIBLE
+            binding.emptyStateText.text = getString(R.string.shop_empty_items)
             binding.productRecyclerView.visibility = View.GONE
         } else {
             binding.emptyStateText.visibility = View.GONE
             binding.productRecyclerView.visibility = View.VISIBLE
 
-            // ✅ All Items - ShopProductAdapter (view count, no toggle)
             binding.productRecyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
             shopProductAdapter.submitList(allItems)
             binding.productRecyclerView.adapter = shopProductAdapter
@@ -176,20 +176,19 @@ class ShopFragment : Fragment() {
 
     private fun showCategoriesView() {
         val allItems = viewModel.allItems.value
-        Timber.d("showCategoriesView: ${allItems.size} items")
+        Timber.tag(LogTags.UI).d("showCategoriesView: ${allItems.size} items")
 
         if (allItems.isEmpty()) {
             binding.emptyStateText.visibility = View.VISIBLE
+            binding.emptyStateText.text = getString(R.string.shop_empty_items)
             binding.productRecyclerView.visibility = View.GONE
         } else {
             binding.emptyStateText.visibility = View.GONE
             binding.productRecyclerView.visibility = View.VISIBLE
 
-            // ✅ Categories - grouped by category with toggle
             val sections = groupItemsByCategory(allItems)
             categorySectionAdapter.submitSections(sections)
 
-            // ✅ Use LinearLayoutManager for sections (vertical scrolling)
             binding.productRecyclerView.layoutManager = LinearLayoutManager(requireContext())
             binding.productRecyclerView.adapter = categorySectionAdapter
         }
@@ -216,16 +215,15 @@ class ShopFragment : Fragment() {
                 .timeout(10000)
                 .into(binding.storeProfileImage)
         } catch (e: Exception) {
-            Timber.e(e, "Failed to load profile picture")
+            Timber.tag(LogTags.UI).e(e, "Failed to load profile picture")
             binding.storeProfileImage.setImageResource(R.drawable.ic_user)
         }
     }
 
     private fun setupObservers() {
-        // Loading state
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.isLoading.collect { isLoading ->
-                Timber.d("Loading state: $isLoading")
+                Timber.tag(LogTags.UI).d("Loading state: $isLoading")
                 if (isLoading && isFirstLoad && viewModel.allItems.value.isEmpty()) {
                     binding.shimmerLayout.visibility = View.VISIBLE
                     binding.productRecyclerView.visibility = View.GONE
@@ -238,7 +236,6 @@ class ShopFragment : Fragment() {
             }
         }
 
-        // Error state
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.error.collect { errorMsg ->
                 if (errorMsg != null && viewModel.allItems.value.isEmpty()) {
@@ -254,13 +251,12 @@ class ShopFragment : Fragment() {
             }
         }
 
-        // All items
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.allItems.collectLatest { items ->
-                Timber.d("=== ALL ITEMS RECEIVED ===")
-                Timber.d("Total items count: ${items.size}")
+                Timber.tag(LogTags.UI).d("=== ALL ITEMS RECEIVED ===")
+                Timber.tag(LogTags.UI).d("Total items count: ${items.size}")
                 items.forEachIndexed { i, item ->
-                    Timber.d("Item[$i]: ${item.name}, viewCount: ${item.viewCount}, status: ${item.status}, id: ${item.id}")
+                    Timber.tag(LogTags.UI).d("Item[$i]: ${item.name}, viewCount: ${item.viewCount}, status: ${item.status}, id: ${item.id}")
                 }
 
                 if (items.isEmpty()) {
@@ -275,13 +271,11 @@ class ShopFragment : Fragment() {
                 binding.productRecyclerView.visibility = View.VISIBLE
 
                 if (isCategoriesView) {
-                    // ✅ Categories view - grouped with toggle
                     val sections = groupItemsByCategory(items)
                     categorySectionAdapter.submitSections(sections)
                     binding.productRecyclerView.layoutManager = LinearLayoutManager(requireContext())
                     binding.productRecyclerView.adapter = categorySectionAdapter
                 } else {
-                    // ✅ All Items view - flat grid with view count (no toggle)
                     shopProductAdapter.submitList(items)
                     binding.productRecyclerView.layoutManager = GridLayoutManager(requireContext(), 2)
                     binding.productRecyclerView.adapter = shopProductAdapter
@@ -291,11 +285,10 @@ class ShopFragment : Fragment() {
             }
         }
 
-        // Shop info
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.currentShop.collectLatest { shop ->
                 shop?.let {
-                    Timber.d("Shop loaded: ${it.name}")
+                    Timber.tag(LogTags.UI).d("Shop loaded: ${it.name}")
                     binding.storeName.text = it.displayName.ifEmpty { it.name }
                     if (it.profilePictureUrl.isNotEmpty()) {
                         loadProfilePicture(it.profilePictureUrl)
@@ -312,7 +305,7 @@ class ShopFragment : Fragment() {
     }
 
     private fun navigateToEditItem(itemId: String) {
-        Timber.d("🔍 Navigating to edit item with ID: $itemId")
+        Timber.tag(LogTags.UI).d("🔍 Navigating to edit item with ID: $itemId")
         try {
             val action = R.id.action_shopFragment_to_editItemFragment
             val bundle = Bundle().apply {
@@ -320,13 +313,13 @@ class ShopFragment : Fragment() {
             }
             findNavController().navigate(action, bundle)
         } catch (e: Exception) {
-            Timber.e(e, "Failed to navigate to edit item")
+            Timber.tag(LogTags.UI).e(e, "Failed to navigate to edit item")
             try {
                 findNavController().navigate(R.id.editItemFragment, Bundle().apply {
                     putString("itemId", itemId)
                 })
             } catch (e2: Exception) {
-                Timber.e(e2, "Fallback navigation also failed")
+                Timber.tag(LogTags.UI).e(e2, "Fallback navigation also failed")
             }
         }
     }

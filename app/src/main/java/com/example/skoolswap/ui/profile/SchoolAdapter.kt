@@ -1,4 +1,3 @@
-// ui/profile/adapter/SchoolAdapter.kt
 package com.example.skoolswap.ui.profile
 
 import android.view.LayoutInflater
@@ -6,8 +5,10 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.databinding.ItemSchoolBinding
 import com.example.skoolswap.domain.model.School
+import timber.log.Timber
 
 class SchoolAdapter(
     private val onItemClick: (School) -> Unit
@@ -36,6 +37,7 @@ class SchoolAdapter(
             binding.textSchoolLocation.text = school.provinceName ?: "Location not specified"
 
             binding.root.setOnClickListener {
+                Timber.tag(LogTags.UI).d("School clicked: ${school.name}")
                 onItemClick(school)
             }
         }
