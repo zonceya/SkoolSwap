@@ -9,13 +9,14 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.Toast
-import androidx.wear.compose.material3.Dialog
 import com.example.skoolswap.R
-import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.databinding.DialogContactOptionsBinding
 import com.example.skoolswap.domain.model.Item
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import timber.log.Timber
 
 class ContactOptionsBottomSheet(
     private val item: Item,
@@ -37,7 +38,6 @@ class ContactOptionsBottomSheet(
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Make bottom sheet rounded
         dialog?.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
         binding.optionWhatsApp.setOnClickListener {
@@ -70,7 +70,6 @@ class ContactOptionsBottomSheet(
                 behavior.state = BottomSheetBehavior.STATE_EXPANDED
                 behavior.peekHeight = 0
 
-                // Make bottom sheet corners rounded by setting background
                 it.background = null
                 it.setBackgroundResource(R.drawable.bottom_sheet_rounded)
             }
@@ -87,6 +86,7 @@ class ContactOptionsBottomSheet(
             }
             startActivity(intent)
         } catch (e: Exception) {
+            Timber.tag(LogTags.UI).e(e, "WhatsApp not installed")
             Toast.makeText(requireContext(), "WhatsApp not installed", Toast.LENGTH_SHORT).show()
         }
     }

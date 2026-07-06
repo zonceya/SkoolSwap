@@ -187,8 +187,9 @@ object ItemConstants {
         ItemType("Kids Shoes", 304, 3),
         ItemType("Kids Schoolwear", 305, 3)
     )
+
     // ============ RAILS ITEM TYPES (for API - IDs 1-9) ============
-// These match your Rails database item_types table
+    // These match your Rails database item_types table
     val RAILS_ITEM_TYPES = listOf(
         ItemType("Shirt", 1, 1),            // ID: 1
         ItemType("Pants", 2, 2),            // ID: 2
@@ -201,11 +202,12 @@ object ItemConstants {
         ItemType("Tennis Shoes", 9, 6)      // ID: 9
     )
 
+    // ============ HELPER FUNCTIONS ============
+
     // Helper function to get Rails item types
     fun getRailsItemTypes(): List<ItemType> {
         return RAILS_ITEM_TYPES
     }
-    // ============ HELPER FUNCTIONS ============
 
     fun getCategoryId(displayName: String): Int? {
         return MAIN_CATEGORIES.find { it.displayName == displayName }?.id

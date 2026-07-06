@@ -8,6 +8,7 @@ import com.bumptech.glide.Glide
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemHomeCategoryBinding
 import com.example.skoolswap.ui.home.viewholders.EssentialsCategoryItem
+import timber.log.Timber
 
 private const val TAG = "EssentialsGridAdapter"
 
@@ -17,8 +18,8 @@ class EssentialsGridAdapter(
 ) : RecyclerView.Adapter<EssentialsGridAdapter.ViewHolder>() {
 
     init {
-        Log.d(TAG, "=== GRID ADAPTER CREATED ===")
-        Log.d(TAG, "Items count: ${items.size}")
+        Timber.tag(TAG).d("=== GRID ADAPTER CREATED ===")
+        Timber.tag(TAG).d("Items count: ${items.size}")
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {

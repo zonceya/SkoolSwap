@@ -14,10 +14,14 @@ import com.bumptech.glide.request.transition.Transition
 import com.davemorrissey.labs.subscaleview.ImageSource
 import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.databinding.ItemFullScreenImageBinding
 import timber.log.Timber
 
-private const val TAG = "FullScreenPagerAdapter"
+// Private constants - internal to this file only
+private const val MAX_SCALE = 8f
+private const val TAP_RESET_DELAY_MS = 300L
+private const val IMAGE_OVERRIDE_SIZE = 1600
 
 class FullScreenImagePagerAdapter(
     private val imageUrls: List<String>,
@@ -36,12 +40,10 @@ class FullScreenImagePagerAdapter(
                 override fun onDown(e: MotionEvent) = true
 
                 override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                    // ✅ Only trigger if we're not mid-dismissal
                     if (!isTapHandled) {
                         isTapHandled = true
                         onSingleTap()
-                        // Reset after a short delay to allow re-tap if needed
-                        binding.root.postDelayed({ isTapHandled = false }, 300)
+                        binding.root.postDelayed({ isTapHandled = false }, TAP_RESET_DELAY_MS)
                     }
                     return true
                 }
@@ -51,34 +53,27 @@ class FullScreenImagePagerAdapter(
         init {
             binding.photoView.apply {
                 setMinimumScaleType(SubsamplingScaleImageView.SCALE_TYPE_CENTER_INSIDE)
-                setMaxScale(8f)
+                setMaxScale(MAX_SCALE)
                 setPanLimit(SubsamplingScaleImageView.PAN_LIMIT_INSIDE)
             }
 
-            // ✅ Combined touch handling
             binding.photoView.setOnTouchListener { view, event ->
-                // Let gesture detector process the event first
                 val handled = gestureDetector.onTouchEvent(event)
 
-                // If gesture detector didn't handle it (e.g., pan/zoom), let SSIV handle it
                 if (!handled) {
-                    // SSIV will handle pan/zoom gestures
                     view.performClick()
                 }
 
-                // Return false to let SSIV continue processing for pan/zoom
                 false
             }
         }
 
         fun bind(url: String) {
-            Timber.tag(TAG).d("Binding URL: $url")
-            isTapHandled = false  // ✅ Reset tap state when binding new image
+            Timber.tag(LogTags.UI).d("Binding URL: $url")
+            isTapHandled = false
 
-            // Cancel any in-flight load for this holder
             currentTarget?.let { Glide.with(binding.root.context).clear(it) }
 
-            // Reset SSIV state cleanly
             binding.photoView.recycle()
 
             val target = object : CustomTarget<Bitmap>() {
@@ -86,18 +81,16 @@ class FullScreenImagePagerAdapter(
                     resource: Bitmap,
                     transition: Transition<in Bitmap>?
                 ) {
-                    Timber.tag(TAG).d("Bitmap ready for: $url, size: ${resource.width}x${resource.height}")
+                    Timber.tag(LogTags.UI).d("Bitmap ready for: $url, size: ${resource.width}x${resource.height}")
                     binding.photoView.setImage(ImageSource.bitmap(resource))
                 }
 
                 override fun onLoadFailed(errorDrawable: Drawable?) {
-                    Timber.tag(TAG).e("Load failed for: $url")
-                    // Could set a placeholder drawable if needed
+                    Timber.tag(LogTags.UI).e("Load failed for: $url")
                 }
 
                 override fun onLoadCleared(placeholder: Drawable?) {
-                    Timber.tag(TAG).d("Load cleared for: $url")
-                    // Don't call recycle() - SSIV may still be using the bitmap
+                    Timber.tag(LogTags.UI).d("Load cleared for: $url")
                 }
             }
 
@@ -108,7 +101,7 @@ class FullScreenImagePagerAdapter(
                 .load(url)
                 .diskCacheStrategy(DiskCacheStrategy.ALL)
                 .skipMemoryCache(false)
-                .override(1600, 1600)
+                .override(IMAGE_OVERRIDE_SIZE, IMAGE_OVERRIDE_SIZE)
                 .placeholder(R.drawable.ic_create_item_placeholder)
                 .error(R.drawable.ic_create_item_placeholder)
                 .into(target)

@@ -1,6 +1,5 @@
 package com.example.skoolswap.ui.detail.adapter
 
-import android.util.Log
 import android.view.GestureDetector
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -13,26 +12,25 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.engine.GlideException
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.databinding.ItemImageSliderBinding
 import com.example.skoolswap.ui.detail.zoom.FullScreenImageViewerDialogFragment
 import timber.log.Timber
-
-private const val TAG = "ImageSliderAdapter"
 
 class ImageSliderAdapter(
     val imageUrls: List<String>
 ) : RecyclerView.Adapter<ImageSliderAdapter.ViewHolder>() {
 
     init {
-        Timber.tag(TAG).d("=== ImageSliderAdapter CREATED ===")
-        Timber.tag(TAG).d("Number of images: ${imageUrls.size}")
+        Timber.tag(LogTags.UI).d("=== ImageSliderAdapter CREATED ===")
+        Timber.tag(LogTags.UI).d("Number of images: ${imageUrls.size}")
         imageUrls.forEachIndexed { index, url ->
-            Timber.tag(TAG).d("  Image $index: $url")
+            Timber.tag(LogTags.UI).d("  Image $index: $url")
         }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        Timber.tag(TAG).d("onCreateViewHolder called, viewType: $viewType")
+        Timber.tag(LogTags.UI).d("onCreateViewHolder called, viewType: $viewType")
         val binding = ItemImageSliderBinding.inflate(
             LayoutInflater.from(parent.context), parent, false
         )
@@ -45,18 +43,18 @@ class ImageSliderAdapter(
 
     override fun getItemCount(): Int {
         val count = imageUrls.size
-        Timber.tag(TAG).d("getItemCount: $count")
+        Timber.tag(LogTags.UI).d("getItemCount: $count")
         return count
     }
 
     override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
         super.onAttachedToRecyclerView(recyclerView)
-        Log.d(TAG, "onAttachedToRecyclerView called")
+        Timber.tag(LogTags.UI).d("onAttachedToRecyclerView called")
     }
 
     override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
         super.onDetachedFromRecyclerView(recyclerView)
-        Timber.tag(TAG).d("onDetachedFromRecyclerView called")
+        Timber.tag(LogTags.UI).d("onDetachedFromRecyclerView called")
     }
 
     inner class ViewHolder(
@@ -86,10 +84,10 @@ class ImageSliderAdapter(
                                 dialog.show(fm, "full_screen_viewer")
                             }
                         } ?: run {
-                            Timber.tag(TAG).e("Could not find parent fragment")
+                            Timber.tag(LogTags.UI).e("Could not find parent fragment")
                         }
                     } catch (e: IllegalStateException) {
-                        Timber.tag(TAG).e("Could not find parent fragment: ${e.message}")
+                        Timber.tag(LogTags.UI).e("Could not find parent fragment: ${e.message}")
                     }
 
                     return true
@@ -98,7 +96,7 @@ class ImageSliderAdapter(
         )
 
         init {
-            Timber.tag(TAG).d("ViewHolder created with binding: ${binding.root.javaClass.simpleName}")
+            Timber.tag(LogTags.UI).d("ViewHolder created with binding: ${binding.root.javaClass.simpleName}")
 
             binding.imageView.setOnTouchListener { _, event ->
                 gestureDetector.onTouchEvent(event)
@@ -107,26 +105,24 @@ class ImageSliderAdapter(
 
         fun bind(url: String, position: Int) {
             currentPosition = position
-            Timber.tag(TAG).d("📸 Binding image $position: $url")
+            Timber.tag(LogTags.UI).d("📸 Binding image $position: $url")
 
-            // Clear any previous image
             Glide.with(binding.root.context).clear(binding.imageView)
 
-            // ✅ Use FIT_CENTER instead of CENTER_CROP to show the full image
             Glide.with(binding.root.context)
                 .load(url)
                 .placeholder(R.drawable.ic_create_item_placeholder)
                 .error(R.drawable.ic_create_item_placeholder)
                 .diskCacheStrategy(DiskCacheStrategy.ALL)
                 .skipMemoryCache(false)
-                .fitCenter()  // ✅ Changed from centerCrop() to fitCenter()
+                .fitCenter()
                 .listener(object : com.bumptech.glide.request.RequestListener<android.graphics.drawable.Drawable> {
                     override fun onLoadFailed(
                         e: GlideException?, model: Any?,
                         target: com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable>?,
                         isFirstResource: Boolean
                     ): Boolean {
-                        Timber.tag(TAG).e("❌ Load failed pos $position: ${e?.message}")
+                        Timber.tag(LogTags.UI).e("❌ Load failed pos $position: ${e?.message}")
                         return false
                     }
 
@@ -136,7 +132,7 @@ class ImageSliderAdapter(
                         dataSource: com.bumptech.glide.load.DataSource?,
                         isFirstResource: Boolean
                     ): Boolean {
-                        Timber.tag(TAG).d("✅ Loaded pos $position from $dataSource")
+                        Timber.tag(LogTags.UI).d("✅ Loaded pos $position from $dataSource")
                         return false
                     }
                 })

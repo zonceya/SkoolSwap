@@ -92,7 +92,7 @@ class IntroFragment : Fragment() {
                     controller.show(android.view.WindowInsets.Type.statusBars())
                     controller.show(android.view.WindowInsets.Type.navigationBars())
                     controller.systemBarsBehavior =
-                        android.view.WindowInsetsController.BEHAVIOR_SHOW_BARS_BY_TOUCH
+                        android.view.WindowInsetsController.BEHAVIOR_DEFAULT   // ← fixed
                 }
             } else {
                 @Suppress("DEPRECATION")

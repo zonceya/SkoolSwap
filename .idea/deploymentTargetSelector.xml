@@ -4,14 +4,6 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-06-13T22:02:12.008649400Z">
-          <Target type="DEFAULT_BOOT">
-            <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\zonce\.android\avd\Pixel_6a_Test.avd" />
-            </handle>
-          </Target>
-        </DropdownSelection>
-        <DialogSelection />
       </SelectionState>
     </selectionStates>
   </component>

@@ -1,7 +1,6 @@
 package com.example.skoolswap.ui.products
 
 import android.os.Bundle
-import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -22,6 +21,7 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.databinding.FragmentProductsBinding
 import com.example.skoolswap.domain.model.FilterOption
 import com.example.skoolswap.domain.model.Item
@@ -53,9 +53,19 @@ class ProductsFragment : Fragment() {
     private var selectedColor: String? = null
     private var selectedBrand: String? = null
 
-    companion object {
-        private const val TAG = "ProductsFragment"
-    }
+    // Constants - internal use only
+    private val MIN_SEARCH_LENGTH = 2
+    private val SEARCH_DEBOUNCE_DELAY_MS = 300L
+    private val PRICE_SLIDER_MIN = 0f
+    private val PRICE_SLIDER_MAX = 1000f
+    private val GRID_SPAN_COUNT = 2
+    private val GENDER_BOYS_ID = 42
+    private val GENDER_GIRLS_ID = 43
+    private val GENDER_UNISEX_ID = 27
+    private val GENDER_ODD_ID = 1
+    private val GENDER_EVEN_ID = 26
+    private val GENDER_REM_CHECK = 2
+    private val GENDER_REM_RESULT = 0
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -69,7 +79,6 @@ class ProductsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Show shimmer initially
         binding.shimmerLayout.visibility = View.VISIBLE
         binding.shimmerLayout.startShimmer()
         binding.productsRecycler.visibility = View.GONE
@@ -83,18 +92,18 @@ class ProductsFragment : Fragment() {
         val sportTypeId = arguments?.getInt("SPORT_TYPE_ID", -1)
         val gearType = arguments?.getString("GEAR_TYPE")
 
-        Timber.tag("ProductsViewModel").d("Using endpoint for section: $sectionType")
-        val subCategoryName = arguments?.getString("SUB_CATEGORY_NAME")   // ← Add this
-        val mainCategoryName = arguments?.getString("MAIN_CATEGORY_NAME") // ← Add this
+        Timber.tag(LogTags.UI).d("Using endpoint for section: $sectionType")
+        val subCategoryName = arguments?.getString("SUB_CATEGORY_NAME")
+        val mainCategoryName = arguments?.getString("MAIN_CATEGORY_NAME")
 
-        Timber.tag(TAG).d("📌 subCategoryName: $subCategoryName")
+        Timber.tag(LogTags.UI).d("📌 subCategoryName: $subCategoryName")
         (requireActivity() as AppCompatActivity).supportActionBar?.apply {
             show()
             title = sectionTitle
             setDisplayHomeAsUpEnabled(true)
         }
         val subCategoryId = arguments?.getInt("SUB_CATEGORY_ID")
-        Log.d(TAG, "📌 subCategoryId from arguments: $subCategoryId")
+        Timber.tag(LogTags.UI).d("📌 subCategoryId from arguments: $subCategoryId")
         viewModel.setSubCategoryId(subCategoryId)
         viewModel.resetFirstLoadFlag()
         if (sectionType == "sport") viewModel.clearSavedCategory()
@@ -116,35 +125,26 @@ class ProductsFragment : Fragment() {
             preSelectedSportTypeId = sportTypeId,
             preSelectedGearType = gearType
         )
-        // After viewModel.loadProducts(...)
 
         if (subCategoryId != null && subCategoryId > 0) {
-            // Just ensure the ViewModel knows the subCategory again
             viewModel.setSubCategoryId(subCategoryId)
-
-            // Optional: Small delay only to rebuild filters, NOT reload data
             viewLifecycleOwner.lifecycleScope.launch {
                 delay(300)
                 if (_binding != null) {
-                    viewModel.reloadLocalFiltersOnly()   // We'll create this
+                    viewModel.reloadLocalFiltersOnly()
                 }
             }
         }
     }
 
-    // ====================== SEARCH ======================
-
-    // ProductsFragment.kt - Update performLiveSearch
-
     fun performLiveSearch(query: String) {
-        Timber.tag(TAG).d("🔍 performLiveSearch called with: $query")
-        if (query.length >= 2) {
+        Timber.tag(LogTags.UI).d("🔍 performLiveSearch called with: $query")
+        if (query.length >= MIN_SEARCH_LENGTH) {
             isInSearchMode = true
             enterSearchMode()
             searchJob?.cancel()
             searchJob = viewLifecycleOwner.lifecycleScope.launch {
-                delay(300)
-                // 🔥 Use ranked search instead of local search
+                delay(SEARCH_DEBOUNCE_DELAY_MS)
                 viewModel.searchItemsRanked(
                     query = query,
                     categoryId = arguments?.getInt("CATEGORY_ID")
@@ -159,7 +159,6 @@ class ProductsFragment : Fragment() {
         binding.searchResultsContainer.visibility = View.VISIBLE
         binding.productsRecycler.visibility = View.GONE
         binding.emptySearchResults.visibility = View.GONE
-        // Hide shimmer during search
         binding.shimmerLayout.visibility = View.GONE
         binding.shimmerLayout.stopShimmer()
     }
@@ -173,8 +172,6 @@ class ProductsFragment : Fragment() {
         viewModel.clearSearchResults()
         viewModel.reloadCurrentSection()
     }
-
-    // ====================== FILTER CORE ======================
 
     private fun getOptionsFor(groupId: String): List<String> {
         var items = originalItems.toList()
@@ -209,36 +206,33 @@ class ProductsFragment : Fragment() {
     }
 
     private fun getGenderLabel(item: Item): String? = when (item.genderId) {
-        42 -> "Boys"
-        43 -> "Girls"
-        27 -> "Unisex"
-        in 1..26 -> if (item.genderId?.rem(2) == 0) "Girls" else "Boys"
+        GENDER_BOYS_ID -> "Boys"
+        GENDER_GIRLS_ID -> "Girls"
+        GENDER_UNISEX_ID -> "Unisex"
+        in GENDER_ODD_ID..GENDER_EVEN_ID ->
+            if (item.genderId?.rem(GENDER_REM_CHECK) == GENDER_REM_RESULT) "Girls" else "Boys"
         else -> item.gender?.takeIf { it.isNotBlank() }
     }
 
-    // ====================== applyAllFilters with price ======================
-
     private fun applyAllFilters() {
-        Timber.tag(TAG).d("🔧 applyAllFilters() called - originalItems size: ${originalItems.size}")
+        Timber.tag(LogTags.UI).d("🔧 applyAllFilters() called - originalItems size: ${originalItems.size}")
 
         var filtered = originalItems.toList()
 
-        // ✅ Price filter from slider
         val minPrice = binding.priceSlider.values[0]
         val maxPrice = binding.priceSlider.values[1]
 
-        Timber.tag(TAG).d("💰 Price filter: R${minPrice.toInt()} - R${maxPrice.toInt()}")
+        Timber.tag(LogTags.UI).d("💰 Price filter: R${minPrice.toInt()} - R${maxPrice.toInt()}")
         filtered = filtered.filter { it.price in minPrice..maxPrice }
-        Timber.tag(TAG).d("💰 After price filter: ${filtered.size} items")
+        Timber.tag(LogTags.UI).d("💰 After price filter: ${filtered.size} items")
 
-        // Other filters
         if (selectedGender != null) filtered = filtered.filter { getGenderLabel(it) == selectedGender }
         if (selectedCondition != null) filtered = filtered.filter { it.conditionName == selectedCondition }
         if (selectedSize != null) filtered = filtered.filter { it.sizeName == selectedSize }
         if (selectedColor != null) filtered = filtered.filter { it.colorName == selectedColor }
         if (selectedBrand != null) filtered = filtered.filter { it.brandName == selectedBrand }
 
-        Timber.tag(TAG).d("🔧 After all filters: ${filtered.size} items")
+        Timber.tag(LogTags.UI).d("🔧 After all filters: ${filtered.size} items")
         productsAdapter.submitList(filtered)
     }
 
@@ -250,19 +244,13 @@ class ProductsFragment : Fragment() {
         selectedBrand = null
     }
 
-    // ====================== resetLocalFilters ======================
-
     private fun resetLocalFilters() {
-        // ✅ Reset price slider
-        binding.priceSlider.setValues(0f, 1000f)
-        binding.selectedPriceRange.text = "R0 - R1000"
-
+        binding.priceSlider.setValues(PRICE_SLIDER_MIN, PRICE_SLIDER_MAX)
+        binding.selectedPriceRange.text = "R${PRICE_SLIDER_MIN.toInt()} - R${PRICE_SLIDER_MAX.toInt()}"
         clearFilterState()
         productsAdapter.submitList(originalItems.toList())
         rebuildLocalFilters()
     }
-
-    // ====================== FILTER DRAWER ======================
 
     private fun setupFilterDrawer() {
         setupPriceSlider()
@@ -285,16 +273,13 @@ class ProductsFragment : Fragment() {
         }
     }
 
-    // ====================== setupPriceSlider ======================
-
     private fun setupPriceSlider() {
-        binding.priceSlider.setValues(0f, 1000f)
-        binding.selectedPriceRange.text = "R0 - R1000"
+        binding.priceSlider.setValues(PRICE_SLIDER_MIN, PRICE_SLIDER_MAX)
+        binding.selectedPriceRange.text = "R${PRICE_SLIDER_MIN.toInt()} - R${PRICE_SLIDER_MAX.toInt()}"
         binding.priceSlider.addOnChangeListener { slider, _, _ ->
             val values = slider.values
             if (values.size >= 2) {
                 binding.selectedPriceRange.text = "R${values[0].toInt()} - R${values[1].toInt()}"
-                // ✅ Live filter when slider changes
                 applyAllFilters()
             }
         }
@@ -309,21 +294,18 @@ class ProductsFragment : Fragment() {
                 binding.optionsHeader.visibility = View.GONE
                 binding.dynamicFilterContainer.visibility = View.VISIBLE
                 binding.optionsContainer.visibility = View.GONE
-                // ✅ Rebuild filters when drawer opens
                 rebuildLocalFilters()
                 binding.drawerLayout.openDrawer(GravityCompat.END)
             }
         }
     }
 
-    // ====================== rebuildLocalFilters ======================
-
     private fun rebuildLocalFilters() {
         if (_binding == null) return
         binding.dynamicFilterContainer.removeAllViews()
 
         if (originalItems.isEmpty()) {
-            Timber.tag(TAG).d("⚠️ originalItems is EMPTY, showing 'No items available'")
+            Timber.tag(LogTags.UI).d("⚠️ originalItems is EMPTY, showing 'No items available'")
             addEmptyFilterMessage("No items available")
             return
         }
@@ -333,9 +315,6 @@ class ProductsFragment : Fragment() {
         val sizes = getOptionsFor("size")
         val colors = getOptionsFor("color")
         val brands = getOptionsFor("brand")
-
-        Timber.tag(TAG)
-            .d("🔧 Filter counts - genders: ${genders.size}, conditions: ${conditions.size}, sizes: ${sizes.size}, colors: ${colors.size}, brands: ${brands.size}")
 
         if (genders.isNotEmpty()) {
             addFilterItem("Gender", selectedGender) {
@@ -370,7 +349,6 @@ class ProductsFragment : Fragment() {
 
         if (genders.isEmpty() && conditions.isEmpty() && sizes.isEmpty()
             && colors.isEmpty() && brands.isEmpty()) {
-            Timber.tag(TAG).d("⚠️ All filters are EMPTY, showing 'No filters available'")
             addEmptyFilterMessage("No filters available")
         }
     }
@@ -430,14 +408,10 @@ class ProductsFragment : Fragment() {
                             selectedBrand = null
                         }
                     }
-                    "condition" -> selectedCondition =
-                        if (selectedCondition == option.name) null else option.name
-                    "size" -> selectedSize =
-                        if (selectedSize == option.name) null else option.name
-                    "color" -> selectedColor =
-                        if (selectedColor == option.name) null else option.name
-                    "brand" -> selectedBrand =
-                        if (selectedBrand == option.name) null else option.name
+                    "condition" -> selectedCondition = if (selectedCondition == option.name) null else option.name
+                    "size" -> selectedSize = if (selectedSize == option.name) null else option.name
+                    "color" -> selectedColor = if (selectedColor == option.name) null else option.name
+                    "brand" -> selectedBrand = if (selectedBrand == option.name) null else option.name
                 }
 
                 applyAllFilters()
@@ -462,8 +436,6 @@ class ProductsFragment : Fragment() {
         binding.dynamicFilterContainer.addView(tv)
     }
 
-    // ====================== RECYCLER ======================
-
     private fun setupRecyclerView() {
         productsAdapter = ProductsAdapter { item ->
             viewModel.trackClick(item.id, arguments?.getString("SECTION_TYPE") ?: "all", 0)
@@ -471,10 +443,9 @@ class ProductsFragment : Fragment() {
             findNavController().navigate(R.id.itemDetailFragment, bundle)
         }
         binding.productsRecycler.apply {
-            layoutManager = GridLayoutManager(requireContext(), 2)
+            layoutManager = GridLayoutManager(requireContext(), GRID_SPAN_COUNT)
             adapter = productsAdapter
 
-            // ✅ Auto-hide banner when user starts scrolling
             addOnScrollListener(object : RecyclerView.OnScrollListener() {
                 override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                     super.onScrollStateChanged(recyclerView, newState)
@@ -512,17 +483,15 @@ class ProductsFragment : Fragment() {
         }
     }
 
-    // ====================== COMBINED OBSERVERS ======================
-
     private fun observeViewModel() {
-        // 1. Products observer - SINGLE SOURCE OF TRUTH for data and error states
+        // Products observer
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.products.collect { products ->
                     if (isInSearchMode || _binding == null) return@collect
 
                     if (products.isEmpty() && (viewModel.isLoading.value || viewModel.isNewSectionLoading.value)) {
-                        Timber.tag(TAG).d("⏳ Ignoring empty products list (still loading)")
+                        Timber.tag(LogTags.UI).d("⏳ Ignoring empty products list (still loading)")
                         return@collect
                     }
 
@@ -544,7 +513,6 @@ class ProductsFragment : Fragment() {
                         productsAdapter.submitList(products.toList())
                         rebuildLocalFilters()
 
-                        // ✅ Check if we're in fallback mode (sub-category requested but no matching items)
                         val subCategoryId = arguments?.getInt("SUB_CATEGORY_ID")
                         val hasSubCategoryFilter = subCategoryId != null && subCategoryId > 0
                         val hasSubCategoryItems = if (hasSubCategoryFilter) {
@@ -554,28 +522,23 @@ class ProductsFragment : Fragment() {
                         }
 
                         if (hasSubCategoryFilter && !hasSubCategoryItems) {
-                            Timber.tag(TAG).d("🔔 Showing fallback banner for '$subCategoryName'")
+                            Timber.tag(LogTags.UI).d("🔔 Showing fallback banner for '$subCategoryName'")
                             binding.bannerMessage.text = "No items found for '$subCategoryName'. Similar items are displayed."
                             binding.emptyBanner.visibility = View.VISIBLE
-
-                            // ✅ ONLY close button dismisses banner (NO auto-hide)
                             binding.btnCloseBanner.setOnClickListener {
                                 binding.emptyBanner.visibility = View.GONE
                             }
                         } else {
-                            // ✅ Hide banner when items match the sub-category
                             binding.emptyBanner.visibility = View.GONE
                         }
 
-                        Timber.tag(TAG).d("✅ Products displayed: ${products.size} items")
+                        Timber.tag(LogTags.UI).d("✅ Products displayed: ${products.size} items")
 
-                        // Debug logging
                         if (subCategoryId != null && subCategoryId > 0) {
                             val matchingCount = products.count { it.subCategoryId == subCategoryId }
-                            Timber.tag(TAG).d("🔍 Sub-category $subCategoryId: $matchingCount/${products.size} items match")
+                            Timber.tag(LogTags.UI).d("🔍 Sub-category $subCategoryId: $matchingCount/${products.size} items match")
                         }
                     } else {
-                        // ✅ Truly empty - show error layout
                         binding.shimmerLayout.visibility = View.GONE
                         binding.shimmerLayout.stopShimmer()
                         binding.productsRecycler.visibility = View.GONE
@@ -587,40 +550,33 @@ class ProductsFragment : Fragment() {
             }
         }
 
-        // 2. Search results observer
-        // ProductsFragment.kt - Update the search results observer (around line 450-480)
-
-// 2. Search results observer
+        // Search results observer
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.searchResults.collect { results ->
                     if (!isInSearchMode || _binding == null) return@collect
 
-                    // ✅ IGNORE transient empty list during loading
                     if (results.isEmpty() && (viewModel.isLoading.value || viewModel.isNewSectionLoading.value)) {
-                        Timber.tag(TAG).d("⏳ Ignoring empty search results (still loading)")
+                        Timber.tag(LogTags.UI).d("⏳ Ignoring empty search results (still loading)")
                         return@collect
                     }
 
-                    Timber.tag(TAG).d("🔍 Search results collector received ${results.size} items")
+                    Timber.tag(LogTags.UI).d("🔍 Search results collector received ${results.size} items")
 
                     originalItems.clear()
                     originalItems.addAll(results)
                     clearFilterState()
 
-                    // ✅ Always stop swipe refresh for search
                     binding.swipeRefreshLayout.isRefreshing = false
 
                     if (results.isEmpty()) {
-                        // ✅ Show empty search state, hide shimmer
                         binding.shimmerLayout.visibility = View.GONE
                         binding.shimmerLayout.stopShimmer()
                         binding.emptySearchResults.visibility = View.VISIBLE
                         binding.searchResultsContainer.visibility = View.VISIBLE
                         binding.productsRecycler.visibility = View.GONE
-                        binding.emptyBanner.visibility = View.GONE  // ✅ Hide banner on empty
+                        binding.emptyBanner.visibility = View.GONE
                     } else {
-                        // ✅ Show search results, hide shimmer
                         binding.shimmerLayout.visibility = View.GONE
                         binding.shimmerLayout.stopShimmer()
                         binding.emptySearchResults.visibility = View.GONE
@@ -628,7 +584,6 @@ class ProductsFragment : Fragment() {
                         binding.productsRecycler.visibility = View.VISIBLE
                         productsAdapter.submitList(results.toList())
 
-                        // ✅ 🔥 NEW: Check if there are items from user's school
                         val userSchoolId = viewModel.getUserSchoolId()
                         val hasSchoolItems = if (userSchoolId != null) {
                             results.any { it.schoolId == userSchoolId }
@@ -636,7 +591,6 @@ class ProductsFragment : Fragment() {
                             false
                         }
 
-                        // ✅ Check if there are items from nearby schools
                         val nearbyIds = viewModel.getNearbySchoolIds()
                         val hasNearbyItems = if (nearbyIds.isNotEmpty()) {
                             results.any { nearbyIds.contains(it.schoolId) }
@@ -644,7 +598,6 @@ class ProductsFragment : Fragment() {
                             false
                         }
 
-                        // ✅ Show banner only if items exist BUT none are from user's school
                         if (results.isNotEmpty() && !hasSchoolItems) {
                             var bannerMessage = ""
 
@@ -654,11 +607,10 @@ class ProductsFragment : Fragment() {
                                 bannerMessage = "No items found at your school or nearby. Showing items from other schools."
                             }
 
-                            Timber.tag(TAG).d("🔔 Showing search banner: $bannerMessage")
+                            Timber.tag(LogTags.UI).d("🔔 Showing search banner: $bannerMessage")
                             binding.bannerMessage.text = bannerMessage
                             binding.emptyBanner.visibility = View.VISIBLE
 
-                            // ✅ Close button dismisses banner
                             binding.btnCloseBanner.setOnClickListener {
                                 binding.emptyBanner.visibility = View.GONE
                             }
@@ -666,50 +618,43 @@ class ProductsFragment : Fragment() {
                             binding.emptyBanner.visibility = View.GONE
                         }
 
-                        // ✅ CRITICAL: Rebuild filters when search results load
-                        Timber.tag(TAG).d("🔧 Calling rebuildLocalFilters() from search collector")
                         rebuildLocalFilters()
-
-                        Timber.tag(TAG).d("✅ Search results displayed: ${results.size} items")
+                        Timber.tag(LogTags.UI).d("✅ Search results displayed: ${results.size} items")
                     }
                 }
             }
         }
 
-        // 3. Loading state observer - CONTROLS SHIMMER ONLY, NEVER SHOWS ERROR
+        // Loading state observer
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.isLoading.collect { isLoading ->
                     if (_binding == null) return@collect
                     val isNew = viewModel.isNewSectionLoading.value
 
-                    Timber.tag(TAG)
-                        .d("🔄 Loading state: isLoading=$isLoading, isNew=$isNew, itemCount=${productsAdapter.itemCount}")
+                    Timber.tag(LogTags.UI).d("🔄 Loading state: isLoading=$isLoading, isNew=$isNew, itemCount=${productsAdapter.itemCount}")
 
                     if (isLoading || isNew) {
-                        // Only show shimmer if we don't have data yet AND not in search mode
                         if (productsAdapter.itemCount == 0 && !isInSearchMode) {
-                            Timber.tag(TAG).d("✨ Showing shimmer (no data yet)")
+                            Timber.tag(LogTags.UI).d("✨ Showing shimmer (no data yet)")
                             binding.shimmerLayout.visibility = View.VISIBLE
                             binding.shimmerLayout.startShimmer()
                             binding.productsRecycler.visibility = View.GONE
                             binding.errorLayout.visibility = View.GONE
                         }
                     }
-                    // ❌ REMOVED else branch that shows error - let products collector handle it
                 }
             }
         }
 
-        // 4. Error state observer
+        // Error state observer
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.error.collect { errorMsg ->
                     if (_binding == null) return@collect
 
-                    Log.d(TAG, "❌ Error state: errorMsg=$errorMsg, itemCount=${productsAdapter.itemCount}")
+                    Timber.tag(LogTags.UI).d("❌ Error state: errorMsg=$errorMsg, itemCount=${productsAdapter.itemCount}")
 
-                    // ✅ Always stop swipe refresh on error
                     binding.swipeRefreshLayout.isRefreshing = false
 
                     if (!errorMsg.isNullOrEmpty() && productsAdapter.itemCount == 0) {

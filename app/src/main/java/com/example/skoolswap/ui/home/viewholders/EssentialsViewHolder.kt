@@ -13,6 +13,7 @@ import com.example.skoolswap.databinding.ItemEssentialsRowBinding
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.homefeed.Section
 import com.example.skoolswap.ui.home.adapter.EssentialsGridAdapter
+import timber.log.Timber
 
 private const val TAG = "EssentialsViewHolder"
 
@@ -22,7 +23,7 @@ class EssentialsViewHolder(
 ) : RecyclerView.ViewHolder(binding.root) {
 
     fun bind(section: Section.Essentials) {
-        Log.d(TAG, "=== BINDING ESSENTIALS SECTION ===")
+        Timber.tag(TAG).d("=== BINDING ESSENTIALS SECTION ===")
 
         binding.header.sectionTitle.text = section.title
 
@@ -38,7 +39,7 @@ class EssentialsViewHolder(
 
         binding.header.sectionTitle.setTextColor(textColor)
         binding.header.viewAll.visibility = View.GONE
-        Log.d(TAG, "Header title set to: ${section.title}")
+        Timber.tag(TAG).d("Header title set to: ${section.title}")
 
         // Create category cards with their display names and category IDs
         val categoryCards = mutableListOf<EssentialsCategoryItem>()
@@ -63,7 +64,7 @@ class EssentialsViewHolder(
             )
         }
         categoryCards.add(uniformsItem)
-        Log.d(TAG, "✅ Added Uniforms card")
+        Timber.tag(TAG).d("✅ Added Uniforms card")
 
         // Sports category (ID: 2)
         val sportsItem = if (section.sections.sports.isNotEmpty()) {
@@ -85,7 +86,7 @@ class EssentialsViewHolder(
             )
         }
         categoryCards.add(sportsItem)
-        Log.d(TAG, "✅ Added Sports card")
+        Timber.tag(TAG).d("✅ Added Sports card")
 
         // Stationery category (ID: 5)
         val stationeryItems = section.sections.uniforms.filter {
@@ -110,7 +111,7 @@ class EssentialsViewHolder(
             )
         }
         categoryCards.add(stationeryItem)
-        Log.d(TAG, "✅ Added Stationery card")
+        Timber.tag(TAG).d("✅ Added Stationery card")
 
         // Accessories category (ID: 3)
         val accessoriesItem = if (section.sections.accessories.isNotEmpty()) {
@@ -132,9 +133,9 @@ class EssentialsViewHolder(
             )
         }
         categoryCards.add(accessoriesItem)
-        Log.d(TAG, "✅ Added Accessories card")
+        Timber.tag(TAG).d("✅ Added Accessories card")
 
-        Log.d(TAG, "Total category cards: ${categoryCards.size}")
+        Timber.tag(TAG).d("Total category cards: ${categoryCards.size}")
 
         // Setup grid adapter
         val spanCount = 2
@@ -145,12 +146,13 @@ class EssentialsViewHolder(
         binding.essentialsRecycler.apply {
             layoutManager = GridLayoutManager(itemView.context, spanCount)
             this.adapter = adapter
-            Log.d(TAG, "RecyclerView configured with $spanCount columns")
+            Timber.tag(TAG).d("RecyclerView configured with $spanCount columns")
         }
     }
 
     private fun handleCategoryClick(categoryItem: EssentialsCategoryItem) {
-        Log.d(TAG, "Category clicked: ${categoryItem.displayName}, categoryId: ${categoryItem.categoryId}")
+        Timber.tag(TAG)
+            .d("Category clicked: ${categoryItem.displayName}, categoryId: ${categoryItem.categoryId}")
 
         // Navigate to ProductsFragment with category ID for filters
         val bundle = Bundle().apply {

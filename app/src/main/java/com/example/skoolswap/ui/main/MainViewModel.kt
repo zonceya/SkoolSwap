@@ -1,14 +1,12 @@
 package com.example.skoolswap.ui.main
 
-import android.util.Log
+
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
-import com.example.skoolswap.data.repository.AuthRepository
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
-import com.example.skoolswap.ui.item.CreateItemViewModel.Companion.TAG
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
@@ -94,6 +92,7 @@ class MainViewModel @Inject constructor(
             val userProfile = authRepository.getServerUser().firstOrNull()
             !userProfile?.mobile.isNullOrEmpty()
         } catch (e: Exception) {
+            Timber.tag(LogTags.VIEW_MODEL).e(e, "Failed to check contact number")
             false
         }
     }
@@ -105,7 +104,7 @@ class MainViewModel @Inject constructor(
                 preferences.setLoggedIn(false)
                 _forceNavigation.value = NavigationDestination.LOGIN
             } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Logout error in ViewModel")
+                Timber.tag(LogTags.VIEW_MODEL).e(e, "Logout error in ViewModel")
             }
         }
     }

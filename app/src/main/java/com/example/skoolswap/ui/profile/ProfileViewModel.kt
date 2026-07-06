@@ -3,6 +3,7 @@ package com.example.skoolswap.ui.profile
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.data.repository.SchoolRepository
 import com.example.skoolswap.data.repository.UserSchoolRepository
 import com.example.skoolswap.domain.model.Province
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -64,23 +66,27 @@ class ProfileViewModel @Inject constructor(
 
     private val _isSearchActive = MutableStateFlow(false)
     val isSearchActive: StateFlow<Boolean> = _isSearchActive.asStateFlow()
+
     val _originalMobile = MutableStateFlow<String?>(null)
     private val _originalSchool = MutableStateFlow<School?>(null)
 
-    // Track pending changes (not yet saved)
     private val _pendingMobile = MutableStateFlow<String?>(null)
     private val _pendingSchool = MutableStateFlow<School?>(null)
 
-    // Add this with the other StateFlow declarations
     private val _isInitialized = MutableStateFlow(false)
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
+
     private val _showConfirmationDialog = MutableStateFlow(false)
     val showConfirmationDialog: StateFlow<Boolean> = _showConfirmationDialog.asStateFlow()
+
     val pendingSchool: StateFlow<School?> = _pendingSchool.asStateFlow()
+
     private val _changesSummary = MutableStateFlow<String?>(null)
     val changesSummary: StateFlow<String?> = _changesSummary.asStateFlow()
+
     private val _isNewSectionLoading = MutableStateFlow(false)
     val isNewSectionLoading: StateFlow<Boolean> = _isNewSectionLoading.asStateFlow()
+
     init {
         loadProvinces()
         checkExistingSchoolMapping()
@@ -94,17 +100,20 @@ class ProfileViewModel @Inject constructor(
             when (val result = schoolRepository.getProvinces()) {
                 is Result.Success -> {
                     _provinces.value = result.data
+                    Timber.tag(LogTags.VIEW_MODEL).d("✅ Loaded ${result.data.size} provinces")
                 }
                 is Result.Error -> {
                     _error.value = "Failed to load provinces: ${result.exception.message}"
+                    Timber.tag(LogTags.VIEW_MODEL).e(result.exception, "❌ Failed to load provinces")
                 }
             }
 
             _isLoading.value = false
         }
     }
+
     fun clearSchoolSelection() {
-        Log.d("ProfileViewModel", "⚠️⚠️⚠️ clearSchoolSelection() called! Previous school: ${_selectedSchool.value?.name}")
+        Timber.tag(LogTags.VIEW_MODEL).d("⚠️ clearSchoolSelection() called! Previous school: ${_selectedSchool.value?.name}")
         _selectedSchool.value = null
         _pendingSchool.value = null
     }
@@ -112,22 +121,23 @@ class ProfileViewModel @Inject constructor(
     fun initializeProfile(mobile: String?, school: School?) {
         val normalizedMobile = mobile?.takeIf { it.isNotBlank() } ?: ""
 
-        // Only set mobile once, preserve school from checkExistingSchoolMapping
         if (_originalMobile.value == null) {
             _originalMobile.value = normalizedMobile
             _pendingMobile.value = normalizedMobile
         }
 
-        // School is intentionally ignored here — checkExistingSchoolMapping() owns it
-        Log.d("ProfileViewModel", "initializeProfile - mobile: $normalizedMobile, school ignored")
+        Timber.tag(LogTags.VIEW_MODEL).d("initializeProfile - mobile: $normalizedMobile")
     }
+
     fun previewSchool(school: School) {
         _pendingSchool.value = school
         _selectedSchool.value = school
     }
+
     fun previewMobile(mobile: String) {
         _pendingMobile.value = mobile
     }
+
     fun checkForChanges(): Boolean {
         val originalMobileNormalized = _originalMobile.value ?: ""
         val pendingMobileNormalized = _pendingMobile.value ?: ""
@@ -138,12 +148,11 @@ class ProfileViewModel @Inject constructor(
         val pendingSchoolId = _pendingSchool.value?.id ?: -1
         val schoolChanged = pendingSchoolId != originalSchoolId
 
-        Log.d("ProfileViewModel", "checkForChanges - mobileChanged: $mobileChanged, schoolChanged: $schoolChanged")
-        Log.d("ProfileViewModel", "  pendingMobile: '$pendingMobileNormalized', originalMobile: '$originalMobileNormalized'")
-        Log.d("ProfileViewModel", "  pendingSchool: ${_pendingSchool.value?.id}, originalSchool: ${_originalSchool.value?.id}")
+        Timber.tag(LogTags.VIEW_MODEL).d("checkForChanges - mobileChanged: $mobileChanged, schoolChanged: $schoolChanged")
 
         return mobileChanged || schoolChanged
     }
+
     fun prepareConfirmationDialog() {
         val changes = mutableListOf<String>()
 
@@ -158,19 +167,18 @@ class ProfileViewModel @Inject constructor(
         _changesSummary.value = changes.joinToString("\n")
         _showConfirmationDialog.value = true
     }
+
     fun confirmAndSave() {
         viewModelScope.launch {
             _isLoading.value = true
 
-            // Save mobile if changed
             _pendingMobile.value?.let { mobile ->
                 if (mobile != _originalMobile.value && mobile.isNotBlank()) {
                     authRepository.updateMobile(mobile)
-                    _originalMobile.value = mobile  // ✅ Update original after save
+                    _originalMobile.value = mobile
                 }
             }
 
-            // Save school if changed
             _pendingSchool.value?.let { school ->
                 if (school.id != _originalSchool.value?.id) {
                     if (_hasExistingSchool.value && _currentSchoolMapping.value != null) {
@@ -181,7 +189,7 @@ class ProfileViewModel @Inject constructor(
                     } else {
                         userSchoolRepository.assignSchool(school.id)
                     }
-                    _originalSchool.value = school  // ✅ Update original after save
+                    _originalSchool.value = school
                 }
             }
 
@@ -191,19 +199,18 @@ class ProfileViewModel @Inject constructor(
             _profileComplete.value = true
         }
     }
+
     fun cancelConfirmation() {
-        // Revert to original values
         _pendingMobile.value = _originalMobile.value
         _pendingSchool.value = _originalSchool.value
         _selectedSchool.value = _originalSchool.value
         _showConfirmationDialog.value = false
-
-        // Update UI
         _error.value = "Update cancelled"
     }
+
     fun checkExistingSchoolMapping() {
         viewModelScope.launch {
-            Log.d("ProfileViewModel", "🔍 Checking existing school mapping")
+            Timber.tag(LogTags.VIEW_MODEL).d("🔍 Checking existing school mapping")
 
             when (val result = userSchoolRepository.getCurrentSchoolMapping()) {
                 is Result.Success -> {
@@ -211,9 +218,8 @@ class ProfileViewModel @Inject constructor(
                         _currentSchoolMapping.value = result.data
                         _hasExistingSchool.value = true
 
-                        Log.d("ProfileViewModel", "✅ Found existing school: ${result.data.schoolName}")
+                        Timber.tag(LogTags.VIEW_MODEL).d("✅ Found existing school: ${result.data.schoolName}")
 
-                        // Create school object
                         val school = School(
                             id = result.data.schoolId,
                             name = result.data.schoolName,
@@ -223,31 +229,27 @@ class ProfileViewModel @Inject constructor(
                             schoolType = result.data.schoolType
                         )
 
-                        // Set ALL three school states consistently
                         _selectedSchool.value = school
                         _originalSchool.value = school
                         _pendingSchool.value = school
 
-                        // Find and set the province
                         result.data.provinceId?.let { provinceId ->
                             val province = _provinces.value.find { it.id == provinceId }
                             if (province != null) {
                                 _selectedProvince.value = province
-                                Log.d("ProfileViewModel", "✅ Set province: ${province.name}")
+                                Timber.tag(LogTags.VIEW_MODEL).d("✅ Set province: ${province.name}")
                             }
                         }
                     } else {
                         _hasExistingSchool.value = false
-                        Log.d("ProfileViewModel", "ℹ️ No existing school found")
+                        Timber.tag(LogTags.VIEW_MODEL).d("ℹ️ No existing school found")
                     }
-                    // ✅ Mark as initialized AFTER everything is set
                     _isInitialized.value = true
                 }
                 is Result.Error -> {
                     _error.value = "Failed to check school status"
                     _hasExistingSchool.value = false
-                    Log.e("ProfileViewModel", "❌ Error checking school: ${result.exception.message}")
-                    // ✅ Also mark as initialized on error so UI isn't blocked
+                    Timber.tag(LogTags.VIEW_MODEL).e(result.exception, "❌ Error checking school")
                     _isInitialized.value = true
                 }
             }
@@ -255,11 +257,11 @@ class ProfileViewModel @Inject constructor(
     }
 
     fun selectProvince(province: Province, shouldClearSchool: Boolean = false) {
-        Log.d("ProfileViewModel", "📍 selectProvince: ${province.name}, clearSchool: $shouldClearSchool")
+        Timber.tag(LogTags.VIEW_MODEL).d("📍 selectProvince: ${province.name}, clearSchool: $shouldClearSchool")
 
         val currentSchool = _selectedSchool.value
         if (currentSchool != null && currentSchool.provinceId == province.id) {
-            Log.d("ProfileViewModel", "✅ Keeping school because it matches province: ${currentSchool.name}")
+            Timber.tag(LogTags.VIEW_MODEL).d("✅ Keeping school because it matches province: ${currentSchool.name}")
             _selectedProvince.value = province
             return
         }
@@ -267,12 +269,13 @@ class ProfileViewModel @Inject constructor(
         _selectedProvince.value = province
 
         if (shouldClearSchool) {
-            Log.d("ProfileViewModel", "🗑️ Clearing school selection")
+            Timber.tag(LogTags.VIEW_MODEL).d("🗑️ Clearing school selection")
             _selectedSchool.value = null
-            _pendingSchool.value = null  // Also clear pending
+            _pendingSchool.value = null
             _schools.value = emptyList()
         }
     }
+
     fun searchSchools(query: String) {
         val province = _selectedProvince.value ?: return
 
@@ -288,9 +291,11 @@ class ProfileViewModel @Inject constructor(
             when (val result = schoolRepository.searchSchools(province.id, query)) {
                 is Result.Success -> {
                     _schools.value = result.data
+                    Timber.tag(LogTags.VIEW_MODEL).d("🔍 Found ${result.data.size} schools for '$query'")
                 }
                 is Result.Error -> {
                     _error.value = "Search failed: ${result.exception.message}"
+                    Timber.tag(LogTags.VIEW_MODEL).e(result.exception, "❌ Search failed")
                 }
             }
 
@@ -298,21 +303,17 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    // In ProfileViewModel.kt
     fun selectSchool(school: School) {
-        Log.d("ProfileViewModel", "📝 selectSchool called with: ${school.name} (ID: ${school.id})")
+        Timber.tag(LogTags.VIEW_MODEL).d("📝 selectSchool called with: ${school.name} (ID: ${school.id})")
 
-        // Set the school FIRST
         _selectedSchool.value = school
 
-        // Verify it was set
-        Log.d("ProfileViewModel", "✅ After setting school: ${_selectedSchool.value?.name}")
+        Timber.tag(LogTags.VIEW_MODEL).d("✅ After setting school: ${_selectedSchool.value?.name}")
 
         _isSearchActive.value = false
         _schools.value = emptyList()
 
-        Log.d("ProfileViewModel", "✅ Final check - school is: ${_selectedSchool.value?.name}")
-        Log.d("ProfileViewModel", "✅ School selected: ${school.name} (waiting for submit)")
+        Timber.tag(LogTags.VIEW_MODEL).d("✅ Final check - school is: ${_selectedSchool.value?.name}")
     }
 
     fun submitSchoolSelection() {
@@ -323,30 +324,30 @@ class ProfileViewModel @Inject constructor(
             _error.value = null
 
             if (_hasExistingSchool.value && _currentSchoolMapping.value != null) {
-                // Update existing mapping
                 val mapping = _currentSchoolMapping.value!!
                 when (val result = userSchoolRepository.updateSchoolMapping(mapping.mappingId, school.id)) {
                     is Result.Success -> {
                         _currentSchoolMapping.value = result.data
                         _updateSuccess.value = true
                         _profileComplete.value = true
-                        Log.d("ProfileViewModel", "✅ School updated to: ${school.name}")
+                        Timber.tag(LogTags.VIEW_MODEL).d("✅ School updated to: ${school.name}")
                     }
                     is Result.Error -> {
                         _error.value = result.exception.message ?: "Failed to update school"
+                        Timber.tag(LogTags.VIEW_MODEL).e(result.exception, "❌ Update failed")
                     }
                 }
             } else {
-                // First time assignment
                 when (val result = userSchoolRepository.assignSchool(school.id)) {
                     is Result.Success -> {
                         refreshCurrentMapping()
                         _updateSuccess.value = true
                         _profileComplete.value = true
-                        Log.d("ProfileViewModel", "✅ New school assigned: ${school.name}")
+                        Timber.tag(LogTags.VIEW_MODEL).d("✅ New school assigned: ${school.name}")
                     }
                     is Result.Error -> {
                         _error.value = result.exception.message ?: "Failed to assign school"
+                        Timber.tag(LogTags.VIEW_MODEL).e(result.exception, "❌ Assign failed")
                     }
                 }
             }
@@ -354,6 +355,7 @@ class ProfileViewModel @Inject constructor(
             _isLoading.value = false
         }
     }
+
     private fun saveSchoolSelection() {
         viewModelScope.launch {
             val school = _selectedSchool.value ?: return@launch
@@ -362,31 +364,28 @@ class ProfileViewModel @Inject constructor(
             _error.value = null
 
             if (_hasExistingSchool.value && _currentSchoolMapping.value != null) {
-                // Update existing mapping
                 val mapping = _currentSchoolMapping.value!!
                 when (val result = userSchoolRepository.updateSchoolMapping(mapping.mappingId, school.id)) {
                     is Result.Success -> {
                         _currentSchoolMapping.value = result.data
                         _updateSuccess.value = true
-                        Log.d("ProfileViewModel", "✅ School updated to: ${school.name}")
+                        Timber.tag(LogTags.VIEW_MODEL).d("✅ School updated to: ${school.name}")
                     }
                     is Result.Error -> {
                         _error.value = result.exception.message ?: "Failed to update school"
-                        Log.e("ProfileViewModel", "❌ Update failed: ${result.exception.message}")
+                        Timber.tag(LogTags.VIEW_MODEL).e(result.exception, "❌ Update failed")
                     }
                 }
             } else {
-                // First time assignment
                 when (val result = userSchoolRepository.assignSchool(school.id)) {
                     is Result.Success -> {
-                        // Refresh to get the mapping
                         refreshCurrentMapping()
                         _updateSuccess.value = true
-                        Log.d("ProfileViewModel", "✅ New school assigned: ${school.name}")
+                        Timber.tag(LogTags.VIEW_MODEL).d("✅ New school assigned: ${school.name}")
                     }
                     is Result.Error -> {
                         _error.value = result.exception.message ?: "Failed to assign school"
-                        Log.e("ProfileViewModel", "❌ Assign failed: ${result.exception.message}")
+                        Timber.tag(LogTags.VIEW_MODEL).e(result.exception, "❌ Assign failed")
                     }
                 }
             }
@@ -405,7 +404,7 @@ class ProfileViewModel @Inject constructor(
                     }
                 }
                 is Result.Error -> {
-                    Log.e("ProfileViewModel", "Failed to refresh mapping")
+                    Timber.tag(LogTags.VIEW_MODEL).e(result.exception, "Failed to refresh mapping")
                 }
             }
         }
@@ -418,7 +417,7 @@ class ProfileViewModel @Inject constructor(
 
     fun updateMobile(mobile: String) {
         if (mobile.isBlank()) {
-            Log.d("ProfileViewModel", "⚠️ Mobile is empty - skipping update")
+            Timber.tag(LogTags.VIEW_MODEL).d("⚠️ Mobile is empty - skipping update")
             return
         }
 
@@ -432,9 +431,10 @@ class ProfileViewModel @Inject constructor(
             result.onSuccess {
                 _updateSuccess.value = true
                 refreshUserProfile()
-                Log.d("ProfileViewModel", "✅ Mobile updated: $mobile")
+                Timber.tag(LogTags.VIEW_MODEL).d("✅ Mobile updated: $mobile")
             }.onFailure { throwable ->
                 _error.value = throwable.message ?: "Failed to update mobile"
+                Timber.tag(LogTags.VIEW_MODEL).e(throwable, "❌ Failed to update mobile")
             }
 
             _isLoading.value = false
@@ -442,9 +442,7 @@ class ProfileViewModel @Inject constructor(
     }
 
     fun submitProfile() {
-        Log.e("ProfileViewModel", "📞 submitProfile() called")
-
-        // Just show success message - school is already saved when selected
+        Timber.tag(LogTags.VIEW_MODEL).d("📞 submitProfile() called")
         _profileComplete.value = true
     }
 
@@ -453,6 +451,7 @@ class ProfileViewModel @Inject constructor(
             val result = authRepository.refreshUserProfile()
             result.onFailure { throwable ->
                 _error.value = "Failed to refresh profile: ${throwable.message}"
+                Timber.tag(LogTags.VIEW_MODEL).e(throwable, "❌ Failed to refresh profile")
             }
         }
     }

@@ -21,6 +21,8 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.AppConstants
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.databinding.FragmentSchoolOnboardingBinding
 import com.example.skoolswap.domain.model.Province
 import com.example.skoolswap.ui.profile.SchoolAdapter
@@ -41,6 +43,12 @@ class SchoolOnboardingFragment : Fragment() {
 
     private lateinit var schoolAdapter: SchoolAdapter
 
+    companion object {
+        private const val NAVIGATION_DELAY_MS = 2000L
+        private const val SEARCH_MIN_LENGTH = 2
+        private const val PROVINCE_SPINNER_THRESHOLD = 1
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -53,22 +61,17 @@ class SchoolOnboardingFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-
         verifyAllDrawables()
         setupUI()
         setupRecyclerView()
         setupSearchListener()
         observeViewModel()
 
-        // Initialize progress - only PROVINCE active
         resetProgress()
-
-        // Load provinces
         viewModel.loadProvinces()
     }
 
     private fun resetProgress() {
-        // Only PROVINCE is active
         binding.progressStep1Icon.setImageResource(R.drawable.dot_province_active)
         binding.progressStep1Line.setBackgroundResource(R.drawable.progress_line_active)
 
@@ -78,12 +81,14 @@ class SchoolOnboardingFragment : Fragment() {
         binding.progressStep3Icon.setImageResource(R.drawable.dot_end_inactive)
         binding.progressStep3Line.setBackgroundResource(R.drawable.progress_line_inactive)
 
-        Log.d("SchoolOnboardingFragment", "📊 Progress reset: Only PROVINCE active")
+        Timber.tag(LogTags.UI).d("📊 Progress reset: Only PROVINCE active")
     }
 
-        private fun setupUI() {
+    private fun setupUI() {
         binding.submitButton.isEnabled = false
+        binding.submitButton.text = getString(R.string.school_onboarding_submit)
         binding.schoolSearch.isEnabled = false
+        binding.schoolSearch.hint = getString(R.string.school_onboarding_search_school)
 
         binding.submitButton.setOnClickListener {
             viewModel.submitSchoolSelection()
@@ -101,7 +106,7 @@ class SchoolOnboardingFragment : Fragment() {
             binding.selectedSchoolCard.visibility = View.VISIBLE
             binding.selectedSchoolName.text = school.name
             binding.submitButton.isEnabled = true
-            updateProgress(2) // School selected
+            updateProgress(2)
         }
 
         binding.schoolResultsRecyclerView.apply {
@@ -115,7 +120,7 @@ class SchoolOnboardingFragment : Fragment() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val query = s?.toString() ?: ""
+                val query = s?.toString() ?: AppConstants.EMPTY_STRING
 
                 if (query.isNotEmpty()) {
                     if (viewModel.selectedProvince.value != null) {
@@ -126,6 +131,7 @@ class SchoolOnboardingFragment : Fragment() {
                     } else {
                         binding.schoolResultsRecyclerView.visibility = View.GONE
                         binding.provinceEmptyMessage.visibility = View.VISIBLE
+                        binding.provinceEmptyMessage.text = getString(R.string.school_onboarding_select_province_first)
                     }
                 } else {
                     binding.schoolResultsRecyclerView.visibility = View.GONE
@@ -139,23 +145,21 @@ class SchoolOnboardingFragment : Fragment() {
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                // Observe provinces - THIS IS CRITICAL
                 launch {
                     viewModel.provinces.collect { provinces ->
-                        Log.d("SchoolOnboardingFragment", "📋 Provinces collected: ${provinces.size}")
+                        Timber.tag(LogTags.UI).d("📋 Provinces collected: ${provinces.size}")
                         if (provinces.isNotEmpty()) {
                             setupProvinceSpinner(provinces)
                         }
                     }
                 }
 
-                // Observe selected province
                 launch {
                     viewModel.selectedProvince.collect { province ->
                         if (province != null) {
-                            Log.d("SchoolOnboardingFragment", "📍 Province selected: ${province.name}")
+                            Timber.tag(LogTags.UI).d("📍 Province selected: ${province.name}")
                             binding.schoolSearch.isEnabled = true
-                            binding.schoolSearchLayout.placeholderText = "Start typing..."
+                            binding.schoolSearchLayout.placeholderText = getString(R.string.school_onboarding_start_typing)
                             binding.provinceEmptyMessage.visibility = View.GONE
                             viewModel.loadAllSchoolsForProvince(province)
                             updateProgress(1)
@@ -163,38 +167,35 @@ class SchoolOnboardingFragment : Fragment() {
                     }
                 }
 
-                // Observe school search results
                 launch {
                     viewModel.schools.collect { schools ->
                         schoolAdapter.submitList(schools)
                         if (schools.isEmpty() && binding.schoolSearch.text?.isNotEmpty() == true) {
                             binding.noResultsText.visibility = View.VISIBLE
+                            binding.noResultsText.text = getString(R.string.school_onboarding_no_results)
                         } else {
                             binding.noResultsText.visibility = View.GONE
                         }
                     }
                 }
 
-                // Observe loading states
                 launch {
                     viewModel.isLoading.collect { isLoading ->
                         binding.progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
                     }
                 }
 
-                // Observe schools loading
                 launch {
                     viewModel.isLoadingSchools.collect { isLoading ->
                         binding.schoolProgressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
                         if (!isLoading && viewModel.cachedSchools.value.isNotEmpty()) {
-                            Log.d("SchoolOnboardingFragment", "✅ Schools loaded: ${viewModel.cachedSchools.value.size}")
+                            Timber.tag(LogTags.UI).d("✅ Schools loaded: ${viewModel.cachedSchools.value.size}")
                             binding.schoolSearch.requestFocus()
                             showKeyboard(binding.schoolSearch)
                         }
                     }
                 }
 
-                // Observe selected school
                 launch {
                     viewModel.selectedSchool.collect { school ->
                         if (school != null) {
@@ -205,7 +206,6 @@ class SchoolOnboardingFragment : Fragment() {
                     }
                 }
 
-                // Observe update success
                 launch {
                     viewModel.updateSuccess.collect { success ->
                         if (success) {
@@ -215,7 +215,6 @@ class SchoolOnboardingFragment : Fragment() {
                     }
                 }
 
-                // Observe errors
                 launch {
                     viewModel.error.collect { error ->
                         if (error != null) {
@@ -224,36 +223,27 @@ class SchoolOnboardingFragment : Fragment() {
                         }
                     }
                 }
-
-                // Observe profile completion - COMMENTED OUT (handled in showSuccessAndNavigate)
-                // launch {
-                //     viewModel.profileComplete.collect { isComplete ->
-                //         if (isComplete) {
-                //             findNavController().navigate(R.id.action_schoolOnboardingFragment_to_nav_home)
-                //             viewModel.resetNavigation()
-                //         }
-                //     }
-                // }
             }
         }
     }
 
     private fun setupProvinceSpinner(provinces: List<Province>) {
-        Log.d("SchoolOnboardingFragment", "🔧 Setting up province spinner with ${provinces.size} provinces")
+        Timber.tag(LogTags.UI).d("🔧 Setting up province spinner with ${provinces.size} provinces")
 
         val provinceNames = provinces.map { it.name }
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, provinceNames)
 
         val autoCompleteTextView = binding.provinceSpinner as? AutoCompleteTextView
         autoCompleteTextView?.setAdapter(adapter)
-        autoCompleteTextView?.threshold = 1
+        autoCompleteTextView?.threshold = PROVINCE_SPINNER_THRESHOLD
+        autoCompleteTextView?.hint = getString(R.string.school_onboarding_select_province)
 
         autoCompleteTextView?.setOnItemClickListener { _, _, position, _ ->
             val selectedProvince = provinces[position]
-            Log.d("SchoolOnboardingFragment", "👆 Province clicked: ${selectedProvince.name}")
+            Timber.tag(LogTags.UI).d("👆 Province clicked: ${selectedProvince.name}")
             viewModel.selectProvince(selectedProvince, shouldClearSchool = true)
 
-            binding.schoolSearch.setText("")
+            binding.schoolSearch.setText(AppConstants.EMPTY_STRING)
             binding.schoolSearch.isEnabled = true
             binding.selectedSchoolCard.visibility = View.GONE
             binding.submitButton.isEnabled = false
@@ -262,19 +252,11 @@ class SchoolOnboardingFragment : Fragment() {
     }
 
     private fun updateProgress(step: Int) {
-        Log.d("SchoolOnboardingFragment", "📊 updateProgress called with step: $step")
+        Timber.tag(LogTags.UI).d("📊 updateProgress called with step: $step")
 
         when (step) {
             1 -> {
-                Log.d("SchoolOnboardingFragment", "🎨 STEP 1: Province selected")
-                Log.d("SchoolOnboardingFragment", "   - PROVINCE dot: dot_province_active (Black + White center)")
-                Log.d("SchoolOnboardingFragment", "   - PROVINCE line: progress_line_active (Black)")
-                Log.d("SchoolOnboardingFragment", "   - SCHOOL dot: dot_school_inactive (Gray outline + Gray center)")
-                Log.d("SchoolOnboardingFragment", "   - SCHOOL line: progress_line_active (Black - guiding to SCHOOL)")
-                Log.d("SchoolOnboardingFragment", "   - DONE dot: dot_end_inactive (Gray outline + Gray center)")
-                Log.d("SchoolOnboardingFragment", "   - DONE line: progress_line_inactive (Light Gray)")
-
-                // Province selected - PROVINCE active, line to SCHOOL becomes bold
+                Timber.tag(LogTags.UI).d("🎨 STEP 1: Province selected")
                 binding.progressStep1Icon.setImageResource(R.drawable.dot_province_active)
                 binding.progressStep1Line.setBackgroundResource(R.drawable.progress_line_active)
 
@@ -287,15 +269,7 @@ class SchoolOnboardingFragment : Fragment() {
                 verifyProgressDrawables()
             }
             2 -> {
-                Log.d("SchoolOnboardingFragment", "🎨 STEP 2: School selected")
-                Log.d("SchoolOnboardingFragment", "   - PROVINCE dot: dot_province_active (Black + White center)")
-                Log.d("SchoolOnboardingFragment", "   - PROVINCE line: progress_line_active (Black)")
-                Log.d("SchoolOnboardingFragment", "   - SCHOOL dot: dot_school_active (Black + White center)")
-                Log.d("SchoolOnboardingFragment", "   - SCHOOL line: progress_line_active (Black)")
-                Log.d("SchoolOnboardingFragment", "   - DONE dot: dot_end_inactive (Gray outline + Gray center)")
-                Log.d("SchoolOnboardingFragment", "   - DONE line: progress_line_active (Black - guiding to DONE)")
-
-                // School selected - PROVINCE + SCHOOL active, line to DONE becomes bold
+                Timber.tag(LogTags.UI).d("🎨 STEP 2: School selected")
                 binding.progressStep1Icon.setImageResource(R.drawable.dot_province_active)
                 binding.progressStep1Line.setBackgroundResource(R.drawable.progress_line_active)
 
@@ -308,15 +282,7 @@ class SchoolOnboardingFragment : Fragment() {
                 verifyProgressDrawables()
             }
             3 -> {
-                Log.d("SchoolOnboardingFragment", "🎨 STEP 3: Complete - ALL active")
-                Log.d("SchoolOnboardingFragment", "   - PROVINCE dot: dot_province_active (Black + White center)")
-                Log.d("SchoolOnboardingFragment", "   - PROVINCE line: progress_line_active (Black)")
-                Log.d("SchoolOnboardingFragment", "   - SCHOOL dot: dot_school_active (Black + White center)")
-                Log.d("SchoolOnboardingFragment", "   - SCHOOL line: progress_line_active (Black)")
-                Log.d("SchoolOnboardingFragment", "   - DONE dot: dot_end_active (Black + White center)")
-                Log.d("SchoolOnboardingFragment", "   - DONE line: progress_line_active (Black)")
-
-                // Complete - ALL active
+                Timber.tag(LogTags.UI).d("🎨 STEP 3: Complete - ALL active")
                 binding.progressStep1Icon.setImageResource(R.drawable.dot_province_active)
                 binding.progressStep1Line.setBackgroundResource(R.drawable.progress_line_active)
 
@@ -332,31 +298,24 @@ class SchoolOnboardingFragment : Fragment() {
     }
 
     private fun verifyProgressDrawables() {
-        val step1Icon = binding.progressStep1Icon.drawable
-        val step1Line = binding.progressStep1Line.background
-        val step2Icon = binding.progressStep2Icon.drawable
-        val step2Line = binding.progressStep2Line.background
-        val step3Icon = binding.progressStep3Icon.drawable
-        val step3Line = binding.progressStep3Line.background
-
-        Log.d("SchoolOnboardingFragment", "🔍 VERIFYING DRAWABLES:")
-        Log.d("SchoolOnboardingFragment", "   Step1 Icon: ${step1Icon?.constantState}")
-        Log.d("SchoolOnboardingFragment", "   Step1 Line: ${step1Line?.constantState}")
-        Log.d("SchoolOnboardingFragment", "   Step2 Icon: ${step2Icon?.constantState}")
-        Log.d("SchoolOnboardingFragment", "   Step2 Line: ${step2Line?.constantState}")
-        Log.d("SchoolOnboardingFragment", "   Step3 Icon: ${step3Icon?.constantState}")
-        Log.d("SchoolOnboardingFragment", "   Step3 Line: ${step3Line?.constantState}")
+        Timber.tag(LogTags.UI).d("🔍 VERIFYING DRAWABLES:")
+        Timber.tag(LogTags.UI).d("   Step1 Icon: ${binding.progressStep1Icon.drawable?.constantState}")
+        Timber.tag(LogTags.UI).d("   Step1 Line: ${binding.progressStep1Line.background?.constantState}")
+        Timber.tag(LogTags.UI).d("   Step2 Icon: ${binding.progressStep2Icon.drawable?.constantState}")
+        Timber.tag(LogTags.UI).d("   Step2 Line: ${binding.progressStep2Line.background?.constantState}")
+        Timber.tag(LogTags.UI).d("   Step3 Icon: ${binding.progressStep3Icon.drawable?.constantState}")
+        Timber.tag(LogTags.UI).d("   Step3 Line: ${binding.progressStep3Line.background?.constantState}")
     }
 
     private fun checkDrawableExists(drawableName: String): Boolean {
         val resourceId = resources.getIdentifier(drawableName, "drawable", requireContext().packageName)
         val exists = resourceId != 0
-        Log.d("SchoolOnboardingFragment", "📁 Drawable '$drawableName' exists: $exists")
+        Timber.tag(LogTags.UI).d("📁 Drawable '$drawableName' exists: $exists")
         return exists
     }
 
     private fun verifyAllDrawables() {
-        Log.d("SchoolOnboardingFragment", "🔍 CHECKING ALL DRAWABLES:")
+        Timber.tag(LogTags.UI).d("🔍 CHECKING ALL DRAWABLES:")
         checkDrawableExists("dot_province_active")
         checkDrawableExists("dot_province_inactive")
         checkDrawableExists("dot_school_active")
@@ -368,24 +327,23 @@ class SchoolOnboardingFragment : Fragment() {
     }
 
     private fun showSuccessAndNavigate() {
-        val schoolName = viewModel.selectedSchool.value?.name ?: "your school"
+        val schoolName = viewModel.selectedSchool.value?.name ?: AppConstants.EMPTY_STRING
 
         updateProgress(3)
 
-        // Show Snackbar (replaces Lottie)
+        val successMessage = getString(R.string.school_onboarding_success_message, schoolName)
         Snackbar.make(
             binding.root,
-            "🎉 Well done! You have successfully chosen $schoolName",
+            successMessage,
             Snackbar.LENGTH_LONG
         ).show()
 
-        // Navigate ONCE after delay
         lifecycleScope.launch {
-            delay(2000)
+            delay(NAVIGATION_DELAY_MS)
             try {
                 findNavController().navigate(R.id.action_schoolOnboardingFragment_to_nav_home)
             } catch (e: Exception) {
-                Log.e("SchoolOnboarding", "Navigation error: ${e.message}")
+                Timber.tag(LogTags.UI).e(e, "Navigation error")
                 findNavController().popBackStack()
             }
         }
@@ -403,7 +361,6 @@ class SchoolOnboardingFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
-
         _binding = null
     }
 }

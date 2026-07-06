@@ -1,8 +1,8 @@
 package com.example.skoolswap.data.repository
 
 import android.os.Build
-import android.util.Log
 import androidx.annotation.RequiresApi
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.data.local.database.dao.ShopDao
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.mapper.toDomain
@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,20 +35,14 @@ class ShopRepository @Inject constructor(
     private val appPreferences: AppPreferences
 ) : ShopRepositoryInterface {
 
-    companion object {
-        private const val TAG = "ShopRepository"
-    }
-
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
     private val _currentShop = MutableStateFlow<Shop?>(null)
     override val currentShop: StateFlow<Shop?> = _currentShop.asStateFlow()
 
-    // ✅ Implement shopItems StateFlow
     private val _shopItems = MutableStateFlow<List<Item>>(emptyList())
     override val shopItems: StateFlow<List<Item>> = _shopItems.asStateFlow()
 
     init {
-        // Load cached shop on initialization
         coroutineScope.launch {
             loadCachedShop()
         }
@@ -59,10 +54,10 @@ class ShopRepository @Inject constructor(
             val cachedShop = shopDao.getCurrentShop()
             cachedShop?.let {
                 _currentShop.value = it.toDomain()
-                Log.d(TAG, "Loaded cached shop: ${it.name}")
+                Timber.tag(LogTags.REPOSITORY).d("Loaded cached shop: ${it.name}")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error loading cached shop", e)
+            Timber.tag(LogTags.REPOSITORY).e(e, "Error loading cached shop")
         }
     }
 
@@ -75,7 +70,7 @@ class ShopRepository @Inject constructor(
             }
 
             val currentUser = authRepository.getServerUser().value
-            println("DEBUG: Current user in ShopRepository: ${currentUser?.profilePictureUrl}")
+            Timber.tag(LogTags.REPOSITORY).d("Current user in ShopRepository: ${currentUser?.profilePictureUrl}")
 
             if (currentUser == null) {
                 return Result.failure(Exception("User not found"))
@@ -90,43 +85,41 @@ class ShopRepository @Inject constructor(
                         profilePictureUrl = currentUser.profilePictureUrl ?: ""
                     )
 
-                    println("DEBUG: Created shop with profilePic: ${shop.profilePictureUrl}")
+                    Timber.tag(LogTags.REPOSITORY).d("Created shop with profilePic: ${shop.profilePictureUrl}")
 
                     shopDao.insertShop(shop.toEntity())
                     _currentShop.value = shop
 
-                    Log.i(TAG, "Shop loaded successfully: ${shop.name}")
+                    Timber.tag(LogTags.REPOSITORY).i("Shop loaded successfully: ${shop.name}")
                     Result.success(shop)
                 } else {
                     val errorMsg = shopResponse?.error ?: "Failed to load shop"
-                    Log.e(TAG, "API error: $errorMsg")
+                    Timber.tag(LogTags.REPOSITORY).e("API error: $errorMsg")
                     Result.failure(Exception(errorMsg))
                 }
             } else {
                 val errorMsg = "Server error: ${response.code()}"
-                Log.e(TAG, "Network error: $errorMsg")
+                Timber.tag(LogTags.REPOSITORY).e("Network error: $errorMsg")
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Get shop failed", e)
+            Timber.tag(LogTags.REPOSITORY).e(e, "Get shop failed")
             Result.failure(e)
         }
     }
 
-    // ✅ Implement getMyShopItems()
     override suspend fun getMyShopItems(): Result<List<Item>> {
         return try {
-            // Delegate to ItemRepository
             val result = itemRepository.getMyShopItems()
 
             result.onSuccess { items ->
                 _shopItems.value = items
-                Log.d(TAG, "Loaded ${items.size} shop items")
+                Timber.tag(LogTags.REPOSITORY).d("Loaded ${items.size} shop items")
             }
 
             result
         } catch (e: Exception) {
-            Log.e(TAG, "Get my shop items failed", e)
+            Timber.tag(LogTags.REPOSITORY).e(e, "Get my shop items failed")
             Result.failure(e)
         }
     }
@@ -169,22 +162,22 @@ class ShopRepository @Inject constructor(
 
                     _currentShop.value = updatedShop
 
-                    Log.i(TAG, "Shop display name updated to: $displayName")
+                    Timber.tag(LogTags.REPOSITORY).i("Shop display name updated to: $displayName")
                     Result.success(updatedShop)
                 } else {
                     val errorMsg = updateResponse?.error ?:
                     updateResponse?.errors?.joinToString(", ") ?:
                     "Failed to update shop"
-                    Log.e(TAG, "Update API error: $errorMsg")
+                    Timber.tag(LogTags.REPOSITORY).e("Update API error: $errorMsg")
                     Result.failure(Exception(errorMsg))
                 }
             } else {
                 val errorMsg = "Server error: ${response.code()}"
-                Log.e(TAG, "Network error: $errorMsg")
+                Timber.tag(LogTags.REPOSITORY).e("Network error: $errorMsg")
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Update shop failed", e)
+            Timber.tag(LogTags.REPOSITORY).e(e, "Update shop failed")
             Result.failure(e)
         }
     }
@@ -194,7 +187,7 @@ class ShopRepository @Inject constructor(
         return try {
             val cachedShop = shopDao.getShopById(shopId)
             if (cachedShop != null) {
-                Log.d(TAG, "Returning cached public shop: ${cachedShop.name}")
+                Timber.tag(LogTags.REPOSITORY).d("Returning cached public shop: ${cachedShop.name}")
                 return Result.success(cachedShop.toDomain())
             }
 
@@ -217,20 +210,20 @@ class ShopRepository @Inject constructor(
 
                     shopDao.insertShop(shop.toEntity())
 
-                    Log.i(TAG, "Public shop loaded: ${shop.name}")
+                    Timber.tag(LogTags.REPOSITORY).i("Public shop loaded: ${shop.name}")
                     Result.success(shop)
                 } else {
                     val errorMsg = publicResponse?.error ?: "Failed to load public shop"
-                    Log.e(TAG, "API error: $errorMsg")
+                    Timber.tag(LogTags.REPOSITORY).e("API error: $errorMsg")
                     Result.failure(Exception(errorMsg))
                 }
             } else {
                 val errorMsg = "Server error: ${response.code()}"
-                Log.e(TAG, "Network error: $errorMsg")
+                Timber.tag(LogTags.REPOSITORY).e("Network error: $errorMsg")
                 Result.failure(Exception(errorMsg))
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Get public shop failed", e)
+            Timber.tag(LogTags.REPOSITORY).e(e, "Get public shop failed")
             Result.failure(e)
         }
     }
@@ -239,10 +232,10 @@ class ShopRepository @Inject constructor(
         try {
             shopDao.clearAllShops()
             _currentShop.value = null
-            _shopItems.value = emptyList()  // Also clear shop items
-            Log.i(TAG, "Shop data cleared")
+            _shopItems.value = emptyList()
+            Timber.tag(LogTags.REPOSITORY).i("Shop data cleared")
         } catch (e: Exception) {
-            Log.e(TAG, "Error clearing shop data", e)
+            Timber.tag(LogTags.REPOSITORY).e(e, "Error clearing shop data")
         }
     }
 }

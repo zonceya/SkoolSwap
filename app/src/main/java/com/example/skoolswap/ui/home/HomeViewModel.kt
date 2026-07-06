@@ -2,6 +2,8 @@ package com.example.skoolswap.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.skoolswap.common.constants.AppConstants
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.domain.model.RelevanceGroups
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.homefeed.HomeFeed
@@ -35,6 +37,18 @@ class HomeViewModel @Inject constructor(
     private val productsCacheRepository: ProductsCacheRepositoryInterface
 ) : ViewModel() {
 
+    companion object {
+        private const val SEARCH_DEBOUNCE_DELAY_MS = 500L
+        private const val SEARCH_TIMEOUT_MS = 30000L
+        private const val FEED_TIMEOUT_MS = 15000L
+        private const val PER_PAGE_DEFAULT = 30
+        private const val PAGE_DEFAULT = 1
+        private const val MAX_RETRIES = 2
+        private const val RETRY_DELAY_MS = 1000L
+        private const val MIN_SEARCH_LENGTH = 2
+        private const val MAX_LOCAL_RESULTS = 30
+    }
+
     private val _homeFeed = MutableStateFlow<HomeFeed?>(null)
     val homeFeed: StateFlow<HomeFeed?> = _homeFeed.asStateFlow()
 
@@ -44,15 +58,12 @@ class HomeViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
-    // 🔥 NEW: Ranked search results
     private val _rankedSearchResults = MutableStateFlow<List<Item>>(emptyList())
     val rankedSearchResults: StateFlow<List<Item>> = _rankedSearchResults.asStateFlow()
 
-    // 🔥 NEW: Relevance groups for debugging/UI
     private val _searchRelevanceGroups = MutableStateFlow(RelevanceGroups(emptyList(), emptyList(), emptyList()))
     val searchRelevanceGroups: StateFlow<RelevanceGroups> = _searchRelevanceGroups.asStateFlow()
 
-    // Legacy (keep for backward compatibility)
     private val _searchResults = MutableStateFlow<List<Item>>(emptyList())
     val searchResults: StateFlow<List<Item>> = _searchResults.asStateFlow()
 
@@ -77,17 +88,16 @@ class HomeViewModel @Inject constructor(
 
     private val loadMutex = Mutex()
 
-
     // ==================== LOAD HOME FEED ====================
 
     fun setKnownSchoolId(schoolId: Int) {
-        Timber.tag("HomeViewModel").d("🔑 setKnownSchoolId called with: $schoolId, previous: $knownSchoolId")
+        Timber.tag(LogTags.VIEW_MODEL).d("🔑 setKnownSchoolId called with: $schoolId, previous: $knownSchoolId")
         knownSchoolId = schoolId
     }
 
     fun loadHomeFeed(forceRefresh: Boolean = false) {
         if (!forceRefresh && cachedHomeFeed != null) {
-            Timber.tag("HomeViewModel").d("📦 Using cached feed")
+            Timber.tag(LogTags.VIEW_MODEL).d("📦 Using cached feed")
             _homeFeed.value = cachedHomeFeed
             _isFromCache.value = false
             return
@@ -95,7 +105,7 @@ class HomeViewModel @Inject constructor(
 
         viewModelScope.launch {
             if (!loadMutex.tryLock()) {
-                Timber.tag("HomeViewModel").d("⏳ Already loading, skipping")
+                Timber.tag(LogTags.VIEW_MODEL).d("⏳ Already loading, skipping")
                 return@launch
             }
 
@@ -105,43 +115,44 @@ class HomeViewModel @Inject constructor(
                 _isFromCache.value = false
 
                 val directSchoolId = knownSchoolId
-                Timber.tag("HomeViewModel").d("🔑 knownSchoolId = $directSchoolId")
+                Timber.tag(LogTags.VIEW_MODEL).d("🔑 knownSchoolId = $directSchoolId")
 
                 if (directSchoolId != null) {
                     loadFeedWithCache(directSchoolId, forceRefresh)
                     return@launch
                 }
 
-                Timber.tag("HomeViewModel").d("🔍 Falling back to Room lookup")
+                Timber.tag(LogTags.VIEW_MODEL).d("🔍 Falling back to Room lookup")
                 when (val result = userSchoolRepository.getCurrentSchoolMapping()) {
                     is Result.Success -> {
                         val mapping = result.data
-                        Timber.tag("HomeViewModel").d("📍 Room mapping result: ${mapping?.schoolId}")
+                        Timber.tag(LogTags.VIEW_MODEL).d("📍 Room mapping result: ${mapping?.schoolId}")
                         if (mapping != null) {
                             loadFeedWithCache(mapping.schoolId, forceRefresh)
                         } else {
-                            Timber.tag("HomeViewModel").e("❌ No school mapping in Room")
+                            Timber.tag(LogTags.VIEW_MODEL).e("❌ No school mapping in Room")
                             _error.value = "Please select a school first"
                         }
                     }
                     is Result.Error -> {
-                        Timber.tag("HomeViewModel").e("❌ Room error: ${result.exception.message}")
+                        Timber.tag(LogTags.VIEW_MODEL).e("❌ Room error: ${result.exception.message}")
                         _error.value = "Failed to get school: ${result.exception.message}"
                     }
                 }
             } finally {
                 _isLoading.value = false
                 loadMutex.unlock()
-                Timber.tag("HomeViewModel").d("🔓 Loading complete, mutex unlocked")
+                Timber.tag(LogTags.VIEW_MODEL).d("🔓 Loading complete, mutex unlocked")
             }
         }
     }
+
     fun searchLocalOnly(query: String, categoryId: Int?) {
         _searchQuery.value = query
 
         val localResults = searchLocalCache(query, categoryId)
         if (localResults.isNotEmpty()) {
-            Timber.tag("HomeViewModel").d("⚡ Showing ${localResults.size} LOCAL results immediately")
+            Timber.tag(LogTags.VIEW_MODEL).d("⚡ Showing ${localResults.size} LOCAL results immediately")
             val grouped = groupByRelevance(localResults, knownSchoolId)
             _searchRelevanceGroups.value = grouped
             _rankedSearchResults.value = localResults
@@ -152,7 +163,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun searchServer(query: String, categoryId: Int?) {
-        searchJob?.cancel() // Cancel any previous server job
+        searchJob?.cancel()
 
         searchJob = viewModelScope.launch {
             if (query != _searchQuery.value || !isActive) return@launch
@@ -166,8 +177,8 @@ class HomeViewModel @Inject constructor(
                     query = query,
                     schoolId = schoolId,
                     categoryId = if (categoryId != null && categoryId > 0) categoryId else null,
-                    page = 1,
-                    perPage = 30
+                    page = PAGE_DEFAULT,
+                    perPage = PER_PAGE_DEFAULT
                 )
 
                 if (query != _searchQuery.value || !isActive) return@launch
@@ -175,7 +186,7 @@ class HomeViewModel @Inject constructor(
                 when (serverResult) {
                     is Result.Success -> {
                         val serverItems = serverResult.data.items
-                        Timber.d("✅ Server returned ${serverItems.size} items")
+                        Timber.tag(LogTags.VIEW_MODEL).d("✅ Server returned ${serverItems.size} items")
 
                         val current = _rankedSearchResults.value.toMutableList()
                         val existingIds = current.map { it.id }.toSet()
@@ -188,7 +199,7 @@ class HomeViewModel @Inject constructor(
                         }
                     }
                     is Result.Error -> {
-                        Timber.e("Server search failed: ${serverResult.exception.message}")
+                        Timber.tag(LogTags.VIEW_MODEL).e("Server search failed: ${serverResult.exception.message}")
                     }
                 }
             } finally {
@@ -196,10 +207,10 @@ class HomeViewModel @Inject constructor(
             }
         }
     }
-    private suspend fun loadFeedWithCache(schoolId: Int, forceRefresh: Boolean) {
-        Timber.tag("HomeViewModel").d("🔄 Loading feed for school $schoolId (forceRefresh=$forceRefresh)")
 
-        // STEP 1: Check Room cache first (instant load)
+    private suspend fun loadFeedWithCache(schoolId: Int, forceRefresh: Boolean) {
+        Timber.tag(LogTags.VIEW_MODEL).d("🔄 Loading feed for school $schoolId (forceRefresh=$forceRefresh)")
+
         if (!forceRefresh) {
             val cachedSections = loadCachedSections(schoolId)
             if (cachedSections.isNotEmpty()) {
@@ -212,13 +223,12 @@ class HomeViewModel @Inject constructor(
                 cachedHomeFeed = cachedFeed
                 _homeFeed.value = cachedFeed
                 _isFromCache.value = true
-                Timber.tag("HomeViewModel").d("📦 Loaded ${cachedSections.size} sections from cache")
+                Timber.tag(LogTags.VIEW_MODEL).d("📦 Loaded ${cachedSections.size} sections from cache")
             }
         }
 
-        // STEP 2: Fetch from API in background (fresh data)
         try {
-            val result = withTimeout(15_000L) {
+            val result = withTimeout(FEED_TIMEOUT_MS) {
                 homeRepository.getHomeFeed(schoolId)
             }
 
@@ -230,27 +240,26 @@ class HomeViewModel @Inject constructor(
                     _isFromCache.value = false
                     _error.value = null
 
-                    // Cache sections for next time
                     cacheSections(feed, schoolId)
 
-                    Timber.tag("HomeViewModel").d("✅ Feed loaded: ${feed.sections.size} sections")
+                    Timber.tag(LogTags.VIEW_MODEL).d("✅ Feed loaded: ${feed.sections.size} sections")
                 }
                 is Result.Error -> {
                     if (_homeFeed.value == null) {
                         _error.value = result.exception.message
-                        Timber.tag("HomeViewModel").e("❌ Feed error: ${result.exception.message}")
+                        Timber.tag(LogTags.VIEW_MODEL).e("❌ Feed error: ${result.exception.message}")
                     } else {
-                        Timber.tag("HomeViewModel").d("⚠️ Feed error but showing cached data")
+                        Timber.tag(LogTags.VIEW_MODEL).d("⚠️ Feed error but showing cached data")
                     }
                 }
             }
         } catch (e: TimeoutCancellationException) {
-            Timber.tag("HomeViewModel").e("⏱️ getHomeFeed timed out after 15s")
+            Timber.tag(LogTags.VIEW_MODEL).e("⏱️ getHomeFeed timed out after ${FEED_TIMEOUT_MS}ms")
             if (_homeFeed.value == null) {
                 _error.value = "Request timed out. Please try again."
             }
         } catch (e: Exception) {
-            Timber.tag("HomeViewModel").e("❌ Unexpected error: ${e.message}")
+            Timber.tag(LogTags.VIEW_MODEL).e("❌ Unexpected error: ${e.message}")
             if (_homeFeed.value == null) {
                 _error.value = "Failed to load feed: ${e.message}"
             }
@@ -265,7 +274,7 @@ class HomeViewModel @Inject constructor(
         val recent = productsCacheRepository.getCachedSection("recent", schoolId)
         val essentials = productsCacheRepository.getCachedSection("essentials", schoolId)
 
-        Timber.tag("HomeViewModel").d("📦 Cache results: recommended=${recommended?.size}, trending=${trending?.size}, recent=${recent?.size}, essentials=${essentials?.size}")
+        Timber.tag(LogTags.VIEW_MODEL).d("📦 Cache results: recommended=${recommended?.size}, trending=${trending?.size}, recent=${recent?.size}, essentials=${essentials?.size}")
 
         if (!recommended.isNullOrEmpty()) {
             sections.add(Section.Recommended(
@@ -339,9 +348,9 @@ class HomeViewModel @Inject constructor(
                 sections = sectionsMap
             )
 
-            Timber.tag("HomeViewModel").d("✅ Cached ${sectionsMap.size} sections to Room")
+            Timber.tag(LogTags.VIEW_MODEL).d("✅ Cached ${sectionsMap.size} sections to Room")
         } catch (e: Exception) {
-            Timber.tag("HomeViewModel").e("❌ Failed to cache sections: ${e.message}")
+            Timber.tag(LogTags.VIEW_MODEL).e("❌ Failed to cache sections: ${e.message}")
         }
     }
 
@@ -357,23 +366,20 @@ class HomeViewModel @Inject constructor(
             try {
                 homeRepository.clearHomeData()
             } catch (e: Exception) {
-                Timber.tag("HomeViewModel").e("❌ Failed to clear home data: ${e.message}")
+                Timber.tag(LogTags.VIEW_MODEL).e("❌ Failed to clear home data: ${e.message}")
             }
         }
     }
 
     // ==================== 🔥 RANKED SEARCH ====================
 
-    // HomeViewModel.kt - Updated searchItemsRanked
-
     fun searchItemsRanked(query: String, categoryId: Int?) {
         _searchQuery.value = query
 
-        // ✅ Cancel any existing search job immediately
         searchJob?.cancel()
 
-        if (query.length < 2) {
-            Timber.tag("HomeViewModel").d("Query too short (< 2 chars), clearing results")
+        if (query.length < MIN_SEARCH_LENGTH) {
+            Timber.tag(LogTags.VIEW_MODEL).d("Query too short (< ${MIN_SEARCH_LENGTH} chars), clearing results")
             _rankedSearchResults.value = emptyList()
             _searchRelevanceGroups.value = RelevanceGroups(emptyList(), emptyList(), emptyList())
             _searchResults.value = emptyList()
@@ -383,28 +389,24 @@ class HomeViewModel @Inject constructor(
         }
 
         searchJob = viewModelScope.launch {
-            // ✅ Increase debounce delay to 500ms to reduce cancellations
-            delay(500)
+            delay(SEARCH_DEBOUNCE_DELAY_MS)
 
-            // ✅ Check if this job is still active
             if (!isActive) {
-                Timber.tag("HomeViewModel").d("⏹️ Search cancelled before starting")
+                Timber.tag(LogTags.VIEW_MODEL).d("⏹️ Search cancelled before starting")
                 return@launch
             }
 
-            // ✅ Check if this is still the latest query
             val currentQuery = _searchQuery.value
             if (query != currentQuery) {
-                Timber.tag("HomeViewModel").d("⏭️ Skipping stale search: $query (current: $currentQuery)")
+                Timber.tag(LogTags.VIEW_MODEL).d("⏭️ Skipping stale search: $query (current: $currentQuery)")
                 return@launch
             }
 
-            Timber.tag("HomeViewModel").d("🔍 Ranked search for: $query")
+            Timber.tag(LogTags.VIEW_MODEL).d("🔍 Ranked search for: $query")
 
-            // STEP 1: Search local cache first (instant results)
             val localResults = searchLocalCache(query, categoryId)
             if (localResults.isNotEmpty()) {
-                Timber.tag("HomeViewModel").d("⚡ ${localResults.size} results from LOCAL CACHE")
+                Timber.tag(LogTags.VIEW_MODEL).d("⚡ ${localResults.size} results from LOCAL CACHE")
                 val grouped = groupByRelevance(localResults, knownSchoolId)
                 _searchRelevanceGroups.value = grouped
                 _rankedSearchResults.value = localResults
@@ -414,27 +416,23 @@ class HomeViewModel @Inject constructor(
                 _isShowingLocalResults.value = false
             }
 
-            // STEP 2: Fetch from server with ranking
             _isLoadingMore.value = true
 
             try {
                 val schoolId = knownSchoolId ?: getSchoolIdFromDb()
                 if (schoolId == null) {
-                    Timber.tag("HomeViewModel").e("❌ No school ID available for ranked search")
+                    Timber.tag(LogTags.VIEW_MODEL).e("❌ No school ID available for ranked search")
                     _isLoadingMore.value = false
                     return@launch
                 }
 
-                // ✅ Check cancellation before API call
                 if (!isActive) {
-                    Timber.tag("HomeViewModel").d("⏹️ Search cancelled before API call")
+                    Timber.tag(LogTags.VIEW_MODEL).d("⏹️ Search cancelled before API call")
                     _isLoadingMore.value = false
                     return@launch
                 }
 
-                // ✅ Increase timeout to 30 seconds
-                val serverResult = withTimeout(30_000L) {
-                    // ✅ Check cancellation inside timeout
+                val serverResult = withTimeout(SEARCH_TIMEOUT_MS) {
                     if (!isActive) {
                         _isLoadingMore.value = false
                         return@withTimeout Result.Error(Exception("Cancelled"))
@@ -443,22 +441,20 @@ class HomeViewModel @Inject constructor(
                         query = query,
                         schoolId = schoolId,
                         categoryId = categoryId,
-                        page = 1,
-                        perPage = 30
+                        page = PAGE_DEFAULT,
+                        perPage = PER_PAGE_DEFAULT
                     )
                 }
 
                 _isLoadingMore.value = false
 
-                // ✅ Check if this is still the latest query
                 if (query != _searchQuery.value) {
-                    Timber.tag("HomeViewModel").d("⏭️ Skipping stale results for: $query")
+                    Timber.tag(LogTags.VIEW_MODEL).d("⏭️ Skipping stale results for: $query")
                     return@launch
                 }
 
-                // ✅ Check if job was cancelled during API call
                 if (!isActive) {
-                    Timber.tag("HomeViewModel").d("⏹️ Search cancelled after API call")
+                    Timber.tag(LogTags.VIEW_MODEL).d("⏹️ Search cancelled after API call")
                     return@launch
                 }
 
@@ -468,7 +464,7 @@ class HomeViewModel @Inject constructor(
                         val serverItems = rankedResult.items
                         _serverItemsCount.value = serverItems.size
 
-                        Timber.tag("HomeViewModel").d("✅ Ranked search returned ${serverItems.size} items")
+                        Timber.tag(LogTags.VIEW_MODEL).d("✅ Ranked search returned ${serverItems.size} items")
 
                         if (serverItems.isNotEmpty()) {
                             val currentResults = _rankedSearchResults.value.toMutableList()
@@ -480,7 +476,7 @@ class HomeViewModel @Inject constructor(
                                 val grouped = groupByRelevance(merged, schoolId)
                                 _searchRelevanceGroups.value = grouped
                                 _rankedSearchResults.value = merged
-                                Timber.tag("HomeViewModel").d("📦 Added ${newItems.size} new items")
+                                Timber.tag(LogTags.VIEW_MODEL).d("📦 Added ${newItems.size} new items")
                             } else {
                                 val grouped = groupByRelevance(currentResults, schoolId)
                                 _searchRelevanceGroups.value = grouped
@@ -492,7 +488,7 @@ class HomeViewModel @Inject constructor(
                         }
                     }
                     is Result.Error -> {
-                        Timber.tag("HomeViewModel").e("❌ Server search failed: ${serverResult.exception.message}")
+                        Timber.tag(LogTags.VIEW_MODEL).e("❌ Server search failed: ${serverResult.exception.message}")
                         if (!_isShowingLocalResults.value && _rankedSearchResults.value.isEmpty()) {
                             _error.value = "Failed to load results"
                         }
@@ -500,13 +496,13 @@ class HomeViewModel @Inject constructor(
                 }
             } catch (e: TimeoutCancellationException) {
                 _isLoadingMore.value = false
-                Timber.tag("HomeViewModel").e("⏱️ Server search timed out after 30s")
+                Timber.tag(LogTags.VIEW_MODEL).e("⏱️ Server search timed out after ${SEARCH_TIMEOUT_MS}ms")
                 if (!_isShowingLocalResults.value && _rankedSearchResults.value.isEmpty()) {
                     _error.value = "Search timed out. Please try again."
                 }
             } catch (e: Exception) {
                 _isLoadingMore.value = false
-                Timber.tag("HomeViewModel").e("❌ Search error: ${e.message}")
+                Timber.tag(LogTags.VIEW_MODEL).e("❌ Search error: ${e.message}")
                 if (!_isShowingLocalResults.value && _rankedSearchResults.value.isEmpty()) {
                     _error.value = "Failed to load results: ${e.message}"
                 }
@@ -514,32 +510,30 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // HomeViewModel.kt - Add retry logic
-
     private suspend fun searchWithRetry(
         query: String,
         schoolId: Int,
         categoryId: Int?,
-        maxRetries: Int = 2
+        maxRetries: Int = MAX_RETRIES
     ): Result<RankedItemsResult> {
         var lastError: Exception? = null
 
         repeat(maxRetries + 1) { attempt ->
             try {
-                return withTimeout(30_000L) {
+                return withTimeout(SEARCH_TIMEOUT_MS) {
                     homeRepository.searchItemsRanked(
                         query = query,
                         schoolId = schoolId,
                         categoryId = categoryId,
-                        page = 1,
-                        perPage = 30
+                        page = PAGE_DEFAULT,
+                        perPage = PER_PAGE_DEFAULT
                     )
                 }
             } catch (e: TimeoutCancellationException) {
                 lastError = e
                 if (attempt < maxRetries) {
-                    Timber.tag("HomeViewModel").d("⏱️ Search attempt ${attempt + 1} timed out, retrying...")
-                    delay(1000L * (attempt + 1)) // Exponential backoff
+                    Timber.tag(LogTags.VIEW_MODEL).d("⏱️ Search attempt ${attempt + 1} timed out, retrying...")
+                    delay(RETRY_DELAY_MS * (attempt + 1))
                 }
             } catch (e: Exception) {
                 lastError = e
@@ -558,7 +552,6 @@ class HomeViewModel @Inject constructor(
         val nearbyMatch = mutableListOf<Item>()
         val other = mutableListOf<Item>()
 
-        // Get nearby school IDs (if we have them)
         val nearbyIds = getNearbySchoolIds() ?: emptyList()
 
         items.forEach { item ->
@@ -577,8 +570,6 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun getNearbySchoolIds(): List<Int>? {
-        // This would come from your repository
-        // For now, return null (will treat as 'other')
         return null
     }
 
@@ -586,18 +577,18 @@ class HomeViewModel @Inject constructor(
         return when (val result = userSchoolRepository.getCurrentSchoolMapping()) {
             is Result.Success -> result.data?.schoolId
             is Result.Error -> {
-                Timber.tag("HomeViewModel").e("❌ Failed to get school ID: ${result.exception.message}")
+                Timber.tag(LogTags.VIEW_MODEL).e("❌ Failed to get school ID: ${result.exception.message}")
                 null
             }
         }
     }
 
-    // ==================== LEGACY SEARCH (Keep for compatibility) ====================
+    // ==================== LEGACY SEARCH ====================
 
     private fun searchLocalCache(query: String, categoryId: Int?): List<Item> {
         val currentFeed = _homeFeed.value
         if (currentFeed == null) {
-            Timber.tag("HomeViewModel").d("No cached feed available")
+            Timber.tag(LogTags.VIEW_MODEL).d("No cached feed available")
             return emptyList()
         }
 
@@ -616,13 +607,12 @@ class HomeViewModel @Inject constructor(
             }
         }
 
-        Timber.tag("HomeViewModel").d("📚 Total cached items: ${allItems.size}")
+        Timber.tag(LogTags.VIEW_MODEL).d("📚 Total cached items: ${allItems.size}")
 
         val searchLower = query.lowercase().trim()
 
         val results = allItems
             .filter { item ->
-                // More flexible matching
                 item.name.lowercase().contains(searchLower) ||
                         (item.description?.lowercase()?.contains(searchLower) == true) ||
                         (item.brandName?.lowercase()?.contains(searchLower) == true)
@@ -635,9 +625,9 @@ class HomeViewModel @Inject constructor(
                 }
             }
             .distinctBy { it.id }
-            .take(30)
+            .take(MAX_LOCAL_RESULTS)
 
-        Timber.tag("HomeViewModel").d("🔍 Local search found ${results.size} matches for '$query'")
+        Timber.tag(LogTags.VIEW_MODEL).d("🔍 Local search found ${results.size} matches for '$query'")
         return results
     }
 
@@ -649,60 +639,8 @@ class HomeViewModel @Inject constructor(
         _isShowingLocalResults.value = false
         _serverItemsCount.value = 0
     }
-    // Legacy search method (keep for backward compatibility)
+
     fun searchItems(query: String, categoryId: Int?) {
-        // Forward to ranked search
         searchItemsRanked(query, categoryId)
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

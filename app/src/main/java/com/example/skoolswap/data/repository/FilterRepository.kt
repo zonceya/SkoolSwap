@@ -1,6 +1,6 @@
 package com.example.skoolswap.data.repository
 
-import android.util.Log
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.mapper.toDomain
 import com.example.skoolswap.data.remote.api.FilterApiService
@@ -8,6 +8,7 @@ import com.example.skoolswap.domain.model.FilterConfig
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.domain.repository.FilterRepositoryInterface
 import com.example.skoolswap.utils.Result
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,14 +26,18 @@ class FilterRepository @Inject constructor(
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body?.success == true) {
+                    Timber.tag(LogTags.REPOSITORY).d("✅ Filter config loaded for category: $categoryId")
                     Result.Success(body.toDomain())
                 } else {
+                    Timber.tag(LogTags.REPOSITORY).e("❌ Failed to load filter config: success=false")
                     Result.Error(Exception("Failed to load filter config"))
                 }
             } else {
+                Timber.tag(LogTags.REPOSITORY).e("❌ Server error: ${response.code()}")
                 Result.Error(Exception("Server error: ${response.code()}"))
             }
         } catch (e: Exception) {
+            Timber.tag(LogTags.REPOSITORY).e(e, "❌ Exception loading filter config")
             Result.Error(e)
         }
     }
@@ -44,16 +49,16 @@ class FilterRepository @Inject constructor(
             val cachedJson = appPreferences.getCachedGlobalFilterConfig()
 
             if (isCacheValid && cachedJson != null) {
-                // Parse cached JSON manually (simple parsing without Gson)
+                // Parse cached JSON manually
                 val cachedConfig = parseFilterConfigFromJson(cachedJson)
                 if (cachedConfig != null) {
-                    Log.d("FilterRepository", "Using cached global filter config")
+                    Timber.tag(LogTags.REPOSITORY).d("📦 Using cached global filter config")
                     return Result.Success(cachedConfig)
                 }
             }
 
             // Cache expired or empty, fetch from API
-            Log.d("FilterRepository", "Fetching fresh global filter config from API")
+            Timber.tag(LogTags.REPOSITORY).d("🌐 Fetching fresh global filter config from API")
             val response = api.getGlobalFilterConfig()
 
             if (response.isSuccessful) {
@@ -62,14 +67,18 @@ class FilterRepository @Inject constructor(
                     // Convert to JSON string for caching
                     val json = convertFilterConfigToJson(body)
                     appPreferences.cacheGlobalFilterConfig(json)
+                    Timber.tag(LogTags.REPOSITORY).d("✅ Global filter config loaded and cached")
                     Result.Success(body.toDomain())
                 } else {
+                    Timber.tag(LogTags.REPOSITORY).e("❌ Failed to load global filter config: success=false")
                     Result.Error(Exception("Failed to load global filter config"))
                 }
             } else {
+                Timber.tag(LogTags.REPOSITORY).e("❌ Server error: ${response.code()}")
                 Result.Error(Exception("Server error: ${response.code()}"))
             }
         } catch (e: Exception) {
+            Timber.tag(LogTags.REPOSITORY).e(e, "❌ Exception loading global filter config")
             Result.Error(e)
         }
     }
@@ -81,10 +90,10 @@ class FilterRepository @Inject constructor(
             // Since the structure is consistent, we can parse it
             // For now, return null and fetch from API
             // You can implement full JSON parsing here if needed
-            Log.d("FilterRepository", "Parsing JSON manually")
+            Timber.tag(LogTags.REPOSITORY).d("Parsing JSON manually")
             null
         } catch (e: Exception) {
-            Log.e("FilterRepository", "Failed to parse cached JSON: ${e.message}")
+            Timber.tag(LogTags.REPOSITORY).e(e, "Failed to parse cached JSON")
             null
         }
     }

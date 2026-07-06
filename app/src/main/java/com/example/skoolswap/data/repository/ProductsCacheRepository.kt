@@ -1,5 +1,7 @@
 package com.example.skoolswap.data.repository
 
+import com.example.skoolswap.common.constants.AppConstants
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.data.local.database.dao.ProductsCacheDao
 import com.example.skoolswap.data.local.database.entities.ProductsCacheEntity
 import com.example.skoolswap.domain.model.Item
@@ -19,9 +21,8 @@ class ProductsCacheRepository @Inject constructor(
     private val gson: Gson
 ) : ProductsCacheRepositoryInterface {
 
-    companion object {
-        private const val CACHE_DURATION_MS = 24 * 60 * 60 * 1000L // 24 hours
-    }
+    // Constants - internal use only
+    private val CACHE_DURATION_MS = 24 * 60 * 60 * 1000L // 24 hours
 
     private val _cacheValidMap = MutableStateFlow<Map<String, Boolean>>(emptyMap())
     override fun isCacheValid(cacheKey: String): Boolean {
@@ -49,12 +50,11 @@ class ProductsCacheRepository @Inject constructor(
             )
             productsCacheDao.insertOrUpdate(entity)
 
-            // Update cache validity
             _cacheValidMap.value = _cacheValidMap.value + (cacheKey to true)
 
-            Timber.tag("ProductsCache").d("✅ Cached ${items.size} items for key: $cacheKey")
+            Timber.tag(LogTags.REPOSITORY).d("✅ Cached ${items.size} items for key: $cacheKey")
         } catch (e: Exception) {
-            Timber.tag("ProductsCache").e("Failed to cache products: ${e.message}")
+            Timber.tag(LogTags.REPOSITORY).e(e, "Failed to cache products")
         }
     }
 
@@ -70,13 +70,13 @@ class ProductsCacheRepository @Inject constructor(
         }
 
         if (entity == null) {
-            Timber.tag("ProductsCache").d("No cache found for key: $cacheKey")
+            Timber.tag(LogTags.REPOSITORY).d("No cache found for key: $cacheKey")
             return null
         }
 
         val age = System.currentTimeMillis() - entity.cachedAt
         if (age > maxAgeMs) {
-            Timber.tag("ProductsCache").d("Cache expired for key: $cacheKey (age: ${age / 1000 / 60}min)")
+            Timber.tag(LogTags.REPOSITORY).d("Cache expired for key: $cacheKey (age: ${age / 1000 / 60}min)")
             _cacheValidMap.value = _cacheValidMap.value + (cacheKey to false)
             return null
         }
@@ -85,10 +85,10 @@ class ProductsCacheRepository @Inject constructor(
             val type = object : TypeToken<List<Item>>() {}.type
             val items: List<Item> = gson.fromJson(entity.itemsJson, type)
             _cacheValidMap.value = _cacheValidMap.value + (cacheKey to true)
-            Timber.tag("ProductsCache").d("📦 Loaded ${items.size} items from cache: $cacheKey")
+            Timber.tag(LogTags.REPOSITORY).d("📦 Loaded ${items.size} items from cache: $cacheKey")
             items
         } catch (e: Exception) {
-            Timber.tag("ProductsCache").e("Failed to parse cached products: ${e.message}")
+            Timber.tag(LogTags.REPOSITORY).e(e, "Failed to parse cached products")
             _cacheValidMap.value = _cacheValidMap.value + (cacheKey to false)
             null
         }
@@ -99,7 +99,6 @@ class ProductsCacheRepository @Inject constructor(
         schoolId: Int,
         sections: Map<String, List<Item>>
     ) {
-        // Cache individual sections
         sections.forEach { (sectionType, items) ->
             val cacheKey = "${sectionType}_${schoolId}"
             cacheProducts(
@@ -110,7 +109,6 @@ class ProductsCacheRepository @Inject constructor(
             )
         }
 
-        // Also cache combined feed
         cacheProducts(
             cacheKey = "home_feed_${schoolId}",
             items = feedItems,
@@ -130,9 +128,8 @@ class ProductsCacheRepository @Inject constructor(
     override suspend fun clearCache() {
         productsCacheDao.clearAll()
         _cacheValidMap.value = emptyMap()
-        Timber.tag("ProductsCache").d("🗑️ All products cache cleared")
+        Timber.tag(LogTags.REPOSITORY).d("🗑️ All products cache cleared")
     }
-    // In ProductsCacheRepository.kt - Add these methods
 
     // ============ UNIFORM CACHE ============
     override suspend fun cacheUniforms(

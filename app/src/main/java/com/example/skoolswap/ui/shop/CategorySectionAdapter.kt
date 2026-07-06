@@ -6,13 +6,15 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.databinding.ItemCategorySectionBinding
 import com.example.skoolswap.domain.model.ItemCategorySection
+import timber.log.Timber
 
 class CategorySectionAdapter(
     private val onItemClick: (String) -> Unit,
-    private val onSoldToggle: ((String, Boolean) -> Unit)? = null,  // ✅ Add toggle callback
-    private val isShopMode: Boolean = false  // ✅ Add shop mode
+    private val onSoldToggle: ((String, Boolean) -> Unit)? = null,
+    private val isShopMode: Boolean = false
 ) : RecyclerView.Adapter<CategorySectionAdapter.SectionViewHolder>() {
 
     private var sections: List<ItemCategorySection> = emptyList()
@@ -54,20 +56,18 @@ class CategorySectionAdapter(
             }
             binding.arrowIcon.setImageResource(arrowRes)
 
-            // Determine which items to show
             val itemsToShow = if (section.isExpanded) {
                 section.items
             } else {
                 section.items.take(2)
             }
 
-            // ✅ Setup grid adapter with toggle support
             val gridAdapter = CategoryGridAdapter(
                 onItemClick = { itemId ->
                     onItemClick(itemId)
                 },
-                onSoldToggle = onSoldToggle,  // Pass toggle callback
-                isShopMode = isShopMode        // Pass shop mode
+                onSoldToggle = onSoldToggle,
+                isShopMode = isShopMode
             )
 
             binding.categoryGrid.apply {
@@ -77,19 +77,16 @@ class CategorySectionAdapter(
 
             gridAdapter.submitList(itemsToShow)
 
-            // Handle header click (expand/collapse)
             binding.headerContainer.setOnClickListener {
                 section.isExpanded = !section.isExpanded
                 adapter.notifyItemChanged(position)
             }
 
-            // Handle arrow click
             binding.arrowIcon.setOnClickListener {
                 section.isExpanded = !section.isExpanded
                 adapter.notifyItemChanged(position)
             }
 
-            // Hide divider for last category
             val isLastSection = position == adapter.itemCount - 1
             binding.divider.visibility = if (isLastSection) View.GONE else View.VISIBLE
         }

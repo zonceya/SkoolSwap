@@ -2,6 +2,7 @@ package com.example.skoolswap.ui.shop
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.Shop
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
@@ -20,6 +21,12 @@ class ShopViewModel @Inject constructor(
     private val itemRepository: ItemRepositoryInterface
 ) : ViewModel() {
 
+    companion object {
+        private const val ALL_ITEMS = "All Items"
+        private const val STATUS_SOLD = "sold"
+        private const val STATUS_AVAILABLE = "available"
+    }
+
     val currentShop: StateFlow<Shop?> = shopRepository.currentShop
 
     private val _allItems = MutableStateFlow<List<Item>>(emptyList())
@@ -31,7 +38,7 @@ class ShopViewModel @Inject constructor(
     private val _categories = MutableStateFlow<List<String>>(emptyList())
     val categories: StateFlow<List<String>> = _categories.asStateFlow()
 
-    private val _selectedCategory = MutableStateFlow("All Items")
+    private val _selectedCategory = MutableStateFlow(ALL_ITEMS)
     val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
@@ -49,40 +56,39 @@ class ShopViewModel @Inject constructor(
     }
 
     fun loadMyShopItems() {
-        Timber.d("loadMyShopItems called")
+        Timber.tag(LogTags.VIEW_MODEL).d("loadMyShopItems called")
         viewModelScope.launch {
-            _isLoading.value = true  // ← Set loading to true before network call
+            _isLoading.value = true
             val result = itemRepository.getMyShopItems()
             result.onSuccess { items ->
                 _allItems.value = items
                 extractCategoriesFromItems(items)
                 filterItemsByCategory()
-                Timber.d("Loaded ${items.size} items")
+                Timber.tag(LogTags.VIEW_MODEL).d("Loaded ${items.size} items")
                 _error.value = null
             }.onFailure { e ->
                 _error.value = e.message
-                Timber.e(e, "Failed to load items")
+                Timber.tag(LogTags.VIEW_MODEL).e(e, "Failed to load items")
             }
-            _isLoading.value = false  // ← Set loading to false after completion
+            _isLoading.value = false
         }
     }
-    // Add this method to ShopViewModel
+
     fun removeItemLocally(itemId: String) {
         val currentItems = _allItems.value
         val updatedItems = currentItems.filter { it.id != itemId }
         _allItems.value = updatedItems
-        Timber.d("Removed item $itemId locally, remaining: ${updatedItems.size}")
+        Timber.tag(LogTags.VIEW_MODEL).d("Removed item $itemId locally, remaining: ${updatedItems.size}")
     }
+
     private fun extractCategoriesFromItems(items: List<Item>) {
-        // Get actual categories from items based on itemTypeId
         val actualCategories = items.mapNotNull { item ->
             getCategoryFromTypeId(item.itemTypeId)
         }.distinct().sorted()
 
-        val categoryList = mutableListOf("All Items")
+        val categoryList = mutableListOf(ALL_ITEMS)
         categoryList.addAll(actualCategories)
 
-        // If no categories found, use predefined ones
         if (actualCategories.isEmpty()) {
             categoryList.addAll(listOf("Uniform", "Sport", "Stationary", "Accessories", "Books"))
         }
@@ -90,12 +96,11 @@ class ShopViewModel @Inject constructor(
         _categories.value = categoryList.distinct()
     }
 
-    // FIXED: Filter using itemTypeId, not category field
     private fun filterItemsByCategory() {
         val selected = _selectedCategory.value
         val items = _allItems.value
 
-        val filtered = if (selected == "All Items") {
+        val filtered = if (selected == ALL_ITEMS) {
             items
         } else {
             items.filter { item ->
@@ -109,7 +114,7 @@ class ShopViewModel @Inject constructor(
 
     fun selectCategory(category: String) {
         _selectedCategory.value = category
-        filterItemsByCategory()  // Instant client-side filter
+        filterItemsByCategory()
     }
 
     fun getCategoryFromTypeId(typeId: Int?): String? {
@@ -142,16 +147,16 @@ class ShopViewModel @Inject constructor(
         loadMyShop(showLoading = true)
         loadMyShopItems()
     }
+
     fun toggleItemSoldStatus(itemId: String, markAsSold: Boolean) {
         viewModelScope.launch {
-            Timber.d("🔄 Toggling item $itemId to sold=$markAsSold")
+            Timber.tag(LogTags.VIEW_MODEL).d("🔄 Toggling item $itemId to sold=$markAsSold")
 
-            // Update local list immediately for UI
             val currentItems = _allItems.value.toMutableList()
             val index = currentItems.indexOfFirst { it.id == itemId }
 
             if (index != -1) {
-                val newStatus = if (markAsSold) "sold" else "available"
+                val newStatus = if (markAsSold) STATUS_SOLD else STATUS_AVAILABLE
                 val newQuantity = if (markAsSold) 0 else 1
 
                 val updatedItem = currentItems[index].copy(
@@ -161,18 +166,19 @@ class ShopViewModel @Inject constructor(
                 currentItems[index] = updatedItem
                 _allItems.value = currentItems
 
-                // ✅ Now this will work
                 itemRepository.updateItemStatus(itemId, newStatus)
                     .onSuccess {
-                        Timber.d("✅ Successfully updated status to $newStatus")
+                        Timber.tag(LogTags.VIEW_MODEL).d("✅ Successfully updated status to $newStatus")
                     }
                     .onFailure { error ->
-                        Timber.e(error, "❌ Failed to update status")
-                        loadMyShopItems()  // Revert on failure
+                        Timber.tag(LogTags.VIEW_MODEL).e(error, "❌ Failed to update status")
+                        loadMyShopItems()
                     }
             }
         }
     }
-    fun clearError() { _error.value = null }
 
+    fun clearError() {
+        _error.value = null
+    }
 }

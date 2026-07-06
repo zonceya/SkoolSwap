@@ -7,13 +7,19 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.databinding.ItemProductBinding
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.utils.extensions.formatViewCount
+import timber.log.Timber
 
 class ShopProductAdapter(
     private val onItemClick: (String) -> Unit
 ) : RecyclerView.Adapter<ShopProductAdapter.ProductViewHolder>() {
+
+    companion object {
+        private const val STATUS_SOLD = "sold"
+    }
 
     private val items = mutableListOf<Item>()
 
@@ -49,25 +55,22 @@ class ShopProductAdapter(
 
         fun bind(item: Item) {
             binding.apply {
-                // ✅ ADD LOGGING
-                Log.d("ProductAdapter", "Binding item: ${item.name}, viewCount: ${item.viewCount}, status: ${item.status}")
+                Timber.tag(LogTags.UI).d("Binding item: ${item.name}, viewCount: ${item.viewCount}, status: ${item.status}")
 
                 productName.text = item.name
                 productPrice.text = "R${item.price}"
 
-                // Show view count badge
                 if (item.viewCount > 0) {
-                    Log.d("ProductAdapter", "  ✅ Showing view count: ${item.viewCount}")
+                    Timber.tag(LogTags.UI).d("  ✅ Showing view count: ${item.viewCount}")
                     viewCountContainer.visibility = View.VISIBLE
                     viewCount.text = item.viewCount.formatViewCount()
                 } else {
-                    Log.d("ProductAdapter", "  ❌ Hiding view count (value: ${item.viewCount})")
+                    Timber.tag(LogTags.UI).d("  ❌ Hiding view count (value: ${item.viewCount})")
                     viewCountContainer.visibility = View.GONE
                 }
 
-                // Show sold badge
-                if (item.status == "sold" || item.quantity <= 0) {
-                    Log.d("ProductAdapter", "  ✅ Showing SOLD badge")
+                if (item.status == STATUS_SOLD || item.quantity <= 0) {
+                    Timber.tag(LogTags.UI).d("  ✅ Showing SOLD badge")
                     soldBadge.visibility = View.VISIBLE
                     productName.alpha = 0.5f
                     productPrice.alpha = 0.5f
@@ -77,7 +80,6 @@ class ShopProductAdapter(
                     productPrice.alpha = 1f
                 }
 
-                // Load image
                 val imageUrl = item.images.firstOrNull()?.url ?: ""
                 if (imageUrl.isNotEmpty()) {
                     Glide.with(root.context)

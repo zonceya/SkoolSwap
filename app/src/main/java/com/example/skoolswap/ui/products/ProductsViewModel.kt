@@ -1,9 +1,9 @@
 package com.example.skoolswap.ui.products
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.skoolswap.common.constants.ItemConstants.getSchoolId
+import com.example.skoolswap.common.constants.AppConstants
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.remote.models.response.home.PaginatedResponse
 import com.example.skoolswap.domain.model.RelevanceGroups
@@ -13,7 +13,6 @@ import com.example.skoolswap.domain.model.FilterGroup
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.repository.FilterRepositoryInterface
 import com.example.skoolswap.domain.repository.ProductsRepositoryInterface
-import com.example.skoolswap.ui.home.HomeViewModel
 import com.example.skoolswap.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -22,24 +21,35 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import timber.log.Timber
 import javax.inject.Inject
-import kotlinx.coroutines.flow.first
+
+// Private constants - internal to this file only
+private const val SEARCH_DEBOUNCE_DELAY_MS = 300L
+private const val SEARCH_TIMEOUT_MS = 10000L
+private const val MIN_SEARCH_LENGTH = 2
+private const val PER_PAGE_DEFAULT = 30
+private const val PAGE_DEFAULT = 1
+private const val PRICE_MIN = 0f
+private const val PRICE_MAX = 100000f
+private const val CATEGORY_ID_SPORT = 2
+
 @HiltViewModel
 class ProductsViewModel @Inject constructor(
     private val productsRepository: ProductsRepositoryInterface,
     private val appPreferences: AppPreferences,
     private val filterRepository: FilterRepositoryInterface
 ) : ViewModel() {
-    // Add this flag to block stale data replay
+
     private val _isNewSectionLoading = MutableStateFlow(false)
     val isNewSectionLoading: StateFlow<Boolean> = _isNewSectionLoading.asStateFlow()
+
     private val _products = MutableStateFlow<List<Item>>(emptyList())
     val products: StateFlow<List<Item>> = _products
 
-    // ADDED: Search results state (like HomeViewModel)
     private val _searchResults = MutableStateFlow<List<Item>>(emptyList())
     val searchResults: StateFlow<List<Item>> = _searchResults.asStateFlow()
 
@@ -85,7 +95,9 @@ class ProductsViewModel @Inject constructor(
     // Sort state
     private var _currentSortType: String? = null
     private var currentSubCategoryId: Int? = null
-    // ==================== Public Methods ====================
+    private var currentNavCategoryId: Int? = null
+
+    // User school context
     private var userSchoolId: Int? = null
     private var nearbySchoolIds: List<Int> = emptyList()
 
@@ -97,17 +109,24 @@ class ProductsViewModel @Inject constructor(
 
     private val _serverItemsCount = MutableStateFlow(0)
     val serverItemsCount: StateFlow<Int> = _serverItemsCount.asStateFlow()
+
     private val _searchRelevanceGroups = MutableStateFlow(RelevanceGroups(emptyList(), emptyList(), emptyList()))
     val searchRelevanceGroups: StateFlow<RelevanceGroups> = _searchRelevanceGroups.asStateFlow()
+
     private val _searchQuery = MutableStateFlow<String?>(null)
     val searchQuery: StateFlow<String?> = _searchQuery.asStateFlow()
+
+    private val itemsCache = mutableMapOf<String, List<Item>>()
+
+    // ==================== Public Methods ====================
+
     fun getSavedCategoryId(): Int? = savedCategoryId
     fun getSavedCategoryName(): String? = savedCategoryName
-    private var currentNavCategoryId: Int? = null  // ← ADD THIS
+
     fun setSavedCategory(categoryId: Int, categoryName: String) {
         savedCategoryId = categoryId
         savedCategoryName = categoryName
-        Timber.tag("ProductsViewModel").d("Saved category: $categoryName (ID: $categoryId)")
+        Timber.tag(LogTags.VIEW_MODEL).d("Saved category: $categoryName (ID: $categoryId)")
     }
 
     fun setSectionType(sectionType: String, period: String? = null, categoryId: Int? = null) {
@@ -116,15 +135,38 @@ class ProductsViewModel @Inject constructor(
         currentCategoryId = categoryId
     }
 
-    // UPDATED: Search with debounce like HomeViewModel
+    fun setSubCategoryId(subCategoryId: Int?) {
+        currentSubCategoryId = subCategoryId
+    }
+
+    fun resetFirstLoadFlag() {
+        _error.value = null
+    }
+
+    fun clearSavedCategory() {
+        savedCategoryId = null
+        savedCategoryName = null
+        Timber.tag(LogTags.VIEW_MODEL).d("Cleared saved category")
+    }
+
+    fun setUserSchoolContext(schoolId: Int, nearbyIds: List<Int>) {
+        userSchoolId = schoolId
+        nearbySchoolIds = nearbyIds
+    }
+
+    fun getUserSchoolId(): Int? = userSchoolId
+    fun getNearbySchoolIds(): List<Int> = nearbySchoolIds
+
+    // ==================== Search Methods ====================
+
     fun searchInCurrentSection(query: String) {
-        Timber.tag("ProductsViewModel").d("🔍 searchInCurrentSection called with query: '$query'")
+        Timber.tag(LogTags.VIEW_MODEL).d("🔍 searchInCurrentSection called with query: '$query'")
         searchJob?.cancel()
 
         _searchQuery.value = query
 
-        if (query.length < 2) {
-            Timber.tag("ProductsViewModel").d("Query too short, clearing results")
+        if (query.length < MIN_SEARCH_LENGTH) {
+            Timber.tag(LogTags.VIEW_MODEL).d("Query too short, clearing results")
             _searchResults.value = emptyList()
             _isShowingLocalResults.value = false
             _serverItemsCount.value = 0
@@ -132,17 +174,16 @@ class ProductsViewModel @Inject constructor(
         }
 
         searchJob = viewModelScope.launch {
-            delay(300)
+            delay(SEARCH_DEBOUNCE_DELAY_MS)
 
-            Timber.tag("ProductsViewModel").d("🔍 Searching for: $query")
+            Timber.tag(LogTags.VIEW_MODEL).d("🔍 Searching for: $query")
 
             _serverItemsCount.value = 0
-
 
             val localResults = searchLocalCache(query, getValidCategoryId())
 
             if (localResults.isNotEmpty()) {
-                Timber.tag("ProductsViewModel").d("⚡ ${localResults.size} results from LOCAL CACHE")
+                Timber.tag(LogTags.VIEW_MODEL).d("⚡ ${localResults.size} results from LOCAL CACHE")
                 _searchResults.value = localResults
                 _isShowingLocalResults.value = true
             } else {
@@ -150,15 +191,13 @@ class ProductsViewModel @Inject constructor(
                 _isShowingLocalResults.value = false
             }
 
-            // STEP 2: Search server in background
             _isLoadingMore.value = true
 
-            // ✅ FIX: Convert -1 to null, and ensure we don't send invalid category IDs
             val validCategoryId = getValidCategoryId()
 
             val result = productsRepository.searchItems(
                 query = query,
-                categoryId = validCategoryId,  // ← Now properly null for "all categories"
+                categoryId = validCategoryId,
                 genderId = _appliedFilters.value.gender,
                 brandId = _appliedFilters.value.brand?.firstOrNull(),
                 sizeId = _appliedFilters.value.size,
@@ -167,8 +206,8 @@ class ProductsViewModel @Inject constructor(
                 minPrice = _appliedFilters.value.minPrice,
                 maxPrice = _appliedFilters.value.maxPrice,
                 sort = _currentSortType,
-                page = 1,
-                perPage = 30
+                page = PAGE_DEFAULT,
+                perPage = PER_PAGE_DEFAULT
             )
 
             _isLoadingMore.value = false
@@ -177,7 +216,7 @@ class ProductsViewModel @Inject constructor(
                 is Result.Success -> {
                     val serverItems = result.data.items
                     _serverItemsCount.value = serverItems.size
-                    Timber.tag("ProductsViewModel").d("✅ Server returned ${serverItems.size} results")
+                    Timber.tag(LogTags.VIEW_MODEL).d("✅ Server returned ${serverItems.size} results")
 
                     if (serverItems.isNotEmpty()) {
                         val currentResults = _searchResults.value.toMutableList()
@@ -187,7 +226,7 @@ class ProductsViewModel @Inject constructor(
                         if (newItems.isNotEmpty()) {
                             val merged = currentResults + newItems
                             _searchResults.value = merged
-                            Timber.tag("ProductsViewModel").d("📦 Added ${newItems.size} new items")
+                            Timber.tag(LogTags.VIEW_MODEL).d("📦 Added ${newItems.size} new items")
                         }
                         _isShowingLocalResults.value = false
                     } else if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
@@ -195,7 +234,7 @@ class ProductsViewModel @Inject constructor(
                     }
                 }
                 is Result.Error -> {
-                    Timber.tag("ProductsViewModel").e("❌ Server search failed: ${result.exception.message}")
+                    Timber.tag(LogTags.VIEW_MODEL).e("❌ Server search failed: ${result.exception.message}")
                     if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
                         _error.value = "Failed to load results"
                     }
@@ -203,29 +242,120 @@ class ProductsViewModel @Inject constructor(
             }
         }
     }
-    fun setUserSchoolContext(schoolId: Int, nearbyIds: List<Int>) {
-        userSchoolId = schoolId
-        nearbySchoolIds = nearbyIds
+
+    fun searchItemsRanked(query: String, categoryId: Int?) {
+        _searchQuery.value = query
+        searchJob?.cancel()
+
+        if (query.length < MIN_SEARCH_LENGTH) {
+            Timber.tag(LogTags.VIEW_MODEL).d("Query too short, clearing results")
+            _searchResults.value = emptyList()
+            _searchRelevanceGroups.value = RelevanceGroups(emptyList(), emptyList(), emptyList())
+            _isShowingLocalResults.value = false
+            _serverItemsCount.value = 0
+            return
+        }
+
+        searchJob = viewModelScope.launch {
+            delay(SEARCH_DEBOUNCE_DELAY_MS)
+
+            Timber.tag(LogTags.VIEW_MODEL).d("🔍 Ranked search for: $query")
+
+            val localResults = searchLocalCache(query, getValidCategoryId())
+            if (localResults.isNotEmpty()) {
+                Timber.tag(LogTags.VIEW_MODEL).d("⚡ ${localResults.size} results from LOCAL CACHE")
+                _searchResults.value = localResults
+                _isShowingLocalResults.value = true
+            } else {
+                _searchResults.value = emptyList()
+                _isShowingLocalResults.value = false
+            }
+
+            _isLoadingMore.value = true
+
+            try {
+                val schoolId = getSchoolId()
+                if (schoolId == null) {
+                    Timber.tag(LogTags.VIEW_MODEL).e("❌ No school ID available")
+                    _isLoadingMore.value = false
+                    return@launch
+                }
+
+                val validCategoryId = getValidCategoryId()
+                val serverResult = withTimeout(SEARCH_TIMEOUT_MS) {
+                    productsRepository.searchItemsRanked(
+                        query = query,
+                        schoolId = schoolId,
+                        categoryId = validCategoryId,
+                        subCategoryId = currentSubCategoryId,
+                        minPrice = _appliedFilters.value.minPrice,
+                        maxPrice = _appliedFilters.value.maxPrice,
+                        page = PAGE_DEFAULT,
+                        perPage = PER_PAGE_DEFAULT
+                    )
+                }
+
+                _isLoadingMore.value = false
+
+                when (serverResult) {
+                    is Result.Success -> {
+                        val rankedResult = serverResult.data
+                        val serverItems = rankedResult.items
+                        _serverItemsCount.value = serverItems.size
+
+                        Timber.tag(LogTags.VIEW_MODEL).d("✅ Ranked search returned ${serverItems.size} items")
+
+                        if (serverItems.isNotEmpty()) {
+                            val currentResults = _searchResults.value.toMutableList()
+                            val existingIds = currentResults.map { it.id }.toSet()
+                            val newItems = serverItems.filter { it.id !in existingIds }
+
+                            if (newItems.isNotEmpty()) {
+                                val merged = currentResults + newItems
+                                _searchResults.value = merged
+                                Timber.tag(LogTags.VIEW_MODEL).d("📦 Added ${newItems.size} new items")
+                            }
+                            _isShowingLocalResults.value = false
+                        } else if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
+                            _searchResults.value = emptyList()
+                        }
+                    }
+                    is Result.Error -> {
+                        Timber.tag(LogTags.VIEW_MODEL).e("❌ Server search failed: ${serverResult.exception.message}")
+                        if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
+                            _error.value = "Failed to load results"
+                        }
+                    }
+                }
+            } catch (e: TimeoutCancellationException) {
+                _isLoadingMore.value = false
+                Timber.tag(LogTags.VIEW_MODEL).e("⏱️ Server search timed out")
+                if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
+                    _error.value = "Search timed out. Please try again."
+                }
+            } catch (e: Exception) {
+                _isLoadingMore.value = false
+                Timber.tag(LogTags.VIEW_MODEL).e("❌ Search error: ${e.message}")
+                if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
+                    _error.value = "Failed to load results: ${e.message}"
+                }
+            }
+        }
     }
-    fun getUserSchoolId(): Int? = userSchoolId
-    fun getNearbySchoolIds(): List<Int> = nearbySchoolIds
+
+    private suspend fun getSchoolId(): Int? {
+        return appPreferences.schoolId.first()
+    }
+
     private fun getValidCategoryId(): Int? {
         val categoryId = currentCategoryId ?: _appliedFilters.value.categoryId
-        // Convert -1 or 0 to null (meaning "all categories")
         return if (categoryId == null || categoryId <= 0) null else categoryId
     }
-    fun setSubCategoryId(subCategoryId: Int?) {
-        currentSubCategoryId = subCategoryId
-    }
-    fun resetFirstLoadFlag() {
-        // This helps reset any stale state
-        _error.value = null
-        // Don't reset products here - let loading handle it
-    }
+
     private fun searchLocalCache(query: String, categoryId: Int?): List<Item> {
         val currentProducts = _products.value
         if (currentProducts.isEmpty()) {
-            Timber.tag("ProductsViewModel").d("No cached products available")
+            Timber.tag(LogTags.VIEW_MODEL).d("No cached products available")
             return emptyList()
         }
 
@@ -242,17 +372,13 @@ class ProductsViewModel @Inject constructor(
                         item.description.lowercase().contains(searchLower)
             }
             .distinctBy { it.id }
-            .take(30)
+            .take(PER_PAGE_DEFAULT)
 
-        Timber.tag("ProductsViewModel").d("🔍 Local search found ${results.size} matches from ${currentProducts.size} cached items")
+        Timber.tag(LogTags.VIEW_MODEL).d("🔍 Local search found ${results.size} matches from ${currentProducts.size} cached items")
         return results
     }
 
-    fun clearSavedCategory() {
-        savedCategoryId = null
-        savedCategoryName = null
-        Timber.tag("ProductsViewModel").d("Cleared saved category")
-    }
+    // ==================== Load Products Methods ====================
 
     fun loadProducts(
         sectionType: String,
@@ -262,7 +388,7 @@ class ProductsViewModel @Inject constructor(
         preSelectedSportTypeId: Int? = null,
         preSelectedGearType: String? = null
     ) {
-        Timber.tag("ProductsViewModel").d("🔄 loadProducts: section='$sectionType', subCategoryId=$subCategoryId, navCategoryId=$navCategoryId")
+        Timber.tag(LogTags.VIEW_MODEL).d("🔄 loadProducts: section='$sectionType', subCategoryId=$subCategoryId, navCategoryId=$navCategoryId")
 
         currentSubCategoryId = subCategoryId
         currentNavCategoryId = navCategoryId
@@ -275,7 +401,6 @@ class ProductsViewModel @Inject constructor(
         loadProductsJob?.cancel()
         searchJob?.cancel()
 
-
         this.preSelectedSportTypeId = preSelectedSportTypeId
         this.preSelectedGearType = preSelectedGearType
 
@@ -283,7 +408,7 @@ class ProductsViewModel @Inject constructor(
         val incomingCategoryId = if (navCategoryId == -1) null else navCategoryId
 
         val effectiveCategoryId = when {
-            normalizedType == "sports" || normalizedType == "sport" -> incomingCategoryId ?: 2
+            normalizedType == "sports" || normalizedType == "sport" -> incomingCategoryId ?: CATEGORY_ID_SPORT
             else -> savedCategoryId ?: _appliedFilters.value.categoryId ?: incomingCategoryId
         }
 
@@ -295,6 +420,99 @@ class ProductsViewModel @Inject constructor(
         loadProductsInternal(effectiveCategoryId, normalizedType)
     }
 
+    fun reloadCurrentSection() {
+        currentSearchQuery = null
+        _searchResults.value = emptyList()
+        loadProductsInternal(_appliedFilters.value.categoryId, currentSectionType)
+    }
+
+    fun reloadLocalFiltersOnly() {
+        viewModelScope.launch {
+            _products.value = _products.value
+        }
+    }
+
+    private fun loadProductsInternal(categoryId: Int?, sectionType: String? = null) {
+        val effectiveSubCategoryId = currentSubCategoryId
+
+        Timber.tag(LogTags.VIEW_MODEL).d("🚀 loadProductsInternal START → section=$sectionType, subCategoryId=$effectiveSubCategoryId, categoryId=$categoryId")
+
+        loadProductsJob?.cancel()
+
+        loadProductsJob = viewModelScope.launch {
+            _isNewSectionLoading.value = true
+            _isLoading.value = true
+            _error.value = null
+            _products.value = emptyList()
+
+            val result: Result<PaginatedResponse<Item>> = when {
+                sectionType == "uniform" || sectionType == "uniforms" -> {
+                    Timber.tag(LogTags.VIEW_MODEL).d("👕 Loading Uniforms with subCategoryId=$effectiveSubCategoryId")
+                    productsRepository.getEssentialsAll(
+                        page = PAGE_DEFAULT,
+                        category = "Uniforms",
+                        subCategoryId = effectiveSubCategoryId,
+                        perPage = PER_PAGE_DEFAULT,
+                        conditionId = _appliedFilters.value.condition,
+                        minPrice = _appliedFilters.value.minPrice,
+                        maxPrice = _appliedFilters.value.maxPrice
+                    )
+                }
+                sectionType == "sports" || sectionType == "sport" -> {
+                    Timber.tag(LogTags.VIEW_MODEL).d("🏅 Loading Sports with subCategoryId=$effectiveSubCategoryId")
+                    productsRepository.getEssentialsAll(
+                        page = PAGE_DEFAULT,
+                        category = "Sports",
+                        subCategoryId = effectiveSubCategoryId,
+                        perPage = PER_PAGE_DEFAULT,
+                        conditionId = _appliedFilters.value.condition,
+                        minPrice = _appliedFilters.value.minPrice,
+                        maxPrice = _appliedFilters.value.maxPrice
+                    )
+                }
+                sectionType == "accessories" -> {
+                    Timber.tag(LogTags.VIEW_MODEL).d("🎒 Loading Accessories")
+                    productsRepository.getEssentialsAll(
+                        page = PAGE_DEFAULT,
+                        category = "Accessories",
+                        subCategoryId = null,
+                        perPage = PER_PAGE_DEFAULT,
+                        conditionId = _appliedFilters.value.condition,
+                        minPrice = _appliedFilters.value.minPrice,
+                        maxPrice = _appliedFilters.value.maxPrice
+                    )
+                }
+                else -> {
+                    Timber.tag(LogTags.VIEW_MODEL).d("✨ Loading Recommended")
+                    productsRepository.getRecommendedAll(
+                        page = PAGE_DEFAULT,
+                        categoryId = getValidCategoryId(),
+                        conditionId = _appliedFilters.value.condition,
+                        minPrice = _appliedFilters.value.minPrice,
+                        maxPrice = _appliedFilters.value.maxPrice
+                    )
+                }
+            }
+
+            when (val res = result) {
+                is Result.Success -> {
+                    val items = res.data.items
+                    _products.value = items
+                    Timber.tag(LogTags.VIEW_MODEL).d("✅ SUCCESS: Loaded ${items.size} items | section=$sectionType | subCategory=$effectiveSubCategoryId")
+                }
+                is Result.Error -> {
+                    _error.value = res.exception.message ?: "Failed to load items"
+                    Timber.tag(LogTags.VIEW_MODEL).e(res.exception, "❌ Failed to load products")
+                }
+            }
+
+            _isLoading.value = false
+            _isNewSectionLoading.value = false
+            Timber.tag(LogTags.VIEW_MODEL).d("🏁 Loading finished")
+        }
+    }
+
+    // ==================== Filter Methods ====================
 
     fun loadFilterConfig(categoryId: Int) {
         if (categoryId <= 0) return
@@ -308,122 +526,54 @@ class ProductsViewModel @Inject constructor(
                 is Result.Success -> {
                     globalFilterConfig = result.data
                     _filterConfig.value = result.data
-                    Timber.tag("ProductsViewModel")
-                        .d("Loaded global filter config: ${result.data.filterGroups.size} groups")
+                    Timber.tag(LogTags.VIEW_MODEL).d("Loaded global filter config: ${result.data.filterGroups.size} groups")
                 }
                 is Result.Error -> {
-                    Timber.tag("ProductsViewModel")
-                        .e("Failed to load global filter config: ${result.exception.message}")
+                    Timber.tag(LogTags.VIEW_MODEL).e("Failed to load global filter config: ${result.exception.message}")
                 }
             }
         }
     }
-    fun searchItemsRanked(query: String, categoryId: Int?) {
-        _searchQuery.value = query
-        searchJob?.cancel()
 
-        if (query.length < 2) {
-            Timber.tag("ProductsViewModel").d("Query too short, clearing results")
-            _searchResults.value = emptyList()
-            _searchRelevanceGroups.value =
-                RelevanceGroups(emptyList(), emptyList(), emptyList())
-            _isShowingLocalResults.value = false
-            _serverItemsCount.value = 0
+    private fun loadFilterConfigIfNeeded(categoryId: Int?) {
+        val currentConfig = _filterConfig.value
+        if (categoryId != null && categoryId > 0 && currentConfig?.categoryId == categoryId) {
+            Timber.tag(LogTags.VIEW_MODEL).d("Filter config already loaded for category $categoryId")
+            return
+        }
+        if (categoryId == null && currentConfig?.categoryId == null && currentConfig != null) {
+            Timber.tag(LogTags.VIEW_MODEL).d("Global filter config already loaded")
             return
         }
 
-        searchJob = viewModelScope.launch {
-            delay(300)
-
-            Timber.tag("ProductsViewModel").d("🔍 Ranked search for: $query")
-
-            // STEP 1: Search local cache first (instant results)
-            val localResults = searchLocalCache(query, getValidCategoryId())
-            if (localResults.isNotEmpty()) {
-                Timber.tag("ProductsViewModel").d("⚡ ${localResults.size} results from LOCAL CACHE")
-                _searchResults.value = localResults
-                _isShowingLocalResults.value = true
+        loadFilterJob?.cancel()
+        loadFilterJob = viewModelScope.launch {
+            val result = if (categoryId != null && categoryId > 0) {
+                Timber.tag(LogTags.VIEW_MODEL).d("Loading CATEGORY-SPECIFIC filters for ID: $categoryId")
+                filterRepository.getFilterConfig(categoryId)
             } else {
-                _searchResults.value = emptyList()
-                _isShowingLocalResults.value = false
+                Timber.tag(LogTags.VIEW_MODEL).d("Loading GLOBAL filters")
+                filterRepository.getGlobalFilterConfig()
             }
 
-            // STEP 2: Fetch from server with ranking
-            _isLoadingMore.value = true
-
-            try {
-                // Get school ID (you need to inject UserSchoolRepository or pass it)
-                val schoolId = getSchoolId() // You'll need to add this method
-                if (schoolId == null) {
-                    Timber.tag("ProductsViewModel").e("❌ No school ID available")
-                    _isLoadingMore.value = false
-                    return@launch
-                }
-
-                val validCategoryId = getValidCategoryId()
-                val serverResult = withTimeout(10_000L) {
-                    productsRepository.searchItemsRanked(
-                        query = query,
-                        schoolId = schoolId,
-                        categoryId = validCategoryId,
-                        subCategoryId = currentSubCategoryId,
-                        minPrice = _appliedFilters.value.minPrice,
-                        maxPrice = _appliedFilters.value.maxPrice,
-                        page = 1,
-                        perPage = 30
-                    )
-                }
-
-                _isLoadingMore.value = false
-
-                when (serverResult) {
-                    is Result.Success -> {
-                        val rankedResult = serverResult.data
-                        val serverItems = rankedResult.items
-                        _serverItemsCount.value = serverItems.size
-
-                        Timber.tag("ProductsViewModel").d("✅ Ranked search returned ${serverItems.size} items")
-
-                        if (serverItems.isNotEmpty()) {
-                            val currentResults = _searchResults.value.toMutableList()
-                            val existingIds = currentResults.map { it.id }.toSet()
-                            val newItems = serverItems.filter { it.id !in existingIds }
-
-                            if (newItems.isNotEmpty()) {
-                                val merged = currentResults + newItems
-                                _searchResults.value = merged
-                                Timber.tag("ProductsViewModel").d("📦 Added ${newItems.size} new items")
-                            }
-                            _isShowingLocalResults.value = false
-                        } else if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
-                            _searchResults.value = emptyList()
-                        }
+            when (result) {
+                is Result.Success -> {
+                    _filterConfig.value = result.data
+                    if (categoryId == null) {
+                        globalFilterConfig = result.data
                     }
-                    is Result.Error -> {
-                        Timber.tag("ProductsViewModel").e("❌ Server search failed: ${serverResult.exception.message}")
-                        if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
-                            _error.value = "Failed to load results"
-                        }
+                    Timber.tag(LogTags.VIEW_MODEL).d("Filter config loaded: ${result.data.filterGroups.size} groups")
+                    result.data.filterGroups.forEach { group ->
+                        Timber.tag(LogTags.VIEW_MODEL).d("  - ${group.name}: ${group.options.size} options")
                     }
                 }
-            } catch (e: TimeoutCancellationException) {
-                _isLoadingMore.value = false
-                Timber.tag("ProductsViewModel").e("⏱️ Server search timed out")
-                if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
-                    _error.value = "Search timed out. Please try again."
-                }
-            } catch (e: Exception) {
-                _isLoadingMore.value = false
-                Timber.tag("ProductsViewModel").e("❌ Search error: ${e.message}")
-                if (!_isShowingLocalResults.value && _searchResults.value.isEmpty()) {
-                    _error.value = "Failed to load results: ${e.message}"
+                is Result.Error -> {
+                    Timber.tag(LogTags.VIEW_MODEL).e("Filter config failed: ${result.exception.message}")
                 }
             }
         }
     }
-    private suspend fun getSchoolId(): Int? {
-        return appPreferences.schoolId.first()
-    }
+
     fun updateFilter(key: String, value: Any?) {
         val updated = when (key) {
             "category" -> {
@@ -453,7 +603,6 @@ class ProductsViewModel @Inject constructor(
             loadFilterConfigIfNeeded(value as? Int)
         }
 
-        // If we're in search mode, re-run search with new filters
         if (currentSearchQuery != null) {
             searchInCurrentSection(currentSearchQuery!!)
         } else {
@@ -463,14 +612,13 @@ class ProductsViewModel @Inject constructor(
 
     fun updatePriceRange(min: Float, max: Float) {
         val newFilters = _appliedFilters.value.copy(
-            minPrice = if (min > 0f) min else null,
-            maxPrice = if (max < 100000f) max else null
+            minPrice = if (min > PRICE_MIN) min else null,
+            maxPrice = if (max < PRICE_MAX) max else null
         )
         _appliedFilters.value = newFilters
 
-        Timber.tag("ProductsViewModel").d("📊 Price filter updated → R${min.toInt()} - R${max.toInt()}")
+        Timber.tag(LogTags.VIEW_MODEL).d("📊 Price filter updated → R${min.toInt()} - R${max.toInt()}")
 
-        // Re-load data with new price filter
         if (currentSearchQuery != null) {
             searchInCurrentSection(currentSearchQuery!!)
         } else {
@@ -478,9 +626,8 @@ class ProductsViewModel @Inject constructor(
         }
     }
 
-
     fun applyFilters() {
-        Timber.tag("ProductsViewModel").d("Applying all filters including price")
+        Timber.tag(LogTags.VIEW_MODEL).d("Applying all filters including price")
 
         if (currentSearchQuery != null) {
             searchInCurrentSection(currentSearchQuery!!)
@@ -490,7 +637,7 @@ class ProductsViewModel @Inject constructor(
     }
 
     fun resetFilters() {
-        _appliedFilters.value = AppliedFilters()   // This should clear minPrice/maxPrice
+        _appliedFilters.value = AppliedFilters()
         clearSavedCategory()
 
         if (currentSearchQuery != null) {
@@ -509,10 +656,8 @@ class ProductsViewModel @Inject constructor(
         }
 
         if (currentSearchQuery != null) {
-            // Re-run search with new sort
             searchInCurrentSection(currentSearchQuery!!)
         } else {
-            // Regular sorting on current products
             val sorted = when (sortType) {
                 "price_low" -> _products.value.sortedBy { it.price }
                 "price_high" -> _products.value.sortedByDescending { it.price }
@@ -537,172 +682,19 @@ class ProductsViewModel @Inject constructor(
         }
     }
 
-    // ==================== Private Methods ====================
-
-    private fun loadFilterConfigIfNeeded(categoryId: Int?) {
-        val currentConfig = _filterConfig.value
-        if (categoryId != null && categoryId > 0 &&
-            currentConfig?.categoryId == categoryId) {
-            Timber.tag("ProductsViewModel")
-                .d("Filter config already loaded for category $categoryId")
-            return
-        }
-        if (categoryId == null && currentConfig?.categoryId == null && currentConfig != null) {
-            Timber.tag("ProductsViewModel").d("Global filter config already loaded")
-            return
-        }
-
-        loadFilterJob?.cancel()
-        loadFilterJob = viewModelScope.launch {
-            val result = if (categoryId != null && categoryId > 0) {
-                Timber.tag("ProductsViewModel")
-                    .d("Loading CATEGORY-SPECIFIC filters for ID: $categoryId")
-                filterRepository.getFilterConfig(categoryId)
-            } else {
-                Timber.tag("ProductsViewModel").d("Loading GLOBAL filters")
-                filterRepository.getGlobalFilterConfig()
-            }
-
-            when (result) {
-                is Result.Success -> {
-                    _filterConfig.value = result.data
-                    if (categoryId == null) {
-                        globalFilterConfig = result.data
-                    }
-                    Timber.tag("ProductsViewModel")
-                        .d("Filter config loaded: ${result.data.filterGroups.size} groups")
-                    result.data.filterGroups.forEach { group ->
-                        Timber.tag("ProductsViewModel")
-                            .d("  - ${group.name}: ${group.options.size} options")
-                    }
-                }
-                is Result.Error -> {
-                    Timber.tag("ProductsViewModel")
-                        .e("Filter config failed: ${result.exception.message}")
-                }
-            }
-        }
-    }
-
-    private fun loadProductsInternal(categoryId: Int?, sectionType: String? = null) {
-        // ✅ Use the stored currentSubCategoryId (set in loadProducts)
-        val effectiveSubCategoryId = currentSubCategoryId
-
-        Timber.tag("ProductsViewModel").d("🚀 loadProductsInternal START → section=$sectionType, subCategoryId=$effectiveSubCategoryId, categoryId=$categoryId")
-
-        // Cancel previous job
-        loadProductsJob?.cancel()
-
-        loadProductsJob = viewModelScope.launch {
-            _isNewSectionLoading.value = true
-            _isLoading.value = true
-            _error.value = null
-            _products.value = emptyList()
-
-            // ✅ Use effectiveSubCategoryId in all calls
-            val result: Result<PaginatedResponse<Item>> = when {
-                sectionType == "uniform" || sectionType == "uniforms" -> {
-                    Timber.tag("ProductsViewModel").d("👕 Loading Uniforms with subCategoryId=$effectiveSubCategoryId")
-                    productsRepository.getEssentialsAll(
-                        page = 1,
-                        category = "Uniforms",
-                        subCategoryId = effectiveSubCategoryId,  // ← USE STORED VALUE
-                        perPage = 30,
-                        conditionId = _appliedFilters.value.condition,
-                        minPrice = _appliedFilters.value.minPrice,
-                        maxPrice = _appliedFilters.value.maxPrice
-                    )
-                }
-
-                sectionType == "sports" || sectionType == "sport" -> {
-                    Timber.tag("ProductsViewModel").d("🏅 Loading Sports with subCategoryId=$effectiveSubCategoryId")
-                    productsRepository.getEssentialsAll(
-                        page = 1,
-                        category = "Sports",
-                        subCategoryId = effectiveSubCategoryId,  // ← USE STORED VALUE
-                        perPage = 30,
-                        conditionId = _appliedFilters.value.condition,
-                        minPrice = _appliedFilters.value.minPrice,
-                        maxPrice = _appliedFilters.value.maxPrice
-                    )
-                }
-
-                sectionType == "accessories" -> {
-                    Timber.tag("ProductsViewModel").d("🎒 Loading Accessories")
-                    productsRepository.getEssentialsAll(
-                        page = 1,
-                        category = "Accessories",
-                        subCategoryId = null,
-                        perPage = 30,
-                        conditionId = _appliedFilters.value.condition,
-                        minPrice = _appliedFilters.value.minPrice,
-                        maxPrice = _appliedFilters.value.maxPrice
-                    )
-                }
-
-                else -> {
-                    Timber.tag("ProductsViewModel").d("✨ Loading Recommended")
-                    productsRepository.getRecommendedAll(
-                        page = 1,
-                        categoryId = getValidCategoryId(),
-                        conditionId = _appliedFilters.value.condition,
-                        minPrice = _appliedFilters.value.minPrice,
-                        maxPrice = _appliedFilters.value.maxPrice
-                    )
-                }
-            }
-
-            when (val res = result) {
-                is Result.Success -> {
-                    val items = res.data.items
-                    _products.value = items
-                    Timber.tag("ProductsViewModel")
-                        .d("✅ SUCCESS: Loaded ${items.size} items | section=$sectionType | subCategory=$effectiveSubCategoryId")
-                }
-                is Result.Error -> {
-                    _error.value = res.exception.message ?: "Failed to load items"
-                    Timber.e(res.exception, "❌ Failed to load products")
-                }
-            }
-
-            _isLoading.value = false
-            _isNewSectionLoading.value = false
-            Timber.tag("ProductsViewModel").d("🏁 Loading finished")
-        }
-    }
-
-
-
-    // Add this helper if you don't have it
-    fun reloadLocalFiltersOnly() {
-        // Just trigger filter rebuild without new network call
-        viewModelScope.launch {
-            // You can emit the current products again to trigger collector
-            _products.value = _products.value
-        }
-    }
-    override fun onCleared() {
-        loadProductsJob?.cancel()
-        loadFilterJob?.cancel()
-        searchJob?.cancel()
-        super.onCleared()
-    }
     fun clearSearchResults() {
         _searchResults.value = emptyList()
         currentSearchQuery = null
     }
 
-    fun reloadCurrentSection() {
-        currentSearchQuery = null
-        _searchResults.value = emptyList()
-        // ✅ Pass the current section type to preserve sub-category filter
-        loadProductsInternal(_appliedFilters.value.categoryId, currentSectionType)
-    }
-
-    // Add items cache
-    private val itemsCache = mutableMapOf<String, List<Item>>()
-
     private fun getCacheKey(): String {
         return "${currentSectionType}_${currentCategoryId}_${_appliedFilters.value}"
+    }
+
+    override fun onCleared() {
+        loadProductsJob?.cancel()
+        loadFilterJob?.cancel()
+        searchJob?.cancel()
+        super.onCleared()
     }
 }

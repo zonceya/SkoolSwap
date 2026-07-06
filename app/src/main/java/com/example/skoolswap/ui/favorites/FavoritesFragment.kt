@@ -14,11 +14,14 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.GridLayoutManager
 import com.example.skoolswap.R
+import com.example.skoolswap.common.constants.AppConstants
+import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.databinding.FragmentFavoritesBinding
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -32,6 +35,13 @@ class FavoritesFragment : Fragment() {
 
     @Inject
     lateinit var appPreferences: AppPreferences
+
+    companion object {
+        private const val MY_FAVORITES = "My Favorites"
+        private const val DEFAULT_NAME = "My"
+        private const val FAVORITES_FORMAT = "%s's Favorites"
+        private const val GRID_SPAN_COUNT = 2
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -52,21 +62,23 @@ class FavoritesFragment : Fragment() {
     }
 
     private fun setUserName() {
-        // viewLifecycleOwner.lifecycleScope so it cancels when the view is destroyed
         viewLifecycleOwner.lifecycleScope.launch {
-            val userName = appPreferences.userName.first() ?: "My"
-            binding.favoritesTitle.text =
-                if (userName == "My") "My Favorites" else "$userName's Favorites"
+            val userName = appPreferences.userName.first() ?: DEFAULT_NAME
+            binding.favoritesTitle.text = if (userName == DEFAULT_NAME) {
+                MY_FAVORITES
+            } else {
+                String.format(FAVORITES_FORMAT, userName)
+            }
         }
     }
 
     private fun setupRecyclerView() {
         adapter = FavoritesAdapter { itemId ->
-            val bundle = bundleOf("itemId" to itemId)
+            val bundle = bundleOf(AppConstants.ARG_PRODUCT_ID to itemId)
             findNavController().navigate(R.id.itemDetailFragment, bundle)
         }
         binding.recyclerView.apply {
-            layoutManager = GridLayoutManager(requireContext(), 2)
+            layoutManager = GridLayoutManager(requireContext(), GRID_SPAN_COUNT)
             adapter = this@FavoritesFragment.adapter
         }
     }
@@ -90,10 +102,6 @@ class FavoritesFragment : Fragment() {
     }
 
     private fun observeViewModel() {
-        // Single coroutine, all collectors inside repeatOnLifecycle.
-        // repeatOnLifecycle cancels everything inside it when the view
-        // drops below STARTED (i.e. on back press / destroy), so _binding
-        // is guaranteed to be non-null whenever a collector runs.
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
 
@@ -130,12 +138,11 @@ class FavoritesFragment : Fragment() {
                     viewModel.favorites.collect { items ->
                         isFirstLoad = false
                         binding.shimmerLayout.visibility = View.GONE
-                        binding.recyclerView.visibility =
-                            if (items.isNotEmpty()) View.VISIBLE else View.GONE
-                        binding.emptyView.visibility =
-                            if (items.isEmpty()) View.VISIBLE else View.GONE
+                        binding.recyclerView.visibility = if (items.isNotEmpty()) View.VISIBLE else View.GONE
+                        binding.emptyView.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
                         binding.errorLayout.visibility = View.GONE
                         adapter.submitList(items)
+                        Timber.tag(LogTags.UI).d("Loaded ${items.size} favorites")
                     }
                 }
             }

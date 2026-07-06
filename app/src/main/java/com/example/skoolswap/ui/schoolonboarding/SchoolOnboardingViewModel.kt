@@ -3,6 +3,8 @@ package com.example.skoolswap.ui.schoolonboarding
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.skoolswap.common.constants.AppConstants.LogTags
+import com.example.skoolswap.common.constants.ErrorConstantsHelper
 import com.example.skoolswap.data.repository.SchoolRepository
 import com.example.skoolswap.data.repository.UserSchoolRepository
 import com.example.skoolswap.domain.model.Province
@@ -14,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -22,6 +25,10 @@ class SchoolOnboardingViewModel @Inject constructor(
     private val userSchoolRepository: UserSchoolRepository,
     private val authRepository: AuthRepositoryInterface
 ) : ViewModel() {
+
+    companion object {
+        private const val MIN_SEARCH_LENGTH = 2
+    }
 
     // Loading states
     private val _isLoading = MutableStateFlow(false)
@@ -67,19 +74,18 @@ class SchoolOnboardingViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
 
-            // Check if user is authenticated first
             val token = authRepository.getCurrentToken()
             if (token.isNullOrEmpty()) {
                 _error.value = "Please log in to continue"
                 _isLoading.value = false
-                _profileComplete.value = true  // Trigger navigation to login
+                _profileComplete.value = true
                 return@launch
             }
 
             when (val result = schoolRepository.getProvinces()) {
                 is Result.Success -> {
                     _provinces.value = result.data
-                    Log.d("SchoolOnboardingVM", "✅ Loaded ${result.data.size} provinces")
+                    Timber.tag(LogTags.VIEW_MODEL).d("✅ Loaded ${result.data.size} provinces")
                 }
                 is Result.Error -> {
                     val errorMsg = when {
@@ -87,7 +93,7 @@ class SchoolOnboardingViewModel @Inject constructor(
                         else -> "Failed to load provinces: ${result.exception.message}"
                     }
                     _error.value = errorMsg
-                    Log.e("SchoolOnboardingVM", "❌ Error loading provinces", result.exception)
+                    Timber.tag(LogTags.VIEW_MODEL).e(result.exception, "❌ Error loading provinces")
                 }
             }
 
@@ -96,7 +102,7 @@ class SchoolOnboardingViewModel @Inject constructor(
     }
 
     fun selectProvince(province: Province, shouldClearSchool: Boolean = false) {
-        Log.d("SchoolOnboardingVM", "📍 selectProvince: ${province.name}")
+        Timber.tag(LogTags.VIEW_MODEL).d("📍 selectProvince: ${province.name}")
 
         _selectedProvince.value = province
 
@@ -110,17 +116,16 @@ class SchoolOnboardingViewModel @Inject constructor(
     fun loadAllSchoolsForProvince(province: Province) {
         viewModelScope.launch {
             _isLoadingSchools.value = true
-            Log.d("SchoolOnboardingVM", "Loading schools for province: ${province.name}")
+            Timber.tag(LogTags.VIEW_MODEL).d("Loading schools for province: ${province.name}")
 
-            // Use existing searchSchools with empty string to get all schools
             when (val result = schoolRepository.searchSchools(province.id, "")) {
                 is Result.Success -> {
                     _cachedSchools.value = result.data
-                    Log.d("SchoolOnboardingVM", "✅ Loaded ${_cachedSchools.value.size} schools for ${province.name}")
+                    Timber.tag(LogTags.VIEW_MODEL).d("✅ Loaded ${_cachedSchools.value.size} schools for ${province.name}")
                 }
                 is Result.Error -> {
                     _error.value = "Failed to load schools: ${result.exception.message}"
-                    Log.e("SchoolOnboardingVM", "❌ Error loading schools", result.exception)
+                    Timber.tag(LogTags.VIEW_MODEL).e(result.exception, "❌ Error loading schools")
                 }
             }
 
@@ -129,7 +134,7 @@ class SchoolOnboardingViewModel @Inject constructor(
     }
 
     fun searchSchoolsLocally(query: String) {
-        if (query.length < 2) {
+        if (query.length < MIN_SEARCH_LENGTH) {
             _schools.value = emptyList()
             return
         }
@@ -139,13 +144,13 @@ class SchoolOnboardingViewModel @Inject constructor(
         }
 
         _schools.value = results
-        Log.d("SchoolOnboardingVM", "🔍 Local search found ${results.size} results for '$query'")
+        Timber.tag(LogTags.VIEW_MODEL).d("🔍 Local search found ${results.size} results for '$query'")
     }
 
     fun selectSchool(school: School) {
-        Log.d("SchoolOnboardingVM", "📝 School selected: ${school.name}")
+        Timber.tag(LogTags.VIEW_MODEL).d("📝 School selected: ${school.name}")
         _selectedSchool.value = school
-        _schools.value = emptyList() // Clear search results
+        _schools.value = emptyList()
     }
 
     fun submitSchoolSelection() {
@@ -159,17 +164,18 @@ class SchoolOnboardingViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
 
-            Log.d("SchoolOnboardingVM", "Submitting school: ${school.name}")
+            Timber.tag(LogTags.VIEW_MODEL).d("Submitting school: ${school.name}")
 
             when (val result = userSchoolRepository.assignSchool(school.id)) {
                 is Result.Success -> {
                     _updateSuccess.value = true
                     _profileComplete.value = true
-                    Log.d("SchoolOnboardingVM", "✅ School assigned successfully: ${school.name}")
+                    Timber.tag(LogTags.VIEW_MODEL).d("✅ School assigned successfully: ${school.name}")
                 }
                 is Result.Error -> {
-                    _error.value = result.exception.message ?: "Failed to assign school"
-                    Log.e("SchoolOnboardingVM", "❌ Failed to assign school", result.exception)
+                    val errorMsg = result.exception.message ?: "Failed to assign school"
+                    _error.value = errorMsg
+                    Timber.tag(LogTags.VIEW_MODEL).e(result.exception, "❌ Failed to assign school")
                 }
             }
 
