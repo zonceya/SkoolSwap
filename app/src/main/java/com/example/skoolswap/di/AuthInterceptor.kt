@@ -29,24 +29,25 @@ class AuthInterceptor @Inject constructor(
             originalRequest
         }
 
-        var response = chain.proceed(request)
+        val response = chain.proceed(request)
 
-        // Handle 401 + refresh
         if (response.code == 401 &&
             !originalRequest.url.encodedPath.contains("refresh")) {
 
-            response.close() // Safe to close failed response
-
             val newToken = performTokenRefresh(token)
 
-            if (!newToken.isNullOrEmpty()) {
+            return if (!newToken.isNullOrEmpty()) {
+                response.close() // only close now, because we're replacing it
                 val retryRequest = originalRequest.newBuilder()
                     .header("Authorization", "Bearer $newToken")
                     .build()
-                response = chain.proceed(retryRequest)
+                chain.proceed(retryRequest)
             } else {
-                // Force logout on refresh failure
+                // Force logout on refresh failure — but don't touch `response`,
+                // just let it flow back up unread/unclosed so the chain (and
+                // whoever eventually consumes the body) can handle it normally.
                 runBlocking { authRepository.get().signOut() }
+                response
             }
         }
 

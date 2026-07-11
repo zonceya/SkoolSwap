@@ -4,10 +4,12 @@ import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.mapper.toDomain
 import com.example.skoolswap.data.remote.api.FilterApiService
+import com.example.skoolswap.data.remote.models.response.home.FilterConfigResponse
 import com.example.skoolswap.domain.model.FilterConfig
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.domain.repository.FilterRepositoryInterface
 import com.example.skoolswap.utils.Result
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,15 +21,58 @@ class FilterRepository @Inject constructor(
     private val appPreferences: AppPreferences
 ) : FilterRepositoryInterface {
 
+    // ✅ In-memory cache
+    private val categoryFilterCache = mutableMapOf<Int, FilterConfig>()
+    private var globalFilterCache: FilterConfig? = null
+
     override suspend fun getFilterConfig(categoryId: Int): Result<FilterConfig> {
+        // 1. Check memory cache FIRST (super fast)
+        categoryFilterCache[categoryId]?.let {
+            Timber.tag(LogTags.REPOSITORY).d("📦 Memory cache HIT for category: $categoryId")
+            return Result.Success(it)
+        }
+
+        // 2. Check DataStore cache
+        try {
+            val isCacheValid = appPreferences.isCategoryFilterValid(categoryId)
+            val cachedJson = appPreferences.getCachedFilterConfig(categoryId)
+
+            if (isCacheValid && cachedJson != null) {
+                val cached = parseFilterConfigFromJson(cachedJson)
+                if (cached != null) {
+                    Timber.tag(LogTags.REPOSITORY).d("📦 DataStore cache HIT for category: $categoryId")
+                    categoryFilterCache[categoryId] = cached
+                    return Result.Success(cached)
+                }
+            }
+        } catch (e: Exception) {
+            Timber.tag(LogTags.REPOSITORY).e(e, "Failed to read from DataStore cache")
+        }
+
+        // 3. Cache miss - fetch from API
+        Timber.tag(LogTags.REPOSITORY).d("🌐 Fetching fresh filter config for category: $categoryId")
+
         return try {
             val response = api.getFilterConfig(categoryId)
 
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body?.success == true) {
-                    Timber.tag(LogTags.REPOSITORY).d("✅ Filter config loaded for category: $categoryId")
-                    Result.Success(body.toDomain())
+                    val config = body.toDomain()
+
+                    // Save to memory cache
+                    categoryFilterCache[categoryId] = config
+
+                    // Save to DataStore
+                    try {
+                        val json = convertFilterConfigToJson(body)
+                        appPreferences.cacheFilterConfig(categoryId, json)
+                        Timber.tag(LogTags.REPOSITORY).d("✅ Filter config cached for category: $categoryId")
+                    } catch (e: Exception) {
+                        Timber.tag(LogTags.REPOSITORY).e(e, "Failed to cache to DataStore")
+                    }
+
+                    Result.Success(config)
                 } else {
                     Timber.tag(LogTags.REPOSITORY).e("❌ Failed to load filter config: success=false")
                     Result.Error(Exception("Failed to load filter config"))
@@ -42,33 +87,55 @@ class FilterRepository @Inject constructor(
         }
     }
 
+
     override suspend fun getGlobalFilterConfig(): Result<FilterConfig> {
-        return try {
-            // Check cache first
+        // 1. Check memory cache
+        globalFilterCache?.let {
+            Timber.tag(LogTags.REPOSITORY).d("📦 Global filter memory cache HIT")
+            return Result.Success(it)
+        }
+
+        // 2. Check DataStore cache
+        try {
             val isCacheValid = appPreferences.isGlobalFilterConfigCacheValid()
             val cachedJson = appPreferences.getCachedGlobalFilterConfig()
 
             if (isCacheValid && cachedJson != null) {
-                // Parse cached JSON manually
-                val cachedConfig = parseFilterConfigFromJson(cachedJson)
-                if (cachedConfig != null) {
-                    Timber.tag(LogTags.REPOSITORY).d("📦 Using cached global filter config")
-                    return Result.Success(cachedConfig)
+                val cached = parseFilterConfigFromJson(cachedJson)
+                if (cached != null) {
+                    Timber.tag(LogTags.REPOSITORY).d("📦 Global filter DataStore cache HIT")
+                    globalFilterCache = cached
+                    return Result.Success(cached)
                 }
             }
+        } catch (e: Exception) {
+            Timber.tag(LogTags.REPOSITORY).e(e, "Failed to read global cache from DataStore")
+        }
 
-            // Cache expired or empty, fetch from API
-            Timber.tag(LogTags.REPOSITORY).d("🌐 Fetching fresh global filter config from API")
+        // 3. Cache miss - fetch from API
+        Timber.tag(LogTags.REPOSITORY).d("🌐 Fetching fresh global filter config")
+
+        return try {
             val response = api.getGlobalFilterConfig()
 
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body?.success == true) {
-                    // Convert to JSON string for caching
-                    val json = convertFilterConfigToJson(body)
-                    appPreferences.cacheGlobalFilterConfig(json)
-                    Timber.tag(LogTags.REPOSITORY).d("✅ Global filter config loaded and cached")
-                    Result.Success(body.toDomain())
+                    val config = body.toDomain()
+
+                    // Save to memory
+                    globalFilterCache = config
+
+                    // Save to DataStore
+                    try {
+                        val json = convertFilterConfigToJson(body)
+                        appPreferences.cacheGlobalFilterConfig(json)
+                        Timber.tag(LogTags.REPOSITORY).d("✅ Global filter config cached")
+                    } catch (e: Exception) {
+                        Timber.tag(LogTags.REPOSITORY).e(e, "Failed to cache global filter")
+                    }
+
+                    Result.Success(config)
                 } else {
                     Timber.tag(LogTags.REPOSITORY).e("❌ Failed to load global filter config: success=false")
                     Result.Error(Exception("Failed to load global filter config"))
@@ -83,28 +150,104 @@ class FilterRepository @Inject constructor(
         }
     }
 
-    // Simple JSON parser without Gson
+    // ✅ Fixed JSON parser - use Gson or Moshi
     private fun parseFilterConfigFromJson(json: String): FilterConfig? {
         return try {
-            // Basic JSON parsing - extract values manually
-            // Since the structure is consistent, we can parse it
-            // For now, return null and fetch from API
-            // You can implement full JSON parsing here if needed
-            Timber.tag(LogTags.REPOSITORY).d("Parsing JSON manually")
-            null
+            // Option 1: Using Gson
+            val gson = com.google.gson.Gson()
+            val response = gson.fromJson(json, FilterConfigResponse::class.java)
+            response.toDomain()
+
+            // Option 2: Using Moshi
+            // val moshi = Moshi.Builder().build()
+            // val adapter = moshi.adapter(FilterConfigResponse::class.java)
+            // val response = adapter.fromJson(json)
+            // response?.toDomain()
         } catch (e: Exception) {
             Timber.tag(LogTags.REPOSITORY).e(e, "Failed to parse cached JSON")
             null
         }
     }
 
-    // Convert FilterConfigResponse to JSON string
+    // ✅ Fixed JSON serializer
     private fun convertFilterConfigToJson(response: Any): String {
-        // Build JSON string manually
-        return buildString {
-            append("{\"success\":true,\"filter_groups\":[")
-            // This is simplified - you'll need to properly serialize
-            // For now, return empty JSON to skip caching
+        return try {
+            val gson = com.google.gson.Gson()
+            gson.toJson(response)
+        } catch (e: Exception) {
+            Timber.tag(LogTags.REPOSITORY).e(e, "Failed to serialize filter config")
+            "{}"
         }
+    }
+// In FilterRepository.kt
+
+    /**
+     * ✅ Load filters from DataStore into Memory IMMEDIATELY
+     * This is called when the app starts - before the user can interact
+     * It takes < 100ms because it's just reading from DataStore
+     */
+    override suspend fun warmUpCache() {
+        Timber.tag(LogTags.REPOSITORY).d("🔥 Warming up filter cache from DataStore...")
+        val startTime = System.currentTimeMillis()
+
+        val categoryIds = listOf(1, 2, 3, 4)
+        var loadedCount = 0
+
+        categoryIds.forEach { categoryId ->
+            try {
+                // Check if already in memory
+                if (categoryFilterCache.containsKey(categoryId)) {
+                    Timber.tag(LogTags.REPOSITORY).d("✅ Category $categoryId already in memory")
+                    return@forEach
+                }
+
+                // Load from DataStore
+                val cachedJson = appPreferences.getCachedFilterConfig(categoryId)
+                if (cachedJson != null) {
+                    val config = parseFilterConfigFromJson(cachedJson)
+                    if (config != null) {
+                        categoryFilterCache[categoryId] = config
+                        loadedCount++
+                        Timber.tag(LogTags.REPOSITORY).d("✅ Loaded category $categoryId from DataStore to Memory")
+                    } else {
+                        Timber.tag(LogTags.REPOSITORY).d("⚠️ Failed to parse category $categoryId from DataStore")
+                    }
+                } else {
+                    Timber.tag(LogTags.REPOSITORY).d("⏭️ No cached data for category $categoryId")
+                }
+            } catch (e: Exception) {
+                Timber.tag(LogTags.REPOSITORY).e(e, "❌ Failed to load category $categoryId from DataStore")
+            }
+        }
+
+        val elapsed = System.currentTimeMillis() - startTime
+        Timber.tag(LogTags.REPOSITORY).d("✅ Cache warmed up: $loadedCount categories loaded in ${elapsed}ms")
+    }
+    override suspend fun preloadCategoryFilters(categoryIds: List<Int>) {
+        Timber.tag(LogTags.REPOSITORY).d("🔄 Preloading ${categoryIds.size} category filters")
+
+        kotlinx.coroutines.coroutineScope {
+            categoryIds.forEach { categoryId ->
+                launch {
+                    try {
+                        getFilterConfig(categoryId)
+                        Timber.tag(LogTags.REPOSITORY).d("✅ Preloaded filter for category: $categoryId")
+                    } catch (e: Exception) {
+                        Timber.tag(LogTags.REPOSITORY).e(e, "⚠️ Failed to preload filter for category $categoryId")
+                    }
+                }
+            }
+        }
+
+        Timber.tag(LogTags.REPOSITORY).d("✅ All ${categoryIds.size} filters preloaded")
+    }
+
+    // ✅ Clear all caches (useful for logout or force refresh)
+    suspend fun clearAllCaches() {
+        categoryFilterCache.clear()
+        globalFilterCache = null
+        appPreferences.clearAllCategoryFilterCaches()
+        appPreferences.clearGlobalFilterCache()
+        Timber.tag(LogTags.REPOSITORY).d("🗑️ All filter caches cleared")
     }
 }

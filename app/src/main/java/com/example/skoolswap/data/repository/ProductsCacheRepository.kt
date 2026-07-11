@@ -57,6 +57,26 @@ class ProductsCacheRepository @Inject constructor(
             Timber.tag(LogTags.REPOSITORY).e(e, "Failed to cache products")
         }
     }
+    override suspend fun preload() {
+        try {
+            Timber.tag(LogTags.REPOSITORY).d("🔄 Preloading products cache...")
+
+            // Get count of cached items to verify cache is working
+            val cacheCount = productsCacheDao.getCacheCount()
+
+            if (cacheCount > 0) {
+                Timber.tag(LogTags.REPOSITORY).d("✅ Products cache is ready with $cacheCount entries")
+            } else {
+                Timber.tag(LogTags.REPOSITORY).d("✅ Products cache is empty but ready for use")
+            }
+
+            // Note: We don't load everything here because that would be expensive
+            // Data is loaded on-demand when needed, but the cache is ready
+
+        } catch (e: Exception) {
+            Timber.tag(LogTags.REPOSITORY).e(e, "❌ Failed to preload products cache")
+        }
+    }
 
     override suspend fun getCachedProducts(
         cacheKey: String,

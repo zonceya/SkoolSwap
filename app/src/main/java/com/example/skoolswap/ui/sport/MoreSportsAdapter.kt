@@ -2,6 +2,8 @@ package com.example.skoolswap.ui.sport
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.skoolswap.databinding.ItemChipWhiteBinding
 import com.example.skoolswap.domain.model.SportItem
@@ -9,14 +11,10 @@ import com.example.skoolswap.utils.extensions.dpToPx
 
 class MoreSportsAdapter(
     private val onItemClick: (SportItem) -> Unit
-) : RecyclerView.Adapter<MoreSportsAdapter.ViewHolder>() {
+) : ListAdapter<SportItem, MoreSportsAdapter.ViewHolder>(SportDiffCallback()) {
 
-    private var items: List<SportItem> = emptyList()
-
-    fun submitList(newItems: List<SportItem>) {
-        items = newItems
-        notifyDataSetChanged()
-    }
+    // ✅ REMOVED: custom submitList() - use parent's implementation
+    // Just call adapter.submitList(items) from Fragment
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ItemChipWhiteBinding.inflate(
@@ -26,10 +24,18 @@ class MoreSportsAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(items[position])
+        holder.bind(getItem(position))
     }
 
-    override fun getItemCount(): Int = items.size
+    class SportDiffCallback : DiffUtil.ItemCallback<SportItem>() {
+        override fun areItemsTheSame(oldItem: SportItem, newItem: SportItem): Boolean {
+            return oldItem.id == newItem.id
+        }
+
+        override fun areContentsTheSame(oldItem: SportItem, newItem: SportItem): Boolean {
+            return oldItem == newItem
+        }
+    }
 
     inner class ViewHolder(
         private val binding: ItemChipWhiteBinding

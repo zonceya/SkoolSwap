@@ -624,31 +624,26 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        Timber.tag(LogTags.UI).d("🔄 onResume - refreshing toolbar")
+        Timber.tag(LogTags.UI).d("🔄 onResume called")
 
+        // ✅ Only handle the camera/gallery return edge case
         if (viewModel.suppressNextResumeRefresh) {
             viewModel.suppressNextResumeRefresh = false
-            Timber.tag(LogTags.UI).d("⏭️ Skipping resume refresh - returning from camera/gallery")
+            Timber.tag(LogTags.UI).d("⏭️ Skipping toolbar refresh - returning from camera/gallery")
             refreshToolbarVisibility()
             updateStatusBar()
             return
         }
 
+        // ✅ Minimal: just ensure UI state is correct
         refreshToolbarVisibility()
         updateStatusBar()
-        navHeaderViewModel.refresh()
 
-        val now = SystemClock.elapsedRealtime()
-        if (now - lastForegroundRefreshAt > MIN_REFRESH_INTERVAL_MS) {
-            lastForegroundRefreshAt = now
+        // ❌ REMOVED: navHeaderViewModel.refresh() - This should be event-driven
+        // ❌ REMOVED: All workerManager sync calls - Moved to ProcessLifecycleOwner
 
-            lifecycleScope.launch {
-                launch { workerManager.refreshTokenNow() }
-                launch { workerManager.syncHomeFeedNow() }
-                launch { workerManager.scheduleProductsSync() }
-                launch { workerManager.cleanupImagesNow() }
-            }
-        }
+        // ✅ Note: Nav header will refresh when user state changes
+        // via the collector in setupNavigationHeader()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

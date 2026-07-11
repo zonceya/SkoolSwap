@@ -40,7 +40,7 @@ class WorkerManager @Inject constructor(
             val request = ProductsSyncWorker.createOneTimeRequest()
             workManager.enqueueUniqueWork(
                 PRODUCTS_SYNC_WORK,
-                ExistingWorkPolicy.REPLACE,
+                ExistingWorkPolicy.KEEP,  // ✅ Don't cancel existing work
                 request
             )
             Timber.d("✅ Products sync scheduled")
@@ -49,13 +49,12 @@ class WorkerManager @Inject constructor(
         }
     }
 
-    // ✅ FIXED: Use ITEM_CACHE_WORK with itemId appended
     fun cacheItemNow(itemId: String) {
         try {
             val request = ItemCacheWorker.createOneTimeRequest(itemId)
             workManager.enqueueUniqueWork(
-                "${ITEM_CACHE_WORK}_${itemId}",  // ← FIXED: Added underscore between constants
-                ExistingWorkPolicy.REPLACE,
+                "${ITEM_CACHE_WORK}_${itemId}",
+                ExistingWorkPolicy.KEEP,  // ✅ Don't cancel existing work
                 request
             )
             Timber.d("🔄 Item cache triggered for: $itemId")
@@ -69,10 +68,10 @@ class WorkerManager @Inject constructor(
             val request = HomeFeedSyncWorker.createOneTimeRequest()
             workManager.enqueueUniqueWork(
                 HOME_FEED_SYNC_WORK,
-                ExistingWorkPolicy.REPLACE,
+                ExistingWorkPolicy.KEEP,  // ✅ Don't cancel existing work
                 request
             )
-            Timber.d("🔄 Manual home feed sync triggered")
+            Timber.d("🔄 Home feed sync requested (will run if not already running)")
         } catch (e: Exception) {
             Timber.e(e, "❌ Failed to trigger home feed sync")
         }
@@ -83,7 +82,7 @@ class WorkerManager @Inject constructor(
             val request = HomeFeedSyncWorker.createOneTimeRequest()
             workManager.enqueueUniqueWork(
                 HOME_FEED_SYNC_WORK,
-                ExistingWorkPolicy.REPLACE,
+                ExistingWorkPolicy.KEEP,  // ✅ Don't cancel existing work
                 request
             )
             Timber.d("✅ Home feed sync scheduled (on-login)")
@@ -92,13 +91,12 @@ class WorkerManager @Inject constructor(
         }
     }
 
-    // ==================== TOKEN REFRESH ====================
     fun scheduleTokenRefresh() {
         try {
             val request = TokenRefreshWorker.createPeriodicRequest()
             workManager.enqueueUniquePeriodicWork(
                 TOKEN_REFRESH_WORK,
-                ExistingPeriodicWorkPolicy.REPLACE,
+                ExistingPeriodicWorkPolicy.KEEP,  // ✅ Don't cancel existing work
                 request
             )
             Timber.d("✅ Token refresh worker scheduled")
@@ -116,13 +114,12 @@ class WorkerManager @Inject constructor(
         }
     }
 
-    // ==================== HOME FEED SYNC ====================
     fun scheduleHomeFeedSync() {
         try {
             val request = HomeFeedSyncWorker.createOneTimeRequest()
             workManager.enqueueUniqueWork(
                 HOME_FEED_SYNC_WORK,
-                ExistingWorkPolicy.REPLACE,
+                ExistingWorkPolicy.KEEP,  // ✅ Don't cancel existing work
                 request
             )
             Timber.d("✅ Home feed sync scheduled (on-demand)")
@@ -140,13 +137,12 @@ class WorkerManager @Inject constructor(
         }
     }
 
-    // ==================== IMAGE CLEANUP ====================
     fun scheduleImageCleanup() {
         try {
             val request = ImageCleanupWorker.createPeriodicRequest()
             workManager.enqueueUniquePeriodicWork(
                 IMAGE_CLEANUP_WORK,
-                ExistingPeriodicWorkPolicy.REPLACE,
+                ExistingPeriodicWorkPolicy.KEEP,  // ✅ Don't cancel existing work
                 request
             )
             Timber.d("✅ Image cleanup worker scheduled")
@@ -164,13 +160,12 @@ class WorkerManager @Inject constructor(
         }
     }
 
-    // ==================== OFFLINE SYNC ====================
     fun scheduleOfflineSync() {
         try {
             val request = OfflineSyncWorker.createPeriodicRequest()
             workManager.enqueueUniquePeriodicWork(
                 OFFLINE_SYNC_WORK,
-                ExistingPeriodicWorkPolicy.REPLACE,
+                ExistingPeriodicWorkPolicy.KEEP,  // ✅ Don't cancel existing work
                 request
             )
             Timber.d("✅ Offline sync worker scheduled")
@@ -188,19 +183,17 @@ class WorkerManager @Inject constructor(
         }
     }
 
-    // ==================== MANUAL TRIGGERS ====================
-
     fun refreshTokenNow() {
         try {
             val request = TokenRefreshWorker.createOneTimeRequest()
             workManager.enqueueUniqueWork(
                 TOKEN_REFRESH_WORK,
-                ExistingWorkPolicy.REPLACE,
+                ExistingWorkPolicy.KEEP,  // ✅ Don't cancel existing work
                 request
             )
-            Timber.d("🔄 Manual token refresh triggered")
+            Timber.d("🔄 Token refresh requested")
         } catch (e: Exception) {
-            Timber.e(e, "❌ Failed to trigger manual token refresh")
+            Timber.e(e, "❌ Failed to trigger token refresh")
         }
     }
 
@@ -209,12 +202,12 @@ class WorkerManager @Inject constructor(
             val request = ImageCleanupWorker.createOneTimeRequest()
             workManager.enqueueUniqueWork(
                 IMAGE_CLEANUP_WORK,
-                ExistingWorkPolicy.REPLACE,
+                ExistingWorkPolicy.KEEP,  // ✅ Don't cancel existing work
                 request
             )
-            Timber.d("🔄 Manual image cleanup triggered")
+            Timber.d("🔄 Image cleanup requested")
         } catch (e: Exception) {
-            Timber.e(e, "❌ Failed to trigger manual image cleanup")
+            Timber.e(e, "❌ Failed to trigger image cleanup")
         }
     }
 
@@ -223,16 +216,14 @@ class WorkerManager @Inject constructor(
             val request = OfflineSyncWorker.createOneTimeRequest()
             workManager.enqueueUniqueWork(
                 OFFLINE_SYNC_WORK,
-                ExistingWorkPolicy.REPLACE,
+                ExistingWorkPolicy.KEEP,  // ✅ Don't cancel existing work
                 request
             )
-            Timber.d("🔄 Manual offline sync triggered")
+            Timber.d("🔄 Manual offline sync requested")
         } catch (e: Exception) {
             Timber.e(e, "❌ Failed to trigger manual offline sync")
         }
     }
-
-    // ==================== CANCEL ALL ====================
 
     fun cancelAllWorkers() {
         try {
@@ -240,7 +231,7 @@ class WorkerManager @Inject constructor(
             workManager.cancelUniqueWork(HOME_FEED_SYNC_WORK)
             workManager.cancelUniqueWork(IMAGE_CLEANUP_WORK)
             workManager.cancelUniqueWork(OFFLINE_SYNC_WORK)
-            workManager.cancelUniqueWork(PRODUCTS_SYNC_WORK)  // ← Added this
+            workManager.cancelUniqueWork(PRODUCTS_SYNC_WORK)
             Timber.d("❌ All workers cancelled")
         } catch (e: Exception) {
             Timber.e(e, "❌ Failed to cancel workers")
@@ -252,7 +243,7 @@ class WorkerManager @Inject constructor(
             val request = ItemCreationWorker.createOneTimeRequest(itemId, imageUris)
             workManager.enqueueUniqueWork(
                 "item_creation_$itemId",
-                ExistingWorkPolicy.REPLACE,
+                ExistingWorkPolicy.KEEP,  // ✅ Don't cancel existing work
                 request
             )
             Timber.d("✅ Item creation worker scheduled for: $itemId")
@@ -263,11 +254,10 @@ class WorkerManager @Inject constructor(
 
     fun retryFailedItem(itemId: String) {
         try {
-            // Get the item and retry
             val request = ItemCreationWorker.createOneTimeRequest(itemId, emptyList())
             workManager.enqueueUniqueWork(
                 "item_retry_$itemId",
-                ExistingWorkPolicy.REPLACE,
+                ExistingWorkPolicy.KEEP,  // ✅ Don't cancel existing work
                 request
             )
             Timber.d("🔄 Retry scheduled for item: $itemId")

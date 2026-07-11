@@ -2,7 +2,6 @@ package com.example.skoolswap.ui.home.viewholders
 
 import android.content.res.Configuration
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import androidx.core.content.ContextCompat
 import androidx.navigation.findNavController
@@ -22,12 +21,23 @@ class EssentialsViewHolder(
     private val onItemClick: (Item, String) -> Unit
 ) : RecyclerView.ViewHolder(binding.root) {
 
-    fun bind(section: Section.Essentials) {
-        Timber.tag(TAG).d("=== BINDING ESSENTIALS SECTION ===")
+    // ✅ Create adapter ONCE and reuse it
+    private val gridAdapter = EssentialsGridAdapter(
+        items = emptyList(),
+        onCategoryClick = { categoryItem ->
+            handleCategoryClick(categoryItem)
+        }
+    )
 
-        binding.header.sectionTitle.text = section.title
+    init {
+        // ✅ Setup RecyclerView ONCE in init
+        binding.essentialsRecycler.apply {
+            layoutManager = GridLayoutManager(itemView.context, 2)
+            adapter = gridAdapter
+            setHasFixedSize(true)
+        }
 
-        // Set text color based on theme
+        // ✅ Set header color in init (themed)
         val isDarkMode = (itemView.context.resources.configuration.uiMode and
                 Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
 
@@ -39,9 +49,23 @@ class EssentialsViewHolder(
 
         binding.header.sectionTitle.setTextColor(textColor)
         binding.header.viewAll.visibility = View.GONE
+    }
+
+    fun bind(section: Section.Essentials) {
+        Timber.tag(TAG).d("=== BINDING ESSENTIALS SECTION ===")
+
+        binding.header.sectionTitle.text = section.title
         Timber.tag(TAG).d("Header title set to: ${section.title}")
 
-        // Create category cards with their display names and category IDs
+        // Build category cards
+        val categoryCards = buildCategoryCards(section)
+        Timber.tag(TAG).d("Total category cards: ${categoryCards.size}")
+
+        // ✅ Just update the adapter's data - NO new adapter!
+        gridAdapter.updateItems(categoryCards)
+    }
+
+    private fun buildCategoryCards(section: Section.Essentials): List<EssentialsCategoryItem> {
         val categoryCards = mutableListOf<EssentialsCategoryItem>()
 
         // Uniforms category (ID: 1)
@@ -135,33 +159,19 @@ class EssentialsViewHolder(
         categoryCards.add(accessoriesItem)
         Timber.tag(TAG).d("✅ Added Accessories card")
 
-        Timber.tag(TAG).d("Total category cards: ${categoryCards.size}")
-
-        // Setup grid adapter
-        val spanCount = 2
-        val adapter = EssentialsGridAdapter(categoryCards) { categoryItem ->
-            handleCategoryClick(categoryItem)
-        }
-
-        binding.essentialsRecycler.apply {
-            layoutManager = GridLayoutManager(itemView.context, spanCount)
-            this.adapter = adapter
-            Timber.tag(TAG).d("RecyclerView configured with $spanCount columns")
-        }
+        return categoryCards
     }
 
     private fun handleCategoryClick(categoryItem: EssentialsCategoryItem) {
         Timber.tag(TAG)
             .d("Category clicked: ${categoryItem.displayName}, categoryId: ${categoryItem.categoryId}")
 
-        // Navigate to ProductsFragment with category ID for filters
         val bundle = Bundle().apply {
             putString("SECTION_TYPE", categoryItem.categoryType)
             putString("SECTION_TITLE", categoryItem.displayName)
             putInt("CATEGORY_ID", categoryItem.categoryId)
         }
 
-        // Navigate using the root view's nav controller
         itemView.findNavController().navigate(
             R.id.action_homeFragment_to_productsFragment,
             bundle

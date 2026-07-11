@@ -3,6 +3,8 @@ package com.example.skoolswap.ui.home.adapter
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
@@ -13,10 +15,14 @@ import java.text.NumberFormat
 import java.util.Locale
 
 class HorizontalItemsAdapter(
-    private val items: List<Item>,
     private val sectionType: String,
     private val onItemClick: (Item, String) -> Unit
-) : RecyclerView.Adapter<HorizontalItemsAdapter.ViewHolder>() {
+) : ListAdapter<Item, HorizontalItemsAdapter.ViewHolder>(ItemDiffCallback()) {
+
+    // ✅ Convenience method - delegates to submitList()
+    fun updateItems(newItems: List<Item>) {
+        submitList(newItems)
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ItemHomeProductBinding.inflate(
@@ -26,10 +32,18 @@ class HorizontalItemsAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(items[position])
+        holder.bind(getItem(position))
     }
 
-    override fun getItemCount() = items.size
+    class ItemDiffCallback : DiffUtil.ItemCallback<Item>() {
+        override fun areItemsTheSame(oldItem: Item, newItem: Item): Boolean {
+            return oldItem.id == newItem.id
+        }
+
+        override fun areContentsTheSame(oldItem: Item, newItem: Item): Boolean {
+            return oldItem == newItem
+        }
+    }
 
     inner class ViewHolder(
         private val binding: ItemHomeProductBinding
@@ -39,21 +53,16 @@ class HorizontalItemsAdapter(
             binding.root.setOnClickListener {
                 val position = adapterPosition
                 if (position != RecyclerView.NO_POSITION) {
-                    onItemClick(items[position], sectionType)
+                    onItemClick(getItem(position), sectionType)
                 }
             }
         }
 
         fun bind(item: Item) {
-            // Set product title
             binding.productTitle.text = item.name
-
-            // Format price (e.g., "R1,060.00")
             binding.productPrice.text = formatPrice(item.price)
 
-            // Load product image - REMOVED all overrides
             val imageUrl = item.resolveImageUrl()
-
             if (!imageUrl.isNullOrEmpty()) {
                 Glide.with(binding.root.context)
                     .load(imageUrl)
@@ -61,17 +70,13 @@ class HorizontalItemsAdapter(
                         RequestOptions()
                             .placeholder(R.drawable.ic_create_item_placeholder)
                             .error(R.drawable.ic_create_item_placeholder)
-                            .fitCenter()  // ← Changed from centerCrop()
+                            .fitCenter()
                     )
                     .into(binding.productImage)
             } else {
                 binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
             }
 
-            // REMOVED: binding.productImage.scaleType override
-            // REMOVED: manual layout params height override
-
-            // Handle SOLD badge
             val isSold = item.status == "sold" || item.quantity <= 0
             if (isSold) {
                 binding.soldBadge.visibility = View.VISIBLE

@@ -510,7 +510,8 @@ class ProductsFragment : Fragment() {
                         binding.productsRecycler.visibility = View.VISIBLE
                         binding.errorLayout.visibility = View.GONE
 
-                        productsAdapter.submitList(products.toList())
+                        // ✅ Submit list to adapter
+                        productsAdapter.submitList(products)
                         rebuildLocalFilters()
 
                         val subCategoryId = arguments?.getInt("SUB_CATEGORY_ID")
@@ -582,7 +583,9 @@ class ProductsFragment : Fragment() {
                         binding.emptySearchResults.visibility = View.GONE
                         binding.searchResultsContainer.visibility = View.VISIBLE
                         binding.productsRecycler.visibility = View.VISIBLE
-                        productsAdapter.submitList(results.toList())
+
+                        // ✅ Submit search results to adapter
+                        productsAdapter.submitList(results)
 
                         val userSchoolId = viewModel.getUserSchoolId()
                         val hasSchoolItems = if (userSchoolId != null) {

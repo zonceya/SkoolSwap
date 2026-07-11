@@ -23,7 +23,10 @@ import com.example.skoolswap.utils.extensions.formatViewCount
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 
 @AndroidEntryPoint
@@ -187,7 +190,7 @@ class ShopFragment : Fragment() {
             binding.productRecyclerView.visibility = View.VISIBLE
 
             val sections = groupItemsByCategory(allItems)
-            categorySectionAdapter.submitSections(sections)
+            categorySectionAdapter.submitList(sections)
 
             binding.productRecyclerView.layoutManager = LinearLayoutManager(requireContext())
             binding.productRecyclerView.adapter = categorySectionAdapter
@@ -212,6 +215,7 @@ class ShopFragment : Fragment() {
                 .placeholder(R.drawable.ic_user)
                 .error(R.drawable.ic_user)
                 .circleCrop()
+                .override(216, 216)
                 .timeout(10000)
                 .into(binding.storeProfileImage)
         } catch (e: Exception) {
@@ -272,7 +276,7 @@ class ShopFragment : Fragment() {
 
                 if (isCategoriesView) {
                     val sections = groupItemsByCategory(items)
-                    categorySectionAdapter.submitSections(sections)
+                    categorySectionAdapter.submitList(sections)
                     binding.productRecyclerView.layoutManager = LinearLayoutManager(requireContext())
                     binding.productRecyclerView.adapter = categorySectionAdapter
                 } else {
@@ -285,19 +289,20 @@ class ShopFragment : Fragment() {
             }
         }
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.currentShop.collectLatest { shop ->
+        viewLifecycleOwner.lifecycleScope.launch {  // ← COROUTINE SCOPE
+            viewModel.currentShop.collectLatest { shop ->  // ← Called INSIDE the coroutine
                 shop?.let {
-                    Timber.tag(LogTags.UI).d("Shop loaded: ${it.name}")
                     binding.storeName.text = it.displayName.ifEmpty { it.name }
-                    if (it.profilePictureUrl.isNotEmpty()) {
-                        loadProfilePicture(it.profilePictureUrl)
+
+                    val picUrl = it.profilePictureUrl.takeIf { p -> p.isNotEmpty() }
+                        ?: withTimeoutOrNull(2000) {
+                            authRepository.getServerUser().filterNotNull().first()
+                        }?.profilePictureUrl
+
+                    if (!picUrl.isNullOrEmpty()) {
+                        loadProfilePicture(picUrl)
                     } else {
-                        authRepository.getServerUser().collect { user ->
-                            user?.profilePictureUrl?.let { url ->
-                                if (url.isNotEmpty()) loadProfilePicture(url)
-                            }
-                        }
+                        binding.storeProfileImage.setImageResource(R.drawable.ic_user)
                     }
                 }
             }

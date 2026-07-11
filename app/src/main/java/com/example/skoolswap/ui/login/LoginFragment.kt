@@ -46,7 +46,7 @@ class LoginFragment : Fragment() {
         private const val GOOGLE_SIGN_IN_TIMEOUT_MS = 15000L
         private const val EMAIL_SIGN_IN_TIMEOUT_MS = 10000L
         private const val FADE_ANIMATION_DURATION_MS = 300L
-        private const val NAVIGATION_DELAY_MS = 350L
+        private const val NAVIGATION_DELAY_MS = 600L
     }
 
     override fun onCreateView(
@@ -163,16 +163,19 @@ class LoginFragment : Fragment() {
         }
 
         if (show) {
+            // 🔥 KEY FIX: Bring to front
+            overlay.bringToFront()
+
             overlay.visibility = View.VISIBLE
             overlay.alpha = 0f
             overlay.animate()
                 .alpha(1f)
-                .setDuration(FADE_ANIMATION_DURATION_MS)
+                .setDuration(300)
                 .start()
         } else {
             overlay.animate()
                 .alpha(0f)
-                .setDuration(FADE_ANIMATION_DURATION_MS)
+                .setDuration(300)
                 .setListener(object : AnimatorListenerAdapter() {
                     override fun onAnimationEnd(animation: Animator) {
                         overlay.visibility = View.GONE

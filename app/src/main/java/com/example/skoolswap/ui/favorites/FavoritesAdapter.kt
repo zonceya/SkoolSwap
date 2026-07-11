@@ -2,6 +2,8 @@ package com.example.skoolswap.ui.favorites
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
@@ -13,15 +15,10 @@ import timber.log.Timber
 
 class FavoritesAdapter(
     private val onItemClick: (String) -> Unit
-) : RecyclerView.Adapter<FavoritesAdapter.FavoriteViewHolder>() {
+) : ListAdapter<Item, FavoritesAdapter.FavoriteViewHolder>(FavoriteDiffCallback()) {
 
-    private var items = listOf<Item>()
-
-    fun submitList(newItems: List<Item>) {
-        items = newItems
-        notifyDataSetChanged()
-        Timber.tag(LogTags.UI).d("Submitted ${newItems.size} favorites")
-    }
+    // ✅ REMOVED: custom submitList() - use parent's implementation
+    // Just call adapter.submitList(items) from Fragment
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FavoriteViewHolder {
         val binding = ItemFavoriteCardBinding.inflate(
@@ -33,10 +30,18 @@ class FavoritesAdapter(
     }
 
     override fun onBindViewHolder(holder: FavoriteViewHolder, position: Int) {
-        holder.bind(items[position])
+        holder.bind(getItem(position))
     }
 
-    override fun getItemCount(): Int = items.size
+    class FavoriteDiffCallback : DiffUtil.ItemCallback<Item>() {
+        override fun areItemsTheSame(oldItem: Item, newItem: Item): Boolean {
+            return oldItem.id == newItem.id
+        }
+
+        override fun areContentsTheSame(oldItem: Item, newItem: Item): Boolean {
+            return oldItem == newItem
+        }
+    }
 
     inner class FavoriteViewHolder(
         private val binding: ItemFavoriteCardBinding
@@ -47,11 +52,10 @@ class FavoritesAdapter(
                 productName.text = item.name
                 productPrice.text = "R${String.format("%.2f", item.price)}"
 
-                val imageUrl = when {
-                    !item.coverImage.isNullOrBlank() -> item.coverImage
-                    item.images.isNotEmpty() -> item.images.first().url
-                    else -> null
-                }
+                // ✅ Use the helper method for consistency
+                val imageUrl = item.resolveImageUrl()
+                    ?: item.coverImage
+                    ?: item.images.firstOrNull()?.url
 
                 if (!imageUrl.isNullOrBlank()) {
                     Glide.with(binding.root.context)

@@ -1,4 +1,3 @@
-// ui/home/viewholders/TrendingViewHolder.kt
 package com.example.skoolswap.ui.home.viewholders
 
 import android.content.res.Configuration
@@ -18,12 +17,33 @@ class TrendingViewHolder(
     private val onViewAllClick: (String) -> Unit
 ) : RecyclerView.ViewHolder(binding.root) {
 
+    // ✅ FIXED: No 'items' parameter
+    private val itemsAdapter = HorizontalItemsAdapter(
+        sectionType = "trending",
+        onItemClick = onItemClick
+    )
+
+    init {
+        binding.trendingRecycler.apply {
+            layoutManager = LinearLayoutManager(
+                itemView.context,
+                LinearLayoutManager.HORIZONTAL,
+                false
+            )
+            adapter = itemsAdapter
+            setHasFixedSize(true)
+        }
+
+        binding.root.findViewById<TextView>(R.id.viewAll)?.setOnClickListener {
+            onViewAllClick("trending")
+        }
+    }
+
     fun bind(section: Section.Trending) {
-        // Set header title (from included header)
         val sectionTitle = binding.root.findViewById<TextView>(R.id.sectionTitle)
         val viewAll = binding.root.findViewById<TextView>(R.id.viewAll)
 
-        sectionTitle.text = section.title
+        sectionTitle?.text = section.title
 
         val isDarkMode = (itemView.context.resources.configuration.uiMode and
                 Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
@@ -34,21 +54,9 @@ class TrendingViewHolder(
             ContextCompat.getColor(itemView.context, R.color.black)
         }
 
-        sectionTitle.setTextColor(textColor)
-        viewAll.setTextColor(textColor)
+        sectionTitle?.setTextColor(textColor)
+        viewAll?.setTextColor(textColor)
 
-        // Setup horizontal recycler
-        val adapter = HorizontalItemsAdapter(section.items, section.type, onItemClick)
-        binding.trendingRecycler.apply {
-            layoutManager = LinearLayoutManager(
-                itemView.context,
-                LinearLayoutManager.HORIZONTAL,
-                false
-            )
-            this.adapter = adapter
-        }
-        binding.header.viewAll.setOnClickListener {
-            onViewAllClick(section.type)
-        }
+        itemsAdapter.updateItems(section.items)
     }
 }

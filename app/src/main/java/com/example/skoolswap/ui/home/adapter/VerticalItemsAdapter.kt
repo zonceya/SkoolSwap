@@ -7,33 +7,24 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
-import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestOptions
 import com.example.skoolswap.R
-import com.example.skoolswap.databinding.ItemHomeRecentItemBinding
+import com.example.skoolswap.databinding.ItemHomeVerticalBinding
 import com.example.skoolswap.domain.model.Item
 import java.text.NumberFormat
 import java.util.Locale
 
-class RecentItemsAdapter(
-    private val onItemClick: (Item) -> Unit,
-    private val maxItems: Int = 4
-) : ListAdapter<Item, RecentItemsAdapter.ViewHolder>(DIFF_CALLBACK) {
+class VerticalItemsAdapter(
+    private val sectionType: String,
+    private val onItemClick: (Item, String) -> Unit
+) : ListAdapter<Item, VerticalItemsAdapter.ViewHolder>(ItemDiffCallback()) {
 
-    companion object {
-        private val DIFF_CALLBACK = object : DiffUtil.ItemCallback<Item>() {
-            override fun areItemsTheSame(old: Item, new: Item) = old.id == new.id
-            override fun areContentsTheSame(old: Item, new: Item) = old == new
-        }
-    }
-
-    // ✅ Convenience method - limits items to maxItems
     fun updateItems(newItems: List<Item>) {
-        submitList(newItems.take(maxItems))
+        submitList(newItems)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val binding = ItemHomeRecentItemBinding.inflate(
+        val binding = ItemHomeVerticalBinding.inflate(
             LayoutInflater.from(parent.context), parent, false
         )
         return ViewHolder(binding)
@@ -43,57 +34,67 @@ class RecentItemsAdapter(
         holder.bind(getItem(position))
     }
 
+    class ItemDiffCallback : DiffUtil.ItemCallback<Item>() {
+        override fun areItemsTheSame(oldItem: Item, newItem: Item): Boolean {
+            return oldItem.id == newItem.id
+        }
+
+        override fun areContentsTheSame(oldItem: Item, newItem: Item): Boolean {
+            return oldItem == newItem
+        }
+    }
+
     inner class ViewHolder(
-        private val binding: ItemHomeRecentItemBinding
+        private val binding: ItemHomeVerticalBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
         init {
             binding.root.setOnClickListener {
                 val position = adapterPosition
                 if (position != RecyclerView.NO_POSITION) {
-                    onItemClick(getItem(position))
+                    onItemClick(getItem(position), sectionType)
                 }
             }
         }
 
         fun bind(item: Item) {
-            binding.recentTitle.text = item.name
+            binding.productTitle.text = item.name
+            binding.productPrice.text = formatPrice(item.price)
 
-            // ✅ Use schoolName, fallback to brandName, then generic label
-            binding.recentSchool.text = when {
+            // School/Brand name
+            binding.productSchool.text = when {
                 !item.schoolName.isNullOrBlank() -> item.schoolName
                 !item.brandName.isNullOrBlank() -> item.brandName
                 else -> "School Item"
             }
 
-            // ✅ Format price - remove trailing .00
-            val price = item.price
-            if (price > 0) {
-                binding.recentPrice.text = formatPrice(price)
-                binding.recentPrice.visibility = View.VISIBLE
+            val imageUrl = item.resolveImageUrl()
+            if (!imageUrl.isNullOrEmpty()) {
+                Glide.with(binding.root.context)
+                    .load(imageUrl)
+                    .apply(
+                        RequestOptions()
+                            .placeholder(R.drawable.ic_create_item_placeholder)
+                            .error(R.drawable.ic_create_item_placeholder)
+                            .centerCrop()
+                    )
+                    .into(binding.productImage)
             } else {
-                binding.recentPrice.visibility = View.GONE
+                binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
             }
 
-            // ✅ Sold badge
             val isSold = item.status == "sold" || item.quantity <= 0
-            binding.soldBadge.visibility = if (isSold) View.VISIBLE else View.GONE
+            if (isSold) {
+                binding.soldBadge.visibility = View.VISIBLE
+                binding.productTitle.alpha = 0.6f
+                binding.productPrice.alpha = 0.6f
+            } else {
+                binding.soldBadge.visibility = View.GONE
+                binding.productTitle.alpha = 1f
+                binding.productPrice.alpha = 1f
+            }
 
-            // ✅ Image - use resolveImageUrl() helper if available, otherwise fallback
-            val imageUrl = item.resolveImageUrl()
-                ?: item.images?.firstOrNull()?.url
-                ?: item.coverImage
 
-            Glide.with(binding.root.context)
-                .load(imageUrl)
-                .apply(
-                    RequestOptions()
-                        .placeholder(R.drawable.ic_create_item_placeholder)
-                        .error(R.drawable.ic_create_item_placeholder)
-                        .fitCenter()
-                )
-                .transition(DrawableTransitionOptions.withCrossFade())
-                .into(binding.recentImage)
         }
 
         private fun formatPrice(price: Double): String {
@@ -101,14 +102,12 @@ class RecentItemsAdapter(
                 val formatter = NumberFormat.getCurrencyInstance(Locale("en", "ZA"))
                 formatter.currency = java.util.Currency.getInstance("ZAR")
                 val formatted = formatter.format(price)
-                // ✅ Remove trailing .00 if present
                 if (formatted.endsWith(".00")) {
                     formatted.replace(".00", "")
                 } else {
                     formatted
                 }
             } catch (e: Exception) {
-                // ✅ Fallback formatting
                 if (price % 1.0 == 0.0) {
                     "R${String.format("%,d", price.toInt())}"
                 } else {

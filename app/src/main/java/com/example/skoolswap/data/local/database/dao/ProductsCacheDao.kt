@@ -26,4 +26,6 @@ interface ProductsCacheDao {
 
     @Query("DELETE FROM products_cache")
     suspend fun clearAll()
+    @Query("SELECT COUNT(*) FROM products_cache")
+    suspend fun getCacheCount(): Int
 }

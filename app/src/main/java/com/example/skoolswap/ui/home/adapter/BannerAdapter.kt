@@ -25,7 +25,11 @@ class BannerAdapter(
     private val retryDelayMs = 2000L
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BannerViewHolder {
-        val binding = ItemBannerBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        val binding = ItemBannerBinding.inflate(
+            LayoutInflater.from(parent.context),
+            parent,
+            false
+        )
         return BannerViewHolder(binding)
     }
 
@@ -41,14 +45,14 @@ class BannerAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
 
         private var retryCount = 0
-        val handler = Handler(Looper.getMainLooper())
+        private val handler = Handler(Looper.getMainLooper())
         private var currentUrl = ""
 
         fun bind(bannerItem: BannerItem) {
             retryCount = 0
             currentUrl = bannerItem.imageUrl
 
-            // Handle title
+            // ✅ Handle title
             if (!bannerItem.title.isNullOrEmpty()) {
                 binding.bannerTitle.text = bannerItem.title
                 binding.bannerTitle.visibility = View.VISIBLE
@@ -62,13 +66,16 @@ class BannerAdapter(
         }
 
         private fun loadImage(url: String) {
+            // ✅ Cancel any pending requests to avoid loading wrong image
+            Glide.with(binding.root.context)
+                .clear(binding.bannerImage)
+
             Glide.with(binding.root.context)
                 .load(url)
                 .override(397, 262)
                 .centerCrop()
-                // Glide automatically handles ETag/Last-Modified with these settings:
-                .diskCacheStrategy(DiskCacheStrategy.ALL) // Cache image + headers
-                .skipMemoryCache(false) // Keep in memory for speed
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .skipMemoryCache(false)
                 .placeholder(R.drawable.banner_placeholder)
                 .error(R.drawable.banner_error)
                 .listener(object : RequestListener<Drawable> {
@@ -81,7 +88,10 @@ class BannerAdapter(
                         if (retryCount < maxRetryCount) {
                             retryCount++
                             handler.postDelayed({
-                                loadImage(url)
+                                // ✅ Only retry if the view is still attached and URL hasn't changed
+                                if (currentUrl == url && binding.bannerImage.isAttachedToWindow) {
+                                    loadImage(url)
+                                }
                             }, retryDelayMs * retryCount)
                             return true
                         }
@@ -101,10 +111,26 @@ class BannerAdapter(
                 })
                 .into(binding.bannerImage)
         }
+
+        // ✅ Clean up when view is recycled
+        fun release() {
+            handler.removeCallbacksAndMessages(null)
+            Glide.with(binding.root.context).clear(binding.bannerImage)
+        }
     }
 
     override fun onViewRecycled(holder: BannerViewHolder) {
         super.onViewRecycled(holder)
-        holder.handler.removeCallbacksAndMessages(null)
+        holder.release()
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        super.onDetachedFromRecyclerView(recyclerView)
+        // ✅ Clean up all pending requests when adapter is detached
+        for (i in 0 until recyclerView.childCount) {
+            val child = recyclerView.getChildAt(i)
+            val holder = recyclerView.getChildViewHolder(child) as? BannerViewHolder
+            holder?.release()
+        }
     }
 }

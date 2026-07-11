@@ -9,10 +9,12 @@ import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.homefeed.HomeFeed
 import com.example.skoolswap.domain.model.homefeed.Section
 import com.example.skoolswap.domain.model.homefeed.getAllItems
+import com.example.skoolswap.domain.repository.FilterRepositoryInterface
 import com.example.skoolswap.domain.repository.HomeRepositoryInterface
 import com.example.skoolswap.domain.repository.ProductsCacheRepositoryInterface
 import com.example.skoolswap.domain.repository.ProductsRepositoryInterface
 import com.example.skoolswap.domain.repository.RankedItemsResult
+import com.example.skoolswap.domain.repository.ShopRepositoryInterface
 import com.example.skoolswap.domain.repository.UserSchoolRepositoryInterface
 import com.example.skoolswap.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,6 +26,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeout
 import timber.log.Timber
@@ -33,7 +38,8 @@ import javax.inject.Inject
 class HomeViewModel @Inject constructor(
     private val homeRepository: HomeRepositoryInterface,
     private val userSchoolRepository: UserSchoolRepositoryInterface,
-    private val productsRepository: ProductsRepositoryInterface,
+    private val filterRepository: FilterRepositoryInterface,
+    private val shopRepository: ShopRepositoryInterface,
     private val productsCacheRepository: ProductsCacheRepositoryInterface
 ) : ViewModel() {
 
@@ -49,6 +55,7 @@ class HomeViewModel @Inject constructor(
         private const val MAX_LOCAL_RESULTS = 30
     }
 
+    // ==================== STATE FLOWS (Data) ====================
     private val _homeFeed = MutableStateFlow<HomeFeed?>(null)
     val homeFeed: StateFlow<HomeFeed?> = _homeFeed.asStateFlow()
 
@@ -79,13 +86,17 @@ class HomeViewModel @Inject constructor(
     private val _serverItemsCount = MutableStateFlow(0)
     val serverItemsCount: StateFlow<Int> = _serverItemsCount.asStateFlow()
 
-    private val _isFromCache = MutableStateFlow(false)
-    val isFromCache: StateFlow<Boolean> = _isFromCache.asStateFlow()
+    // ❌ REMOVED: _isFromCache - no longer needed with SharedFlow events
+    // private val _isFromCache = MutableStateFlow(false)
+    // val isFromCache: StateFlow<Boolean> = _isFromCache.asStateFlow()
+
+    // ==================== EVENT FLOW (One-time notifications) ====================
+    private val _feedUpdateEvent = MutableSharedFlow<String>(replay = 0, extraBufferCapacity = 1)
+    val feedUpdateEvent: SharedFlow<String> = _feedUpdateEvent.asSharedFlow()
 
     private var searchJob: Job? = null
     private var cachedHomeFeed: HomeFeed? = null
     private var knownSchoolId: Int? = null
-
     private val loadMutex = Mutex()
 
     // ==================== LOAD HOME FEED ====================
@@ -99,11 +110,42 @@ class HomeViewModel @Inject constructor(
         if (!forceRefresh && cachedHomeFeed != null) {
             Timber.tag(LogTags.VIEW_MODEL).d("📦 Using cached feed")
             _homeFeed.value = cachedHomeFeed
-            _isFromCache.value = false
+            // ✅ NO EVENT EMISSION - just showing cached data
             return
         }
 
         viewModelScope.launch {
+            launch {
+                try {
+                    Timber.tag(LogTags.VIEW_MODEL).d("🔄 Preloading category filters...")
+                    filterRepository.preloadCategoryFilters(listOf(1, 2, 3, 4))
+                    Timber.tag(LogTags.VIEW_MODEL).d("✅ Filters preloaded")
+                } catch (e: Exception) {
+                    Timber.tag(LogTags.VIEW_MODEL).e(e, "⚠️ Failed to preload filters")
+                }
+            }
+
+            launch {
+                try {
+                    Timber.tag(LogTags.VIEW_MODEL).d("🔄 Preloading shop data...")
+                    shopRepository.getMyShop()  // This caches the shop
+                    shopRepository.getMyShopItems()  // This caches shop items
+                    Timber.tag(LogTags.VIEW_MODEL).d("✅ Shop data preloaded")
+                } catch (e: Exception) {
+                    Timber.tag(LogTags.VIEW_MODEL).e(e, "⚠️ Failed to preload shop")
+                }
+            }
+
+            launch {
+                try {
+                    Timber.tag(LogTags.VIEW_MODEL).d("🔄 Preloading products cache...")
+                    productsCacheRepository.preload()
+                    Timber.tag(LogTags.VIEW_MODEL).d("✅ Products cache preloaded")
+                } catch (e: Exception) {
+                    Timber.tag(LogTags.VIEW_MODEL).e(e, "⚠️ Failed to preload products cache")
+                }
+            }
+
             if (!loadMutex.tryLock()) {
                 Timber.tag(LogTags.VIEW_MODEL).d("⏳ Already loading, skipping")
                 return@launch
@@ -112,7 +154,6 @@ class HomeViewModel @Inject constructor(
             try {
                 _isLoading.value = true
                 _error.value = null
-                _isFromCache.value = false
 
                 val directSchoolId = knownSchoolId
                 Timber.tag(LogTags.VIEW_MODEL).d("🔑 knownSchoolId = $directSchoolId")
@@ -211,6 +252,7 @@ class HomeViewModel @Inject constructor(
     private suspend fun loadFeedWithCache(schoolId: Int, forceRefresh: Boolean) {
         Timber.tag(LogTags.VIEW_MODEL).d("🔄 Loading feed for school $schoolId (forceRefresh=$forceRefresh)")
 
+        // ✅ Load cache silently
         if (!forceRefresh) {
             val cachedSections = loadCachedSections(schoolId)
             if (cachedSections.isNotEmpty()) {
@@ -222,11 +264,11 @@ class HomeViewModel @Inject constructor(
                 )
                 cachedHomeFeed = cachedFeed
                 _homeFeed.value = cachedFeed
-                _isFromCache.value = true
                 Timber.tag(LogTags.VIEW_MODEL).d("📦 Loaded ${cachedSections.size} sections from cache")
             }
         }
 
+        // ✅ Network fetch - sort sections on success
         try {
             val result = withTimeout(FEED_TIMEOUT_MS) {
                 homeRepository.getHomeFeed(schoolId)
@@ -235,14 +277,29 @@ class HomeViewModel @Inject constructor(
             when (result) {
                 is Result.Success -> {
                     val feed = result.data
-                    cachedHomeFeed = feed
-                    _homeFeed.value = feed
-                    _isFromCache.value = false
+
+                    // ✅ Sort sections: Recent FIRST
+                    val sortedSections = feed.sections.sortedBy { section ->
+                        when (section) {
+                            is Section.Recent -> 0
+                            is Section.Essentials -> 1
+                            is Section.Trending -> 2
+                            is Section.Recommended -> 3
+                            else -> 4
+                        }
+                    }
+
+                    val sortedFeed = feed.copy(sections = sortedSections)
+
+                    cachedHomeFeed = sortedFeed
+                    _homeFeed.value = sortedFeed
                     _error.value = null
 
-                    cacheSections(feed, schoolId)
+                    cacheSections(sortedFeed, schoolId)
 
-                    Timber.tag(LogTags.VIEW_MODEL).d("✅ Feed loaded: ${feed.sections.size} sections")
+                    // ✅ EMIT EVENT - real network fetch completed!
+                    _feedUpdateEvent.emit("Data updated")
+                    Timber.tag(LogTags.VIEW_MODEL).d("✅ Feed loaded: ${sortedFeed.sections.size} sections")
                 }
                 is Result.Error -> {
                     if (_homeFeed.value == null) {
@@ -269,6 +326,7 @@ class HomeViewModel @Inject constructor(
     private suspend fun loadCachedSections(schoolId: Int): List<Section> {
         val sections = mutableListOf<Section>()
 
+        // ✅ Load ALL sections from cache
         val recommended = productsCacheRepository.getCachedSection("recommended", schoolId)
         val trending = productsCacheRepository.getCachedSection("trending", schoolId)
         val recent = productsCacheRepository.getCachedSection("recent", schoolId)
@@ -276,22 +334,7 @@ class HomeViewModel @Inject constructor(
 
         Timber.tag(LogTags.VIEW_MODEL).d("📦 Cache results: recommended=${recommended?.size}, trending=${trending?.size}, recent=${recent?.size}, essentials=${essentials?.size}")
 
-        if (!recommended.isNullOrEmpty()) {
-            sections.add(Section.Recommended(
-                title = "Recommended For You",
-                type = "recommended",
-                items = recommended
-            ))
-        }
-
-        if (!trending.isNullOrEmpty()) {
-            sections.add(Section.Trending(
-                title = "Trending Today",
-                type = "trending",
-                items = trending
-            ))
-        }
-
+        // ✅ Add sections in the correct order: RECENT FIRST
         if (!recent.isNullOrEmpty()) {
             sections.add(Section.Recent(
                 title = "Recently Added",
@@ -316,10 +359,27 @@ class HomeViewModel @Inject constructor(
             ))
         }
 
+        if (!trending.isNullOrEmpty()) {
+            sections.add(Section.Trending(
+                title = "Trending Today",
+                type = "trending",
+                items = trending
+            ))
+        }
+
+        if (!recommended.isNullOrEmpty()) {
+            sections.add(Section.Recommended(
+                title = "Recommended For You",
+                type = "recommended",
+                items = recommended
+            ))
+        }
+
         return sections
     }
 
     private suspend fun cacheSections(feed: HomeFeed, schoolId: Int) {
+        // ... existing code (unchanged) ...
         try {
             val sectionsMap = mutableMapOf<String, List<Item>>()
 
@@ -371,9 +431,10 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // ==================== 🔥 RANKED SEARCH ====================
+    // ==================== SEARCH ====================
 
     fun searchItemsRanked(query: String, categoryId: Int?) {
+        // ... existing code (unchanged) ...
         _searchQuery.value = query
 
         searchJob?.cancel()
@@ -516,6 +577,7 @@ class HomeViewModel @Inject constructor(
         categoryId: Int?,
         maxRetries: Int = MAX_RETRIES
     ): Result<RankedItemsResult> {
+        // ... existing code (unchanged) ...
         var lastError: Exception? = null
 
         repeat(maxRetries + 1) { attempt ->
@@ -544,6 +606,7 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun groupByRelevance(items: List<Item>, schoolId: Int?): RelevanceGroups {
+        // ... existing code (unchanged) ...
         if (schoolId == null) {
             return RelevanceGroups(emptyList(), emptyList(), items)
         }
@@ -583,9 +646,8 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    // ==================== LEGACY SEARCH ====================
-
     private fun searchLocalCache(query: String, categoryId: Int?): List<Item> {
+        // ... existing code (unchanged) ...
         val currentFeed = _homeFeed.value
         if (currentFeed == null) {
             Timber.tag(LogTags.VIEW_MODEL).d("No cached feed available")
