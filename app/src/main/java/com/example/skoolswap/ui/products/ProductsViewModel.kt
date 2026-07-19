@@ -407,10 +407,9 @@ class ProductsViewModel @Inject constructor(
         val normalizedType = sectionType.lowercase()
         val incomingCategoryId = if (navCategoryId == -1) null else navCategoryId
 
-        val effectiveCategoryId = when {
-            normalizedType == "sports" || normalizedType == "sport" -> incomingCategoryId ?: CATEGORY_ID_SPORT
-            else -> savedCategoryId ?: _appliedFilters.value.categoryId ?: incomingCategoryId
-        }
+        val effectiveCategoryId = navCategoryId ?: savedCategoryId ?: _appliedFilters.value.categoryId
+        Timber.tag(LogTags.VIEW_MODEL).d("🔄 Loading products with categoryId: $effectiveCategoryId")
+
 
         currentSectionType = normalizedType
         currentPeriod = period

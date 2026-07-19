@@ -3,7 +3,9 @@ package com.example.skoolswap.ui.shop
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.skoolswap.R
 import com.example.skoolswap.common.constants.AppConstants.LogTags
@@ -15,79 +17,118 @@ class CategorySectionAdapter(
     private val onItemClick: (String) -> Unit,
     private val onSoldToggle: ((String, Boolean) -> Unit)? = null,
     private val isShopMode: Boolean = false
-) : RecyclerView.Adapter<CategorySectionAdapter.SectionViewHolder>() {
+) : ListAdapter<ItemCategorySection, CategorySectionAdapter.SectionViewHolder>(
+    SectionDiffCallback()
+) {
 
-    private var sections: List<ItemCategorySection> = emptyList()
+    // ✅ Track expanded state outside the adapter data
+    private val expandedState = mutableMapOf<String, Boolean>()
 
-    fun submitSections(newSections: List<ItemCategorySection>) {
-        sections = newSections
-        notifyDataSetChanged()
-    }
+    // ✅ Create ONE nested adapter instance and reuse it
+    private val nestedAdapter = CategoryGridAdapter(
+        onItemClick = onItemClick,
+        onSoldToggle = onSoldToggle,
+        isShopMode = isShopMode
+    )
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SectionViewHolder {
         val binding = ItemCategorySectionBinding.inflate(
-            LayoutInflater.from(parent.context), parent, false
+            LayoutInflater.from(parent.context),
+            parent,
+            false
         )
-        return SectionViewHolder(binding, onItemClick, onSoldToggle, isShopMode, this)
+        return SectionViewHolder(binding, nestedAdapter, this)
     }
 
     override fun onBindViewHolder(holder: SectionViewHolder, position: Int) {
-        holder.bind(sections[position], position)
+        val section = getItem(position)
+        val isExpanded = expandedState[section.categoryName] ?: false
+        holder.bind(section, isExpanded, position == itemCount - 1)
     }
 
-    override fun getItemCount(): Int = sections.size
+    // ✅ Toggle expansion state
+    fun toggleExpanded(categoryName: String) {
+        val current = expandedState[categoryName] ?: false
+        expandedState[categoryName] = !current
+        // ✅ Only notify that this item changed, not everything
+        val position = currentList.indexOfFirst { it.categoryName == categoryName }
+        if (position != -1) {
+            notifyItemChanged(position)
+        }
+    }
+
+    class SectionDiffCallback : DiffUtil.ItemCallback<ItemCategorySection>() {
+        override fun areItemsTheSame(
+            oldItem: ItemCategorySection,
+            newItem: ItemCategorySection
+        ): Boolean {
+            return oldItem.categoryName == newItem.categoryName
+        }
+
+        override fun areContentsTheSame(
+            oldItem: ItemCategorySection,
+            newItem: ItemCategorySection
+        ): Boolean {
+            return oldItem == newItem
+        }
+    }
 
     class SectionViewHolder(
         private val binding: ItemCategorySectionBinding,
-        private val onItemClick: (String) -> Unit,
-        private val onSoldToggle: ((String, Boolean) -> Unit)?,
-        private val isShopMode: Boolean,
-        private val adapter: CategorySectionAdapter
+        private val nestedAdapter: CategoryGridAdapter,  // ✅ Reuse adapter
+        private val parentAdapter: CategorySectionAdapter
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(section: ItemCategorySection, position: Int) {
+        init {
+            // ✅ Setup RecyclerView ONCE in init
+            binding.categoryGrid.apply {
+                layoutManager = GridLayoutManager(binding.root.context, 2)
+                adapter = nestedAdapter
+                setHasFixedSize(true)
+                // ✅ Keep the grid's scroll position when expanding
+                isNestedScrollingEnabled = false
+            }
+
+            // ✅ Set up click listeners ONCE in init
+            binding.headerContainer.setOnClickListener {
+                val position = adapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    val section = parentAdapter.getItem(position)
+                    parentAdapter.toggleExpanded(section.categoryName)
+                }
+            }
+
+            binding.arrowIcon.setOnClickListener {
+                val position = adapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    val section = parentAdapter.getItem(position)
+                    parentAdapter.toggleExpanded(section.categoryName)
+                }
+            }
+        }
+
+        fun bind(section: ItemCategorySection, isExpanded: Boolean, isLastSection: Boolean) {
             binding.categoryTitle.text = section.categoryName
             binding.itemCount.text = "${section.items.size} items"
 
-            val arrowRes = if (section.isExpanded) {
+            val arrowRes = if (isExpanded) {
                 R.drawable.ic_chevron_down
             } else {
                 R.drawable.ic_chevron_right
             }
             binding.arrowIcon.setImageResource(arrowRes)
 
-            val itemsToShow = if (section.isExpanded) {
+            // ✅ Determine which items to show
+            val itemsToShow = if (isExpanded) {
                 section.items
             } else {
                 section.items.take(2)
             }
 
-            val gridAdapter = CategoryGridAdapter(
-                onItemClick = { itemId ->
-                    onItemClick(itemId)
-                },
-                onSoldToggle = onSoldToggle,
-                isShopMode = isShopMode
-            )
+            // ✅ Just update the nested adapter's data - no new adapter!
+            nestedAdapter.submitList(itemsToShow)
 
-            binding.categoryGrid.apply {
-                layoutManager = GridLayoutManager(binding.root.context, 2)
-                adapter = gridAdapter
-            }
-
-            gridAdapter.submitList(itemsToShow)
-
-            binding.headerContainer.setOnClickListener {
-                section.isExpanded = !section.isExpanded
-                adapter.notifyItemChanged(position)
-            }
-
-            binding.arrowIcon.setOnClickListener {
-                section.isExpanded = !section.isExpanded
-                adapter.notifyItemChanged(position)
-            }
-
-            val isLastSection = position == adapter.itemCount - 1
+            // ✅ Show/hide divider for last section
             binding.divider.visibility = if (isLastSection) View.GONE else View.VISIBLE
         }
     }

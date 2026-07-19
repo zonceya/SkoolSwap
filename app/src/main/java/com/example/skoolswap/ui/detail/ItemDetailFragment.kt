@@ -18,7 +18,7 @@ import com.example.skoolswap.R
 import com.example.skoolswap.common.constants.AppConstants
 import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.databinding.FragmentItemDetailBinding
-import com.example.skoolswap.ui.detail.adapter.ImageSliderAdapter
+import com.example.skoolswap.ui.detail.adapter.ImageSliderAdapter  // ✅ IMPORT
 import com.example.skoolswap.ui.detail.adapter.SimilarItemsAdapter
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import dagger.hilt.android.AndroidEntryPoint
@@ -368,6 +368,7 @@ class ItemDetailFragment : Fragment() {
         }
 
         binding.imageSlider.visibility = View.VISIBLE
+        // ✅ Now ImageSliderAdapter is resolved with import
         binding.imageSlider.adapter = ImageSliderAdapter(imageUrls)
         binding.imageSlider.post { binding.imageSlider.setCurrentItem(0, false) }
     }
@@ -416,6 +417,7 @@ class ItemDetailFragment : Fragment() {
                 return
             }
 
+            // ✅ Fixed: Use constructor directly
             val bottomSheet = ContactOptionsBottomSheet(item, sellerMobile)
             bottomSheet.show(parentFragmentManager, "contact_options")
         }

@@ -5,6 +5,8 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.core.os.bundleOf
 import androidx.navigation.findNavController
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
@@ -14,14 +16,8 @@ import timber.log.Timber
 
 class ProductsAdapter(
     private val onItemClick: (Item) -> Unit
-) : RecyclerView.Adapter<ProductsAdapter.ViewHolder>() {
+) : ListAdapter<Item, ProductsAdapter.ViewHolder>(ProductDiffCallback()) {
 
-    private var items: List<Item> = emptyList()
-
-    fun submitList(newItems: List<Item>) {
-        items = newItems
-        notifyDataSetChanged()
-    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ItemHomeProductBinding.inflate(
@@ -31,27 +27,34 @@ class ProductsAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(items[position])
+        holder.bind(getItem(position))
     }
 
-    override fun getItemCount() = items.size
+    class ProductDiffCallback : DiffUtil.ItemCallback<Item>() {
+        override fun areItemsTheSame(oldItem: Item, newItem: Item): Boolean {
+            return oldItem.id == newItem.id
+        }
+
+        override fun areContentsTheSame(oldItem: Item, newItem: Item): Boolean {
+            return oldItem == newItem
+        }
+    }
 
     inner class ViewHolder(
         private val binding: ItemHomeProductBinding
-
     ) : RecyclerView.ViewHolder(binding.root) {
 
         init {
             binding.root.setOnClickListener {
                 val position = adapterPosition
                 if (position != RecyclerView.NO_POSITION) {
-                    val item = items[position]
+                    val item = getItem(position)
+                    onItemClick(item)
 
                     val bundle = bundleOf(
                         "itemId" to item.id,
                         "source" to "products_screen"
                     )
-
                     binding.root.findNavController().navigate(R.id.itemDetailFragment, bundle)
                 }
             }
@@ -70,8 +73,8 @@ class ProductsAdapter(
             } else {
                 binding.soldBadge.visibility = View.GONE
             }
-            val imageUrl = item.resolveImageUrl()
 
+            val imageUrl = item.resolveImageUrl()
             if (!imageUrl.isNullOrBlank()) {
                 Glide.with(binding.root.context)
                     .load(imageUrl)

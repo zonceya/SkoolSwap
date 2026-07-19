@@ -4,6 +4,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
@@ -17,14 +19,10 @@ class CategoryGridAdapter(
     private val onItemClick: (String) -> Unit,
     private val onSoldToggle: ((String, Boolean) -> Unit)? = null,
     private val isShopMode: Boolean = false
-) : RecyclerView.Adapter<CategoryGridAdapter.GridViewHolder>() {
+) : ListAdapter<Item, CategoryGridAdapter.GridViewHolder>(ItemDiffCallback()) {
 
-    private var items: List<Item> = emptyList()
-
-    fun submitList(newItems: List<Item>) {
-        items = newItems
-        notifyDataSetChanged()
-    }
+    // ✅ REMOVED: private var items: List<Item> = emptyList()
+    // ✅ REMOVED: fun submitList() override - use ListAdapter's built-in submitList()
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): GridViewHolder {
         val binding = ItemCategoryGridItemBinding.inflate(
@@ -34,10 +32,26 @@ class CategoryGridAdapter(
     }
 
     override fun onBindViewHolder(holder: GridViewHolder, position: Int) {
-        holder.bind(items[position])
+        // ✅ Use getItem() from ListAdapter, not local list
+        holder.bind(getItem(position))
     }
 
-    override fun getItemCount(): Int = items.size
+    // ✅ REMOVED: override fun getItemCount() - ListAdapter provides this
+
+    class ItemDiffCallback : DiffUtil.ItemCallback<Item>() {
+        override fun areItemsTheSame(oldItem: Item, newItem: Item): Boolean {
+            return oldItem.id == newItem.id
+        }
+
+        override fun areContentsTheSame(oldItem: Item, newItem: Item): Boolean {
+            return oldItem == newItem
+        }
+
+        // ✅ OPTIONAL: For better performance when items have same ID but changed content
+        override fun getChangePayload(oldItem: Item, newItem: Item): Any? {
+            return null // or return a bundle of changed fields for partial updates
+        }
+    }
 
     class GridViewHolder(
         private val binding: ItemCategoryGridItemBinding,

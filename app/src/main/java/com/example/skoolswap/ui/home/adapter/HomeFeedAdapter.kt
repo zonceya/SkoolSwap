@@ -2,6 +2,8 @@ package com.example.skoolswap.ui.home.adapter
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.skoolswap.databinding.*
 import com.example.skoolswap.domain.model.Item
@@ -12,9 +14,7 @@ import timber.log.Timber
 class HomeFeedAdapter(
     private val onItemClick: (Item, String) -> Unit,
     private val onViewAllClick: (String) -> Unit
-) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-
-    private val sections = mutableListOf<Section>()
+) : ListAdapter<Section, RecyclerView.ViewHolder>(SectionDiffCallback()) {
 
     companion object {
         private const val TYPE_RECOMMENDED = 1
@@ -23,14 +23,11 @@ class HomeFeedAdapter(
         private const val TYPE_RECENT = 4
     }
 
-    fun submitList(newSections: List<Section>) {
-        sections.clear()
-        sections.addAll(newSections)
-        notifyDataSetChanged()
-    }
+    // ✅ REMOVED: private val sections = mutableListOf<Section>()
+    // ✅ REMOVED: fun submitList() override - using parent method
 
     override fun getItemViewType(position: Int): Int {
-        return when (sections[position]) {
+        return when (getItem(position)) {  // ✅ Use getItem() from ListAdapter
             is Section.Recommended -> TYPE_RECOMMENDED
             is Section.Essentials -> TYPE_ESSENTIALS
             is Section.Trending -> TYPE_TRENDING
@@ -41,15 +38,13 @@ class HomeFeedAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         return when (viewType) {
             TYPE_RECOMMENDED -> {
-                // FIXED: Use correct binding name
-                val binding = ItemRecommendedRowBinding.inflate(  // Changed from ItemHomeRecommendedSectionBinding
+                val binding = ItemRecommendedRowBinding.inflate(
                     LayoutInflater.from(parent.context), parent, false
                 )
                 RecommendedViewHolder(binding, onItemClick, onViewAllClick)
             }
             TYPE_ESSENTIALS -> {
-                // You'll need to fix this one too - what's your XML name for essentials?
-                val binding = ItemEssentialsRowBinding.inflate(  // Assuming this is correct
+                val binding = ItemEssentialsRowBinding.inflate(
                     LayoutInflater.from(parent.context), parent, false
                 )
                 EssentialsViewHolder(binding, onItemClick)
@@ -71,25 +66,38 @@ class HomeFeedAdapter(
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        val section = getItem(position)  // ✅ Use getItem() from ListAdapter
+
         when (holder) {
             is RecommendedViewHolder -> {
                 Timber.tag("HomeFeedAdapter").d("Binding Recommended at position $position")
-                holder.bind(sections[position] as Section.Recommended)
+                holder.bind(section as Section.Recommended)
             }
             is EssentialsViewHolder -> {
                 Timber.tag("HomeFeedAdapter").d("Binding Essentials at position $position")
-                holder.bind(sections[position] as Section.Essentials)
+                holder.bind(section as Section.Essentials)
             }
             is TrendingViewHolder -> {
                 Timber.tag("HomeFeedAdapter").d("Binding Trending at position $position")
-                holder.bind(sections[position] as Section.Trending)
+                holder.bind(section as Section.Trending)
             }
             is RecentViewHolder -> {
                 Timber.tag("HomeFeedAdapter").d("Binding Recent at position $position")
-                holder.bind(sections[position] as Section.Recent)
+                holder.bind(section as Section.Recent)
             }
         }
     }
 
-    override fun getItemCount() = sections.size
+    // ✅ REMOVED: override fun getItemCount() - ListAdapter provides this
+
+    private class SectionDiffCallback : DiffUtil.ItemCallback<Section>() {
+        override fun areItemsTheSame(oldItem: Section, newItem: Section): Boolean {
+            // Sections are identified by their type (only one of each type in the feed)
+            return oldItem::class == newItem::class
+        }
+
+        override fun areContentsTheSame(oldItem: Section, newItem: Section): Boolean {
+            return oldItem == newItem
+        }
+    }
 }

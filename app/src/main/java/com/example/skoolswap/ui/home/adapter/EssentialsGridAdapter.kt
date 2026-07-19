@@ -13,13 +13,14 @@ import timber.log.Timber
 private const val TAG = "EssentialsGridAdapter"
 
 class EssentialsGridAdapter(
-    private val items: List<EssentialsCategoryItem>,
+    private var items: List<EssentialsCategoryItem> = emptyList(),
     private val onCategoryClick: (EssentialsCategoryItem) -> Unit
 ) : RecyclerView.Adapter<EssentialsGridAdapter.ViewHolder>() {
 
-    init {
-        Timber.tag(TAG).d("=== GRID ADAPTER CREATED ===")
-        Timber.tag(TAG).d("Items count: ${items.size}")
+    // ✅ ADD THIS METHOD - updates the data without creating a new adapter
+    fun updateItems(newItems: List<EssentialsCategoryItem>) {
+        items = newItems
+        notifyDataSetChanged()
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -44,7 +45,6 @@ class EssentialsGridAdapter(
             binding.categoryName.text = categoryItem.displayName
 
             // Determine which image to use
-            // Priority: actual item image > default image > local placeholder
             val actualImageUrl = categoryItem.item.images.firstOrNull()?.url
             val imageUrl = if (!actualImageUrl.isNullOrEmpty()) {
                 actualImageUrl
@@ -53,7 +53,6 @@ class EssentialsGridAdapter(
             }
 
             if (!imageUrl.isNullOrEmpty()) {
-                // Load image from URL (either actual item or default)
                 Glide.with(binding.root.context)
                     .load(imageUrl)
                     .placeholder(getPlaceholderForCategory(categoryItem.categoryType))
@@ -62,7 +61,6 @@ class EssentialsGridAdapter(
                     .into(binding.categoryIcon)
                 Log.d(TAG, "Loaded image for ${categoryItem.displayName}: $imageUrl")
             } else {
-                // Fallback to local drawable placeholder
                 val iconResId = getPlaceholderForCategory(categoryItem.categoryType)
                 binding.categoryIcon.setImageResource(iconResId)
                 Log.d(TAG, "Using placeholder for ${categoryItem.displayName}")

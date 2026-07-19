@@ -91,7 +91,53 @@ class AppPreferences @Inject constructor(
     suspend fun setUserEmail(email: String) { context.dataStore.edit { it[USER_EMAIL] = email } }
     suspend fun setUserProfileImage(imageUrl: String) { context.dataStore.edit { it[USER_PROFILE_IMAGE] = imageUrl } }
     suspend fun setAuthToken(token: String) { cachedToken = token; context.dataStore.edit { it[AUTH_TOKEN] = token } }
-
+    suspend fun cacheFilterConfig(categoryId: Int, configJson: String) {
+        context.dataStore.edit {
+            it[stringPreferencesKey("${CATEGORY_FILTER_CACHE_PREFIX}$categoryId")] = configJson
+            it[longPreferencesKey("${CATEGORY_FILTER_TIMESTAMP_PREFIX}$categoryId")] = System.currentTimeMillis()
+        }
+        Timber.tag("AppPreferences").d("✅ Cached filter config for category: $categoryId")
+    }
+    suspend fun isCategoryFilterValid(categoryId: Int): Boolean {
+        val timestamp = context.dataStore.data.map {
+            it[longPreferencesKey("${CATEGORY_FILTER_TIMESTAMP_PREFIX}$categoryId")] ?: 0L
+        }.first()
+        val isValid = System.currentTimeMillis() - timestamp < 24 * 60 * 60 * 1000 // 24 hours
+        Timber.tag("AppPreferences").d("Category $categoryId cache valid: $isValid")
+        return isValid
+    }
+    suspend fun clearCategoryFilterCache(categoryId: Int) {
+        context.dataStore.edit {
+            it.remove(stringPreferencesKey("${CATEGORY_FILTER_CACHE_PREFIX}$categoryId"))
+            it.remove(longPreferencesKey("${CATEGORY_FILTER_TIMESTAMP_PREFIX}$categoryId"))
+        }
+        Timber.tag("AppPreferences").d("🗑️ Cleared filter cache for category: $categoryId")
+    }
+    suspend fun clearAllCategoryFilterCaches() {
+        // We need to get all keys and remove those that match the pattern
+        // Since DataStore doesn't support pattern matching, we'll remove individually
+        // You can also store a list of cached category IDs
+        context.dataStore.edit { prefs ->
+            val keysToRemove = prefs.asMap().keys.filter { key ->
+                key.name.startsWith(CATEGORY_FILTER_CACHE_PREFIX) ||
+                        key.name.startsWith(CATEGORY_FILTER_TIMESTAMP_PREFIX)
+            }
+            keysToRemove.forEach { prefs.remove(it) }
+        }
+        Timber.tag("AppPreferences").d("🗑️ Cleared all category filter caches")
+    }
+    suspend fun getCachedFilterConfig(categoryId: Int): String? {
+        return context.dataStore.data.map {
+            it[stringPreferencesKey("${CATEGORY_FILTER_CACHE_PREFIX}$categoryId")]
+        }.first()
+    }
+    suspend fun clearGlobalFilterCache() {
+        context.dataStore.edit {
+            it.remove(GLOBAL_FILTER_CONFIG_CACHE)
+            it.remove(GLOBAL_FILTER_CONFIG_TIMESTAMP)
+        }
+        Timber.tag("AppPreferences").d("🗑️ Cleared global filter cache")
+    }
     fun getAuthTokenSync(): String? {
         cachedToken?.let { return it }
         return try {

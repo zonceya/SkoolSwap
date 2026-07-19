@@ -576,6 +576,7 @@ class ProfileFragment : Fragment() {
                 .placeholder(R.drawable.ic_user)
                 .error(R.drawable.ic_user)
                 .circleCrop()
+                .override(240, 240)
                 .timeout(10000)
                 .into(binding.profileImage)
         } catch (e: Exception) {

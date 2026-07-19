@@ -1,9 +1,10 @@
 package com.example.skoolswap.ui.shop
 
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
@@ -15,23 +16,10 @@ import timber.log.Timber
 
 class ShopProductAdapter(
     private val onItemClick: (String) -> Unit
-) : RecyclerView.Adapter<ShopProductAdapter.ProductViewHolder>() {
+) : ListAdapter<Item, ShopProductAdapter.ProductViewHolder>(ProductDiffCallback()) {
 
     companion object {
         private const val STATUS_SOLD = "sold"
-    }
-
-    private val items = mutableListOf<Item>()
-
-    fun submitList(newItems: List<Item>) {
-        items.clear()
-        items.addAll(newItems)
-        notifyDataSetChanged()
-    }
-
-    fun clearItems() {
-        items.clear()
-        notifyDataSetChanged()
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ProductViewHolder {
@@ -44,10 +32,21 @@ class ShopProductAdapter(
     }
 
     override fun onBindViewHolder(holder: ProductViewHolder, position: Int) {
-        holder.bind(items[position])
+        // ✅ Use getItem() from ListAdapter
+        holder.bind(getItem(position))
     }
 
-    override fun getItemCount() = items.size
+    // ✅ REMOVED: override fun getItemCount() - ListAdapter provides this
+
+    class ProductDiffCallback : DiffUtil.ItemCallback<Item>() {
+        override fun areItemsTheSame(oldItem: Item, newItem: Item): Boolean {
+            return oldItem.id == newItem.id
+        }
+
+        override fun areContentsTheSame(oldItem: Item, newItem: Item): Boolean {
+            return oldItem == newItem
+        }
+    }
 
     inner class ProductViewHolder(
         private val binding: ItemProductBinding

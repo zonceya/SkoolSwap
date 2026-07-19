@@ -6,6 +6,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.skoolswap.R
+import com.example.skoolswap.domain.model.UniformCategory
 import com.example.skoolswap.domain.repository.FilterRepositoryInterface
 import com.example.skoolswap.utils.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -44,7 +45,7 @@ class UniformViewModel @Inject constructor(
     fun loadUniformCategories() {
         viewModelScope.launch {
             _isLoading.value = true
-            _error.value = null  // ← Clear previous error
+            _error.value = null
 
             when (val result = filterRepository.getFilterConfig(1)) {
                 is Result.Success -> {
@@ -55,14 +56,15 @@ class UniformViewModel @Inject constructor(
                             UniformCategory(
                                 id = option.id,
                                 name = option.name,
+                                categoryId = 1,  // ✅ Uniforms category ID
                                 imageResId = getImageResId(option.id)
                             )
                         } ?: getFallbackCategories()
                     _categories.value = categories
                 }
                 is Result.Error -> {
-                    _error.value = result.exception.message  // ← Set error message
-                    _categories.value = getFallbackCategories()  // ← Still show fallback
+                    _error.value = result.exception.message
+                    _categories.value = getFallbackCategories()
                 }
             }
             _isLoading.value = false
@@ -85,20 +87,15 @@ class UniformViewModel @Inject constructor(
 
     private fun getFallbackCategories(): List<UniformCategory> {
         return listOf(
-            UniformCategory(27, "Shirts & Golfers", R.drawable.ic_uniform_shirt),
-            UniformCategory(30, "Trousers & Shorts", R.drawable.ic_uniform_pants),
-            UniformCategory(29, "Blazers & Jackets", R.drawable.ic_uniform_blazer),
-            UniformCategory(28, "Jerseys & Pullovers", R.drawable.ic_uniform_jersey),
-            UniformCategory(31, "Skirts & Dresses", R.drawable.ic_uniform_skirt),
-            UniformCategory(34, "Tracksuits", R.drawable.ic_uniform_tracksuit),
-            UniformCategory(32, "Ties & Accessories", R.drawable.ic_uniform_tie),
-            UniformCategory(33, "Socks", R.drawable.ic_uniform_socks)
+            UniformCategory(27, "Shirts & Golfers", 1, R.drawable.ic_uniform_shirt),
+            UniformCategory(30, "Trousers & Shorts", 1, R.drawable.ic_uniform_pants),
+            UniformCategory(29, "Blazers & Jackets", 1, R.drawable.ic_uniform_blazer),
+            UniformCategory(28, "Jerseys & Pullovers", 1, R.drawable.ic_uniform_jersey),
+            UniformCategory(31, "Skirts & Dresses", 1, R.drawable.ic_uniform_skirt),
+            UniformCategory(34, "Tracksuits", 1, R.drawable.ic_uniform_tracksuit),
+            UniformCategory(32, "Ties & Accessories", 1, R.drawable.ic_uniform_tie),
+            UniformCategory(33, "Socks", 1, R.drawable.ic_uniform_socks)
         )
     }
 }
 
-data class UniformCategory(
-    val id: Int,
-    val name: String,
-    val imageResId: Int
-)

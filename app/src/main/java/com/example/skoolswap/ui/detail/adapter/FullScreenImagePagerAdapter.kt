@@ -28,11 +28,31 @@ class FullScreenImagePagerAdapter(
     private val onSingleTap: () -> Unit = {}
 ) : RecyclerView.Adapter<FullScreenImagePagerAdapter.ViewHolder>() {
 
-    inner class ViewHolder(val binding: ItemFullScreenImageBinding) :
-        RecyclerView.ViewHolder(binding.root) {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val binding = ItemFullScreenImageBinding.inflate(
+            LayoutInflater.from(parent.context), parent, false
+        )
+        return ViewHolder(binding)
+    }
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        holder.bind(imageUrls[position])
+    }
+
+    override fun onViewRecycled(holder: ViewHolder) {
+        super.onViewRecycled(holder)
+        holder.clear()
+    }
+
+    override fun getItemCount() = imageUrls.size
+
+    inner class ViewHolder(
+        private val binding: ItemFullScreenImageBinding
+    ) : RecyclerView.ViewHolder(binding.root) {
 
         private var currentTarget: CustomTarget<Bitmap>? = null
         private var isTapHandled = false
+        private var currentUrl: String? = null
 
         private val gestureDetector = GestureDetector(
             binding.root.context,
@@ -59,34 +79,45 @@ class FullScreenImagePagerAdapter(
 
             binding.photoView.setOnTouchListener { view, event ->
                 val handled = gestureDetector.onTouchEvent(event)
-
                 if (!handled) {
                     view.performClick()
                 }
-
                 false
             }
         }
 
         fun bind(url: String) {
+            // ✅ Skip if same URL to avoid reloading
+            if (currentUrl == url && currentTarget != null) {
+                Timber.tag(LogTags.UI).d("Skipping bind - same URL: $url")
+                return
+            }
+
             Timber.tag(LogTags.UI).d("Binding URL: $url")
+            currentUrl = url
             isTapHandled = false
 
-            currentTarget?.let { Glide.with(binding.root.context).clear(it) }
-
-            binding.photoView.recycle()
+            // ✅ Clear previous target
+            clear()
 
             val target = object : CustomTarget<Bitmap>() {
                 override fun onResourceReady(
                     resource: Bitmap,
                     transition: Transition<in Bitmap>?
                 ) {
-                    Timber.tag(LogTags.UI).d("Bitmap ready for: $url, size: ${resource.width}x${resource.height}")
-                    binding.photoView.setImage(ImageSource.bitmap(resource))
+                    if (currentUrl == url) {
+                        Timber.tag(LogTags.UI).d("Bitmap ready for: $url, size: ${resource.width}x${resource.height}")
+                        binding.photoView.setImage(ImageSource.bitmap(resource))
+                    } else {
+                        Timber.tag(LogTags.UI).d("Bitmap ready but URL changed, ignoring: $url")
+                    }
                 }
 
                 override fun onLoadFailed(errorDrawable: Drawable?) {
-                    Timber.tag(LogTags.UI).e("Load failed for: $url")
+                    if (currentUrl == url) {
+                        Timber.tag(LogTags.UI).e("Load failed for: $url")
+                        binding.photoView.setImage(ImageSource.resource(R.drawable.ic_create_item_placeholder))
+                    }
                 }
 
                 override fun onLoadCleared(placeholder: Drawable?) {
@@ -108,28 +139,27 @@ class FullScreenImagePagerAdapter(
         }
 
         fun clear() {
-            currentTarget?.let { Glide.with(binding.root.context).clear(it) }
+            currentTarget?.let { target ->
+                try {
+                    Glide.with(binding.root.context).clear(target)
+                } catch (e: Exception) {
+                    Timber.tag(LogTags.UI).e("Error clearing Glide target: ${e.message}")
+                }
+            }
             currentTarget = null
             binding.photoView.recycle()
             isTapHandled = false
         }
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val binding = ItemFullScreenImageBinding.inflate(
-            LayoutInflater.from(parent.context), parent, false
-        )
-        return ViewHolder(binding)
+    // ✅ Clean up all images when adapter is detached
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        super.onDetachedFromRecyclerView(recyclerView)
+        // Clear all pending Glide requests
+        try {
+            Glide.get(recyclerView.context).clearMemory()
+        } catch (e: Exception) {
+            Timber.tag(LogTags.UI).e("Error clearing Glide memory: ${e.message}")
+        }
     }
-
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(imageUrls[position])
-    }
-
-    override fun onViewRecycled(holder: ViewHolder) {
-        super.onViewRecycled(holder)
-        holder.clear()
-    }
-
-    override fun getItemCount() = imageUrls.size
 }

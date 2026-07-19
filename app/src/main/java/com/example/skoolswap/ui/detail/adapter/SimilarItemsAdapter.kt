@@ -1,29 +1,25 @@
 package com.example.skoolswap.ui.detail.adapter
 
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemSimilarProductBinding
 import com.example.skoolswap.domain.model.Item
-import com.example.skoolswap.utils.extensions.formatViewCount
 import timber.log.Timber
 
 class SimilarItemsAdapter(
     private val onItemClick: (Item) -> Unit
-) : RecyclerView.Adapter<SimilarItemsAdapter.ViewHolder>() {
+) : ListAdapter<Item, SimilarItemsAdapter.ViewHolder>(SimilarItemDiffCallback()) {
 
-    private var items: List<Item> = emptyList()
     private val TAG = "SimilarItemsAdapter"
 
-    fun submitList(newItems: List<Item>) {
-        Timber.tag(TAG).d("submitList called with ${newItems.size} items")
-        items = newItems
-        notifyDataSetChanged()
-    }
+    // ✅ REMOVED: custom submitList() - use parent's implementation directly
+    // Just call adapter.submitList(items) from Fragment
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ItemSimilarProductBinding.inflate(
@@ -33,11 +29,18 @@ class SimilarItemsAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(items[position])
+        holder.bind(getItem(position))
     }
 
-    override fun getItemCount(): Int = items.size
+    class SimilarItemDiffCallback : DiffUtil.ItemCallback<Item>() {
+        override fun areItemsTheSame(oldItem: Item, newItem: Item): Boolean {
+            return oldItem.id == newItem.id
+        }
 
+        override fun areContentsTheSame(oldItem: Item, newItem: Item): Boolean {
+            return oldItem == newItem
+        }
+    }
 
     inner class ViewHolder(
         private val binding: ItemSimilarProductBinding
@@ -47,7 +50,7 @@ class SimilarItemsAdapter(
             binding.root.setOnClickListener {
                 val position = adapterPosition
                 if (position != RecyclerView.NO_POSITION) {
-                    onItemClick(items[position])
+                    onItemClick(getItem(position))
                 }
             }
         }
@@ -63,14 +66,10 @@ class SimilarItemsAdapter(
                 binding.soldBadge.visibility = View.GONE
             }
 
-            // ✅ Mirror the same image-picking logic as setupImageSlider in the fragment
-            val imageUrl: String? = when {
-                !item.coverImage.isNullOrBlank() -> item.coverImage
-                item.images.isNotEmpty() -> item.images.firstOrNull {
-                    !it.url.isNullOrBlank() && it.url.startsWith("http")
-                }?.url
-                else -> null
-            }
+            // ✅ Use resolveImageUrl() helper for consistency
+            val imageUrl = item.resolveImageUrl()
+                ?: item.coverImage
+                ?: item.images.firstOrNull { !it.url.isNullOrBlank() && it.url.startsWith("http") }?.url
 
             if (!imageUrl.isNullOrBlank()) {
                 Glide.with(binding.root.context)

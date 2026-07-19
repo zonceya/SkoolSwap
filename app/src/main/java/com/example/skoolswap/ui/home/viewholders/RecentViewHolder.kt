@@ -9,7 +9,7 @@ import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemRecentRowBinding
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.homefeed.Section
-import com.example.skoolswap.ui.home.adapter.RecentItemsAdapter
+import com.example.skoolswap.ui.home.adapter.HorizontalItemsAdapter
 
 class RecentViewHolder(
     private val binding: ItemRecentRowBinding,
@@ -17,19 +17,25 @@ class RecentViewHolder(
     private val onViewAllClick: (String) -> Unit
 ) : RecyclerView.ViewHolder(binding.root) {
 
-    // Create adapter once and reuse it
-    private val recentAdapter = RecentItemsAdapter(
-        onItemClick = { item ->
-            onItemClick(item, "recent")
-        },
-        maxItems = 4
+    // ✅ FIXED: No 'items' parameter
+    private val itemsAdapter = HorizontalItemsAdapter(
+        sectionType = "recent",
+        onItemClick = onItemClick
     )
 
     init {
-        // Set up the recycler view once
         binding.recentRecycler.apply {
-            layoutManager = LinearLayoutManager(itemView.context)
-            adapter = recentAdapter
+            layoutManager = LinearLayoutManager(
+                itemView.context,
+                LinearLayoutManager.HORIZONTAL,
+                false
+            )
+            adapter = itemsAdapter
+            setHasFixedSize(true)
+        }
+
+        binding.root.findViewById<TextView>(R.id.viewAll)?.setOnClickListener {
+            onViewAllClick("recent")
         }
     }
 
@@ -37,7 +43,7 @@ class RecentViewHolder(
         val sectionTitle = binding.root.findViewById<TextView>(R.id.sectionTitle)
         val viewAll = binding.root.findViewById<TextView>(R.id.viewAll)
 
-        sectionTitle.text = section.title
+        sectionTitle?.text = section.title
 
         val isDarkMode = (itemView.context.resources.configuration.uiMode and
                 Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
@@ -48,16 +54,9 @@ class RecentViewHolder(
             ContextCompat.getColor(itemView.context, R.color.black)
         }
 
-        sectionTitle.setTextColor(textColor)
-        viewAll.setTextColor(textColor)
-        binding.header.sectionTitle.text = section.title
+        sectionTitle?.setTextColor(textColor)
+        viewAll?.setTextColor(textColor)
 
-        // Set up View All click
-        binding.header.viewAll.setOnClickListener {
-            onViewAllClick(section.type)
-        }
-
-        // Update the existing adapter with new items
-        recentAdapter.updateItems(section.items)
+        itemsAdapter.updateItems(section.items)
     }
 }

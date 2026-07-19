@@ -80,7 +80,6 @@ class HomeFragment : Fragment() {
         private const val GRID_SPAN_COUNT = 2
         private const val TAB_UNIFORM_ID = 6
         private const val TAB_SPORT_ID = 7
-        // Remove BANNER_OFFSCREEN_PAGE_LIMIT - use ViewPager2 constant directly
         private const val BANNER_INITIAL_POSITION_DIVIDER = 2
         private const val GENDER_BOYS_ID = 42
         private const val GENDER_GIRLS_ID = 43
@@ -128,11 +127,9 @@ class HomeFragment : Fragment() {
                 viewModel.setKnownSchoolId(schoolId)
             }
 
+            // ✅ Only load if feed is null (initial load)
             if (viewModel.homeFeed.value == null && !viewModel.isLoading.value) {
                 viewModel.loadHomeFeed()
-            } else if (viewModel.isLoading.value && schoolId != null) {
-                Timber.tag(LogTags.UI).d("🔄 Restarting load with correct schoolId: $schoolId")
-                viewModel.loadHomeFeed(forceRefresh = true)
             }
         }
 
@@ -394,6 +391,7 @@ class HomeFragment : Fragment() {
     }
 
     private fun observeViewModel() {
+        // ✅ 1. Loading state
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.isLoading.collect { isLoading ->
                 if (isLoading && viewModel.homeFeed.value == null) {
@@ -411,6 +409,7 @@ class HomeFragment : Fragment() {
             }
         }
 
+        // ✅ 2. Error state
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.error.collect { errorMsg ->
                 val isTechnicalError = errorMsg?.contains("401") == true ||
@@ -432,34 +431,52 @@ class HomeFragment : Fragment() {
             }
         }
 
+        // ✅ 3. Home feed data - NO SNACKBAR HERE
+        // ✅ 3. Home feed data - WITH SORTING
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.homeFeed.collect { feed ->
                 feed?.let {
+                    // ✅ Sort sections: Recent → Essentials → Trending → Recommended
+                    val sortedSections = it.sections.sortedBy { section ->
+                        when (section) {
+                            is Section.Recent -> 0      // Recent FIRST (most important)
+                            is Section.Essentials -> 1   // Essentials SECOND
+                            is Section.Trending -> 2     // Trending THIRD
+                            is Section.Recommended -> 3  // Recommended LAST
+                            else -> 4
+                        }
+                    }
+
                     Timber.tag(LogTags.UI).d("=== HOME FEED RECEIVED ===")
                     Timber.tag(LogTags.UI).d("Sections count: ${it.sections.size}")
+                    Timber.tag(LogTags.UI).d("Sorted order:")
+                    sortedSections.forEachIndexed { index, section ->
+                        Timber.tag(LogTags.UI).d("  $index: ${section::class.simpleName}")
+                    }
+
                     binding.shimmerLayout.visibility = View.GONE
                     binding.homeRecycler.visibility = View.VISIBLE
                     binding.errorLayout.visibility = View.GONE
                     binding.noSchoolLayout.visibility = View.GONE
                     binding.swipeRefreshLayout.isRefreshing = false
-                    homeAdapter.submitList(it.sections)
-                    if (isAdded && view != null && binding.root.isAttachedToWindow) {
-                        val message = if (it.message == "Cached data") "Using cached data" else "Data updated"
-                        try {
-                            Snackbar.make(binding.root, message, Snackbar.LENGTH_SHORT).show()
-                        } catch (e: Exception) {
-                            Timber.tag(LogTags.UI).e("Failed to show Snackbar: ${e.message}")
-                        }
-                    }
+
+                    // ✅ FIX: Use sortedSections
+                    homeAdapter.submitList(sortedSections)
+
+                    // ✅ SCROLL TO TOP - Important!
+                    binding.homeRecycler.postDelayed({
+                        binding.homeRecycler.scrollToPosition(0)
+                    }, 200)
                 }
             }
         }
 
+
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.isFromCache.collect { fromCache ->
+            viewModel.feedUpdateEvent.collect { message ->
                 if (isAdded && view != null && binding.root.isAttachedToWindow) {
-                    val message = if (fromCache) "Using cached data" else "Data updated"
                     try {
+                        Timber.tag(LogTags.UI).d("📢 Showing update snackbar: $message")
                         Snackbar.make(binding.root, message, Snackbar.LENGTH_SHORT).show()
                     } catch (e: Exception) {
                         Timber.tag(LogTags.UI).e("Failed to show Snackbar: ${e.message}")
@@ -491,6 +508,7 @@ class HomeFragment : Fragment() {
             }
         }
 
+        // ✅ 6. Relevance groups (logging only)
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.searchRelevanceGroups.collect { groups ->
                 Timber.tag(LogTags.UI).d("📊 Relevance groups: school=${groups.schoolMatch.size}, nearby=${groups.nearbyMatch.size}, other=${groups.other.size}")
@@ -771,6 +789,7 @@ class HomeFragment : Fragment() {
 
         when (selectedTab.id) {
             R.id.tabHome -> {
+                // ✅ Only load if feed is null
                 if (viewModel.homeFeed.value == null && !viewModel.isLoading.value) {
                     viewModel.loadHomeFeed()
                 }
@@ -793,12 +812,11 @@ class HomeFragment : Fragment() {
         navigateToProducts("recent", "Recently Added", "all", null)
     }
 
+    // ✅ FIXED: Simplified onResume - only auto-scroll, no reload
     override fun onResume() {
         super.onResume()
         autoScrollHelper?.resumeAutoScroll()
-        if (viewModel.homeFeed.value == null && !isInSearchMode && !viewModel.isLoading.value) {
-            viewModel.loadHomeFeed()
-        }
+        // ❌ REMOVED: reload logic - only load if null (handled in onCreateView)
     }
 
     override fun onPause() {

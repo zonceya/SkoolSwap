@@ -1,22 +1,20 @@
-// ui/uniform/UniformCategoryAdapter.kt
 package com.example.skoolswap.ui.uniform
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemUniformCategoryBinding
+import com.example.skoolswap.domain.model.UniformCategory
 
 class UniformCategoryAdapter(
     private val onCategoryClick: (UniformCategory) -> Unit
-) : RecyclerView.Adapter<UniformCategoryAdapter.ViewHolder>() {
+) : ListAdapter<UniformCategory, UniformCategoryAdapter.ViewHolder>(CategoryDiffCallback()) {
 
-    private var categories = listOf<UniformCategory>()
-
-    fun submitList(newCategories: List<UniformCategory>) {
-        categories = newCategories
-        notifyDataSetChanged()
-    }
+    // ✅ REMOVED: custom submitList() - use parent's implementation
+    // Just call adapter.submitList(categories) from Fragment
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ItemUniformCategoryBinding.inflate(
@@ -26,10 +24,18 @@ class UniformCategoryAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(categories[position])
+        holder.bind(getItem(position))
     }
 
-    override fun getItemCount() = categories.size
+    class CategoryDiffCallback : DiffUtil.ItemCallback<UniformCategory>() {
+        override fun areItemsTheSame(oldItem: UniformCategory, newItem: UniformCategory): Boolean {
+            return oldItem.id == newItem.id
+        }
+
+        override fun areContentsTheSame(oldItem: UniformCategory, newItem: UniformCategory): Boolean {
+            return oldItem == newItem
+        }
+    }
 
     inner class ViewHolder(
         private val binding: ItemUniformCategoryBinding

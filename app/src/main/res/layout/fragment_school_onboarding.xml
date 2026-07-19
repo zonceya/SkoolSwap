@@ -47,7 +47,6 @@
         </LinearLayout>
 
         <!-- Progress Indicator -->
-        <!-- Progress Indicator - 3 Steps: PROVINCE → SCHOOL → DONE -->
         <LinearLayout
             android:id="@+id/progressIndicator"
             android:layout_width="match_parent"
@@ -155,7 +154,7 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Onboarding Title - ADDED BACK -->
+        <!-- Onboarding Title -->
         <TextView
             android:id="@+id/onboardingTitle"
             android:layout_width="match_parent"
@@ -167,7 +166,7 @@
             android:gravity="center"
             android:layout_marginBottom="12dp" />
 
-        <!-- Onboarding Message - ADDED BACK -->
+        <!-- Onboarding Message -->
         <TextView
             android:id="@+id/onboardingMessage"
             android:layout_width="match_parent"
@@ -194,12 +193,12 @@
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Select your province"
             android:layout_marginBottom="24dp"
             app:startIconDrawable="@drawable/ic_location"
             app:startIconTint="#666666"
             app:boxStrokeColor="#999999"
-            app:hintTextColor="#666666">
+            app:hintTextColor="#666666"
+            app:hintEnabled="false">
 
             <AutoCompleteTextView
                 android:id="@+id/provinceSpinner"
@@ -207,7 +206,8 @@
                 android:layout_height="wrap_content"
                 android:inputType="none"
                 android:paddingStart="48dp"
-                android:textColor="#000000" />
+                android:textColor="#000000"
+                android:textSize="16sp" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- School Search -->
@@ -225,14 +225,14 @@
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Start typing..."
             app:startIconDrawable="@drawable/ic_search"
             app:startIconTint="#666666"
             app:endIconMode="clear_text"
             app:endIconTint="#666666"
             app:boxStrokeColor="#999999"
             app:hintTextColor="#666666"
-            android:layout_marginBottom="4dp">
+            android:layout_marginBottom="4dp"
+            app:hintEnabled="false">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/schoolSearch"
@@ -244,7 +244,8 @@
                 android:paddingEnd="48dp"
                 android:singleLine="true"
                 android:ellipsize="end"
-                android:textColor="#000000" />
+                android:textColor="#000000"
+                android:textSize="16sp" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <!-- Example hint -->
@@ -255,7 +256,7 @@
             android:text="Example: Westville Primary"
             android:textSize="12sp"
             android:textColor="#999999"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="4dp"
             android:layout_marginBottom="16dp" />
 
         <!-- Province Empty Message -->

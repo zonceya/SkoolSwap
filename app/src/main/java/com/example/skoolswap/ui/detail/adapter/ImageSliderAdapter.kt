@@ -6,7 +6,7 @@ import android.view.MotionEvent
 import android.view.ViewGroup
 import androidx.core.view.ViewCompat
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.findFragment
+import androidx.fragment.app.findFragment  // ✅ ADD THIS IMPORT
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
@@ -18,7 +18,7 @@ import com.example.skoolswap.ui.detail.zoom.FullScreenImageViewerDialogFragment
 import timber.log.Timber
 
 class ImageSliderAdapter(
-    val imageUrls: List<String>
+    private val imageUrls: List<String>
 ) : RecyclerView.Adapter<ImageSliderAdapter.ViewHolder>() {
 
     init {
@@ -41,20 +41,20 @@ class ImageSliderAdapter(
         holder.bind(imageUrls[position], position)
     }
 
-    override fun getItemCount(): Int {
-        val count = imageUrls.size
-        Timber.tag(LogTags.UI).d("getItemCount: $count")
-        return count
-    }
+    override fun getItemCount(): Int = imageUrls.size
 
-    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
-        super.onAttachedToRecyclerView(recyclerView)
-        Timber.tag(LogTags.UI).d("onAttachedToRecyclerView called")
+    override fun onViewRecycled(holder: ViewHolder) {
+        super.onViewRecycled(holder)
+        holder.clear()
     }
 
     override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
         super.onDetachedFromRecyclerView(recyclerView)
-        Timber.tag(LogTags.UI).d("onDetachedFromRecyclerView called")
+        try {
+            Glide.get(recyclerView.context).clearMemory()
+        } catch (e: Exception) {
+            Timber.tag(LogTags.UI).e("Error clearing Glide memory: ${e.message}")
+        }
     }
 
     inner class ViewHolder(
@@ -62,6 +62,7 @@ class ImageSliderAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
 
         private var currentPosition: Int = 0
+        private var currentUrl: String? = null
 
         private val gestureDetector = GestureDetector(
             binding.root.context,
@@ -78,6 +79,7 @@ class ImageSliderAdapter(
                     )
 
                     try {
+                        // ✅ Now works with the import
                         val fragment = binding.root.findFragment<Fragment>()
                         fragment?.parentFragmentManager?.let { fm ->
                             if (fm.findFragmentByTag("full_screen_viewer") == null) {
@@ -96,15 +98,19 @@ class ImageSliderAdapter(
         )
 
         init {
-            Timber.tag(LogTags.UI).d("ViewHolder created with binding: ${binding.root.javaClass.simpleName}")
-
             binding.imageView.setOnTouchListener { _, event ->
                 gestureDetector.onTouchEvent(event)
             }
         }
 
         fun bind(url: String, position: Int) {
+            if (currentUrl == url && currentPosition == position) {
+                Timber.tag(LogTags.UI).d("Skipping bind - same URL: $url")
+                return
+            }
+
             currentPosition = position
+            currentUrl = url
             Timber.tag(LogTags.UI).d("📸 Binding image $position: $url")
 
             Glide.with(binding.root.context).clear(binding.imageView)
@@ -122,7 +128,9 @@ class ImageSliderAdapter(
                         target: com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable>?,
                         isFirstResource: Boolean
                     ): Boolean {
-                        Timber.tag(LogTags.UI).e("❌ Load failed pos $position: ${e?.message}")
+                        if (currentUrl == url) {
+                            Timber.tag(LogTags.UI).e("❌ Load failed pos $position: ${e?.message}")
+                        }
                         return false
                     }
 
@@ -132,11 +140,22 @@ class ImageSliderAdapter(
                         dataSource: com.bumptech.glide.load.DataSource?,
                         isFirstResource: Boolean
                     ): Boolean {
-                        Timber.tag(LogTags.UI).d("✅ Loaded pos $position from $dataSource")
+                        if (currentUrl == url) {
+                            Timber.tag(LogTags.UI).d("✅ Loaded pos $position from $dataSource")
+                        }
                         return false
                     }
                 })
                 .into(binding.imageView)
+        }
+
+        fun clear() {
+            try {
+                Glide.with(binding.root.context).clear(binding.imageView)
+            } catch (e: Exception) {
+                Timber.tag(LogTags.UI).e("Error clearing image: ${e.message}")
+            }
+            currentUrl = null
         }
     }
 }

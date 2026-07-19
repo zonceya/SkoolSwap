@@ -9,7 +9,7 @@ import com.example.skoolswap.R
 import com.example.skoolswap.databinding.ItemRecommendedRowBinding
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.homefeed.Section
-import com.example.skoolswap.ui.home.adapter.HorizontalItemsAdapter
+import com.example.skoolswap.ui.home.adapter.VerticalItemsAdapter
 import timber.log.Timber
 
 class RecommendedViewHolder(
@@ -18,26 +18,38 @@ class RecommendedViewHolder(
     private val onViewAllClick: (String) -> Unit
 ) : RecyclerView.ViewHolder(binding.root) {
 
+    private val itemsAdapter = VerticalItemsAdapter(
+        sectionType = "recommended",
+        onItemClick = onItemClick
+    )
+
+    init {
+        binding.recommendedRecycler.apply {
+            layoutManager = LinearLayoutManager(
+                itemView.context,
+                LinearLayoutManager.VERTICAL,
+                false
+            )
+            adapter = itemsAdapter
+            setHasFixedSize(true)
+            isNestedScrollingEnabled = false
+        }
+
+        binding.root.findViewById<TextView>(R.id.viewAll)?.setOnClickListener {
+            onViewAllClick("recommended")
+        }
+    }
+
     fun bind(section: Section.Recommended) {
-        // Log what data we received
         Timber.tag("RecommendedViewHolder").d("========== RECOMMENDED SECTION ==========")
         Timber.tag("RecommendedViewHolder").d("Title: ${section.title}")
         Timber.tag("RecommendedViewHolder").d("Items count: ${section.items.size}")
 
-        section.items.forEachIndexed { index, item ->
-            Timber.tag("RecommendedViewHolder").d("Item $index: ${item.name}")
-            Timber.tag("RecommendedViewHolder").d("  coverImage: ${item.coverImage}")
-            Timber.tag("RecommendedViewHolder").d("  images size: ${item.images.size}")
-            item.images.forEach { image ->
-                Timber.tag("RecommendedViewHolder").d("    image url: ${image.url}")
-            }
-        }
         val sectionTitle = binding.root.findViewById<TextView>(R.id.sectionTitle)
         val viewAll = binding.root.findViewById<TextView>(R.id.viewAll)
 
-        sectionTitle.text = section.title
+        sectionTitle?.text = section.title
 
-        // Set text colors based on theme
         val isDarkMode = (itemView.context.resources.configuration.uiMode and
                 Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
 
@@ -47,21 +59,9 @@ class RecommendedViewHolder(
             ContextCompat.getColor(itemView.context, R.color.black)
         }
 
-        sectionTitle.setTextColor(textColor)
-        viewAll.setTextColor(textColor)
+        sectionTitle?.setTextColor(textColor)
+        viewAll?.setTextColor(textColor)
 
-        val adapter = HorizontalItemsAdapter(section.items, section.type, onItemClick)
-        binding.recommendedRecycler.apply {
-            layoutManager = LinearLayoutManager(
-                itemView.context,
-                LinearLayoutManager.HORIZONTAL,
-                false
-            )
-            this.adapter = adapter
-        }
-
-        viewAll.setOnClickListener {
-            onViewAllClick(section.type)
-        }
+        itemsAdapter.updateItems(section.items)
     }
 }

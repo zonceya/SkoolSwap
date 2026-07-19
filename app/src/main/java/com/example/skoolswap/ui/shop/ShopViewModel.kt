@@ -177,7 +177,19 @@ class ShopViewModel @Inject constructor(
             }
         }
     }
-
+    init {
+        // ✅ Preload shop data when ViewModel is created
+        viewModelScope.launch {
+            try {
+                Timber.tag(LogTags.VIEW_MODEL).d("🔄 Preloading shop data from init...")
+                loadMyShop(showLoading = false)
+                loadMyShopItems()
+                Timber.tag(LogTags.VIEW_MODEL).d("✅ Shop data preloaded from init")
+            } catch (e: Exception) {
+                Timber.tag(LogTags.VIEW_MODEL).e(e, "⚠️ Failed to preload shop from init")
+            }
+        }
+    }
     fun clearError() {
         _error.value = null
     }

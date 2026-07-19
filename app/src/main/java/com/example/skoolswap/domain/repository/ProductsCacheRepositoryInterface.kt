@@ -14,7 +14,7 @@ interface ProductsCacheRepositoryInterface {
         period: String? = null,
         categoryId: Int? = null
     )
-
+    suspend fun preload()
     // Get cached products by key
     suspend fun getCachedProducts(
         cacheKey: String,

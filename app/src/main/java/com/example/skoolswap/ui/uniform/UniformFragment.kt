@@ -13,6 +13,7 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.skoolswap.R
 import com.example.skoolswap.databinding.FragmentUniformBinding
+import com.example.skoolswap.domain.model.UniformCategory
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
@@ -104,9 +105,14 @@ class UniformFragment : Fragment() {
 
     private fun navigateToProducts(category: UniformCategory) {
         val bundle = Bundle().apply {
-            putString("SECTION_TYPE", "uniform")
+            putString("SECTION_TYPE", when (category.categoryId) {
+                1 -> "uniform"
+                2 -> "sports"
+                3 -> "accessories"
+                else -> "uniform"
+            })
             putString("SECTION_TITLE", category.name)
-            putInt("CATEGORY_ID", 1)
+            putInt("CATEGORY_ID", category.categoryId)
             putInt("SUB_CATEGORY_ID", category.id)
         }
         findNavController().navigate(R.id.action_uniformFragment_to_productsFragment, bundle)

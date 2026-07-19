@@ -159,7 +159,6 @@ class SchoolOnboardingFragment : Fragment() {
                         if (province != null) {
                             Timber.tag(LogTags.UI).d("📍 Province selected: ${province.name}")
                             binding.schoolSearch.isEnabled = true
-                            binding.schoolSearchLayout.placeholderText = getString(R.string.school_onboarding_start_typing)
                             binding.provinceEmptyMessage.visibility = View.GONE
                             viewModel.loadAllSchoolsForProvince(province)
                             updateProgress(1)
