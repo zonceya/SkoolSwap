@@ -2,7 +2,7 @@ package com.example.skoolswap.common.constants
 
 object AppConstants {
     // ============ BASE CONFIGURATION ============
-    const val BASE_URL = "https://api.sekeni.xyz/"
+    const val BASE_URL = "https://api.skoolswap.co.za/"
     const val API_VERSION = "v1"
     const val FULL_BASE_URL = "$BASE_URL$API_VERSION/"
     const val CACHE_DURATION_MS = 24 * 60 * 60 * 1000L // 24 hour
