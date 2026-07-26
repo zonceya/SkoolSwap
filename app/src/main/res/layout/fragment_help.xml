@@ -1,0 +1,350 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="?android:attr/colorBackground">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        tools:context=".ui.help.HelpFragment">
+
+        <RelativeLayout
+            android:id="@+id/helpLayout"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginTop="40dp"
+            android:layout_marginBottom="30dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <!-- Title -->
+            <TextView
+                android:id="@+id/tvTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="Get in touch with us"
+                android:textAlignment="center"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:textColor="?attr/colorOnSurface" />
+
+            <!-- Subtitle -->
+            <TextView
+                android:id="@+id/tvSubtitle1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/tvTitle"
+                android:layout_marginTop="8dp"
+                android:text="Complete the form below and we'll get back within 24 hours"
+                android:textAlignment="center"
+                android:textSize="14sp"
+                android:textColor="?attr/colorOnSurface"
+                android:alpha="0.7" />
+
+            <!-- Subject Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/subjectTextInputLayout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/tvSubtitle1"
+                android:layout_marginTop="24dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginStart="8dp"
+                android:hint="Your Subject Here"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp"
+                app:boxStrokeColor="?attr/colorOnSurface"
+                app:boxStrokeErrorColor="@color/red"
+                app:errorIconTint="@color/red"
+                app:errorTextColor="@color/red"
+                app:hintTextColor="?attr/colorOnSurface">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etSubject"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text"
+                    android:textColor="?attr/colorOnSurface" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Description Input -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/descriptionTextInputLayout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/subjectTextInputLayout"
+                android:layout_marginTop="12dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginStart="8dp"
+                android:hint="Description"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp"
+                app:boxStrokeColor="?attr/colorOnSurface"
+                app:boxStrokeErrorColor="@color/red"
+                app:errorIconTint="@color/red"
+                app:errorTextColor="@color/red"
+                app:hintTextColor="?attr/colorOnSurface">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etDescription"
+                    android:layout_width="match_parent"
+                    android:layout_height="120dp"
+                    android:gravity="top"
+                    android:inputType="textMultiLine"
+                    android:textColor="?attr/colorOnSurface" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Character Counter -->
+            <TextView
+                android:id="@+id/tvCharCounter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/descriptionTextInputLayout"
+                android:layout_marginTop="4dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginStart="8dp"
+                android:text="0/400"
+                android:textAlignment="textEnd"
+                android:textSize="12sp"
+                android:textColor="?attr/colorOnSurface"
+                android:alpha="0.7" />
+
+            <!-- User Details Section -->
+            <TextView
+                android:id="@+id/tvUserDetailsTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/tvCharCounter"
+                android:layout_marginTop="16dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:text="Your Details"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="?attr/colorOnSurface" />
+
+            <View
+                android:id="@+id/divider"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_below="@id/tvUserDetailsTitle"
+                android:layout_marginVertical="8dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:background="?attr/colorOnSurface"
+                android:alpha="0.2" />
+
+            <!-- Name and Surname (Auto-filled) -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/nameTextInputLayout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/divider"
+                android:layout_marginEnd="8dp"
+                android:layout_marginStart="8dp"
+                android:hint="Name and Surname"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp"
+                app:boxStrokeColor="?attr/colorOnSurface"
+                app:hintTextColor="?attr/colorOnSurface">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clickable="false"
+                    android:cursorVisible="false"
+                    android:enabled="false"
+                    android:focusable="false"
+                    android:inputType="none"
+                    android:textColor="?attr/colorOnSurface" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Email (Auto-filled) -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/emailTextInputLayout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/nameTextInputLayout"
+                android:layout_marginTop="12dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginStart="8dp"
+                android:hint="Email"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp"
+                app:boxStrokeColor="?attr/colorOnSurface"
+                app:hintTextColor="?attr/colorOnSurface">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etEmail"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clickable="false"
+                    android:cursorVisible="false"
+                    android:enabled="false"
+                    android:focusable="false"
+                    android:inputType="none"
+                    android:textColor="?attr/colorOnSurface" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Mobile Number (Auto-filled) -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/mobileTextInputLayout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/emailTextInputLayout"
+                android:layout_marginTop="12dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginStart="8dp"
+                android:hint="Mobile Number"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp"
+                app:boxStrokeColor="?attr/colorOnSurface"
+                app:hintTextColor="?attr/colorOnSurface">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etMobileNumber"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clickable="false"
+                    android:cursorVisible="false"
+                    android:enabled="false"
+                    android:focusable="false"
+                    android:inputType="none"
+                    android:textColor="?attr/colorOnSurface" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Send Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSend"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/mobileTextInputLayout"
+                android:layout_marginTop="24dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:backgroundTint="@color/black"
+                android:text="SEND"
+                android:textAllCaps="true"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <!-- Contact Hours Section -->
+            <!-- Support Hours Section -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/supportHoursCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/btnSend"
+                android:layout_marginTop="32dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Support Hours"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="Monday - Friday"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="8:00 AM - 5:00 PM"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp"
+                        android:alpha="0.7" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="Weekend &amp; Public Holidays"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Limited support via email"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="14sp"
+                        android:alpha="0.7" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:padding="8dp"
+                        android:background="@drawable/surface_highlight_background"
+                        android:text="Send us a message using the form above. We aim to respond within 24 hours."
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="12sp"
+                        android:alpha="0.8" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+        </RelativeLayout>
+
+        <!-- Loading Indicator -->
+        <LinearLayout
+            android:id="@+id/helpProgressLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:indeterminate="true" />
+        </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>

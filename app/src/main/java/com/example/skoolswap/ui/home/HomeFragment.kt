@@ -816,7 +816,6 @@ class HomeFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         autoScrollHelper?.resumeAutoScroll()
-        // ❌ REMOVED: reload logic - only load if null (handled in onCreateView)
     }
 
     override fun onPause() {

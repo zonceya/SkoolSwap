@@ -168,6 +168,16 @@ class SchoolOnboardingViewModel @Inject constructor(
 
             when (val result = userSchoolRepository.assignSchool(school.id)) {
                 is Result.Success -> {
+                    // ✅ Sync the local cache (Room + AppPreferences) so IntroFragment's
+                    // fast-path check sees schoolMapped = true on next launch
+                    val refreshResult = authRepository.refreshUserProfile()
+                    if (refreshResult.isFailure) {
+                        Timber.tag(LogTags.VIEW_MODEL)
+                            .w("⚠️ School assigned on server but local cache refresh failed: ${refreshResult.exceptionOrNull()?.message}")
+                        // Don't block success on this — server is source of truth,
+                        // and IntroFragment's fallback (restoreSession) will still catch it next launch.
+                    }
+
                     _updateSuccess.value = true
                     _profileComplete.value = true
                     Timber.tag(LogTags.VIEW_MODEL).d("✅ School assigned successfully: ${school.name}")

@@ -187,7 +187,63 @@ class AppPreferences @Inject constructor(
         val timestamp = context.dataStore.data.map { it[longPreferencesKey("${CATEGORY_FILTER_TIMESTAMP_PREFIX}$categoryId")] ?: 0L }.first()
         return System.currentTimeMillis() - timestamp < 60 * 60 * 1000
     }
+// Add to AppPreferences.kt - these are synchronous versions for easy access
 
+// ==================== Synchronous Getters (for easy access) ====================
+
+    fun getUserNameSync(): String? {
+        return try {
+            runBlocking {
+                withTimeoutOrNull(100L) {
+                    userName.first()
+                }
+            }
+        } catch (e: Exception) {
+            Timber.tag("AppPreferences").e(e, "Failed to get username sync")
+            null
+        }
+    }
+
+    fun getUserEmailSync(): String? {
+        return try {
+            runBlocking {
+                withTimeoutOrNull(100L) {
+                    userEmail.first()
+                }
+            }
+        } catch (e: Exception) {
+            Timber.tag("AppPreferences").e(e, "Failed to get user email sync")
+            null
+        }
+    }
+
+    fun getMobileNumberSync(): String? {
+        return try {
+            runBlocking {
+                withTimeoutOrNull(100L) {
+                    // Try to get from user preferences
+                    // You might need to store mobile number separately
+                    // For now, return null or get from shared prefs
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            Timber.tag("AppPreferences").e(e, "Failed to get mobile number sync")
+            null
+        }
+    }
+
+    // If you want to store mobile number separately, add these:
+    suspend fun setMobileNumber(mobile: String) {
+        context.dataStore.edit { it[stringPreferencesKey("user_mobile")] = mobile }
+    }
+
+    suspend fun getMobileNumber(): String? {
+        return context.dataStore.data.map { it[stringPreferencesKey("user_mobile")] }.first()
+    }
+
+    // Add this key
+    val USER_MOBILE = stringPreferencesKey("user_mobile")
     // ==================== Helper Methods ====================
 
     suspend fun hasSchoolMapped(): Boolean = context.dataStore.data.map { it[SCHOOL_MAPPED] ?: false }.first()

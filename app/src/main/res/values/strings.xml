@@ -23,7 +23,8 @@
     <string name="menu_logout">Logout</string>
     <string name="menu_gallery">Gallery</string>
     <string name="menu_slideshow">Slideshow</string>
-
+    <string name="menu_help">Help &amp; Support</string>
+    <string name="help_illustration">Help Illustration</string>
     <!-- Onboarding -->
     <string name="sell_easily">Sell Easily</string>
     <string name="sell_easy_disc">Sell your school\'s preloved items—from uniforms and accessories to sports gear—all through your phone.</string>

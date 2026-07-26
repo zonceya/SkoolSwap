@@ -19,6 +19,7 @@ import com.example.skoolswap.data.local.database.dao.UserDao
 import com.example.skoolswap.data.local.database.dao.UserSchoolDao
 import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.data.remote.api.FilterApiService
+import com.example.skoolswap.data.remote.api.HelpApiService
 import com.example.skoolswap.data.remote.api.ImageApiService
 import com.example.skoolswap.data.remote.api.ItemApiService
 import com.example.skoolswap.data.remote.api.ProvinceApiService
@@ -32,6 +33,7 @@ import com.example.skoolswap.data.remote.api.UserSchoolApiService
 import com.example.skoolswap.data.repository.AuthRepository
 import com.example.skoolswap.data.repository.FavoriteRepository
 import com.example.skoolswap.data.repository.FilterRepository
+import com.example.skoolswap.data.repository.HelpRepository
 import com.example.skoolswap.data.repository.HomeRepository
 import com.example.skoolswap.data.repository.ImageUploadRepository
 import com.example.skoolswap.data.repository.ItemRepository
@@ -42,6 +44,7 @@ import com.example.skoolswap.data.repository.UserSchoolRepository
 import com.example.skoolswap.domain.repository.AuthRepositoryInterface
 import com.example.skoolswap.domain.repository.FavoriteRepositoryInterface
 import com.example.skoolswap.domain.repository.FilterRepositoryInterface
+import com.example.skoolswap.domain.repository.HelpRepositoryInterface
 import com.example.skoolswap.domain.repository.HomeRepositoryInterface
 import com.example.skoolswap.domain.repository.ItemRepositoryInterface
 import com.example.skoolswap.domain.repository.ProductsCacheRepositoryInterface
@@ -184,6 +187,13 @@ object AppModule {
     fun provideImageApiService(retrofit: Retrofit): ImageApiService {
         return retrofit.create(ImageApiService::class.java)
     }
+    @Provides
+    @Singleton
+    fun provideHelpApiService(retrofit: Retrofit): HelpApiService {
+        return retrofit.create(HelpApiService::class.java)
+    }
+
+
 
     // ========== OTHER DEPENDENCIES ==========
     @Provides
@@ -216,7 +226,17 @@ object AppModule {
             provinceDao = provinceDao
         )
     }
-
+    @Provides
+    @Singleton
+    fun provideHelpRepository(
+        helpApiService: HelpApiService,
+        authRepository: AuthRepositoryInterface
+    ): HelpRepositoryInterface {
+        return HelpRepository(
+            helpApiService = helpApiService,
+            authRepository = authRepository
+        )
+    }
     @Provides
     @Singleton
     fun provideUserSchoolRepository(

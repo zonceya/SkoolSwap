@@ -11,6 +11,7 @@ import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
+import android.widget.ScrollView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -128,10 +129,14 @@ class SchoolOnboardingFragment : Fragment() {
                         binding.schoolResultsRecyclerView.visibility = View.VISIBLE
                         binding.noResultsText.visibility = View.GONE
                         binding.provinceEmptyMessage.visibility = View.GONE
+
+                        scrollToReveal(binding.schoolResultsRecyclerView) // 👈 auto scroll
                     } else {
                         binding.schoolResultsRecyclerView.visibility = View.GONE
                         binding.provinceEmptyMessage.visibility = View.VISIBLE
                         binding.provinceEmptyMessage.text = getString(R.string.school_onboarding_select_province_first)
+
+                        scrollToReveal(binding.provinceEmptyMessage) // 👈 auto scroll
                     }
                 } else {
                     binding.schoolResultsRecyclerView.visibility = View.GONE
@@ -172,8 +177,13 @@ class SchoolOnboardingFragment : Fragment() {
                         if (schools.isEmpty() && binding.schoolSearch.text?.isNotEmpty() == true) {
                             binding.noResultsText.visibility = View.VISIBLE
                             binding.noResultsText.text = getString(R.string.school_onboarding_no_results)
+                            scrollToReveal(binding.noResultsText)
                         } else {
                             binding.noResultsText.visibility = View.GONE
+                            if (schools.isNotEmpty()) {
+                                binding.schoolResultsRecyclerView.visibility = View.VISIBLE
+                                scrollToReveal(binding.schoolResultsRecyclerView)
+                            }
                         }
                     }
                 }
@@ -361,5 +371,13 @@ class SchoolOnboardingFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+    private fun scrollToReveal(target: View) {
+        // Root is a ScrollView, so we can scroll it directly
+        val scrollView = binding.root as? ScrollView ?: return
+        target.post {
+            val offset = (16 * resources.displayMetrics.density).toInt() // small breathing room
+            scrollView.smoothScrollTo(0, target.top - offset)
+        }
     }
 }
