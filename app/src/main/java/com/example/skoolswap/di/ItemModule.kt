@@ -28,8 +28,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object ItemModule {
-
-    // Item DAO
     @Provides
     @Singleton
     fun provideItemDao(database: SkoolSwapDatabase): ItemDao = database.itemDao()

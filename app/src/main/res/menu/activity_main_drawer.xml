@@ -16,6 +16,10 @@
             android:id="@+id/nav_favorites"
             android:icon="@drawable/ic_favorite"
             android:title="@string/favorites" />
+        <item
+            android:id="@+id/nav_help"
+            android:icon="@drawable/ic_help"
+            android:title="@string/menu_help" />
        <!-- <item
             android:id="@+id/nav_wallet"
             android:icon="@drawable/ic_wallet"

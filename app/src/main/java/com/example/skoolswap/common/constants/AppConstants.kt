@@ -12,7 +12,7 @@ object AppConstants {
     const val WRITE_TIMEOUT = 30L
     const val API_TIMEOUT = 30L
     const val TIMEOUT = 1000L
-
+    const val SUPPORT_EMAIL = "admin@skoolswap.com"
     // ============ DATABASE ============
     const val DATABASE_NAME = "skoolswap_database"
     const val DATABASE_VERSION = 1

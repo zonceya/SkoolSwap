@@ -137,7 +137,6 @@ class IntroFragment : Fragment() {
     private fun determineDestination() {
         lifecycleScope.launch {
             try {
-                // Quick check: If user is already properly logged in → go straight to home
                 val isLoggedIn = appPreferences.isLoggedIn.first()
                 val roomUser = authRepository.getRoomUser()
 
@@ -147,7 +146,8 @@ class IntroFragment : Fragment() {
                     val destination = if (roomUser.schoolMapped) {
                         R.id.nav_home
                     } else {
-                        R.id.nav_profile
+                        Timber.tag(TAG).i("🏫 School not mapped — resuming school onboarding")
+                        R.id.schoolOnboardingFragment
                     }
                     onDestinationDetermined(destination)
                     return@launch
@@ -160,13 +160,13 @@ class IntroFragment : Fragment() {
                     val destination = if (updatedUser?.schoolMapped == true) {
                         R.id.nav_home
                     } else {
-                        R.id.nav_profile
+                        Timber.tag(TAG).i("🏫 School not mapped — resuming school onboarding")
+                        R.id.schoolOnboardingFragment
                     }
                     onDestinationDetermined(destination)
                     return@launch
                 }
 
-                // No valid session → go to login
                 Timber.tag(TAG).i("❌ No valid session found → login")
                 onDestinationDetermined(R.id.loginFragment)
 

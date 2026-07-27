@@ -287,6 +287,12 @@ class MainActivity : AppCompatActivity() {
                     showLogoutConfirmationDialog()
                     true
                 }
+                R.id.nav_help -> {
+                    // Navigate to help fragment
+                    navController.navigate(R.id.nav_help)
+                    binding.drawerLayout.closeDrawer(GravityCompat.START)
+                    true
+                }
                 else -> {
                     try {
                         if (navController.currentDestination?.id != menuItem.itemId) {
@@ -325,10 +331,11 @@ class MainActivity : AppCompatActivity() {
                 R.id.nav_favorites,
                 R.id.createItemFragment,
                 R.id.editItemFragment,
-                R.id.nav_shop -> {
+                R.id.nav_shop,
+                R.id.nav_help -> {
                     supportActionBar?.show()
                     binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
-                    binding.appBarMain.fab.visibility = View.VISIBLE
+                    binding.appBarMain.fab.visibility = View.GONE  // ← HIDE FAB
                     binding.appBarMain.toolbar.menu.findItem(R.id.action_search)?.isVisible = false
                 }
                 else -> {
