@@ -274,6 +274,10 @@
     <string name="home_tab_uniform">Uniform</string>
     <string name="home_tab_sport">Sport</string>
     <string name="home_tab_recent">Recent</string>
+    <string name="menu_privacy">menu privacy</string>
+    <string name="menu_terms">menu terms</string>
+    <string name="menu_guidelines">menu guidelines</string>
+    <string name="menu_prohibited">menu prohibited</string>
     <string-array name="main_categories" translatable="false">
 
         <item>Women</item>

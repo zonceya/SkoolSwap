@@ -119,6 +119,7 @@ dependencies {
     implementation(libs.androidx.compose.remote.creation.core)
     implementation(libs.androidx.hilt.work)
     implementation(libs.identity.jvm)
+    implementation(libs.play.services.maps3d)
     kapt(libs.androidx.hilt.compiler)
     kapt(libs.room.compiler)
     implementation(libs.kotlinx.datetime)

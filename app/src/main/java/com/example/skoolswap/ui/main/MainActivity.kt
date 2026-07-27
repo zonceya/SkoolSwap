@@ -1,5 +1,6 @@
 package com.example.skoolswap.ui.main
 
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.os.SystemClock
@@ -55,6 +56,7 @@ import jakarta.inject.Inject
 import timber.log.Timber
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import android.net.Uri
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -116,7 +118,7 @@ class MainActivity : AppCompatActivity() {
         setupNavigationListener()
         observeNavigation()
         observeAuthState()
-
+        setupPolicyFooter()
         binding.appBarMain.fab.visibility = View.GONE
         supportActionBar?.hide()
         binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
@@ -293,6 +295,7 @@ class MainActivity : AppCompatActivity() {
                     binding.drawerLayout.closeDrawer(GravityCompat.START)
                     true
                 }
+
                 else -> {
                     try {
                         if (navController.currentDestination?.id != menuItem.itemId) {
@@ -365,6 +368,34 @@ class MainActivity : AppCompatActivity() {
             }
         )
     }
+    private fun setupPolicyFooter() {
+        val navView = binding.navView
+
+        // Inflate the footer layout
+        val footerLayout = layoutInflater.inflate(R.layout.nav_footer_policies, navView, false)
+
+        // Add at the END of the NavigationView (after header and menu)
+        // Get the current child count and add at the end
+        navView.addView(footerLayout, navView.childCount)
+
+        // Set click listeners
+        footerLayout.findViewById<TextView>(R.id.tv_privacy)?.setOnClickListener {
+            openPolicyUrl("https://skoolswap.co.za/privacy")
+            binding.drawerLayout.closeDrawer(GravityCompat.START)
+        }
+        footerLayout.findViewById<TextView>(R.id.tv_terms)?.setOnClickListener {
+            openPolicyUrl("https://skoolswap.co.za/terms")
+            binding.drawerLayout.closeDrawer(GravityCompat.START)
+        }
+        footerLayout.findViewById<TextView>(R.id.tv_guidelines)?.setOnClickListener {
+            openPolicyUrl("https://skoolswap.co.za/guidelines")
+            binding.drawerLayout.closeDrawer(GravityCompat.START)
+        }
+        footerLayout.findViewById<TextView>(R.id.tv_prohibited)?.setOnClickListener {
+            openPolicyUrl("https://skoolswap.co.za/Prohibited")
+            binding.drawerLayout.closeDrawer(GravityCompat.START)
+        }
+    }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
         super.onRestoreInstanceState(savedInstanceState)
@@ -373,7 +404,15 @@ class MainActivity : AppCompatActivity() {
             navController.navigate(destinationId)
         }
     }
-
+    private fun openPolicyUrl(url: String) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            startActivity(intent)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to open URL: $url")
+            Toast.makeText(this, "Unable to open link", Toast.LENGTH_SHORT).show()
+        }
+    }
     private fun performLogout() {
         binding.drawerLayout.closeDrawer(GravityCompat.START)
 
