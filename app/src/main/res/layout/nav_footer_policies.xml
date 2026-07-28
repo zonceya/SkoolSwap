@@ -6,7 +6,7 @@
     android:paddingStart="10dp"
     android:paddingEnd="2dp"
     android:paddingBottom="16dp"
-    android:paddingTop="440dp">
+    android:paddingTop="730dp">
 
     <!-- Row 1: Privacy Policy | Terms & Conditions -->
     <LinearLayout

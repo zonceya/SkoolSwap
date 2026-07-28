@@ -35,7 +35,7 @@ import com.example.skoolswap.data.local.database.entities.*
         ProductsCacheEntity::class,
         PendingActionEntity::class
     ],
-    version = 21,  // ✅ BUMPED to 21
+    version = 22,  // ✅ BUMPED to 21
     exportSchema = false
 )
 @TypeConverters(Converters::class)

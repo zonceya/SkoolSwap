@@ -9,5 +9,7 @@ data class SchoolEntity(
     val id: Int,
     val name: String,
     val schoolType: String?,
-    val provinceId: Int?
+    val provinceId: Int? = null,
+    val locationId: Int? = null,
+
 )

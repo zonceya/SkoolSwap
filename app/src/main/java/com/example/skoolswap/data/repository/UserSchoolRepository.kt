@@ -1,5 +1,6 @@
 package com.example.skoolswap.data.repository
 
+import android.util.Log
 import com.example.skoolswap.common.constants.AppConstants.LogTags
 import com.example.skoolswap.data.local.database.dao.ProvinceDao
 import com.example.skoolswap.data.local.database.dao.SchoolDao
@@ -314,6 +315,35 @@ class UserSchoolRepository @Inject constructor(
         } catch (e: Exception) {
             Timber.tag(LogTags.REPOSITORY).e(e, "❌ Exception removing school")
             Result.Error(e)
+        }
+    }
+
+    // data/repository/UserSchoolRepositoryImpl.kt
+    override suspend fun getNearbySchoolIds(schoolId: Int): List<Int> {
+        return try {
+            val school = schoolDao.getByIdSync(schoolId)
+            if (school == null) return emptyList()
+
+            // Priority 1: Same location
+            school.locationId?.let { locationId ->
+                val nearby = schoolDao.getByLocationId(locationId, schoolId)
+                if (nearby.isNotEmpty()) {
+                    return nearby.map { it.id }
+                }
+            }
+
+            // Priority 2: Same province
+            school.provinceId?.let { provinceId ->
+                val nearby = schoolDao.getByProvinceId(provinceId, schoolId)
+                if (nearby.isNotEmpty()) {
+                    return nearby.map { it.id }
+                }
+            }
+
+            emptyList()
+        } catch (e: Exception) {
+            Timber.tag("UserSchoolRepo").e("Failed to get nearby schools: ${e.message}")
+            emptyList()
         }
     }
 

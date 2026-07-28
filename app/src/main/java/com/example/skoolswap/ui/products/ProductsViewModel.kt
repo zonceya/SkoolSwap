@@ -117,7 +117,7 @@ class ProductsViewModel @Inject constructor(
     val searchQuery: StateFlow<String?> = _searchQuery.asStateFlow()
 
     private val itemsCache = mutableMapOf<String, List<Item>>()
-
+    private var _nearbySchoolIds: List<Int> = emptyList()
     // ==================== Public Methods ====================
 
     fun getSavedCategoryId(): Int? = savedCategoryId
@@ -156,7 +156,9 @@ class ProductsViewModel @Inject constructor(
 
     fun getUserSchoolId(): Int? = userSchoolId
     fun getNearbySchoolIds(): List<Int> = nearbySchoolIds
-
+    fun setNearbySchoolIds(ids: List<Int>) {
+        _nearbySchoolIds = ids
+    }
     // ==================== Search Methods ====================
 
     fun searchInCurrentSection(query: String) {
