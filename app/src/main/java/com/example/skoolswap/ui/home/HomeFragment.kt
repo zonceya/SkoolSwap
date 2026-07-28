@@ -17,6 +17,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.example.skoolswap.R
 import com.example.skoolswap.common.constants.AppConstants
@@ -27,6 +28,8 @@ import com.example.skoolswap.domain.model.BannerItem
 import com.example.skoolswap.domain.model.FilterOption
 import com.example.skoolswap.domain.model.Item
 import com.example.skoolswap.domain.model.homefeed.Section
+import com.example.skoolswap.domain.repository.HomeRepositoryInterface
+import com.example.skoolswap.domain.repository.UserSchoolRepositoryInterface
 import com.example.skoolswap.ui.home.adapter.BannerAdapter
 import com.example.skoolswap.ui.home.adapter.HomeFeedAdapter
 import com.example.skoolswap.ui.shop.CategoryGridAdapter
@@ -70,7 +73,8 @@ class HomeFragment : Fragment() {
 
     @Inject
     lateinit var appPreferences: AppPreferences
-
+    @Inject
+    lateinit var userSchoolRepository: UserSchoolRepositoryInterface
     companion object {
         private const val BANNER_AUTO_SCROLL_INTERVAL_MS = 8000L
         private const val SEARCH_DEBOUNCE_DELAY_MS = 400L
@@ -95,7 +99,14 @@ class HomeFragment : Fragment() {
         BannerItem(imageUrl = "https://cdn.skoolswap.co.za/banners/home_2.jpg"),
         BannerItem(imageUrl = "https://cdn.skoolswap.co.za/banners/home_3.jpg")
     )
-
+    private val bannerHideListener = object : RecyclerView.OnScrollListener() {
+        override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+            super.onScrollStateChanged(recyclerView, newState)
+            if (newState == RecyclerView.SCROLL_STATE_DRAGGING) {
+                binding.emptyBanner.visibility = View.GONE
+            }
+        }
+    }
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -115,7 +126,16 @@ class HomeFragment : Fragment() {
         setupBackButton()
         observeViewModel()
         setupSwipeRefresh()
+        binding.homeRecycler.addOnScrollListener(bannerHideListener)
+        binding.searchResultsRecycler.addOnScrollListener(bannerHideListener)
+        lifecycleScope.launch {
+            val schoolId = appPreferences.schoolId.first()?.takeIf { it > 0 }
+            if (schoolId != null) {
 
+                val nearbyIds = userSchoolRepository.getNearbySchoolIds(schoolId)
+                viewModel.setNearbySchoolIds(nearbyIds)
+            }
+        }
         viewLifecycleOwner.lifecycleScope.launch {
             val argSchoolId = arguments?.getInt(AppConstants.ARG_SCHOOL_ID, -1)?.takeIf { it > 0 }
             val prefSchoolId = appPreferences.schoolId.first()?.takeIf { it > 0 }
@@ -127,7 +147,6 @@ class HomeFragment : Fragment() {
                 viewModel.setKnownSchoolId(schoolId)
             }
 
-            // ✅ Only load if feed is null (initial load)
             if (viewModel.homeFeed.value == null && !viewModel.isLoading.value) {
                 viewModel.loadHomeFeed()
             }
@@ -148,7 +167,7 @@ class HomeFragment : Fragment() {
 
         isInSearchMode = true
         enterSearchMode()
-
+        categorySearchAdapter.submitList(emptyList())
         searchJob = viewLifecycleOwner.lifecycleScope.launch {
             viewModel.searchLocalOnly(query, arguments?.getInt("CATEGORY_ID"))
 
@@ -190,7 +209,8 @@ class HomeFragment : Fragment() {
         binding.searchResultsContainer.visibility = View.GONE
         binding.searchResultsRecycler.visibility = View.GONE
         binding.emptySearchResults.visibility = View.GONE
-
+        binding.emptyBanner.visibility = View.GONE
+        categorySearchAdapter.submitList(emptyList())
         selectedGender = null
         selectedCondition = null
         selectedSize = null
@@ -431,8 +451,7 @@ class HomeFragment : Fragment() {
             }
         }
 
-        // ✅ 3. Home feed data - NO SNACKBAR HERE
-        // ✅ 3. Home feed data - WITH SORTING
+
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.homeFeed.collect { feed ->
                 feed?.let {
@@ -486,13 +505,32 @@ class HomeFragment : Fragment() {
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.rankedSearchResults.collect { results ->
+            viewModel.rankedSearchState.collect { state ->
                 if (!isInSearchMode) return@collect
 
+                val results = state.items
+                val query = state.query
+
+                Timber.tag(LogTags.UI).d("📊 Search state: query='$query', results=${results.size}")
+
+                originalSearchResults.clear()
+                currentSearchResults.clear()
+
                 if (results.isEmpty()) {
-                    binding.emptySearchResults.visibility = View.VISIBLE
+                    // ✅ Show empty state with the actual query
                     binding.searchResultsRecycler.visibility = View.GONE
+                    binding.emptySearchResults.visibility = View.VISIBLE
+                    binding.emptySearchResults.text = if (query.isNotEmpty()) {
+                        "No items found for '$query'"
+                    } else {
+                        "No items found"
+                    }
+                    binding.emptyBanner.visibility = View.GONE
+                    categorySearchAdapter.submitList(emptyList())
+
+                    Timber.tag(LogTags.UI).d("📊 Showing empty state for '$query'")
                 } else {
+                    // ✅ Show results
                     binding.emptySearchResults.visibility = View.GONE
                     binding.searchResultsRecycler.visibility = View.VISIBLE
 
@@ -504,6 +542,38 @@ class HomeFragment : Fragment() {
 
                     categorySearchAdapter.submitList(currentSearchResults.toList())
                     rebuildLocalFilters()
+
+                    // ✅ Banner logic
+                    val userSchoolId = viewModel.knownSchoolId
+                    val hasSchoolItems = if (userSchoolId != null) {
+                        results.any { it.schoolId == userSchoolId }
+                    } else {
+                        false
+                    }
+
+                    val nearbyIds = viewModel.getNearbySchoolIds()
+                    val hasNearbyItems = if (nearbyIds.isNotEmpty()) {
+                        results.any { nearbyIds.contains(it.schoolId) }
+                    } else {
+                        false
+                    }
+
+                    if (results.isNotEmpty() && !hasSchoolItems) {
+                        val bannerMessage = if (hasNearbyItems) {
+                            "No items found at your school. Showing nearby items."
+                        } else {
+                            "No items found at your school or nearby. Showing other schools."
+                        }
+                        binding.bannerMessage.text = bannerMessage
+                        binding.emptyBanner.visibility = View.VISIBLE
+                        binding.btnCloseBanner.setOnClickListener {
+                            binding.emptyBanner.visibility = View.GONE
+                        }
+                    } else {
+                        binding.emptyBanner.visibility = View.GONE
+                    }
+
+                    Timber.tag(LogTags.UI).d("📊 Showing ${results.size} results for '$query'")
                 }
             }
         }

@@ -8,4 +8,5 @@ interface UserSchoolRepositoryInterface {
     suspend fun getCurrentSchoolMapping(): com.example.skoolswap.utils.Result<SchoolMapping?>
     suspend fun updateSchoolMapping(mappingId: String, schoolId: Int): Result<SchoolMapping>
     suspend fun removeSchoolMapping(mappingId: String): com.example.skoolswap.utils.Result<Boolean>
+    suspend fun getNearbySchoolIds(schoolId: Int): List<Int>
 }

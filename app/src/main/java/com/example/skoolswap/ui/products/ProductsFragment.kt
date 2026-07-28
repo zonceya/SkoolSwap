@@ -22,13 +22,17 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.skoolswap.R
 import com.example.skoolswap.common.constants.AppConstants.LogTags
+import com.example.skoolswap.data.local.datastore.AppPreferences
 import com.example.skoolswap.databinding.FragmentProductsBinding
 import com.example.skoolswap.domain.model.FilterOption
 import com.example.skoolswap.domain.model.Item
+import com.example.skoolswap.domain.repository.UserSchoolRepositoryInterface
 import com.example.skoolswap.ui.products.adapter.ProductsAdapter
 import dagger.hilt.android.AndroidEntryPoint
+import jakarta.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -66,7 +70,10 @@ class ProductsFragment : Fragment() {
     private val GENDER_EVEN_ID = 26
     private val GENDER_REM_CHECK = 2
     private val GENDER_REM_RESULT = 0
-
+    @Inject
+    lateinit var userSchoolRepository: UserSchoolRepositoryInterface
+    @Inject
+    lateinit var appPreferences: AppPreferences
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -116,7 +123,13 @@ class ProductsFragment : Fragment() {
         setupFilterDrawer()
         setupSwipeRefresh()
         observeViewModel()
-
+        lifecycleScope.launch {
+            val schoolId = appPreferences.schoolId.first()?.takeIf { it > 0 }
+            if (schoolId != null) {
+                val nearbyIds = userSchoolRepository.getNearbySchoolIds(schoolId)
+                viewModel.setNearbySchoolIds(nearbyIds)
+            }
+        }
         viewModel.loadProducts(
             sectionType = sectionType,
             period = period,

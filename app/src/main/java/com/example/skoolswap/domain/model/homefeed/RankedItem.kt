@@ -15,7 +15,7 @@ data class RankedItem(
     val brand: String?,
     val schoolName: String?,
     val schoolId: Int,
-    val relevance: String, // "school_match", "nearby_match", "other"
+    val relevance: String,
     val images: List<String>?,
     val coverPhoto: String?,
     val createdAt: String,
