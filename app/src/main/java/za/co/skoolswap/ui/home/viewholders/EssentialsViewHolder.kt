@@ -1,0 +1,197 @@
+package za.co.skoolswap.ui.home.viewholders
+
+import android.content.res.Configuration
+import android.os.Bundle
+import android.view.View
+import androidx.core.content.ContextCompat
+import androidx.navigation.findNavController
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import za.co.skoolswap.R
+import za.co.skoolswap.databinding.ItemEssentialsRowBinding
+import za.co.skoolswap.domain.model.Item
+import za.co.skoolswap.domain.model.homefeed.Section
+import za.co.skoolswap.ui.home.adapter.EssentialsGridAdapter
+import timber.log.Timber
+
+private const val TAG = "EssentialsViewHolder"
+
+class EssentialsViewHolder(
+    private val binding: ItemEssentialsRowBinding,
+    private val onItemClick: (Item, String) -> Unit
+) : RecyclerView.ViewHolder(binding.root) {
+
+    // ✅ Create adapter ONCE and reuse it
+    private val gridAdapter = EssentialsGridAdapter(
+        items = emptyList(),
+        onCategoryClick = { categoryItem ->
+            handleCategoryClick(categoryItem)
+        }
+    )
+
+    init {
+        // ✅ Setup RecyclerView ONCE in init
+        binding.essentialsRecycler.apply {
+            layoutManager = GridLayoutManager(itemView.context, 2)
+            adapter = gridAdapter
+            setHasFixedSize(true)
+        }
+
+        // ✅ Set header color in init (themed)
+        val isDarkMode = (itemView.context.resources.configuration.uiMode and
+                Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+
+        val textColor = if (isDarkMode) {
+            ContextCompat.getColor(itemView.context, R.color.white)
+        } else {
+            ContextCompat.getColor(itemView.context, R.color.black)
+        }
+
+        binding.header.sectionTitle.setTextColor(textColor)
+        binding.header.viewAll.visibility = View.GONE
+    }
+
+    fun bind(section: Section.Essentials) {
+        Timber.tag(TAG).d("=== BINDING ESSENTIALS SECTION ===")
+
+        binding.header.sectionTitle.text = section.title
+        Timber.tag(TAG).d("Header title set to: ${section.title}")
+
+        // Build category cards
+        val categoryCards = buildCategoryCards(section)
+        Timber.tag(TAG).d("Total category cards: ${categoryCards.size}")
+
+        // ✅ Just update the adapter's data - NO new adapter!
+        gridAdapter.updateItems(categoryCards)
+    }
+
+    // EssentialsViewHolder.kt - buildCategoryCards()
+    private fun buildCategoryCards(section: Section.Essentials): List<EssentialsCategoryItem> {
+        val categoryCards = mutableListOf<EssentialsCategoryItem>()
+
+        // Uniforms
+        val uniformsItem = if (section.sections.uniforms.isNotEmpty()) {
+            EssentialsCategoryItem(
+                item = section.sections.uniforms.first(),
+                categoryType = "uniforms",
+                displayName = "Uniforms",
+                categoryId = 1,
+                // ✅ Remove remote default URL - use local drawable instead
+                defaultImageUrl = null
+            )
+        } else {
+            EssentialsCategoryItem(
+                item = createPlaceholderItem("No uniforms yet", R.drawable.ic_uniform_placeholder),
+                categoryType = "uniforms",
+                displayName = "Uniforms",
+                categoryId = 1,
+                isPlaceholder = true,
+                defaultImageUrl = null
+            )
+        }
+        categoryCards.add(uniformsItem)
+
+        // Sports
+        val sportsItem = if (section.sections.sports.isNotEmpty()) {
+            EssentialsCategoryItem(
+                item = section.sections.sports.first(),
+                categoryType = "sports",
+                displayName = "Sports",
+                categoryId = 2,
+                defaultImageUrl = null
+            )
+        } else {
+            EssentialsCategoryItem(
+                item = createPlaceholderItem("No sports gear yet", R.drawable.ic_sports_placeholder),
+                categoryType = "sports",
+                displayName = "Sports",
+                categoryId = 2,
+                isPlaceholder = true,
+                defaultImageUrl = null
+            )
+        }
+        categoryCards.add(sportsItem)
+
+        // Stationery
+        val stationeryItem = if (section.sections.stationery.isNotEmpty()) {
+            EssentialsCategoryItem(
+                item = section.sections.stationery.first(),
+                categoryType = "stationery",
+                displayName = "Stationery",
+                categoryId = 4,
+                defaultImageUrl = null
+            )
+        } else {
+            EssentialsCategoryItem(
+                item = createPlaceholderItem("Stationery", R.drawable.ic_stationery_placeholder),
+                categoryType = "stationery",
+                displayName = "Stationery",
+                categoryId = 4,
+                isPlaceholder = true,
+                defaultImageUrl = null
+            )
+        }
+        categoryCards.add(stationeryItem)
+
+        // Accessories
+        val accessoriesItem = if (section.sections.accessories.isNotEmpty()) {
+            EssentialsCategoryItem(
+                item = section.sections.accessories.first(),
+                categoryType = "accessories",
+                displayName = "Accessories",
+                categoryId = 5,
+                defaultImageUrl = null
+            )
+        } else {
+            EssentialsCategoryItem(
+                item = createPlaceholderItem("Accessories", R.drawable.ic_accessories_placeholder),
+                categoryType = "accessories",
+                displayName = "Accessories",
+                categoryId = 5,
+                isPlaceholder = true,
+                defaultImageUrl = null
+            )
+        }
+        categoryCards.add(accessoriesItem)
+
+        return categoryCards
+    } private fun handleCategoryClick(categoryItem: EssentialsCategoryItem) {
+        Timber.tag(TAG)
+            .d("Category clicked: ${categoryItem.displayName}, categoryId: ${categoryItem.categoryId}")
+
+        val bundle = Bundle().apply {
+            putString("SECTION_TYPE", categoryItem.categoryType)
+            putString("SECTION_TITLE", categoryItem.displayName)
+            putInt("CATEGORY_ID", categoryItem.categoryId)
+        }
+
+        itemView.findNavController().navigate(
+            R.id.action_homeFragment_to_productsFragment,
+            bundle
+        )
+    }
+
+    private fun createPlaceholderItem(message: String, iconResId: Int): Item {
+        return Item(
+            id = "placeholder_${System.currentTimeMillis()}",
+            name = message,
+            description = "",
+            price = 0.0,
+            images = emptyList(),
+            shopId = 0L,
+            quantity = 0,
+            status = "",
+            createdAt = "",
+        )
+    }
+}
+
+// Data class for category items
+data class EssentialsCategoryItem(
+    val item: Item,
+    val categoryType: String,
+    val displayName: String,
+    val categoryId: Int,
+    val isPlaceholder: Boolean = false,
+    val defaultImageUrl: String? = null
+)

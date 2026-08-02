@@ -15,7 +15,7 @@
     <!-- INTRO FRAGMENT - First screen, plays video -->
     <fragment
         android:id="@+id/introFragment"
-        android:name="com.example.skoolswap.ui.intro.IntroFragment"
+        android:name="za.co.skoolswap.ui.intro.IntroFragment"
         android:label="Intro"
         tools:layout="@layout/fragment_intro">
 
@@ -51,13 +51,13 @@
     </fragment>
     <fragment
         android:id="@+id/nav_help"
-        android:name="com.example.skoolswap.ui.help.HelpFragment"
+        android:name="za.co.skoolswap.ui.help.HelpFragment"
         android:label="@string/menu_help"
         tools:layout="@layout/fragment_help" />
     <!-- School Onboarding Fragment -->
     <fragment
         android:id="@+id/schoolOnboardingFragment"
-        android:name="com.example.skoolswap.ui.schoolonboarding.SchoolOnboardingFragment"
+        android:name="za.co.skoolswap.ui.schoolonboarding.SchoolOnboardingFragment"
         android:label="School Selection"
         tools:layout="@layout/fragment_school_onboarding">
 
@@ -72,7 +72,7 @@
     <!-- Onboarding Flow -->
     <fragment
         android:id="@+id/viewPagerFragment"
-        android:name="com.example.skoolswap.ui.onboarding.ViewPagerFragment"
+        android:name="za.co.skoolswap.ui.onboarding.ViewPagerFragment"
         android:label="Onboarding"
         tools:layout="@layout/fragment_view_pager">
 
@@ -87,7 +87,7 @@
     <!-- Login Flow -->
     <fragment
         android:id="@+id/loginFragment"
-        android:name="com.example.skoolswap.ui.login.LoginFragment"
+        android:name="za.co.skoolswap.ui.login.LoginFragment"
         android:label="Login"
         tools:layout="@layout/fragment_login">
 
@@ -139,14 +139,14 @@
     <!-- Forgot Password Fragment -->
     <fragment
         android:id="@+id/forgotPasswordFragment"
-        android:name="com.example.skoolswap.ui.forgotpassword.ForgotPasswordFragment"
+        android:name="za.co.skoolswap.ui.forgotpassword.ForgotPasswordFragment"
         android:label="Forgot Password"
         tools:layout="@layout/fragment_forgot_password" />
 
     <!-- Sign Up Fragment -->
     <fragment
         android:id="@+id/signUpFragment"
-        android:name="com.example.skoolswap.ui.signup.SignUpFragment"
+        android:name="za.co.skoolswap.ui.signup.SignUpFragment"
         android:label="Sign Up"
         tools:layout="@layout/fragment_sign_up">
 
@@ -173,7 +173,7 @@
     <!-- Main App Flow - Home Fragment -->
     <fragment
         android:id="@+id/nav_home"
-        android:name="com.example.skoolswap.ui.home.HomeFragment"
+        android:name="za.co.skoolswap.ui.home.HomeFragment"
         android:label="@string/menu_home"
         tools:layout="@layout/fragment_home">
 
@@ -210,27 +210,27 @@
     <!-- Favorite Fragment -->
     <fragment
         android:id="@+id/nav_favorites"
-        android:name="com.example.skoolswap.ui.favorites.FavoritesFragment"
+        android:name="za.co.skoolswap.ui.favorites.FavoritesFragment"
         android:label="Favorites"
         tools:layout="@layout/fragment_favorites" />
 
     <!-- Drawer Menu Fragments -->
     <fragment
         android:id="@+id/nav_gallery"
-        android:name="com.example.skoolswap.ui.gallery.GalleryFragment"
+        android:name="za.co.skoolswap.ui.gallery.GalleryFragment"
         android:label="@string/menu_gallery"
         tools:layout="@layout/fragment_gallery" />
 
     <fragment
         android:id="@+id/nav_slideshow"
-        android:name="com.example.skoolswap.ui.slideshow.SlideshowFragment"
+        android:name="za.co.skoolswap.ui.slideshow.SlideshowFragment"
         android:label="@string/menu_slideshow"
         tools:layout="@layout/fragment_slideshow" />
 
     <!-- Profile Fragment -->
     <fragment
         android:id="@+id/nav_profile"
-        android:name="com.example.skoolswap.ui.profile.ProfileFragment"
+        android:name="za.co.skoolswap.ui.profile.ProfileFragment"
         android:label="Profile"
         tools:layout="@layout/fragment_profile">
 
@@ -245,7 +245,7 @@
     <!-- Shop Fragment -->
     <fragment
         android:id="@+id/nav_shop"
-        android:name="com.example.skoolswap.ui.shop.ShopFragment"
+        android:name="za.co.skoolswap.ui.shop.ShopFragment"
         android:label="My Shop"
         tools:layout="@layout/fragment_shop">
 
@@ -272,7 +272,7 @@
     <!-- Create Item Fragment -->
     <fragment
         android:id="@+id/createItemFragment"
-        android:name="com.example.skoolswap.ui.item.CreateItemFragment"
+        android:name="za.co.skoolswap.ui.item.CreateItemFragment"
         android:label="Create Item"
         tools:layout="@layout/fragment_create_item">
 
@@ -293,7 +293,7 @@
     <!-- Edit Item Fragment -->
     <fragment
         android:id="@+id/editItemFragment"
-        android:name="com.example.skoolswap.ui.item.edititem.EditItemFragment"
+        android:name="za.co.skoolswap.ui.item.edititem.EditItemFragment"
         android:label="Edit Item"
         tools:layout="@layout/fragment_edit_item">
 
@@ -306,7 +306,7 @@
     <!-- Products Fragment -->
     <fragment
         android:id="@+id/productsFragment"
-        android:name="com.example.skoolswap.ui.products.ProductsFragment"
+        android:name="za.co.skoolswap.ui.products.ProductsFragment"
         android:label="Products"
         tools:layout="@layout/fragment_products">
 
@@ -347,7 +347,7 @@
     <!-- Uniform Fragment -->
     <fragment
         android:id="@+id/uniformFragment"
-        android:name="com.example.skoolswap.ui.uniform.UniformFragment"
+        android:name="za.co.skoolswap.ui.uniform.UniformFragment"
         android:label="Uniforms"
         tools:layout="@layout/fragment_uniform">
 
@@ -365,7 +365,7 @@
     <!-- Sport Fragment -->
     <fragment
         android:id="@+id/sportFragment"
-        android:name="com.example.skoolswap.ui.sport.SportFragment"
+        android:name="za.skoolswap.app.ui.sport.SportFragment"
         android:label="Sports"
         tools:layout="@layout/fragment_sport">
 
@@ -383,7 +383,7 @@
     <!-- Recent Fragment -->
     <fragment
         android:id="@+id/recentFragment"
-        android:name="com.example.skoolswap.ui.recent.RecentFragment"
+        android:name="za.co.skoolswap.ui.recent.RecentFragment"
         android:label="Recent">
 
         <argument
@@ -396,7 +396,7 @@
     <!-- Item Detail Fragment -->
     <fragment
         android:id="@+id/itemDetailFragment"
-        android:name="com.example.skoolswap.ui.detail.ItemDetailFragment"
+        android:name="za.co.skoolswap.ui.detail.ItemDetailFragment"
         android:label="Item Details"
         tools:layout="@layout/fragment_item_detail">
 

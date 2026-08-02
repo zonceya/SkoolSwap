@@ -14,11 +14,48 @@
       },
       "oauth_client": [
         {
-          "client_id": "63644777044-q566jketqu9m71amlu22i3cm277vrles.apps.googleusercontent.com",
+          "client_id": "63644777044-h0lc83uunpgvi1ivqbmogstvckfo1l7g.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.skoolswap",
-            "certificate_hash": "96124c480c2e8f9710425a5edb71de9471b271b7"
+            "certificate_hash": "a9afc64f873cd5953cfc55ce7f675c15ddd4e59d"
+          }
+        },
+        {
+          "client_id": "63644777044-5ttve1jvt4nr35s31b2gp2b48ev2tp3h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAO1S76gKjGwTnjSio6Ayu-ejFT7HiW40s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "63644777044-5ttve1jvt4nr35s31b2gp2b48ev2tp3h.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:63644777044:android:fa0bcfa4c9e491ad884bc1",
+        "android_client_info": {
+          "package_name": "za.co.skoolswap"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "63644777044-1ife5jrce26psqn1e1deqfgkm24flfjp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "za.co.skoolswap",
+            "certificate_hash": "a9afc64f873cd5953cfc55ce7f675c15ddd4e59d"
           }
         },
         {

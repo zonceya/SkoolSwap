@@ -1,0 +1,165 @@
+package za.co.skoolswap.ui.detail.adapter
+
+import android.graphics.Bitmap
+import android.graphics.drawable.Drawable
+import android.view.GestureDetector
+import android.view.LayoutInflater
+import android.view.MotionEvent
+import android.view.ViewGroup
+import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.request.target.CustomTarget
+import com.bumptech.glide.request.transition.Transition
+import com.davemorrissey.labs.subscaleview.ImageSource
+import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
+import za.co.skoolswap.R
+import za.co.skoolswap.common.constants.AppConstants.LogTags
+import za.co.skoolswap.databinding.ItemFullScreenImageBinding
+import timber.log.Timber
+
+// Private constants - internal to this file only
+private const val MAX_SCALE = 8f
+private const val TAP_RESET_DELAY_MS = 300L
+private const val IMAGE_OVERRIDE_SIZE = 1600
+
+class FullScreenImagePagerAdapter(
+    private val imageUrls: List<String>,
+    private val onSingleTap: () -> Unit = {}
+) : RecyclerView.Adapter<FullScreenImagePagerAdapter.ViewHolder>() {
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val binding = ItemFullScreenImageBinding.inflate(
+            LayoutInflater.from(parent.context), parent, false
+        )
+        return ViewHolder(binding)
+    }
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        holder.bind(imageUrls[position])
+    }
+
+    override fun onViewRecycled(holder: ViewHolder) {
+        super.onViewRecycled(holder)
+        holder.clear()
+    }
+
+    override fun getItemCount() = imageUrls.size
+
+    inner class ViewHolder(
+        private val binding: ItemFullScreenImageBinding
+    ) : RecyclerView.ViewHolder(binding.root) {
+
+        private var currentTarget: CustomTarget<Bitmap>? = null
+        private var isTapHandled = false
+        private var currentUrl: String? = null
+
+        private val gestureDetector = GestureDetector(
+            binding.root.context,
+            object : GestureDetector.SimpleOnGestureListener() {
+                override fun onDown(e: MotionEvent) = true
+
+                override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                    if (!isTapHandled) {
+                        isTapHandled = true
+                        onSingleTap()
+                        binding.root.postDelayed({ isTapHandled = false }, TAP_RESET_DELAY_MS)
+                    }
+                    return true
+                }
+            }
+        )
+
+        init {
+            binding.photoView.apply {
+                setMinimumScaleType(SubsamplingScaleImageView.SCALE_TYPE_CENTER_INSIDE)
+                setMaxScale(MAX_SCALE)
+                setPanLimit(SubsamplingScaleImageView.PAN_LIMIT_INSIDE)
+            }
+
+            binding.photoView.setOnTouchListener { view, event ->
+                val handled = gestureDetector.onTouchEvent(event)
+                if (!handled) {
+                    view.performClick()
+                }
+                false
+            }
+        }
+
+        fun bind(url: String) {
+            // ✅ Skip if same URL to avoid reloading
+            if (currentUrl == url && currentTarget != null) {
+                Timber.tag(LogTags.UI).d("Skipping bind - same URL: $url")
+                return
+            }
+
+            Timber.tag(LogTags.UI).d("Binding URL: $url")
+            currentUrl = url
+            isTapHandled = false
+
+            // ✅ Clear previous target
+            clear()
+
+            val target = object : CustomTarget<Bitmap>() {
+                override fun onResourceReady(
+                    resource: Bitmap,
+                    transition: Transition<in Bitmap>?
+                ) {
+                    if (currentUrl == url) {
+                        Timber.tag(LogTags.UI).d("Bitmap ready for: $url, size: ${resource.width}x${resource.height}")
+                        binding.photoView.setImage(ImageSource.bitmap(resource))
+                    } else {
+                        Timber.tag(LogTags.UI).d("Bitmap ready but URL changed, ignoring: $url")
+                    }
+                }
+
+                override fun onLoadFailed(errorDrawable: Drawable?) {
+                    if (currentUrl == url) {
+                        Timber.tag(LogTags.UI).e("Load failed for: $url")
+                        binding.photoView.setImage(ImageSource.resource(R.drawable.ic_create_item_placeholder))
+                    }
+                }
+
+                override fun onLoadCleared(placeholder: Drawable?) {
+                    Timber.tag(LogTags.UI).d("Load cleared for: $url")
+                }
+            }
+
+            currentTarget = target
+
+            Glide.with(binding.root.context)
+                .asBitmap()
+                .load(url)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .skipMemoryCache(false)
+                .override(IMAGE_OVERRIDE_SIZE, IMAGE_OVERRIDE_SIZE)
+                .placeholder(R.drawable.ic_create_item_placeholder)
+                .error(R.drawable.ic_create_item_placeholder)
+                .into(target)
+        }
+
+        fun clear() {
+            currentTarget?.let { target ->
+                try {
+                    Glide.with(binding.root.context).clear(target)
+                } catch (e: Exception) {
+                    Timber.tag(LogTags.UI).e("Error clearing Glide target: ${e.message}")
+                }
+            }
+            currentTarget = null
+            binding.photoView.recycle()
+            isTapHandled = false
+        }
+    }
+
+    // ✅ Clean up all images when adapter is detached
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        super.onDetachedFromRecyclerView(recyclerView)
+        // Clear all pending Glide requests
+        try {
+            Glide.get(recyclerView.context).clearMemory()
+        } catch (e: Exception) {
+            Timber.tag(LogTags.UI).e("Error clearing Glide memory: ${e.message}")
+        }
+    }
+}

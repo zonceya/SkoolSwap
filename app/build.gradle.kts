@@ -8,22 +8,23 @@ plugins {
 }
 
 android {
-    namespace = "com.example.skoolswap"
+    namespace = "za.co.skoolswap"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.skoolswap"
+        applicationId = "za.co.skoolswap"
         minSdk = 25
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -111,15 +112,10 @@ dependencies {
     // Database
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
-    implementation(libs.firebase.crashlytics.buildtools)
-    implementation(libs.androidx.compose.material3)
-    implementation(libs.navigation.fragment.ktx)
-    implementation(libs.navigation.ui.ktx)
     implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.androidx.compose.remote.creation.core)
     implementation(libs.androidx.hilt.work)
-    implementation(libs.identity.jvm)
-    implementation(libs.play.services.maps3d)
+     implementation(libs.play.services.maps3d)
     kapt(libs.androidx.hilt.compiler)
     kapt(libs.room.compiler)
     implementation(libs.kotlinx.datetime)
