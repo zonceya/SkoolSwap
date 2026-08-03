@@ -1,6 +1,7 @@
 package za.co.skoolswap.data.repository
 
 import za.co.skoolswap.common.constants.AppConstants.LogTags
+import za.co.skoolswap.common.constants.ErrorConstants
 import za.co.skoolswap.data.local.database.dao.HomeFeedDao
 import za.co.skoolswap.data.local.database.dao.ItemDao
 import za.co.skoolswap.data.local.database.dao.ItemImageDao
@@ -42,7 +43,6 @@ class HomeRepository @Inject constructor(
 
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
 
-    // StateFlow for home feed
     private val _homeFeed = MutableStateFlow<HomeFeed?>(null)
     override val homeFeed: StateFlow<HomeFeed?> = _homeFeed.asStateFlow()
 
@@ -71,7 +71,10 @@ class HomeRepository @Inject constructor(
             onSuccess = { response ->
                 Timber.tag(LogTags.REPOSITORY).d("📥 API Response received")
                 Timber.tag(LogTags.REPOSITORY).d("   success: ${response.success}")
-                Timber.tag(LogTags.REPOSITORY).d("   sections count: ${response.sections?.size ?: 0}")
+
+                // ✅ SAFE: Handle null sections
+                val sections = response.sections ?: emptyList()
+                Timber.tag(LogTags.REPOSITORY).d("   sections count: ${sections.size}")
 
                 if (response.success) {
                     val feed = response.toDomain()
@@ -165,11 +168,12 @@ class HomeRepository @Inject constructor(
             errorMessage = "Failed to search items",
             onSuccess = { response ->
                 if (response.success) {
-                    val items = response.items.map { it.toDomain() }
+                    // ✅ SAFE: Handle null items list
+                    val items = response.items?.map { it.toDomain() } ?: emptyList()
                     Result.Success(
                         RankedItemsResult(
                             items = items,
-                            totalCount = response.totalCount,
+                            totalCount = response.totalCount ?: items.size,
                             currentPage = response.pagination?.currentPage ?: page,
                             totalPages = response.pagination?.totalPages ?: 1
                         )
@@ -205,11 +209,11 @@ class HomeRepository @Inject constructor(
             errorMessage = "Failed to load uniforms",
             onSuccess = { response ->
                 if (response.success) {
-                    val items = response.items.map { it.toDomain() }
+                    val items = response.items?.map { it.toDomain() } ?: emptyList()
                     Result.Success(
                         RankedItemsResult(
                             items = items,
-                            totalCount = response.totalCount,
+                            totalCount = response.totalCount ?: items.size,
                             currentPage = response.pagination?.currentPage ?: page,
                             totalPages = response.pagination?.totalPages ?: 1
                         )
@@ -245,11 +249,11 @@ class HomeRepository @Inject constructor(
             errorMessage = "Failed to load sport items",
             onSuccess = { response ->
                 if (response.success) {
-                    val items = response.items.map { it.toDomain() }
+                    val items = response.items?.map { it.toDomain() } ?: emptyList()
                     Result.Success(
                         RankedItemsResult(
                             items = items,
-                            totalCount = response.totalCount,
+                            totalCount = response.totalCount ?: items.size,
                             currentPage = response.pagination?.currentPage ?: page,
                             totalPages = response.pagination?.totalPages ?: 1
                         )
@@ -283,11 +287,11 @@ class HomeRepository @Inject constructor(
             errorMessage = "Failed to load recent items",
             onSuccess = { response ->
                 if (response.success) {
-                    val items = response.items.map { it.toDomain() }
+                    val items = response.items?.map { it.toDomain() } ?: emptyList()
                     Result.Success(
                         RankedItemsResult(
                             items = items,
-                            totalCount = response.totalCount,
+                            totalCount = response.totalCount ?: items.size,
                             currentPage = response.pagination?.currentPage ?: page,
                             totalPages = response.pagination?.totalPages ?: 1
                         )
@@ -323,11 +327,11 @@ class HomeRepository @Inject constructor(
             errorMessage = "Failed to load recommended items",
             onSuccess = { response ->
                 if (response.success) {
-                    val items = response.items.map { it.toDomain() }
+                    val items = response.items?.map { it.toDomain() } ?: emptyList()
                     Result.Success(
                         RankedItemsResult(
                             items = items,
-                            totalCount = response.totalCount,
+                            totalCount = response.totalCount ?: items.size,
                             currentPage = response.pagination?.currentPage ?: page,
                             totalPages = response.pagination?.totalPages ?: 1
                         )
@@ -361,11 +365,11 @@ class HomeRepository @Inject constructor(
             errorMessage = "Failed to load trending items",
             onSuccess = { response ->
                 if (response.success) {
-                    val items = response.items.map { it.toDomain() }
+                    val items = response.items?.map { it.toDomain() } ?: emptyList()
                     Result.Success(
                         RankedItemsResult(
                             items = items,
-                            totalCount = response.totalCount,
+                            totalCount = response.totalCount ?: items.size,
                             currentPage = response.pagination?.currentPage ?: page,
                             totalPages = response.pagination?.totalPages ?: 1
                         )
@@ -401,11 +405,11 @@ class HomeRepository @Inject constructor(
             errorMessage = "Failed to load essentials",
             onSuccess = { response ->
                 if (response.success) {
-                    val items = response.items.map { it.toDomain() }
+                    val items = response.items?.map { it.toDomain() } ?: emptyList()
                     Result.Success(
                         RankedItemsResult(
                             items = items,
-                            totalCount = response.totalCount,
+                            totalCount = response.totalCount ?: items.size,
                             currentPage = response.pagination?.currentPage ?: page,
                             totalPages = response.pagination?.totalPages ?: 1
                         )
@@ -479,7 +483,7 @@ class HomeRepository @Inject constructor(
                 ?: appPreferences.authToken.first()
             if (token.isNullOrBlank()) {
                 Timber.tag(LogTags.REPOSITORY).e("No auth token available")
-                return onError?.invoke() ?: Result.Error(Exception("Authentication required"))
+                return onError?.invoke() ?: Result.Error(Exception(ErrorConstants.Messages.UserFriendly.SESSION_EXPIRED))
             }
 
             val response = call.invoke()
@@ -493,10 +497,10 @@ class HomeRepository @Inject constructor(
             }
         } catch (e: IOException) {
             Timber.tag(LogTags.REPOSITORY).e(e, "Network error")
-            onError?.invoke() ?: Result.Error(Exception("Network error. Please check your connection."))
+            onError?.invoke() ?: Result.Error(Exception(ErrorConstants.Messages.UserFriendly.NO_INTERNET))
         } catch (e: Exception) {
             Timber.tag(LogTags.REPOSITORY).e(e, "Unexpected error")
-            onError?.invoke() ?: Result.Error(Exception("Unexpected error: ${e.message}"))
+            onError?.invoke() ?: Result.Error(Exception(ErrorConstants.Messages.UserFriendly.UNKNOWN))
         }
     }
 
@@ -508,10 +512,15 @@ class HomeRepository @Inject constructor(
         Timber.tag(LogTags.REPOSITORY).e("API error: ${response.code()} - $errorBody")
 
         val message = when (response.code()) {
-            401 -> "Session expired. Please sign in again."
-            403 -> "You don't have permission to access this"
-            404 -> "Resource not found"
-            500 -> "Server error. Please try again later"
+            ErrorConstants.HttpStatus.UNAUTHORIZED -> ErrorConstants.Messages.UserFriendly.SESSION_EXPIRED
+            ErrorConstants.HttpStatus.FORBIDDEN -> ErrorConstants.Messages.UserFriendly.ACCESS_DENIED
+            ErrorConstants.HttpStatus.NOT_FOUND -> ErrorConstants.Messages.UserFriendly.NOT_FOUND
+            ErrorConstants.HttpStatus.INTERNAL_SERVER -> ErrorConstants.Messages.UserFriendly.SERVER_DOWN
+            ErrorConstants.HttpStatus.BAD_GATEWAY -> ErrorConstants.Messages.UserFriendly.SERVER_DOWN
+            ErrorConstants.HttpStatus.SERVICE_UNAVAILABLE -> ErrorConstants.Messages.UserFriendly.SERVICE_UNAVAILABLE
+            ErrorConstants.HttpStatus.GATEWAY_TIMEOUT -> ErrorConstants.Messages.UserFriendly.TIMEOUT
+            ErrorConstants.HttpStatus.AUTHENTICATION_TIMEOUT -> ErrorConstants.Messages.UserFriendly.SESSION_EXPIRED
+            ErrorConstants.HttpStatus.TOO_MANY_REQUESTS -> ErrorConstants.Messages.UserFriendly.SERVER_BUSY
             else -> "$errorMessage: ${response.code()}"
         }
 

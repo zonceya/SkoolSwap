@@ -1,900 +1,529 @@
-package za.co.skoolswap.ui.home
+package za.co.skoolswap.data.repository
 
-import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.PopupMenu
-import android.widget.TextView
-import androidx.core.content.ContextCompat
-import androidx.core.view.GravityCompat
-import androidx.drawerlayout.widget.DrawerLayout
-import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
-import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.findNavController
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import androidx.viewpager2.widget.ViewPager2
-import za.co.skoolswap.R
-import za.co.skoolswap.common.constants.AppConstants
 import za.co.skoolswap.common.constants.AppConstants.LogTags
+import za.co.skoolswap.common.constants.ErrorConstants
+import za.co.skoolswap.data.local.database.dao.HomeFeedDao
+import za.co.skoolswap.data.local.database.dao.ItemDao
+import za.co.skoolswap.data.local.database.dao.ItemImageDao
 import za.co.skoolswap.data.local.datastore.AppPreferences
-import za.co.skoolswap.databinding.FragmentHomeBinding
-import za.co.skoolswap.domain.model.BannerItem
-import za.co.skoolswap.domain.model.FilterOption
-import za.co.skoolswap.domain.model.Item
-import za.co.skoolswap.domain.model.homefeed.Section
-import za.co.skoolswap.domain.repository.UserSchoolRepositoryInterface
-import za.co.skoolswap.ui.home.adapter.BannerAdapter
-import za.co.skoolswap.ui.home.adapter.HomeFeedAdapter
-import za.co.skoolswap.ui.shop.CategoryGridAdapter
-import com.google.android.material.floatingactionbutton.FloatingActionButton
-import com.google.android.material.snackbar.Snackbar
-import dagger.hilt.android.AndroidEntryPoint
-import jakarta.inject.Inject
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import za.co.skoolswap.data.mapper.saveItemsToCache
+import za.co.skoolswap.data.mapper.toDomain
+import za.co.skoolswap.data.mapper.toEntity
+import za.co.skoolswap.data.remote.api.RecommendationsApiService
+import za.co.skoolswap.domain.model.homefeed.HomeFeed
+import za.co.skoolswap.domain.model.homefeed.RecentFeed
+import za.co.skoolswap.domain.model.homefeed.SportFeed
+import za.co.skoolswap.domain.model.homefeed.UniformFeed
+import za.co.skoolswap.domain.repository.AuthRepositoryInterface
+import za.co.skoolswap.domain.repository.HomeRepositoryInterface
+import za.co.skoolswap.domain.repository.RankedItemsResult
+import za.co.skoolswap.utils.Result
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import retrofit2.Response
+import java.io.IOException
+import javax.inject.Inject
+import javax.inject.Singleton
 import timber.log.Timber
 
-@AndroidEntryPoint
-class HomeFragment : Fragment() {
+@Singleton
+class HomeRepository @Inject constructor(
+    private val recommendationsApiService: RecommendationsApiService,
+    private val authRepository: AuthRepositoryInterface,
+    private val appPreferences: AppPreferences,
+    private val homeFeedDao: HomeFeedDao,
+    private val itemDao: ItemDao,
+    private val itemImageDao: ItemImageDao
+) : HomeRepositoryInterface {
 
-    private var _binding: FragmentHomeBinding? = null
-    private val binding get() = _binding!!
+    private val coroutineScope = CoroutineScope(Dispatchers.IO)
 
-    private val viewModel: HomeViewModel by viewModels()
-    private lateinit var homeAdapter: HomeFeedAdapter
-    private lateinit var bannerAdapter: BannerAdapter
-    private lateinit var autoScrollHelper: BannerAutoScrollHelper
-    private lateinit var categorySearchAdapter: CategoryGridAdapter
+    private val _homeFeed = MutableStateFlow<HomeFeed?>(null)
+    override val homeFeed: StateFlow<HomeFeed?> = _homeFeed.asStateFlow()
 
-    private var currentTabId: Int = R.id.tabHome
-    internal var searchJob: Job? = null
-    private var isInSearchMode = false
-
-    // Search result state — single source of truth
-    private var originalSearchResults = mutableListOf<Item>()
-    private var currentSearchResults = mutableListOf<Item>()
-
-    // Filter state
-    private var selectedGender: String? = null
-    private var selectedCondition: String? = null
-    private var selectedSize: String? = null
-    private var selectedColor: String? = null
-    private var selectedBrand: String? = null
-
-    @Inject
-    lateinit var appPreferences: AppPreferences
-    @Inject
-    lateinit var userSchoolRepository: UserSchoolRepositoryInterface
     companion object {
-        private const val BANNER_AUTO_SCROLL_INTERVAL_MS = 8000L
-        private const val SEARCH_DEBOUNCE_DELAY_MS = 400L
-        private const val MIN_SEARCH_LENGTH = 2
-        private const val PRICE_SLIDER_MIN = 0f
-        private const val PRICE_SLIDER_MAX = 1000f
-        private const val GRID_SPAN_COUNT = 2
-        private const val TAB_UNIFORM_ID = 6
-        private const val TAB_SPORT_ID = 7
-        private const val BANNER_INITIAL_POSITION_DIVIDER = 2
-        private const val GENDER_BOYS_ID = 42
-        private const val GENDER_GIRLS_ID = 43
-        private const val GENDER_UNISEX_ID = 27
-        private const val GENDER_ODD_ID = 1
-        private const val GENDER_EVEN_ID = 26
-        private const val GENDER_REM_CHECK = 2
-        private const val GENDER_REM_RESULT = 0
+        private const val PER_PAGE_DEFAULT = 30
+        private const val PAGE_DEFAULT = 1
+        private const val TIMEOUT_DURATION_MS = 15000L
+        private const val TIMEOUT_SEARCH_MS = 30000L
+        private const val MAX_RETRIES = 2
+        private const val RETRY_DELAY_MS = 1000L
     }
 
-    private val bannerItems = listOf(
-        BannerItem(imageUrl = "https://cdn.skoolswap.co.za/banners/home_1.jpg"),
-        BannerItem(imageUrl = "https://cdn.skoolswap.co.za/banners/home_2.jpg"),
-        BannerItem(imageUrl = "https://cdn.skoolswap.co.za/banners/home_3.jpg")
-    )
-    private val bannerHideListener = object : RecyclerView.OnScrollListener() {
-        override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
-            super.onScrollStateChanged(recyclerView, newState)
-            if (newState == RecyclerView.SCROLL_STATE_DRAGGING) {
-                binding.emptyBanner.visibility = View.GONE
-            }
-        }
-    }
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        _binding = FragmentHomeBinding.inflate(inflater, container, false)
+    // ================================================================
+    // LEGACY ENDPOINTS
+    // ================================================================
 
-        val fab = activity?.findViewById<FloatingActionButton>(R.id.fab)
-        fab?.visibility = View.VISIBLE
-        binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
-        setupCustomTabs()
-        setupBannerSlider()
-        setupIndicatorDots()
-        setupRecyclerView()
-        setupFilterBar()
-        setupFilterDrawer()
-        setupBackButton()
-        observeViewModel()
-        setupSwipeRefresh()
-        binding.homeRecycler.addOnScrollListener(bannerHideListener)
-        binding.searchResultsRecycler.addOnScrollListener(bannerHideListener)
-        lifecycleScope.launch {
-            val schoolId = appPreferences.schoolId.first()?.takeIf { it > 0 }
-            if (schoolId != null) {
+    override suspend fun getHomeFeed(schoolId: Int): Result<HomeFeed> {
+        Timber.tag(LogTags.REPOSITORY).d("🔄 getHomeFeed called for schoolId: $schoolId")
 
-                val nearbyIds = userSchoolRepository.getNearbySchoolIds(schoolId)
-                viewModel.setNearbySchoolIds(nearbyIds)
-            }
-        }
-        viewLifecycleOwner.lifecycleScope.launch {
-            val argSchoolId = arguments?.getInt(AppConstants.ARG_SCHOOL_ID, -1)?.takeIf { it > 0 }
-            val prefSchoolId = appPreferences.schoolId.first()?.takeIf { it > 0 }
-            val schoolId = argSchoolId ?: prefSchoolId
-            Timber.tag(LogTags.UI)
-                .d("🔑 schoolId: arg=$argSchoolId prefs=$prefSchoolId using=$schoolId")
-
-            if (schoolId != null) {
-                viewModel.setKnownSchoolId(schoolId)
-            }
-
-            if (viewModel.homeFeed.value == null && !viewModel.isLoading.value) {
-                viewModel.loadHomeFeed()
-            }
-        }
-
-        return binding.root
-    }
-
-    fun performLiveSearch(query: String) {
-        Timber.tag(LogTags.UI).d("🔍 performLiveSearch: $query")
-
-        searchJob?.cancel()
-
-        if (query.length < MIN_SEARCH_LENGTH) {
-            exitSearchMode()
-            return
-        }
-
-        isInSearchMode = true
-        enterSearchMode()
-        categorySearchAdapter.submitList(emptyList())
-        searchJob = viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.searchLocalOnly(query, arguments?.getInt("CATEGORY_ID"))
-
-            delay(SEARCH_DEBOUNCE_DELAY_MS)
-
-            if (query != viewModel.searchQuery.value || !isActive) return@launch
-
-            viewModel.searchServer(query, arguments?.getInt("CATEGORY_ID"))
-        }
-    }
-
-    private fun enterSearchMode() {
-        isInSearchMode = true
-
-        binding.topTabs.visibility = View.GONE
-        binding.bannerViewPager.visibility = View.GONE
-        binding.indicatorDots.visibility = View.GONE
-        binding.homeRecycler.visibility = View.GONE
-        binding.swipeRefreshLayout.visibility = View.GONE
-
-        binding.filterBar.visibility = View.VISIBLE
-        binding.searchResultsContainer.visibility = View.VISIBLE
-        binding.searchResultsRecycler.visibility = View.VISIBLE
-        binding.emptySearchResults.visibility = View.GONE
-
-        binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
-    }
-
-    fun exitSearchMode() {
-        isInSearchMode = false
-
-        binding.topTabs.visibility = View.VISIBLE
-        binding.bannerViewPager.visibility = View.VISIBLE
-        binding.indicatorDots.visibility = View.VISIBLE
-        binding.swipeRefreshLayout.visibility = View.VISIBLE
-        binding.homeRecycler.visibility = View.VISIBLE
-
-        binding.filterBar.visibility = View.GONE
-        binding.searchResultsContainer.visibility = View.GONE
-        binding.searchResultsRecycler.visibility = View.GONE
-        binding.emptySearchResults.visibility = View.GONE
-        binding.emptyBanner.visibility = View.GONE
-        categorySearchAdapter.submitList(emptyList())
-        selectedGender = null
-        selectedCondition = null
-        selectedSize = null
-        selectedColor = null
-        selectedBrand = null
-
-        binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
-        binding.drawerLayout.closeDrawer(GravityCompat.END)
-
-        viewModel.clearSearch()
-    }
-
-    private fun setupRecyclerView() {
-        homeAdapter = HomeFeedAdapter(
-            onItemClick = { item, source ->
-                navigateToItemDetail(item.id, source)
+        return safeApiCall(
+            call = {
+                Timber.tag(LogTags.REPOSITORY).d("📡 Calling API...")
+                recommendationsApiService.getHomeFeed(schoolId)
             },
-            onViewAllClick = { sectionType ->
-                when (sectionType) {
-                    "recommended" -> navigateToProducts("recommended", "Recommended For You", null, null)
-                    "essentials" -> navigateToProducts("essentials", "School Essentials", null, null)
-                    "trending" -> navigateToProducts("trending", "Trending", "today", null)
-                    "recent" -> navigateToProducts("recent", "Recently Added", "all", null)
+            errorMessage = "Failed to load home feed",
+            onSuccess = { response ->
+                Timber.tag(LogTags.REPOSITORY).d("📥 API Response received")
+                Timber.tag(LogTags.REPOSITORY).d("   success: ${response.success}")
+
+                // ✅ SAFE: Handle null sections
+                val sections = response.sections ?: emptyList()
+                Timber.tag(LogTags.REPOSITORY).d("   sections count: ${sections.size}")
+
+                if (response.success) {
+                    val feed = response.toDomain()
+                    Timber.tag(LogTags.REPOSITORY).d("   Domain sections: ${feed.sections.size}")
+
+                    saveHomeFeedToCache(feed)
+                    feed.saveItemsToCache(itemDao, itemImageDao)
+                    _homeFeed.value = feed
+                    Result.Success(feed)
+                } else {
+                    Timber.tag(LogTags.REPOSITORY).e("API returned success=false: ${response.message}")
+                    loadHomeFeedFromCache() ?: Result.Error(Exception(response.message ?: "Unknown error"))
+                }
+            },
+            onError = {
+                Timber.tag(LogTags.REPOSITORY).e("API call failed, loading from cache")
+                loadHomeFeedFromCache()
+            }
+        )
+    }
+
+    override suspend fun getUniforms(schoolId: Int, gender: String?): Result<UniformFeed> {
+        return safeApiCall(
+            call = { recommendationsApiService.getUniforms(schoolId, gender) },
+            errorMessage = "Failed to load uniforms",
+            onSuccess = { response ->
+                if (response.success) {
+                    Result.Success(response.toDomain())
+                } else {
+                    Result.Error(Exception(response.message ?: "Unknown error"))
                 }
             }
         )
-        binding.homeRecycler.apply {
-            layoutManager = LinearLayoutManager(requireContext())
-            adapter = homeAdapter
-        }
-
-        categorySearchAdapter = CategoryGridAdapter(
-            onItemClick = { itemId ->
-                navigateToItemDetail(itemId, "search")
-            },
-            onSoldToggle = null,
-            isShopMode = false
-        )
-        binding.searchResultsRecycler.layoutManager = GridLayoutManager(requireContext(), GRID_SPAN_COUNT)
-        binding.searchResultsRecycler.adapter = categorySearchAdapter
     }
 
-    private fun setupFilterBar() {
-        binding.sortBtn.setOnClickListener {
-            if (isInSearchMode) {
-                showSortMenu()
-            }
-        }
-
-        binding.filterBtn.setOnClickListener {
-            if (isInSearchMode) {
-                rebuildLocalFilters()
-                binding.drawerLayout.openDrawer(GravityCompat.END)
-            }
-        }
-
-        binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
-
-        val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                android.content.res.Configuration.UI_MODE_NIGHT_YES
-
-        if (isDarkMode) {
-            binding.sortBtn.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.dark_surface))
-            binding.filterBtn.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.dark_surface))
-            binding.sortBtn.setTextColor(ContextCompat.getColor(requireContext(), R.color.white))
-            binding.filterBtn.setTextColor(ContextCompat.getColor(requireContext(), R.color.white))
-        } else {
-            binding.sortBtn.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.light_background))
-            binding.filterBtn.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.light_background))
-            binding.sortBtn.setTextColor(ContextCompat.getColor(requireContext(), R.color.black))
-            binding.filterBtn.setTextColor(ContextCompat.getColor(requireContext(), R.color.black))
-        }
-    }
-
-    private fun showSortMenu() {
-        val popup = PopupMenu(requireContext(), binding.sortBtn)
-        popup.menuInflater.inflate(R.menu.menu_sort, popup.menu)
-        popup.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-                R.id.sort_recommended -> sortSearchResults("recommended")
-                R.id.sort_newest -> sortSearchResults("newest")
-                R.id.sort_price_low -> sortSearchResults("price_low")
-                R.id.sort_price_high -> sortSearchResults("price_high")
-            }
-            binding.sortBtn.text = item.title
-            true
-        }
-        popup.show()
-    }
-
-    private fun sortSearchResults(sortType: String) {
-        val sorted = when (sortType) {
-            "price_low" -> currentSearchResults.sortedBy { it.price }
-            "price_high" -> currentSearchResults.sortedByDescending { it.price }
-            "newest" -> currentSearchResults.sortedByDescending { it.createdAt }
-            else -> currentSearchResults.toList()
-        }
-        currentSearchResults.clear()
-        currentSearchResults.addAll(sorted)
-        categorySearchAdapter.submitList(currentSearchResults.toList())
-    }
-
-    private fun setupFilterDrawer() {
-        setupPriceSlider()
-
-        binding.resetFilters.setOnClickListener {
-            resetLocalFilters()
-            binding.drawerLayout.closeDrawers()
-        }
-
-        binding.applyFilters.setOnClickListener {
-            applyAllFilters()
-            binding.drawerLayout.closeDrawers()
-        }
-    }
-
-    private fun setupPriceSlider() {
-        binding.priceSlider.setValues(PRICE_SLIDER_MIN, PRICE_SLIDER_MAX)
-        binding.selectedPriceRange.text = "R${PRICE_SLIDER_MIN.toInt()} - R${PRICE_SLIDER_MAX.toInt()}"
-
-        binding.priceSlider.addOnChangeListener { slider, _, _ ->
-            val values = slider.values
-            if (values.size >= 2) {
-                binding.selectedPriceRange.text = "R${values[0].toInt()} - R${values[1].toInt()}"
-            }
-        }
-    }
-
-    private fun setupBackButton() {
-        binding.backToMain.setOnClickListener {
-            binding.filterHeaderTitle.visibility = View.VISIBLE
-            binding.optionsHeader.visibility = View.GONE
-            binding.dynamicFilterContainer.visibility = View.VISIBLE
-            binding.optionsContainer.visibility = View.GONE
-        }
-    }
-
-    private fun getGender(item: Item): String? {
-        return when (item.genderId) {
-            GENDER_BOYS_ID -> "Boys"
-            GENDER_GIRLS_ID -> "Girls"
-            GENDER_UNISEX_ID -> "Unisex"
-            in GENDER_ODD_ID..GENDER_EVEN_ID ->
-                if (item.genderId?.rem(GENDER_REM_CHECK) == GENDER_REM_RESULT) "Girls" else "Boys"
-            else -> item.gender?.takeIf { it.isNotBlank() }
-        }
-    }
-
-    private fun setupBannerSlider() {
-        bannerAdapter = BannerAdapter(bannerItems)
-        binding.bannerViewPager.apply {
-            adapter = bannerAdapter
-            offscreenPageLimit = ViewPager2.OFFSCREEN_PAGE_LIMIT_DEFAULT
-            setCurrentItem(Int.MAX_VALUE / BANNER_INITIAL_POSITION_DIVIDER, false)
-            registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-                override fun onPageSelected(position: Int) {
-                    super.onPageSelected(position)
-                    updateIndicatorDots(position % bannerItems.size)
+    override suspend fun getSportItems(schoolId: Int, sportType: String?): Result<SportFeed> {
+        return safeApiCall(
+            call = { recommendationsApiService.getSportItems(schoolId, sportType) },
+            errorMessage = "Failed to load sport items",
+            onSuccess = { response ->
+                if (response.success) {
+                    Result.Success(response.toDomain())
+                } else {
+                    Result.Error(Exception(response.message ?: "Unknown error"))
                 }
-            })
-        }
-        autoScrollHelper = BannerAutoScrollHelper(binding.bannerViewPager, BANNER_AUTO_SCROLL_INTERVAL_MS)
-        autoScrollHelper.startAutoScroll()
+            }
+        )
     }
 
-    private fun setupIndicatorDots() {
-        binding.indicatorDots.removeAllViews()
-        bannerItems.forEachIndexed { index, _ ->
-            val dot = ImageView(requireContext()).apply {
-                setImageResource(R.drawable.dot_selector)
-                isSelected = (index == 0)
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
+    override suspend fun getRecentItems(schoolId: Int, period: String?): Result<RecentFeed> {
+        return safeApiCall(
+            call = { recommendationsApiService.getRecentItems(schoolId, period) },
+            errorMessage = "Failed to load recent items",
+            onSuccess = { response ->
+                if (response.success) {
+                    Result.Success(response.toDomain())
+                } else {
+                    Result.Error(Exception(response.message ?: "Unknown error"))
+                }
+            }
+        )
+    }
+
+    // ================================================================
+    // 🔥 NEW RANKED ENDPOINTS
+    // ================================================================
+
+    override suspend fun searchItemsRanked(
+        query: String,
+        schoolId: Int,
+        categoryId: Int?,
+        subCategoryId: Int?,
+        minPrice: Float?,
+        maxPrice: Float?,
+        page: Int,
+        perPage: Int
+    ): Result<RankedItemsResult> {
+        return safeApiCall(
+            call = {
+                recommendationsApiService.searchItemsRanked(
+                    query = query,
+                    schoolId = schoolId,
+                    categoryId = categoryId,
+                    subCategoryId = subCategoryId,
+                    minPrice = minPrice,
+                    maxPrice = maxPrice,
+                    page = page,
+                    perPage = perPage
                 )
-                setPadding(8, 0, 8, 0)
-            }
-            binding.indicatorDots.addView(dot)
-        }
-    }
-
-    private fun updateIndicatorDots(currentIndex: Int) {
-        for (i in 0 until binding.indicatorDots.childCount) {
-            val dot = binding.indicatorDots.getChildAt(i) as ImageView
-            dot.isSelected = (i == currentIndex)
-        }
-    }
-
-    private fun setupSwipeRefresh() {
-        binding.swipeRefreshLayout.apply {
-            setColorSchemeColors(
-                androidx.core.content.ContextCompat.getColor(requireContext(), R.color.teal_200)
-            )
-            setOnRefreshListener {
-                viewModel.refreshHomeFeed()
-            }
-        }
-    }
-
-    private fun observeViewModel() {
-        // ✅ 1. Loading state
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.isLoading.collect { isLoading ->
-                if (isLoading && viewModel.homeFeed.value == null) {
-                    binding.shimmerLayout.visibility = View.VISIBLE
-                    binding.homeRecycler.visibility = View.GONE
-                    binding.errorLayout.visibility = View.GONE
-                    binding.noSchoolLayout.visibility = View.GONE
+            },
+            errorMessage = "Failed to search items",
+            onSuccess = { response ->
+                if (response.success) {
+                    // ✅ SAFE: Handle null items list
+                    val items = response.items?.map { it.toDomain() } ?: emptyList()
+                    Result.Success(
+                        RankedItemsResult(
+                            items = items,
+                            totalCount = response.totalCount ?: items.size,
+                            currentPage = response.pagination?.currentPage ?: page,
+                            totalPages = response.pagination?.totalPages ?: 1
+                        )
+                    )
                 } else {
-                    binding.shimmerLayout.visibility = View.GONE
-                    binding.swipeRefreshLayout.isRefreshing = false
-                    if (viewModel.homeFeed.value != null && !isInSearchMode) {
-                        binding.homeRecycler.visibility = View.VISIBLE
-                    }
+                    Result.Error(Exception("Failed to search items"))
                 }
             }
-        }
+        )
+    }
 
-        // ✅ 2. Error state
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.error.collect { errorMsg ->
-                val isTechnicalError = errorMsg?.contains("401") == true ||
-                        errorMsg?.contains("token") == true ||
-                        errorMsg?.contains("Authorization") == true ||
-                        errorMsg?.contains("session") == true ||
-                        errorMsg?.contains("retry") == true ||
-                        errorMsg.isNullOrEmpty()
-
-                if (!isTechnicalError && viewModel.homeFeed.value == null) {
-                    binding.errorLayout.visibility = View.VISIBLE
-                    binding.errorMessage.text = errorMsg
-                    binding.homeRecycler.visibility = View.GONE
-                    binding.shimmerLayout.visibility = View.GONE
-                    binding.swipeRefreshLayout.isRefreshing = false
+    override suspend fun getUniformsRanked(
+        schoolId: Int,
+        gender: String?,
+        subCategoryId: Int?,
+        minPrice: Float?,
+        maxPrice: Float?,
+        page: Int,
+        perPage: Int
+    ): Result<RankedItemsResult> {
+        return safeApiCall(
+            call = {
+                recommendationsApiService.getUniformsRanked(
+                    schoolId = schoolId,
+                    gender = gender,
+                    subCategoryId = subCategoryId,
+                    minPrice = minPrice,
+                    maxPrice = maxPrice,
+                    page = page,
+                    perPage = perPage
+                )
+            },
+            errorMessage = "Failed to load uniforms",
+            onSuccess = { response ->
+                if (response.success) {
+                    val items = response.items?.map { it.toDomain() } ?: emptyList()
+                    Result.Success(
+                        RankedItemsResult(
+                            items = items,
+                            totalCount = response.totalCount ?: items.size,
+                            currentPage = response.pagination?.currentPage ?: page,
+                            totalPages = response.pagination?.totalPages ?: 1
+                        )
+                    )
                 } else {
-                    binding.errorLayout.visibility = View.GONE
+                    Result.Error(Exception("Failed to load uniforms"))
                 }
             }
-        }
+        )
+    }
 
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.homeFeed.collect { feed ->
-                feed?.let {
-                    // ✅ Sort sections: Recent → Essentials → Trending → Recommended
-                    val sortedSections = it.sections.sortedBy { section ->
-                        when (section) {
-                            is Section.Recent -> 0      // Recent FIRST (most important)
-                            is Section.Essentials -> 1   // Essentials SECOND
-                            is Section.Trending -> 2     // Trending THIRD
-                            is Section.Recommended -> 3  // Recommended LAST
-                            else -> 4
-                        }
-                    }
-
-                    Timber.tag(LogTags.UI).d("=== HOME FEED RECEIVED ===")
-                    Timber.tag(LogTags.UI).d("Sections count: ${it.sections.size}")
-                    Timber.tag(LogTags.UI).d("Sorted order:")
-                    sortedSections.forEachIndexed { index, section ->
-                        Timber.tag(LogTags.UI).d("  $index: ${section::class.simpleName}")
-                    }
-
-                    binding.shimmerLayout.visibility = View.GONE
-                    binding.homeRecycler.visibility = View.VISIBLE
-                    binding.errorLayout.visibility = View.GONE
-                    binding.noSchoolLayout.visibility = View.GONE
-                    binding.swipeRefreshLayout.isRefreshing = false
-
-                    // ✅ FIX: Use sortedSections
-                    homeAdapter.submitList(sortedSections)
-
-                    // ✅ SCROLL TO TOP - Important!
-                    binding.homeRecycler.postDelayed({
-                        binding.homeRecycler.scrollToPosition(0)
-                    }, 200)
-                }
-            }
-        }
-
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.feedUpdateEvent.collect { message ->
-                if (isAdded && view != null && binding.root.isAttachedToWindow) {
-                    try {
-                        Timber.tag(LogTags.UI).d("📢 Showing update snackbar: $message")
-                        Snackbar.make(binding.root, message, Snackbar.LENGTH_SHORT).show()
-                    } catch (e: Exception) {
-                        Timber.tag(LogTags.UI).e("Failed to show Snackbar: ${e.message}")
-                    }
-                }
-            }
-        }
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.rankedSearchState.collect { state ->
-                if (!isInSearchMode) return@collect
-
-                val results = state.items
-                val query = state.query
-
-                Timber.tag(LogTags.UI).d("📊 Search state: query='$query', results=${results.size}")
-
-                originalSearchResults.clear()
-                currentSearchResults.clear()
-
-                if (results.isEmpty()) {
-                    // ✅ Show empty state with the actual query
-                    binding.searchResultsRecycler.visibility = View.GONE
-                    binding.emptySearchResults.visibility = View.VISIBLE
-                    binding.emptySearchResults.text = if (query.isNotEmpty()) {
-                        "No items found for '$query'"
-                    } else {
-                        "No items found"
-                    }
-                    binding.emptyBanner.visibility = View.GONE
-                    categorySearchAdapter.submitList(emptyList())
-
-                    Timber.tag(LogTags.UI).d("📊 Showing empty state for '$query'")
+    override suspend fun getSportItemsRanked(
+        schoolId: Int,
+        sportType: String?,
+        subCategoryId: Int?,
+        minPrice: Float?,
+        maxPrice: Float?,
+        page: Int,
+        perPage: Int
+    ): Result<RankedItemsResult> {
+        return safeApiCall(
+            call = {
+                recommendationsApiService.getSportItemsRanked(
+                    schoolId = schoolId,
+                    sportType = sportType,
+                    subCategoryId = subCategoryId,
+                    minPrice = minPrice,
+                    maxPrice = maxPrice,
+                    page = page,
+                    perPage = perPage
+                )
+            },
+            errorMessage = "Failed to load sport items",
+            onSuccess = { response ->
+                if (response.success) {
+                    val items = response.items?.map { it.toDomain() } ?: emptyList()
+                    Result.Success(
+                        RankedItemsResult(
+                            items = items,
+                            totalCount = response.totalCount ?: items.size,
+                            currentPage = response.pagination?.currentPage ?: page,
+                            totalPages = response.pagination?.totalPages ?: 1
+                        )
+                    )
                 } else {
-                    // ✅ Show results
-                    binding.emptySearchResults.visibility = View.GONE
-                    binding.searchResultsRecycler.visibility = View.VISIBLE
-
-                    originalSearchResults.clear()
-                    originalSearchResults.addAll(results)
-                    clearFilterState()
-                    currentSearchResults.clear()
-                    currentSearchResults.addAll(results)
-
-                    categorySearchAdapter.submitList(currentSearchResults.toList())
-                    rebuildLocalFilters()
-
-                    // ✅ Banner logic
-                    val userSchoolId = viewModel.knownSchoolId
-                    val hasSchoolItems = if (userSchoolId != null) {
-                        results.any { it.schoolId == userSchoolId }
-                    } else {
-                        false
-                    }
-
-                    val nearbyIds = viewModel.getNearbySchoolIds()
-                    val hasNearbyItems = if (nearbyIds.isNotEmpty()) {
-                        results.any { nearbyIds.contains(it.schoolId) }
-                    } else {
-                        false
-                    }
-
-                    if (results.isNotEmpty() && !hasSchoolItems) {
-                        val bannerMessage = if (hasNearbyItems) {
-                            "No items found at your school. Showing nearby items."
-                        } else {
-                            "No items found at your school or nearby. Showing other schools."
-                        }
-                        binding.bannerMessage.text = bannerMessage
-                        binding.emptyBanner.visibility = View.VISIBLE
-                        binding.btnCloseBanner.setOnClickListener {
-                            binding.emptyBanner.visibility = View.GONE
-                        }
-                    } else {
-                        binding.emptyBanner.visibility = View.GONE
-                    }
-
-                    Timber.tag(LogTags.UI).d("📊 Showing ${results.size} results for '$query'")
+                    Result.Error(Exception("Failed to load sport items"))
                 }
             }
-        }
-
-        // ✅ 6. Relevance groups (logging only)
-        viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.searchRelevanceGroups.collect { groups ->
-                Timber.tag(LogTags.UI).d("📊 Relevance groups: school=${groups.schoolMatch.size}, nearby=${groups.nearbyMatch.size}, other=${groups.other.size}")
-            }
-        }
+        )
     }
 
-    private fun rebuildLocalFilters() {
-        binding.dynamicFilterContainer.removeAllViews()
-
-        fun itemsExcluding(excludeGroup: String): List<Item> {
-            var items = originalSearchResults.toList()
-            if (excludeGroup != "gender" && selectedGender != null)
-                items = items.filter { getGender(it) == selectedGender }
-            if (excludeGroup != "condition" && selectedCondition != null)
-                items = items.filter { it.conditionName == selectedCondition }
-            if (excludeGroup != "size" && selectedSize != null)
-                items = items.filter { it.sizeName == selectedSize }
-            if (excludeGroup != "color" && selectedColor != null)
-                items = items.filter { it.colorName == selectedColor }
-            if (excludeGroup != "brand" && selectedBrand != null)
-                items = items.filter { it.brandName == selectedBrand }
-            return items
-        }
-
-        val genders = itemsExcluding("gender").mapNotNull { getGender(it) }.distinct()
-        val conditions = itemsExcluding("condition").mapNotNull { it.conditionName }.distinct()
-        val sizes = itemsExcluding("size").mapNotNull { it.sizeName }.distinct()
-        val colors = itemsExcluding("color").mapNotNull { it.colorName }.distinct()
-        val brands = itemsExcluding("brand").mapNotNull { it.brandName }.distinct()
-
-        if (genders.isNotEmpty()) {
-            addFilterItem("Gender", selectedGender) {
-                showOptionsDrawer("gender", "Gender", genders.map { FilterOption(it.hashCode(), it) }, selectedGender)
-            }
-        }
-        if (conditions.isNotEmpty()) {
-            addFilterItem("Condition", selectedCondition) {
-                showOptionsDrawer("condition", "Condition", conditions.map { FilterOption(it.hashCode(), it) }, selectedCondition)
-            }
-        }
-        if (sizes.isNotEmpty()) {
-            addFilterItem("Size", selectedSize) {
-                showOptionsDrawer("size", "Size", sizes.map { FilterOption(it.hashCode(), it) }, selectedSize)
-            }
-        }
-        if (colors.isNotEmpty()) {
-            addFilterItem("Color", selectedColor) {
-                showOptionsDrawer("color", "Color", colors.map { FilterOption(it.hashCode(), it) }, selectedColor)
-            }
-        }
-        if (brands.isNotEmpty()) {
-            addFilterItem("Brand", selectedBrand) {
-                showOptionsDrawer("brand", "Brand", brands.map { FilterOption(it.hashCode(), it) }, selectedBrand)
-            }
-        }
-    }
-
-    private fun addFilterItem(title: String, selectedValue: String?, onClick: () -> Unit) {
-        val itemView = layoutInflater.inflate(R.layout.item_filter_section, binding.dynamicFilterContainer, false)
-        val titleView = itemView.findViewById<TextView>(R.id.filterTitle)
-        val valueView = itemView.findViewById<TextView>(R.id.filterValue)
-        val clickableRow = itemView.findViewById<LinearLayout>(R.id.filterRow)
-
-        titleView.text = title
-        if (!selectedValue.isNullOrEmpty()) {
-            valueView.text = selectedValue
-            valueView.visibility = View.VISIBLE
-        } else {
-            valueView.visibility = View.GONE
-        }
-
-        clickableRow.setOnClickListener { onClick() }
-        itemView.setOnClickListener { onClick() }
-        binding.dynamicFilterContainer.addView(itemView)
-    }
-
-    private fun showOptionsDrawer(
-        groupId: String,
-        groupName: String,
-        options: List<FilterOption>,
-        currentSelection: String?
-    ) {
-        binding.filterHeaderTitle.visibility = View.GONE
-        binding.optionsHeader.visibility = View.VISIBLE
-        binding.optionsTitle.text = groupName
-        binding.dynamicFilterContainer.visibility = View.GONE
-        binding.optionsContainer.visibility = View.VISIBLE
-
-        val container = binding.optionsContainer
-        container.removeAllViews()
-
-        val sortedOptions = options.sortedBy { if (it.name == currentSelection) 0 else 1 }
-
-        sortedOptions.forEach { option ->
-            val optionView = layoutInflater.inflate(R.layout.item_filter_option, container, false)
-            val textView = optionView.findViewById<TextView>(R.id.optionName)
-            val checkIcon = optionView.findViewById<ImageView>(R.id.checkIcon)
-
-            textView.text = option.name
-            checkIcon.visibility = if (option.name == currentSelection) View.VISIBLE else View.GONE
-
-            optionView.setOnClickListener {
-                when (groupId) {
-                    "gender" -> {
-                        selectedGender = if (selectedGender == option.name) null else option.name
-                        if (selectedGender != null) {
-                            selectedCondition = null
-                            selectedSize = null
-                            selectedColor = null
-                            selectedBrand = null
-                        }
-                    }
-                    "condition" -> selectedCondition = if (selectedCondition == option.name) null else option.name
-                    "size" -> selectedSize = if (selectedSize == option.name) null else option.name
-                    "color" -> selectedColor = if (selectedColor == option.name) null else option.name
-                    "brand" -> selectedBrand = if (selectedBrand == option.name) null else option.name
+    override suspend fun getRecentItemsRanked(
+        schoolId: Int,
+        period: String?,
+        minPrice: Float?,
+        maxPrice: Float?,
+        page: Int,
+        perPage: Int
+    ): Result<RankedItemsResult> {
+        return safeApiCall(
+            call = {
+                recommendationsApiService.getRecentItemsRanked(
+                    schoolId = schoolId,
+                    period = period,
+                    minPrice = minPrice,
+                    maxPrice = maxPrice,
+                    page = page,
+                    perPage = perPage
+                )
+            },
+            errorMessage = "Failed to load recent items",
+            onSuccess = { response ->
+                if (response.success) {
+                    val items = response.items?.map { it.toDomain() } ?: emptyList()
+                    Result.Success(
+                        RankedItemsResult(
+                            items = items,
+                            totalCount = response.totalCount ?: items.size,
+                            currentPage = response.pagination?.currentPage ?: page,
+                            totalPages = response.pagination?.totalPages ?: 1
+                        )
+                    )
+                } else {
+                    Result.Error(Exception("Failed to load recent items"))
                 }
-
-                applyAllFilters()
-                showOptionsDrawer(groupId, groupName, getUpdatedOptions(groupId), getSelection(groupId))
             }
+        )
+    }
 
-            container.addView(optionView)
+    override suspend fun getRecommendedRanked(
+        schoolId: Int,
+        categoryId: Int?,
+        period: String?,
+        minPrice: Float?,
+        maxPrice: Float?,
+        page: Int,
+        perPage: Int
+    ): Result<RankedItemsResult> {
+        return safeApiCall(
+            call = {
+                recommendationsApiService.getRecommendedRanked(
+                    schoolId = schoolId,
+                    categoryId = categoryId,
+                    period = period,
+                    minPrice = minPrice,
+                    maxPrice = maxPrice,
+                    page = page,
+                    perPage = perPage
+                )
+            },
+            errorMessage = "Failed to load recommended items",
+            onSuccess = { response ->
+                if (response.success) {
+                    val items = response.items?.map { it.toDomain() } ?: emptyList()
+                    Result.Success(
+                        RankedItemsResult(
+                            items = items,
+                            totalCount = response.totalCount ?: items.size,
+                            currentPage = response.pagination?.currentPage ?: page,
+                            totalPages = response.pagination?.totalPages ?: 1
+                        )
+                    )
+                } else {
+                    Result.Error(Exception("Failed to load recommended items"))
+                }
+            }
+        )
+    }
+
+    override suspend fun getTrendingRanked(
+        schoolId: Int,
+        period: String,
+        minPrice: Float?,
+        maxPrice: Float?,
+        page: Int,
+        perPage: Int
+    ): Result<RankedItemsResult> {
+        return safeApiCall(
+            call = {
+                recommendationsApiService.getTrendingRanked(
+                    schoolId = schoolId,
+                    period = period,
+                    minPrice = minPrice,
+                    maxPrice = maxPrice,
+                    page = page,
+                    perPage = perPage
+                )
+            },
+            errorMessage = "Failed to load trending items",
+            onSuccess = { response ->
+                if (response.success) {
+                    val items = response.items?.map { it.toDomain() } ?: emptyList()
+                    Result.Success(
+                        RankedItemsResult(
+                            items = items,
+                            totalCount = response.totalCount ?: items.size,
+                            currentPage = response.pagination?.currentPage ?: page,
+                            totalPages = response.pagination?.totalPages ?: 1
+                        )
+                    )
+                } else {
+                    Result.Error(Exception("Failed to load trending items"))
+                }
+            }
+        )
+    }
+
+    override suspend fun getEssentialsRanked(
+        schoolId: Int,
+        category: String?,
+        subCategoryId: Int?,
+        minPrice: Float?,
+        maxPrice: Float?,
+        page: Int,
+        perPage: Int
+    ): Result<RankedItemsResult> {
+        return safeApiCall(
+            call = {
+                recommendationsApiService.getEssentialsRanked(
+                    schoolId = schoolId,
+                    category = category,
+                    subCategoryId = subCategoryId,
+                    minPrice = minPrice,
+                    maxPrice = maxPrice,
+                    page = page,
+                    perPage = perPage
+                )
+            },
+            errorMessage = "Failed to load essentials",
+            onSuccess = { response ->
+                if (response.success) {
+                    val items = response.items?.map { it.toDomain() } ?: emptyList()
+                    Result.Success(
+                        RankedItemsResult(
+                            items = items,
+                            totalCount = response.totalCount ?: items.size,
+                            currentPage = response.pagination?.currentPage ?: page,
+                            totalPages = response.pagination?.totalPages ?: 1
+                        )
+                    )
+                } else {
+                    Result.Error(Exception("Failed to load essentials"))
+                }
+            }
+        )
+    }
+
+    // ================================================================
+    // CLEAR HOME DATA
+    // ================================================================
+
+    override suspend fun clearHomeData() {
+        coroutineScope.launch {
+            _homeFeed.value = null
+            Timber.tag(LogTags.REPOSITORY).d("Home data cleared")
         }
     }
 
-    private fun getUpdatedOptions(groupId: String): List<FilterOption> {
-        var items = originalSearchResults.toList()
-        if (groupId != "gender" && selectedGender != null)
-            items = items.filter { getGender(it) == selectedGender }
-        if (groupId != "condition" && selectedCondition != null)
-            items = items.filter { it.conditionName == selectedCondition }
-        if (groupId != "size" && selectedSize != null)
-            items = items.filter { it.sizeName == selectedSize }
-        if (groupId != "color" && selectedColor != null)
-            items = items.filter { it.colorName == selectedColor }
-        if (groupId != "brand" && selectedBrand != null)
-            items = items.filter { it.brandName == selectedBrand }
+    // ================================================================
+    // PRIVATE HELPERS
+    // ================================================================
 
-        val values = when (groupId) {
-            "gender" -> items.mapNotNull { getGender(it) }.distinct()
-            "condition" -> items.mapNotNull { it.conditionName }.distinct()
-            "size" -> items.mapNotNull { it.sizeName }.distinct()
-            "color" -> items.mapNotNull { it.colorName }.distinct()
-            "brand" -> items.mapNotNull { it.brandName }.distinct()
-            else -> emptyList()
+    private suspend fun saveHomeFeedToCache(feed: HomeFeed) {
+        try {
+            Timber.tag(LogTags.REPOSITORY).d("📝 Saving home feed to cache")
+            Timber.tag(LogTags.REPOSITORY).d("   Sections count: ${feed.sections.size}")
+
+            val entity = feed.toEntity()
+            homeFeedDao.insertHomeFeed(entity)
+            Timber.tag(LogTags.REPOSITORY).d("✅ Home feed cached to Room successfully")
+        } catch (e: Exception) {
+            Timber.tag(LogTags.REPOSITORY).e(e, "❌ Failed to cache home feed")
         }
-        return values.map { FilterOption(it.hashCode(), it) }
     }
 
-    private fun getSelection(groupId: String): String? = when (groupId) {
-        "gender" -> selectedGender
-        "condition" -> selectedCondition
-        "size" -> selectedSize
-        "color" -> selectedColor
-        "brand" -> selectedBrand
-        else -> null
-    }
+    private suspend fun loadHomeFeedFromCache(): Result<HomeFeed>? {
+        return try {
+            val cached = homeFeedDao.getHomeFeed()
+            if (cached != null) {
+                Timber.tag(LogTags.REPOSITORY).d("📖 Loading home feed from cache")
+                Timber.tag(LogTags.REPOSITORY).d("   Cached at: ${java.util.Date(cached.cachedAt)}")
+                Timber.tag(LogTags.REPOSITORY).d("   JSON length: ${cached.sectionsJson.length}")
 
-    private fun applyAllFilters() {
-        var filtered = originalSearchResults.toList()
+                val feed = cached.toDomain()
+                Timber.tag(LogTags.REPOSITORY).d("   Sections count after parsing: ${feed.sections.size}")
 
-        val minPrice = binding.priceSlider.values[0]
-        val maxPrice = binding.priceSlider.values[1]
-        filtered = filtered.filter { it.price in minPrice..maxPrice }
-
-        if (selectedGender != null) filtered = filtered.filter { getGender(it) == selectedGender }
-        if (selectedCondition != null) filtered = filtered.filter { it.conditionName == selectedCondition }
-        if (selectedSize != null) filtered = filtered.filter { it.sizeName == selectedSize }
-        if (selectedColor != null) filtered = filtered.filter { it.colorName == selectedColor }
-        if (selectedBrand != null) filtered = filtered.filter { it.brandName == selectedBrand }
-
-        currentSearchResults.clear()
-        currentSearchResults.addAll(filtered)
-        categorySearchAdapter.submitList(currentSearchResults.toList())
-    }
-
-    private fun resetLocalFilters() {
-        binding.priceSlider.setValues(PRICE_SLIDER_MIN, PRICE_SLIDER_MAX)
-        binding.selectedPriceRange.text = "R${PRICE_SLIDER_MIN.toInt()} - R${PRICE_SLIDER_MAX.toInt()}"
-        clearFilterState()
-        currentSearchResults.clear()
-        currentSearchResults.addAll(originalSearchResults)
-        categorySearchAdapter.submitList(currentSearchResults.toList())
-        rebuildLocalFilters()
-    }
-
-    private fun clearFilterState() {
-        selectedGender = null
-        selectedCondition = null
-        selectedSize = null
-        selectedColor = null
-        selectedBrand = null
-    }
-
-    private fun navigateToItemDetail(itemId: String, source: String) {
-        val bundle = Bundle().apply {
-            putString("itemId", itemId)
-            putString("source", source)
-        }
-        findNavController().navigate(R.id.itemDetailFragment, bundle)
-    }
-
-    private fun navigateToProducts(
-        sectionType: String,
-        title: String,
-        period: String? = null,
-        categoryId: Int? = null
-    ) {
-        val bundle = Bundle().apply {
-            putString("SECTION_TYPE", sectionType)
-            putString("SECTION_TITLE", title)
-            period?.let { putString("PERIOD", it) }
-            if (categoryId != null) putInt("CATEGORY_ID", categoryId)
-        }
-        findNavController().navigate(R.id.action_homeFragment_to_productsFragment, bundle)
-    }
-
-    private fun setupCustomTabs() {
-        val tabs = listOf(binding.tabHome, binding.tabUniform, binding.tabSport, binding.tabRecent)
-        val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                android.content.res.Configuration.UI_MODE_NIGHT_YES
-        val unselectedDrawable = if (isDarkMode) R.drawable.tablayout_unselected_night else R.drawable.tablayout_unselected
-
-        tabs.forEach { tab ->
-            tab.setBackgroundResource(unselectedDrawable)
-            tab.setOnClickListener { selectTab(tab) }
-        }
-        highlightTab(binding.tabHome)
-    }
-
-    private fun highlightTab(selectedTab: TextView) {
-        val tabs = listOf(binding.tabHome, binding.tabUniform, binding.tabSport, binding.tabRecent)
-        val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                android.content.res.Configuration.UI_MODE_NIGHT_YES
-
-        tabs.forEach { tab ->
-            if (tab == selectedTab) {
-                tab.setBackgroundResource(R.drawable.tablayout_selector)
-                tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), android.R.color.white))
-                tab.setTypeface(null, android.graphics.Typeface.BOLD)
+                _homeFeed.value = feed
+                Result.Success(feed)
             } else {
-                if (isDarkMode) {
-                    tab.setBackgroundResource(R.drawable.tablayout_unselected_night)
-                    tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.white_70))
-                } else {
-                    tab.setBackgroundResource(R.drawable.tablayout_unselected)
-                    tab.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.black_70))
-                }
-                tab.setTypeface(null, android.graphics.Typeface.NORMAL)
+                Timber.tag(LogTags.REPOSITORY).d("No cached home feed found")
+                null
             }
+        } catch (e: Exception) {
+            Timber.tag(LogTags.REPOSITORY).e(e, "❌ Failed to load cached home feed")
+            null
         }
     }
 
-    fun getCurrentCategoryId(): Int? {
-        return when (currentTabId) {
-            R.id.tabUniform -> TAB_UNIFORM_ID
-            R.id.tabSport -> TAB_SPORT_ID
-            else -> null
-        }
-    }
-
-    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
-        super.onConfigurationChanged(newConfig)
-        val isDarkMode = (newConfig.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                android.content.res.Configuration.UI_MODE_NIGHT_YES
-        val unselectedDrawable = if (isDarkMode) R.drawable.tablayout_unselected_night else R.drawable.tablayout_unselected
-        val tabs = listOf(binding.tabHome, binding.tabUniform, binding.tabSport, binding.tabRecent)
-        tabs.forEach { tab ->
-            if (tab.id != currentTabId) tab.setBackgroundResource(unselectedDrawable)
-        }
-    }
-
-    private fun selectTab(selectedTab: TextView) {
-        currentTabId = selectedTab.id
-        highlightTab(selectedTab)
-
-        when (selectedTab.id) {
-            R.id.tabHome -> {
-                // ✅ Only load if feed is null
-                if (viewModel.homeFeed.value == null && !viewModel.isLoading.value) {
-                    viewModel.loadHomeFeed()
-                }
+    private suspend fun <T, R> safeApiCall(
+        call: suspend () -> Response<T>,
+        errorMessage: String,
+        onSuccess: suspend (T) -> Result<R>,
+        onError: (suspend () -> Result<R>?)? = null
+    ): Result<R> {
+        return try {
+            val token = authRepository.getAuthToken().first()
+                ?: appPreferences.authToken.first()
+            if (token.isNullOrBlank()) {
+                Timber.tag(LogTags.REPOSITORY).e("No auth token available")
+                return onError?.invoke() ?: Result.Error(Exception("Authentication required"))
             }
-            R.id.tabUniform -> navigateToUniformTab()
-            R.id.tabSport -> navigateToSportTab()
-            R.id.tabRecent -> navigateToRecentTab()
+
+            val response = call.invoke()
+
+            if (response.isSuccessful) {
+                response.body()?.let { body ->
+                    onSuccess(body)
+                } ?: Result.Error(Exception("Empty response body"))
+            } else {
+                onError?.invoke() ?: handleErrorResponse(response, errorMessage)
+            }
+        } catch (e: IOException) {
+            Timber.tag(LogTags.REPOSITORY).e(e, "Network error")
+            onError?.invoke() ?: Result.Error(Exception(ErrorConstants.Messages.UserFriendly.NO_INTERNET))
+        } catch (e: Exception) {
+            Timber.tag(LogTags.REPOSITORY).e(e, "Unexpected error")
+            onError?.invoke() ?: Result.Error(Exception(ErrorConstants.Messages.UserFriendly.UNKNOWN))
         }
     }
 
-    private fun navigateToUniformTab() {
-        findNavController().navigate(R.id.action_homeFragment_to_uniformFragment)
-    }
+    private fun <T> handleErrorResponse(
+        response: Response<T>,
+        errorMessage: String
+    ): Result.Error {
+        val errorBody = response.errorBody()?.string()
+        Timber.tag(LogTags.REPOSITORY).e("API error: ${response.code()} - $errorBody")
 
-    private fun navigateToSportTab() {
-        findNavController().navigate(R.id.action_homeFragment_to_sportFragment)
-    }
+        val message = when (response.code()) {
+            ErrorConstants.HttpStatus.UNAUTHORIZED -> ErrorConstants.Messages.UserFriendly.SESSION_EXPIRED
+            ErrorConstants.HttpStatus.FORBIDDEN -> ErrorConstants.Messages.UserFriendly.ACCESS_DENIED
+            ErrorConstants.HttpStatus.NOT_FOUND -> ErrorConstants.Messages.UserFriendly.NOT_FOUND
+            ErrorConstants.HttpStatus.INTERNAL_SERVER -> ErrorConstants.Messages.UserFriendly.SERVER_DOWN
+            ErrorConstants.HttpStatus.BAD_GATEWAY -> ErrorConstants.Messages.UserFriendly.SERVER_DOWN
+            ErrorConstants.HttpStatus.SERVICE_UNAVAILABLE -> ErrorConstants.Messages.UserFriendly.SERVICE_UNAVAILABLE
+            ErrorConstants.HttpStatus.GATEWAY_TIMEOUT -> ErrorConstants.Messages.UserFriendly.TIMEOUT
+            ErrorConstants.HttpStatus.AUTHENTICATION_TIMEOUT -> ErrorConstants.Messages.UserFriendly.SESSION_EXPIRED
+            ErrorConstants.HttpStatus.TOO_MANY_REQUESTS -> ErrorConstants.Messages.UserFriendly.SERVER_BUSY
+            else -> "$errorMessage: ${response.code()}"
+        }
 
-    private fun navigateToRecentTab() {
-        navigateToProducts("recent", "Recently Added", "all", null)
-    }
-
-    // ✅ FIXED: Simplified onResume - only auto-scroll, no reload
-    override fun onResume() {
-        super.onResume()
-        autoScrollHelper?.resumeAutoScroll()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        autoScrollHelper?.pauseAutoScroll()
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        autoScrollHelper?.stopAutoScroll()
-        _binding = null
+        return Result.Error(Exception(message))
     }
 }

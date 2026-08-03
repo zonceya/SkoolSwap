@@ -3,6 +3,7 @@ package za.co.skoolswap.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import za.co.skoolswap.common.constants.AppConstants.LogTags
+import za.co.skoolswap.common.constants.ErrorConstants
 import za.co.skoolswap.domain.model.RelevanceGroups
 import za.co.skoolswap.domain.model.Item
 import za.co.skoolswap.domain.model.homefeed.HomeFeed
@@ -54,7 +55,6 @@ class HomeViewModel @Inject constructor(
         private const val MAX_LOCAL_RESULTS = 30
     }
 
-    // ✅ FIXED: Moved to top with other properties
     private var _nearbySchoolIds: List<Int> = emptyList()
 
     // ==================== STATE FLOWS ====================
@@ -87,8 +87,10 @@ class HomeViewModel @Inject constructor(
 
     private val _serverItemsCount = MutableStateFlow(0)
     val serverItemsCount: StateFlow<Int> = _serverItemsCount.asStateFlow()
+
     private val _rankedSearchState = MutableStateFlow(RankedSearchState("", emptyList()))
     val rankedSearchState: StateFlow<RankedSearchState> = _rankedSearchState.asStateFlow()
+
     // ==================== EVENT FLOW ====================
     private val _feedUpdateEvent = MutableSharedFlow<String>(replay = 0, extraBufferCapacity = 1)
     val feedUpdateEvent: SharedFlow<String> = _feedUpdateEvent.asSharedFlow()
@@ -114,7 +116,6 @@ class HomeViewModel @Inject constructor(
     }
 
     fun loadHomeFeed(forceRefresh: Boolean = false) {
-        // ... (keep existing code - unchanged) ...
         if (!forceRefresh && cachedHomeFeed != null) {
             Timber.tag(LogTags.VIEW_MODEL).d("📦 Using cached feed")
             _homeFeed.value = cachedHomeFeed
@@ -122,7 +123,38 @@ class HomeViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            // ... keep existing preloading code ...
+            // ✅ Preload data in parallel
+            launch {
+                try {
+                    Timber.tag(LogTags.VIEW_MODEL).d("🔄 Preloading category filters...")
+                    filterRepository.preloadCategoryFilters(listOf(1, 2, 3, 4))
+                    Timber.tag(LogTags.VIEW_MODEL).d("✅ Filters preloaded")
+                } catch (e: Exception) {
+                    Timber.tag(LogTags.VIEW_MODEL).e(e, "⚠️ Failed to preload filters")
+                }
+            }
+
+            launch {
+                try {
+                    Timber.tag(LogTags.VIEW_MODEL).d("🔄 Preloading shop data...")
+                    shopRepository.getMyShop()
+                    shopRepository.getMyShopItems()
+                    Timber.tag(LogTags.VIEW_MODEL).d("✅ Shop data preloaded")
+                } catch (e: Exception) {
+                    Timber.tag(LogTags.VIEW_MODEL).e(e, "⚠️ Failed to preload shop")
+                }
+            }
+
+            launch {
+                try {
+                    Timber.tag(LogTags.VIEW_MODEL).d("🔄 Preloading products cache...")
+                    productsCacheRepository.preload()
+                    Timber.tag(LogTags.VIEW_MODEL).d("✅ Products cache preloaded")
+                } catch (e: Exception) {
+                    Timber.tag(LogTags.VIEW_MODEL).e(e, "⚠️ Failed to preload products cache")
+                }
+            }
+
             if (!loadMutex.tryLock()) {
                 Timber.tag(LogTags.VIEW_MODEL).d("⏳ Already loading, skipping")
                 return@launch
@@ -144,11 +176,19 @@ class HomeViewModel @Inject constructor(
                         if (mapping != null) {
                             loadFeedWithCache(mapping.schoolId, forceRefresh)
                         } else {
-                            _error.value = "Please select a school first"
+                            _error.value = ErrorConstants.Messages.UserFriendly.UNKNOWN
+                            Timber.tag(LogTags.VIEW_MODEL).e("❌ No school mapping")
                         }
                     }
                     is Result.Error -> {
-                        _error.value = "Failed to get school: ${result.exception.message}"
+                        val errorMsg = when {
+                            result.exception.message?.contains("503") == true -> ErrorConstants.Messages.UserFriendly.SERVICE_UNAVAILABLE
+                            result.exception.message?.contains("500") == true -> ErrorConstants.Messages.UserFriendly.SERVER_DOWN
+                            result.exception.message?.contains("network") == true -> ErrorConstants.Messages.UserFriendly.NO_INTERNET
+                            else -> "Failed to get school: ${result.exception.message}"
+                        }
+                        _error.value = errorMsg
+                        Timber.tag(LogTags.VIEW_MODEL).e("❌ School error: $errorMsg")
                     }
                 }
             } finally {
@@ -168,7 +208,6 @@ class HomeViewModel @Inject constructor(
             Timber.tag(LogTags.VIEW_MODEL).d("⚡ Showing ${localResults.size} LOCAL results immediately")
             val grouped = groupByRelevance(localResults, knownSchoolId)
 
-            // ✅ Update both state flows
             _rankedSearchState.value = RankedSearchState(
                 query = query,
                 items = localResults,
@@ -180,7 +219,6 @@ class HomeViewModel @Inject constructor(
             _searchRelevanceGroups.value = grouped
             _isShowingLocalResults.value = true
         } else {
-            // ✅ Empty results with query - this will emit even on repeated empty queries
             _rankedSearchState.value = RankedSearchState(
                 query = query,
                 items = emptyList(),
@@ -221,7 +259,6 @@ class HomeViewModel @Inject constructor(
                         Timber.tag(LogTags.VIEW_MODEL).d("✅ Server returned ${serverItems.size} items")
 
                         if (serverItems.isEmpty()) {
-                            // ✅ Empty results with query - emits every time because query is different
                             val currentState = _rankedSearchState.value
                             _rankedSearchState.value = currentState.copy(
                                 query = query,
@@ -247,7 +284,6 @@ class HomeViewModel @Inject constructor(
 
                             val grouped = groupByRelevance(mergedItems, schoolId)
 
-                            // ✅ Update with results
                             _rankedSearchState.value = RankedSearchState(
                                 query = query,
                                 items = mergedItems,
@@ -262,12 +298,18 @@ class HomeViewModel @Inject constructor(
                         }
                     }
                     is Result.Error -> {
-                        Timber.tag(LogTags.VIEW_MODEL).e("Server search failed: ${serverResult.exception.message}")
-                        // ✅ Keep existing state, just mark error
+                        val errorMsg = when {
+                            serverResult.exception.message?.contains("503") == true -> ErrorConstants.Messages.UserFriendly.SERVICE_UNAVAILABLE
+                            serverResult.exception.message?.contains("500") == true -> ErrorConstants.Messages.UserFriendly.SERVER_DOWN
+                            serverResult.exception.message?.contains("timeout") == true -> ErrorConstants.Messages.UserFriendly.TIMEOUT
+                            serverResult.exception.message?.contains("network") == true -> ErrorConstants.Messages.UserFriendly.NO_INTERNET
+                            else -> "Failed to load results"
+                        }
+                        Timber.tag(LogTags.VIEW_MODEL).e("Server search failed: $errorMsg")
                         val currentState = _rankedSearchState.value
                         _rankedSearchState.value = currentState.copy(isLoadingMore = false)
                         if (_rankedSearchState.value.items.isEmpty()) {
-                            _error.value = "Failed to load results"
+                            _error.value = errorMsg
                         }
                     }
                 }
@@ -287,7 +329,6 @@ class HomeViewModel @Inject constructor(
         if (query.length < MIN_SEARCH_LENGTH) {
             Timber.tag(LogTags.VIEW_MODEL).d("Query too short (< ${MIN_SEARCH_LENGTH} chars), clearing results")
 
-            // ✅ Clear with empty query
             _rankedSearchState.value = RankedSearchState(
                 query = query,
                 items = emptyList(),
@@ -319,7 +360,6 @@ class HomeViewModel @Inject constructor(
 
             Timber.tag(LogTags.VIEW_MODEL).d("🔍 Ranked search for: $query")
 
-            // ✅ Local search
             val localResults = searchLocalCache(query, categoryId)
             if (localResults.isNotEmpty()) {
                 Timber.tag(LogTags.VIEW_MODEL).d("⚡ ${localResults.size} results from LOCAL CACHE")
@@ -337,7 +377,6 @@ class HomeViewModel @Inject constructor(
                 _searchRelevanceGroups.value = grouped
                 _isShowingLocalResults.value = true
             } else {
-                // ✅ Empty results with query - emits on every unique query
                 _rankedSearchState.value = RankedSearchState(
                     query = query,
                     items = emptyList(),
@@ -350,7 +389,6 @@ class HomeViewModel @Inject constructor(
                 _isShowingLocalResults.value = false
             }
 
-            // ✅ Server search
             _isLoadingMore.value = true
 
             try {
@@ -358,6 +396,7 @@ class HomeViewModel @Inject constructor(
                 if (schoolId == null) {
                     Timber.tag(LogTags.VIEW_MODEL).e("❌ No school ID available for ranked search")
                     _isLoadingMore.value = false
+                    _error.value = ErrorConstants.Messages.UserFriendly.UNKNOWN
                     return@launch
                 }
 
@@ -428,7 +467,6 @@ class HomeViewModel @Inject constructor(
                             _isShowingLocalResults.value = false
                             Timber.tag(LogTags.VIEW_MODEL).d("📦 Total ${mergedItems.size} items")
                         } else if (_rankedSearchState.value.items.isEmpty()) {
-                            // ✅ Empty server results and no local results - emit with query
                             _rankedSearchState.value = RankedSearchState(
                                 query = query,
                                 items = emptyList(),
@@ -443,9 +481,16 @@ class HomeViewModel @Inject constructor(
                         }
                     }
                     is Result.Error -> {
-                        Timber.tag(LogTags.VIEW_MODEL).e("❌ Server search failed: ${serverResult.exception.message}")
+                        val errorMsg = when {
+                            serverResult.exception.message?.contains("503") == true -> ErrorConstants.Messages.UserFriendly.SERVICE_UNAVAILABLE
+                            serverResult.exception.message?.contains("500") == true -> ErrorConstants.Messages.UserFriendly.SERVER_DOWN
+                            serverResult.exception.message?.contains("timeout") == true -> ErrorConstants.Messages.UserFriendly.TIMEOUT
+                            serverResult.exception.message?.contains("network") == true -> ErrorConstants.Messages.UserFriendly.NO_INTERNET
+                            else -> "Failed to load results"
+                        }
+                        Timber.tag(LogTags.VIEW_MODEL).e("❌ Server search failed: $errorMsg")
                         if (_rankedSearchState.value.items.isEmpty()) {
-                            _error.value = "Failed to load results"
+                            _error.value = errorMsg
                         }
                     }
                 }
@@ -453,13 +498,19 @@ class HomeViewModel @Inject constructor(
                 _isLoadingMore.value = false
                 Timber.tag(LogTags.VIEW_MODEL).e("⏱️ Server search timed out after ${SEARCH_TIMEOUT_MS}ms")
                 if (_rankedSearchState.value.items.isEmpty()) {
-                    _error.value = "Search timed out. Please try again."
+                    _error.value = ErrorConstants.Messages.UserFriendly.TIMEOUT
                 }
             } catch (e: Exception) {
                 _isLoadingMore.value = false
-                Timber.tag(LogTags.VIEW_MODEL).e("❌ Search error: ${e.message}")
+                val errorMsg = when {
+                    e.message?.contains("503") == true -> ErrorConstants.Messages.UserFriendly.SERVICE_UNAVAILABLE
+                    e.message?.contains("500") == true -> ErrorConstants.Messages.UserFriendly.SERVER_DOWN
+                    e.message?.contains("network") == true -> ErrorConstants.Messages.UserFriendly.NO_INTERNET
+                    else -> "Failed to load results: ${e.message}"
+                }
+                Timber.tag(LogTags.VIEW_MODEL).e("❌ Search error: $errorMsg")
                 if (_rankedSearchState.value.items.isEmpty()) {
-                    _error.value = "Failed to load results: ${e.message}"
+                    _error.value = errorMsg
                 }
             }
         }
@@ -476,7 +527,7 @@ class HomeViewModel @Inject constructor(
         val nearbyMatch = mutableListOf<Item>()
         val other = mutableListOf<Item>()
 
-        val nearbyIds = getNearbySchoolIds()  // ✅ No need for ?: emptyList()
+        val nearbyIds = getNearbySchoolIds()
 
         items.forEach { item ->
             when {
@@ -497,7 +548,12 @@ class HomeViewModel @Inject constructor(
         return when (val result = userSchoolRepository.getCurrentSchoolMapping()) {
             is Result.Success -> result.data?.schoolId
             is Result.Error -> {
-                Timber.tag(LogTags.VIEW_MODEL).e("❌ Failed to get school ID: ${result.exception.message}")
+                val errorMsg = when {
+                    result.exception.message?.contains("503") == true -> ErrorConstants.Messages.UserFriendly.SERVICE_UNAVAILABLE
+                    result.exception.message?.contains("500") == true -> ErrorConstants.Messages.UserFriendly.SERVER_DOWN
+                    else -> "Failed to get school ID: ${result.exception.message}"
+                }
+                Timber.tag(LogTags.VIEW_MODEL).e("❌ $errorMsg")
                 null
             }
         }
@@ -514,14 +570,14 @@ class HomeViewModel @Inject constructor(
 
         currentFeed.sections.forEach { section ->
             when (section) {
-                is Section.Recommended -> allItems.addAll(section.items)
+                is Section.Recommended -> allItems.addAll(section.items ?: emptyList())
                 is Section.Essentials -> {
-                    allItems.addAll(section.sections.uniforms)
-                    allItems.addAll(section.sections.sports)
-                    allItems.addAll(section.sections.accessories)
+                    allItems.addAll(section.sections.uniforms ?: emptyList())
+                    allItems.addAll(section.sections.sports ?: emptyList())
+                    allItems.addAll(section.sections.accessories ?: emptyList())
                 }
-                is Section.Trending -> allItems.addAll(section.items)
-                is Section.Recent -> allItems.addAll(section.items)
+                is Section.Trending -> allItems.addAll(section.items ?: emptyList())
+                is Section.Recent -> allItems.addAll(section.items ?: emptyList())
             }
         }
 
@@ -582,7 +638,6 @@ class HomeViewModel @Inject constructor(
     // ==================== LOAD FEED WITH CACHE ====================
 
     private suspend fun loadFeedWithCache(schoolId: Int, forceRefresh: Boolean) {
-        // ... keep existing implementation ...
         Timber.tag(LogTags.VIEW_MODEL).d("🔄 Loading feed for school $schoolId (forceRefresh=$forceRefresh)")
 
         if (!forceRefresh) {
@@ -608,15 +663,17 @@ class HomeViewModel @Inject constructor(
             when (result) {
                 is Result.Success -> {
                     val feed = result.data
-                    val sortedSections = feed.sections.sortedBy { section ->
-                        when (section) {
-                            is Section.Recent -> 0
-                            is Section.Essentials -> 1
-                            is Section.Trending -> 2
-                            is Section.Recommended -> 3
-                            else -> 4
+                    val sortedSections = feed.sections
+                        .filterNotNull()
+                        .sortedBy { section ->
+                            when (section) {
+                                is Section.Recent -> 0
+                                is Section.Essentials -> 1
+                                is Section.Trending -> 2
+                                is Section.Recommended -> 3
+                                else -> 4
+                            }
                         }
-                    }
                     val sortedFeed = feed.copy(sections = sortedSections)
                     cachedHomeFeed = sortedFeed
                     _homeFeed.value = sortedFeed
@@ -626,20 +683,36 @@ class HomeViewModel @Inject constructor(
                     Timber.tag(LogTags.VIEW_MODEL).d("✅ Feed loaded: ${sortedFeed.sections.size} sections")
                 }
                 is Result.Error -> {
+                    val errorMsg = when {
+                        result.exception.message?.contains("503") == true -> ErrorConstants.Messages.UserFriendly.SERVICE_UNAVAILABLE
+                        result.exception.message?.contains("500") == true -> ErrorConstants.Messages.UserFriendly.SERVER_DOWN
+                        result.exception.message?.contains("timeout") == true -> ErrorConstants.Messages.UserFriendly.TIMEOUT
+                        result.exception.message?.contains("network") == true -> ErrorConstants.Messages.UserFriendly.NO_INTERNET
+                        else -> result.exception.message ?: "Unknown error"
+                    }
                     if (_homeFeed.value == null) {
-                        _error.value = result.exception.message
+                        _error.value = errorMsg
+                        Timber.tag(LogTags.VIEW_MODEL).e("❌ Feed error: $errorMsg")
+                    } else {
+                        Timber.tag(LogTags.VIEW_MODEL).d("⚠️ Feed error but showing cached data: $errorMsg")
                     }
                 }
             }
         } catch (e: TimeoutCancellationException) {
             Timber.tag(LogTags.VIEW_MODEL).e("⏱️ getHomeFeed timed out after ${FEED_TIMEOUT_MS}ms")
             if (_homeFeed.value == null) {
-                _error.value = "Request timed out. Please try again."
+                _error.value = ErrorConstants.Messages.UserFriendly.TIMEOUT
             }
         } catch (e: Exception) {
-            Timber.tag(LogTags.VIEW_MODEL).e("❌ Unexpected error: ${e.message}")
+            val errorMsg = when {
+                e.message?.contains("503") == true -> ErrorConstants.Messages.UserFriendly.SERVICE_UNAVAILABLE
+                e.message?.contains("500") == true -> ErrorConstants.Messages.UserFriendly.SERVER_DOWN
+                e.message?.contains("network") == true -> ErrorConstants.Messages.UserFriendly.NO_INTERNET
+                else -> "Failed to load feed: ${e.message}"
+            }
+            Timber.tag(LogTags.VIEW_MODEL).e("❌ Unexpected error: $errorMsg")
             if (_homeFeed.value == null) {
-                _error.value = "Failed to load feed: ${e.message}"
+                _error.value = errorMsg
             }
         }
     }
@@ -701,13 +774,13 @@ class HomeViewModel @Inject constructor(
 
             feed.sections.forEach { section ->
                 when (section) {
-                    is Section.Recommended -> sectionsMap["recommended"] = section.items
-                    is Section.Trending -> sectionsMap["trending"] = section.items
-                    is Section.Recent -> sectionsMap["recent"] = section.items
+                    is Section.Recommended -> sectionsMap["recommended"] = section.items ?: emptyList()
+                    is Section.Trending -> sectionsMap["trending"] = section.items ?: emptyList()
+                    is Section.Recent -> sectionsMap["recent"] = section.items ?: emptyList()
                     is Section.Essentials -> {
-                        sectionsMap["essentials"] = section.sections.uniforms +
-                                section.sections.sports +
-                                section.sections.accessories
+                        sectionsMap["essentials"] = (section.sections.uniforms ?: emptyList()) +
+                                (section.sections.sports ?: emptyList()) +
+                                (section.sections.accessories ?: emptyList())
                     }
                 }
             }

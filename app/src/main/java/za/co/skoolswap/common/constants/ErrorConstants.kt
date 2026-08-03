@@ -112,11 +112,13 @@ object ErrorConstants {
             const val NO_INTERNET = "📡 No Internet Connection. Please check your Wi-Fi or mobile data."
             const val SLOW_CONNECTION = "⚠️ Your connection is slow. Please try again."
             const val TIMEOUT = "⏱️ Connection timeout. Please try again."
-
-            // Server
             const val SERVER_DOWN = "🔧 Our servers are experiencing issues. Please try again later."
             const val SERVER_MAINTENANCE = "🛠️ We're currently performing maintenance. Please check back later."
             const val SERVER_BUSY = "📊 Server is busy. Please try again in a few minutes."
+            const val SERVICE_UNAVAILABLE = "⏳ Service is temporarily unavailable. Please try again later."  //
+            // Server
+
+
 
             // Authentication
             const val SESSION_EXPIRED = "🔒 Your session has expired. Please login again."
