@@ -48,7 +48,9 @@ import za.co.skoolswap.workers.WorkerManager
 import jakarta.inject.Inject
 import timber.log.Timber
 import android.net.Uri
-
+import android.os.Build
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
@@ -131,6 +133,7 @@ class MainActivity : AppCompatActivity() {
                 else -> { /* stay on loginFragment */ }
             }
         }
+        applySystemBarsForDestination()
         refreshToolbarVisibility()
     }
 
@@ -347,6 +350,7 @@ class MainActivity : AppCompatActivity() {
                     window.decorView.systemUiVisibility = if (isDark) 0 else STATUS_BAR_LIGHT
                 }
             }
+            applySystemBarsForDestination(destination.id)
         }
     }
 
@@ -640,6 +644,43 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+
+    /** Call this whenever destination or theme changes */
+    private fun applySystemBarsForDestination(destinationId: Int? = navController.currentDestination?.id) {
+        val window = window
+        val nightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        val isDark = nightMode == Configuration.UI_MODE_NIGHT_YES
+
+        val isIntroLike = destinationId == R.id.introFragment ||
+                destinationId == R.id.loginFragment ||
+                destinationId == R.id.viewPagerFragment ||
+                destinationId == R.id.schoolOnboardingFragment
+
+        // Content layout: keep default (bars take space) unless you use edge-to-edge everywhere
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+
+        if (isIntroLike) {
+            // Black bars, white icons (network / battery visible)
+            window.statusBarColor = android.graphics.Color.BLACK
+            window.navigationBarColor = android.graphics.Color.BLACK
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                window.isStatusBarContrastEnforced = false
+                window.isNavigationBarContrastEnforced = false
+            }
+            WindowInsetsControllerCompat(window, window.decorView).apply {
+                isAppearanceLightStatusBars = false
+                isAppearanceLightNavigationBars = false
+            }
+        } else {
+            // App screens: white bars + dark icons in light mode
+            window.statusBarColor = if (isDark) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+            window.navigationBarColor = if (isDark) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+            WindowInsetsControllerCompat(window, window.decorView).apply {
+                isAppearanceLightStatusBars = !isDark
+                isAppearanceLightNavigationBars = !isDark
+            }
+        }
+    }
     private fun refreshToolbarVisibility() {
         val currentDestination = navController.currentDestination?.id
         Timber.tag(LogTags.UI).d("🔄 Refreshing toolbar for destination: $currentDestination")
@@ -667,25 +708,21 @@ class MainActivity : AppCompatActivity() {
         if (viewModel.suppressNextResumeRefresh) {
             viewModel.suppressNextResumeRefresh = false
             Timber.tag(LogTags.UI).d("⏭️ Skipping toolbar refresh - returning from camera/gallery")
+            applySystemBarsForDestination()
             refreshToolbarVisibility()
-            updateStatusBar()
+           // updateStatusBar()
             return
         }
 
-        // ✅ Minimal: just ensure UI state is correct
+        applySystemBarsForDestination()
         refreshToolbarVisibility()
-        updateStatusBar()
-
-        // ❌ REMOVED: navHeaderViewModel.refresh() - This should be event-driven
-        // ❌ REMOVED: All workerManager sync calls - Moved to ProcessLifecycleOwner
-
-        // ✅ Note: Nav header will refresh when user state changes
-        // via the collector in setupNavigationHeader()
+       // updateStatusBar()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        updateStatusBar()
+        applySystemBarsForDestination()
+        //updateStatusBar()
     }
 
     override fun onPause() {
