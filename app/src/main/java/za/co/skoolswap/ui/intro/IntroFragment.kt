@@ -66,7 +66,7 @@ class IntroFragment : Fragment() {
         Timber.tag(TAG).e("onViewCreated called")
 
         // ✅ SHOW STATUS BAR IMMEDIATELY on initial load
-        showSystemUI()
+      //  showSystemUI()
 
         // Show placeholder splash immediately
         binding.splashPlaceholder.visibility = View.VISIBLE
@@ -87,19 +87,32 @@ class IntroFragment : Fragment() {
      */
     private fun showSystemUI() {
         try {
+            // Force both system bars to black so they blend with the video/placeholder
+            requireActivity().window.apply {
+                statusBarColor = android.graphics.Color.BLACK
+                navigationBarColor = android.graphics.Color.BLACK
+            }
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 requireActivity().window.insetsController?.let { controller ->
                     controller.show(android.view.WindowInsets.Type.statusBars())
                     controller.show(android.view.WindowInsets.Type.navigationBars())
                     controller.systemBarsBehavior =
-                        android.view.WindowInsetsController.BEHAVIOR_DEFAULT   // ← fixed
+                        android.view.WindowInsetsController.BEHAVIOR_DEFAULT
+
+                    // Background is now black, so icons need to be light (white), not dark
+                    controller.setSystemBarsAppearance(
+                        0,
+                        android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+                                android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+                    )
                 }
             } else {
                 @Suppress("DEPRECATION")
                 requireActivity().window.decorView.systemUiVisibility =
                     View.SYSTEM_UI_FLAG_VISIBLE
             }
-            Timber.tag(TAG).e("✅ System UI shown (status bar visible)")
+            Timber.tag(TAG).e("✅ System UI shown (status bar visible, black background)")
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Error showing system UI")
         }
@@ -413,6 +426,33 @@ class IntroFragment : Fragment() {
             }
         }
     }
+    private fun restoreDefaultSystemUI() {
+        try {
+            val typedValue = android.util.TypedValue()
+            val theme = requireActivity().theme
+            theme.resolveAttribute(android.R.attr.colorBackground, typedValue, true)
+
+            requireActivity().window.apply {
+                statusBarColor = android.graphics.Color.WHITE
+                navigationBarColor = android.graphics.Color.WHITE
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                requireActivity().window.insetsController?.setSystemBarsAppearance(
+                    android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+                            android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+                    android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+                            android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+                )
+            }
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Error restoring default system UI")
+        }
+    }
+
+
+
+
 
     // ==================== LIFECYCLE ====================
 
@@ -421,7 +461,7 @@ class IntroFragment : Fragment() {
         Timber.tag(TAG).e("onResume called")
 
         // ✅ ALWAYS show status bar when resuming - this ensures network/battery signs appear
-        showSystemUI()
+        //showSystemUI()
     }
 
     override fun onPause() {
@@ -429,7 +469,7 @@ class IntroFragment : Fragment() {
         Timber.tag(TAG).e("onPause called")
 
         // ✅ Show system UI before pausing (when navigating away)
-        showSystemUI()
+       // showSystemUI()
 
         if (_binding != null && binding.videoView.isPlaying) {
             binding.videoView.pause()
@@ -442,7 +482,7 @@ class IntroFragment : Fragment() {
         Timber.tag(TAG).e("onStop called")
 
         // ✅ Ensure status bar is visible when stopped
-        showSystemUI()
+      //  showSystemUI()
     }
 
     override fun onDestroyView() {
@@ -451,8 +491,7 @@ class IntroFragment : Fragment() {
         videoWatchdogJob?.cancel()
         videoWatchdogJob = null
 
-        // ✅ Restore system UI when destroying view
-        showSystemUI()
+        //restoreDefaultSystemUI()
 
         binding.videoView.suspend()
         _binding = null
