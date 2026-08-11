@@ -69,7 +69,6 @@ class SignUpFragment : Fragment() {
                     return@setOnClickListener
                 }
                 else -> {
-                    // ✅ Call Firebase sign up instead of OTP
                     viewModel.signUpWithEmail(name, email, password, confirmPassword)
                 }
             }
@@ -82,19 +81,18 @@ class SignUpFragment : Fragment() {
 
     private fun observeViewModel() {
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
-            Timber.tag("SignUpFragment").e("Loading state: $isLoading")
             binding.buttonRegister.isEnabled = !isLoading
             binding.buttonRegister.text = if (isLoading) "Creating account..." else "Sign Up"
         }
 
         viewModel.error.observe(viewLifecycleOwner) { error ->
             if (error != null) {
-                Timber.tag("SignUpFragment").e("Error: $error")
+                Timber.e("Error: $error")
                 Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show()
             }
         }
 
-        // ✅ Changed from otpToken to user object
+        // ✅ Updated navigation to use Province Fragment first
         viewModel.signUpSuccess.observe(viewLifecycleOwner) { user ->
             if (user != null) {
                 Timber.tag("SignUpFragment").e("✅ Sign up successful!")
@@ -102,17 +100,17 @@ class SignUpFragment : Fragment() {
                 Timber.tag("SignUpFragment").e("🏫 schoolMapped: ${user.schoolMapped}")
                 Timber.tag("SignUpFragment").e("🏫 schoolId: ${user.schoolId}")
 
-                // Navigate directly - no OTP screen
                 if (user.schoolMapped == true && user.schoolId != null) {
+                    // ✅ User has school - go to Home
                     Timber.tag("SignUpFragment").e("➡️ User has school - navigating to HOME")
                     val bundle = Bundle().apply {
                         putInt("schoolId", user.schoolId)
                     }
                     findNavController().navigate(R.id.action_signUpFragment_to_nav_home, bundle)
                 } else {
-                    Timber.tag("SignUpFragment")
-                        .e("➡️ User has NO school - navigating to ONBOARDING")
-                    findNavController().navigate(R.id.action_signUpFragment_to_schoolOnboardingFragment)
+                    // ✅ User has NO school - go to Province Selection first
+                    Timber.tag("SignUpFragment").e("➡️ User has NO school - navigating to PROVINCE SELECTION")
+                    findNavController().navigate(R.id.action_signUpFragment_to_schoolOnboardingProvinceFragment)
                 }
             }
         }

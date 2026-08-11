@@ -1,4 +1,4 @@
-package za.skoolswap.app.ui.uniform
+package za.co.skoolswap.ui.uniform
 
 import android.view.LayoutInflater
 import android.view.ViewGroup

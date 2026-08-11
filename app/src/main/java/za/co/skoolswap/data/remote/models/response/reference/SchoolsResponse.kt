@@ -19,7 +19,8 @@ data class SchoolDto(
 
     @SerializedName("name")
     val name: String,
-
+    @SerializedName("logo_url")  // ← ADD THIS
+    val logoUrl: String? = null,
     @SerializedName("school_type")
     val schoolType: String?,
 

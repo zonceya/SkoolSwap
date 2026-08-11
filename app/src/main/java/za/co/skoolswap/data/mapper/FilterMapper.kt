@@ -11,7 +11,8 @@ import za.co.skoolswap.domain.model.FilterOption
 fun FilterConfigResponse.toDomain(): FilterConfig {
     return FilterConfig(
         categoryId = this.categoryId,  // Will be null for global filter
-        categoryName = this.categoryName,  // Will be null for global filter
+        categoryName = this.categoryName,
+        mainCategoryId = this.mainCategoryId,// Will be null for global filter
         filterGroups = this.filterGroups.map { it.toDomain() }
     )
 }

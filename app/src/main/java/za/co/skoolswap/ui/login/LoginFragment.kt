@@ -83,7 +83,6 @@ class LoginFragment : Fragment() {
             isGoogleSignIn = true
             binding.signInButton.isEnabled = false
 
-            // Show loading overlay immediately
             showLoadingOverlay(true, "Signing in with Google...")
 
             viewModel.signInWithGoogle(requireActivity())
@@ -162,9 +161,7 @@ class LoginFragment : Fragment() {
         }
 
         if (show) {
-            // 🔥 KEY FIX: Bring to front
             overlay.bringToFront()
-
             overlay.visibility = View.VISIBLE
             overlay.alpha = 0f
             overlay.animate()
@@ -204,7 +201,6 @@ class LoginFragment : Fragment() {
     }
 
     private fun observeViewModel() {
-        // For email/password loading
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
             if (_binding == null) return@observe
 
@@ -222,7 +218,6 @@ class LoginFragment : Fragment() {
                 showLoadingOverlay(false)
                 binding.progressBar.visibility = View.GONE
 
-                // Use ErrorConstantsHelper for user-friendly message
                 val userMessage = when {
                     error.contains("530") -> ErrorConstants.Messages.UserFriendly.SESSION_EXPIRED
                     error.contains("500") || error.contains("503") -> ErrorConstants.Messages.UserFriendly.SERVER_DOWN
@@ -268,7 +263,8 @@ class LoginFragment : Fragment() {
                 }
                 findNavController().navigate(R.id.action_loginFragment_to_nav_home, bundle)
             } else {
-                findNavController().navigate(R.id.action_loginFragment_to_schoolOnboardingFragment)
+                // ✅ Navigate to Province Selection first
+                findNavController().navigate(R.id.action_loginFragment_to_schoolOnboardingProvinceFragment)
             }
         } catch (e: Exception) {
             Timber.tag(LogTags.UI).e(e, "Navigation failed")

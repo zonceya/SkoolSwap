@@ -87,7 +87,8 @@ class ItemDetailViewModel @Inject constructor(
     private var currentUserId: Int? = null
 
     private val similarItemsCache = mutableMapOf<String, List<Item>>()
-
+    private val _schoolLogoUrl = MutableStateFlow<String?>(null)
+    val schoolLogoUrl: StateFlow<String?> = _schoolLogoUrl.asStateFlow()
     fun loadItem(itemId: String, source: String) {
         viewModelScope.launch {
             currentItemId = itemId
@@ -228,10 +229,12 @@ class ItemDetailViewModel @Inject constructor(
         _colorName.value = item.colorName
         _brandName.value = item.brandName
         _conditionName.value = item.conditionName
+        _schoolLogoUrl.value = item.schoolLogoUrl
 
         item.schoolId?.let { schoolId ->
             val school = schoolDao.getById(schoolId)
             _schoolName.value = school?.name
+            _schoolLogoUrl.value = school?.logoUrl ?: item.schoolLogoUrl
         }
     }
 

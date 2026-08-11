@@ -8,5 +8,7 @@ data class SchoolResponse(
     val province_id: Int,
     val province: ProvinceResponse?,
     val location_id: Int?,
+    val logo_url: String?,
     val school_type: String?
+
 )

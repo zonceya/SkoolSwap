@@ -130,7 +130,7 @@ class EditItemWorker(
                 sizeId = domainItem.sizeId,
                 colorId = domainItem.colorId,
                 tagIds = null,
-                status = domainItem.status
+                status = domainItem.status as String?
             )
 
             if (updateResult.isFailure) {
@@ -161,7 +161,7 @@ class EditItemWorker(
                 updatedAt = serverItem.updatedAt,
                 price = serverItem.price,
                 quantity = serverItem.quantity,
-                status = serverItem.status
+                status = serverItem.status as String
             )
             itemDao.insertItem(updatedEntity)
             Timber.tag(LogTags.SERVICE).d("✅ Local item updated, syncStatus: ${AppConstants.SyncStatus.SYNCED}")

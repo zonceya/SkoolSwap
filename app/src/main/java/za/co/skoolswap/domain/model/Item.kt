@@ -7,7 +7,7 @@ data class Item(
     val description: String,
     val price: Double,
     val quantity: Int,
-    val status: String,
+    val status: Any? = null,
     val itemTypeId: Int? = null,
     val brandId: Int? = null,
     val sizeId: Int? = null,
@@ -15,6 +15,7 @@ data class Item(
     val mainCategoryId: Int? = null,
     val subCategoryId: Int? = null,
     val schoolId: Int? = null,
+    val schoolLogoUrl: String? = null,
     val schoolName: String? = null,
     val itemConditionId: Int? = null,
     val locationId: Int? = null,
@@ -31,7 +32,7 @@ data class Item(
     val images: List<ItemImage> = emptyList(),
     val coverImage: String? = null,
     val image: String? = null,
-    val additionalPhoto: String? = null, 
+    val additionalPhoto: String? = null,
     val sizeName: String? = null,
     val colorName: String? = null,
     val brandName: String? = null,
@@ -56,22 +57,18 @@ data class Item(
     fun resolveAllImageUrls(): List<String> {
         val result = mutableListOf<String>()
 
-        // 1. Add cover photo
         coverImage?.takeIf { it.isNotBlank() }?.let {
             if (!result.contains(it)) result.add(it)
         }
 
-        // 2. Add single 'image' field
         image?.takeIf { it.isNotBlank() }?.let {
             if (!result.contains(it)) result.add(it)
         }
 
-        // 3. Add additional_photo
         additionalPhoto?.takeIf { it.isNotBlank() }?.let {
             if (!result.contains(it)) result.add(it)
         }
 
-        // 4. Add all images from Active Storage attachments
         images.forEach { img ->
             val url = img.url
             if (!url.isNullOrBlank() && !result.contains(url)) {
@@ -81,6 +78,20 @@ data class Item(
 
         return result
     }
+
+    val isSold: Boolean
+        get() = when (status) {
+            is String -> status.lowercase() == "sold"
+            is Int -> status == 2
+            else -> false
+        }
+
+    val isActive: Boolean
+        get() = when (status) {
+            is String -> status.lowercase() == "active"
+            is Int -> status == 1
+            else -> false
+        }
 }
 
 data class ItemMeta(

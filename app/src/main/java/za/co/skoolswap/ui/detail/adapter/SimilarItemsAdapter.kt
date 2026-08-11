@@ -18,9 +18,6 @@ class SimilarItemsAdapter(
 
     private val TAG = "SimilarItemsAdapter"
 
-    // ✅ REMOVED: custom submitList() - use parent's implementation directly
-    // Just call adapter.submitList(items) from Fragment
-
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ItemSimilarProductBinding.inflate(
             LayoutInflater.from(parent.context), parent, false
@@ -59,14 +56,13 @@ class SimilarItemsAdapter(
             binding.productTitle.text = item.name
             binding.productPrice.text = "R${String.format("%.2f", item.price)}"
 
-            // Sold badge
-            if (item.status == "sold" || item.quantity <= 0) {
+            // ✅ FIX: Use item.isSold property
+            if (item.isSold || item.quantity <= 0) {
                 binding.soldBadge.visibility = View.VISIBLE
             } else {
                 binding.soldBadge.visibility = View.GONE
             }
 
-            // ✅ Use resolveImageUrl() helper for consistency
             val imageUrl = item.resolveImageUrl()
                 ?: item.coverImage
                 ?: item.images.firstOrNull { !it.url.isNullOrBlank() && it.url.startsWith("http") }?.url
@@ -82,7 +78,6 @@ class SimilarItemsAdapter(
                 binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
             }
 
-            // Size
             if (!item.sizeName.isNullOrBlank()) {
                 binding.productSize.text = item.sizeName.replace("Adult", "UK")
                 binding.productSize.visibility = View.VISIBLE
@@ -91,7 +86,7 @@ class SimilarItemsAdapter(
             }
 
             Timber.tag(TAG)
-                .d("Binding item: ${item.name}, imageUrl: $imageUrl, images: ${item.images.size}, cover: ${item.coverImage}")
+                .d("Binding item: ${item.name}, isSold: ${item.isSold}, status: ${item.status}")
         }
     }
 }

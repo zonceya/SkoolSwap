@@ -11,5 +11,5 @@ data class SchoolEntity(
     val schoolType: String?,
     val provinceId: Int? = null,
     val locationId: Int? = null,
-
+    val logoUrl: String? = null
 )

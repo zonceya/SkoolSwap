@@ -1,7 +1,7 @@
 package za.co.skoolswap.ui.home.adapter
 
-import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -39,28 +39,40 @@ class EssentialsGridAdapter(
         private val binding: ItemHomeCategoryBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        // EssentialsGridAdapter.kt - bind()
-
         fun bind(categoryItem: EssentialsCategoryItem) {
+            val item = categoryItem.item
+
             binding.categoryName.text = categoryItem.displayName
 
-            // ✅ Try coverImage first (from API)
-            val imageUrl = categoryItem.item.coverImage?.takeIf { it.isNotBlank() }
-                ?: categoryItem.item.image?.takeIf { it.isNotBlank() }
-                ?: categoryItem.item.images.firstOrNull()?.url?.takeIf { it.isNotBlank() }
+            // Sold badge
+            if (categoryItem.isPlaceholder) {
+                binding.soldBadge.visibility = View.GONE
+            } else if (item.isSold || item.quantity <= 0) {
+                binding.soldBadge.visibility = View.VISIBLE
+            } else {
+                binding.soldBadge.visibility = View.GONE
+            }
 
-            if (!imageUrl.isNullOrEmpty()) {
+            val placeholderRes = getPlaceholderDrawable(categoryItem.categoryType)
+            val imageUrl = item.resolveImageUrl()
+                ?: categoryItem.defaultImageUrl
+
+            // Always clear previous Glide request (important when recycling)
+            Glide.with(binding.root.context).clear(binding.categoryIcon)
+
+            if (!imageUrl.isNullOrBlank() && !categoryItem.isPlaceholder) {
                 Glide.with(binding.root.context)
                     .load(imageUrl)
-                    .placeholder(getPlaceholderDrawable(categoryItem.categoryType))
-                    .error(getPlaceholderDrawable(categoryItem.categoryType))
+                    .placeholder(placeholderRes)
+                    .error(placeholderRes)
                     .centerCrop()
                     .into(binding.categoryIcon)
-                Timber.tag(TAG).d("Loaded image for ${categoryItem.displayName}: $imageUrl")
+                Timber.tag(TAG).d("Loaded remote image for ${categoryItem.displayName}: $imageUrl")
             } else {
-                val iconResId = getPlaceholderDrawable(categoryItem.categoryType)
-                binding.categoryIcon.setImageResource(iconResId)
-                Timber.tag(TAG).d("Using local placeholder for ${categoryItem.displayName}")
+                // ✅ Explicit fallback – must show local image
+                binding.categoryIcon.setImageResource(placeholderRes)
+                binding.categoryIcon.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                Timber.tag(TAG).d("Using local placeholder for ${categoryItem.displayName} res=$placeholderRes")
             }
 
             binding.root.setOnClickListener {
@@ -69,14 +81,13 @@ class EssentialsGridAdapter(
         }
 
         private fun getPlaceholderDrawable(categoryType: String): Int {
-            return when (categoryType) {
-                "uniforms" -> R.drawable.ic_uniform_placeholder
-                "sports" -> R.drawable.ic_sports_placeholder
+            return when (categoryType.lowercase()) {
+                "uniforms", "uniform" -> R.drawable.ic_uniform_placeholder
+                "sports", "sport" -> R.drawable.ic_sports_placeholder
                 "stationery" -> R.drawable.ic_stationery_placeholder
-                "accessories" -> R.drawable.ic_accessories_placeholder
+                "accessories", "accessory" -> R.drawable.ic_accessories_placeholder
                 else -> R.drawable.ic_create_item_placeholder
             }
         }
-
     }
 }

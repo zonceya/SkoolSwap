@@ -18,7 +18,6 @@ class ProductsAdapter(
     private val onItemClick: (Item) -> Unit
 ) : ListAdapter<Item, ProductsAdapter.ViewHolder>(ProductDiffCallback()) {
 
-
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ItemHomeProductBinding.inflate(
             LayoutInflater.from(parent.context), parent, false
@@ -67,11 +66,15 @@ class ProductsAdapter(
             binding.productTitle.text = item.name
             binding.productPrice.text = "R${String.format("%.2f", item.price)}"
 
-            // Sold badge
-            if (item.status == "sold" || item.quantity <= 0) {
+            val isSold = item.isSold || item.quantity <= 0
+            if (isSold) {
                 binding.soldBadge.visibility = View.VISIBLE
+                binding.productTitle.alpha = 0.6f
+                binding.productPrice.alpha = 0.6f
             } else {
                 binding.soldBadge.visibility = View.GONE
+                binding.productTitle.alpha = 1f
+                binding.productPrice.alpha = 1f
             }
 
             val imageUrl = item.resolveImageUrl()

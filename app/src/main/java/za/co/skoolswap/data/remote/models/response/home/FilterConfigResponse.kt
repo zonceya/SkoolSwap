@@ -6,7 +6,8 @@ import com.google.gson.annotations.SerializedName
 data class FilterConfigResponse(
     @SerializedName("success") val success: Boolean,
     @SerializedName("category_id") val categoryId: Int? = null,  // Nullable for global filter
-    @SerializedName("category_name") val categoryName: String? = null,  // Nullable for global filter
+    @SerializedName("category_name") val categoryName: String? = null,
+    @SerializedName("main_category_id") val mainCategoryId: Int? = null, // Nullable for global filter
     @SerializedName("filter_groups") val filterGroups: List<FilterGroupResponse>
 )
 

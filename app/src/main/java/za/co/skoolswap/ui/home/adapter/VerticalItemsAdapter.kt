@@ -83,7 +83,9 @@ class VerticalItemsAdapter(
                 binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
             }
 
-            val isSold = item.status == "sold" || item.quantity <= 0
+            // ✅ SINGLE check using isSold property
+            val isSold = item.isSold || item.quantity <= 0
+
             if (isSold) {
                 binding.soldBadge.visibility = View.VISIBLE
                 binding.productTitle.alpha = 0.6f
@@ -93,8 +95,6 @@ class VerticalItemsAdapter(
                 binding.productTitle.alpha = 1f
                 binding.productPrice.alpha = 1f
             }
-
-
         }
 
         private fun formatPrice(price: Double): String {

@@ -223,7 +223,7 @@ class ItemCreationWorker(
                 lastSyncAttempt = System.currentTimeMillis(),
                 price = serverItem.price,
                 quantity = serverItem.quantity,
-                status = serverItem.status,
+                status = serverItem.status as String,
                 createdAt = serverItem.createdAt,
                 updatedAt = serverItem.updatedAt
             )

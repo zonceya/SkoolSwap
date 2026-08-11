@@ -58,6 +58,7 @@
             android:background="@color/shimmer_background" />
 
     </com.facebook.shimmer.ShimmerFrameLayout>
+
     <LinearLayout
         android:id="@+id/errorLayout"
         android:layout_width="match_parent"
@@ -294,16 +295,40 @@
                     android:alpha="0.12"
                     android:layout_marginTop="16dp"/>
 
-                <!-- School -->
-                <TextView
-                    android:id="@+id/productSchool"
+                <!-- ========================= -->
+                <!-- SCHOOL WITH LOGO (FIXED) -->
+                <!-- ========================= -->
+
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="14sp"
-                    android:textColor="?attr/colorOnSurface"
-                    android:alpha="0.7"
-                    android:layout_marginTop="12dp"
-                    android:visibility="gone"/>
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="12dp">
+
+                    <!-- School Logo -->
+                    <ImageView
+                        android:id="@+id/schoolLogo"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_marginEnd="8dp"
+                        android:visibility="gone"
+                        android:contentDescription="School logo"
+                        android:scaleType="centerCrop"/>
+
+                    <!-- School Name -->
+                    <TextView
+                        android:id="@+id/productSchool"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="?attr/colorOnSurface"
+                        android:alpha="0.7"
+                        android:visibility="gone"/>
+
+                </LinearLayout>
 
                 <!-- Divider -->
                 <View
@@ -333,7 +358,7 @@
                     android:layout_marginTop="16dp"/>
 
                 <!-- ========================= -->
-                <!-- SHIPPING SECTION (FIRST) -->
+                <!-- SHIPPING SECTION -->
                 <!-- ========================= -->
 
                 <LinearLayout
@@ -402,7 +427,7 @@
                 </LinearLayout>
 
                 <!-- ========================= -->
-                <!-- SIMILAR ITEMS (BELOW SHIPPING) -->
+                <!-- SIMILAR ITEMS -->
                 <!-- ========================= -->
 
                 <View
@@ -428,6 +453,7 @@
                     android:layout_gravity="center"
                     android:layout_marginTop="8dp"
                     android:visibility="gone"/>
+
                 <com.facebook.shimmer.ShimmerFrameLayout
                     android:id="@+id/similarShimmer"
                     android:layout_width="match_parent"
@@ -463,6 +489,7 @@
                     </LinearLayout>
 
                 </com.facebook.shimmer.ShimmerFrameLayout>
+
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/similarRecycler"
                     android:layout_width="match_parent"
@@ -476,7 +503,7 @@
 
     </ScrollView>
 
-    <!-- Buy Button - Light mode: black background with white text, Dark mode: white background with black text -->
+    <!-- Buy Button -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/buyButton"
         android:layout_width="match_parent"

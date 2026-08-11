@@ -24,9 +24,10 @@
             app:destination="@id/loginFragment"
             app:popUpTo="@id/introFragment"
             app:popUpToInclusive="true" />
+
         <action
-            android:id="@+id/action_introFragment_to_schoolOnboardingFragment"
-            app:destination="@id/schoolOnboardingFragment"
+            android:id="@+id/action_introFragment_to_schoolOnboardingProvinceFragment"
+            app:destination="@id/schoolOnboardingProvinceFragment"
             app:popUpTo="@id/introFragment"
             app:popUpToInclusive="true" />
 
@@ -49,25 +50,56 @@
             app:popUpToInclusive="true" />
 
     </fragment>
+
+    <!-- School Onboarding - Province Selection -->
     <fragment
-        android:id="@+id/nav_help"
-        android:name="za.co.skoolswap.ui.help.HelpFragment"
-        android:label="@string/menu_help"
-        tools:layout="@layout/fragment_help" />
-    <!-- School Onboarding Fragment -->
-    <fragment
-        android:id="@+id/schoolOnboardingFragment"
-        android:name="za.co.skoolswap.ui.schoolonboarding.SchoolOnboardingFragment"
-        android:label="School Selection"
-        tools:layout="@layout/fragment_school_onboarding">
+        android:id="@+id/schoolOnboardingProvinceFragment"
+        android:name="za.co.skoolswap.ui.schoolonboarding.SchoolOnboardingProvinceFragment"
+        android:label="Select Province"
+        tools:layout="@layout/fragment_school_onboarding_province">
 
         <action
-            android:id="@+id/action_schoolOnboardingFragment_to_nav_home"
+            android:id="@+id/action_provinceFragment_to_schoolFragment"
+            app:destination="@id/schoolOnboardingSchoolFragment"
+            app:popUpTo="@id/schoolOnboardingProvinceFragment"
+            app:popUpToInclusive="false" />
+
+        <action
+            android:id="@+id/action_provinceFragment_to_nav_home"
             app:destination="@id/nav_home"
             app:popUpTo="@id/nav_home"
             app:popUpToInclusive="true" />
 
+        <action
+            android:id="@+id/action_provinceFragment_to_loginFragment"
+            app:destination="@id/loginFragment"
+            app:popUpTo="@id/schoolOnboardingProvinceFragment"
+            app:popUpToInclusive="true" />
+
     </fragment>
+
+    <!-- School Onboarding - School Selection -->
+    <fragment
+        android:id="@+id/schoolOnboardingSchoolFragment"
+        android:name="za.co.skoolswap.ui.schoolonboarding.SchoolOnboardingSchoolFragment"
+        android:label="Select School"
+        tools:layout="@layout/fragment_school_onboarding_school">
+
+        <action
+            android:id="@+id/action_schoolFragment_to_nav_home"
+            app:destination="@id/nav_home"
+            app:popUpTo="@id/nav_home"
+            app:popUpToInclusive="true" />
+
+        <action
+            android:id="@+id/action_schoolFragment_to_loginFragment"
+            app:destination="@id/loginFragment"
+            app:popUpTo="@id/schoolOnboardingSchoolFragment"
+            app:popUpToInclusive="true" />
+
+    </fragment>
+
+    <!-- ❌ REMOVED: schoolOnboardingFragment (replaced by two separate fragments) -->
 
     <!-- Onboarding Flow -->
     <fragment
@@ -115,16 +147,9 @@
             app:popUpTo="@id/loginFragment"
             app:popUpToInclusive="false" />
 
-        <!-- ❌ REMOVE THIS LOCAL ACTION - It's now global -->
-        <!-- <action
-            android:id="@+id/action_global_logout"
-            app:destination="@id/loginFragment"
-            app:popUpTo="@id/mobile_navigation"
-            app:popUpToInclusive="true" /> -->
-
         <action
-            android:id="@+id/action_loginFragment_to_schoolOnboardingFragment"
-            app:destination="@id/schoolOnboardingFragment"
+            android:id="@+id/action_loginFragment_to_schoolOnboardingProvinceFragment"
+            app:destination="@id/schoolOnboardingProvinceFragment"
             app:popUpTo="@id/loginFragment"
             app:popUpToInclusive="true" />
 
@@ -157,8 +182,8 @@
             app:popUpToInclusive="false" />
 
         <action
-            android:id="@+id/action_signUpFragment_to_schoolOnboardingFragment"
-            app:destination="@id/schoolOnboardingFragment"
+            android:id="@+id/action_signUpFragment_to_schoolOnboardingProvinceFragment"
+            app:destination="@id/schoolOnboardingProvinceFragment"
             app:popUpTo="@id/signUpFragment"
             app:popUpToInclusive="true" />
 
@@ -200,11 +225,19 @@
         <action
             android:id="@+id/action_nav_home_to_nav_favorites"
             app:destination="@id/nav_favorites" />
+
         <action
             android:id="@+id/action_home_to_logout"
             app:destination="@id/loginFragment"
             app:popUpTo="@id/mobile_navigation"
             app:popUpToInclusive="true" />
+
+        <action
+            android:id="@+id/action_home_to_schoolOnboardingProvinceFragment"
+            app:destination="@id/schoolOnboardingProvinceFragment"
+            app:popUpTo="@id/nav_home"
+            app:popUpToInclusive="false" />
+
     </fragment>
 
     <!-- Favorite Fragment -->
@@ -215,6 +248,12 @@
         tools:layout="@layout/fragment_favorites" />
 
     <!-- Drawer Menu Fragments -->
+    <fragment
+        android:id="@+id/nav_help"
+        android:name="za.co.skoolswap.ui.help.HelpFragment"
+        android:label="@string/menu_help"
+        tools:layout="@layout/fragment_help" />
+
     <fragment
         android:id="@+id/nav_gallery"
         android:name="za.co.skoolswap.ui.gallery.GalleryFragment"
@@ -365,7 +404,7 @@
     <!-- Sport Fragment -->
     <fragment
         android:id="@+id/sportFragment"
-        android:name="za.skoolswap.app.ui.sport.SportFragment"
+        android:name="za.co.skoolswap.ui.sport.SportFragment"
         android:label="Sports"
         tools:layout="@layout/fragment_sport">
 
