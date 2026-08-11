@@ -23,6 +23,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import androidx.fragment.app.DialogFragment
+import com.bumptech.glide.Glide
 import za.co.skoolswap.domain.model.Item
 import za.co.skoolswap.utils.extensions.formatViewCount
 import za.co.skoolswap.utils.ColorUtils
@@ -270,7 +271,21 @@ class ItemDetailFragment : Fragment() {
                 }
             }
         }
-
+        lifecycleScope.launch {
+            viewModel.schoolLogoUrl.collect { logoUrl ->
+                if (!logoUrl.isNullOrEmpty()) {
+                    Glide.with(this@ItemDetailFragment)
+                        .load(logoUrl)
+                        .placeholder(R.drawable.ic_school)
+                        .error(R.drawable.ic_school)
+                        .circleCrop()
+                        .into(binding.schoolLogo)
+                    binding.schoolLogo.visibility = View.VISIBLE
+                } else {
+                    binding.schoolLogo.visibility = View.GONE
+                }
+            }
+        }
         lifecycleScope.launch {
             viewModel.colorName.collect { colorName ->
                 if (!colorName.isNullOrEmpty()) {

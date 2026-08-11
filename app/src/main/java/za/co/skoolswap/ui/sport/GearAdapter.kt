@@ -1,4 +1,4 @@
-package za.skoolswap.app.ui.sport
+package za.co.skoolswap.ui.sport
 
 import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue

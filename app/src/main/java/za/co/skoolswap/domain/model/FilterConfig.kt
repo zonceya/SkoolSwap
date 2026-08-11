@@ -3,7 +3,8 @@ package za.co.skoolswap.domain.model
 
 data class FilterConfig(
     val categoryId: Int? = null,
-    val categoryName: String? = null,  // Make nullable for global filter
+    val categoryName: String? = null,
+    val mainCategoryId: Int? = null,// Make nullable for global filter
     val filterGroups: List<FilterGroup>
 )
 

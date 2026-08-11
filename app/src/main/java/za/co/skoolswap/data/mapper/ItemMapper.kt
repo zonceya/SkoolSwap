@@ -316,7 +316,7 @@ fun Item.toEntity(): ItemEntity {
         description = description,
         price = price,
         quantity = quantity,
-        status = status,
+        status = status as String,
         itemTypeId = itemTypeId,
         brandId = brandId,
         sizeId = sizeId,

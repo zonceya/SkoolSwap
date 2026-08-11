@@ -16,7 +16,6 @@ import za.co.skoolswap.databinding.FragmentUniformBinding
 import za.co.skoolswap.domain.model.UniformCategory
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
-import za.skoolswap.app.ui.uniform.UniformCategoryAdapter
 
 @AndroidEntryPoint
 class UniformFragment : Fragment() {
@@ -60,8 +59,9 @@ class UniformFragment : Fragment() {
 
     private fun setupSwipeRefresh() {
         binding.swipeRefreshLayout.setOnRefreshListener {
-            viewModel.loadUniformCategories()
-            binding.swipeRefreshLayout.isRefreshing = false
+            // Pass forceRefresh = true
+            viewModel.loadUniformCategories(forceRefresh = true)
+            // DO NOT set isRefreshing = false here - let the observer handle it
         }
     }
 

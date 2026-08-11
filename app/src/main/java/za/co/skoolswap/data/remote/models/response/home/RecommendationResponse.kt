@@ -20,7 +20,7 @@ data class EssentialsSectionsDto(
     @SerializedName("uniforms") val uniforms: List<RankedItemDto> = emptyList(),
     @SerializedName("sports") val sports: List<RankedItemDto> = emptyList(),
     @SerializedName("accessories") val accessories: List<RankedItemDto> = emptyList(),
-    @SerializedName("stationery") val stationery: List<RankedItemDto>? = null
+    @SerializedName("stationery") val stationery: List<RankedItemDto>? = emptyList()
 )
 
 // ============ UNIFORM RESPONSE ============

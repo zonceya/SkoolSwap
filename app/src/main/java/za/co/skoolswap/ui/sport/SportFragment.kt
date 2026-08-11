@@ -1,4 +1,4 @@
-package za.skoolswap.app.ui.sport
+package za.co.skoolswap.ui.sport
 
 import android.os.Bundle
 import android.view.LayoutInflater

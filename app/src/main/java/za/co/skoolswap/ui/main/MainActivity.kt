@@ -51,6 +51,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
+
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
@@ -177,49 +178,20 @@ class MainActivity : AppCompatActivity() {
                         }
                         is UserState.Success -> {
                             Timber.tag(LogTags.UI).d("State: SUCCESS")
-                            Timber.tag(LogTags.UI).d("Name: ${userState.name}")
-                            Timber.tag(LogTags.UI).d("Email: ${userState.email}")
-                            Timber.tag(LogTags.UI).d("ProfileImageUrl: ${userState.profileImageUrl}")
-
                             loadingOverlay.visibility = View.GONE
                             usernameTextView.text = userState.name ?: AppConstants.DEFAULT_USER_NAME
                             userEmailTextView.text = userState.email ?: "Sign in to continue"
 
                             if (!userState.profileImageUrl.isNullOrEmpty()) {
-                                Timber.tag(LogTags.UI).d("Loading image from URL: ${userState.profileImageUrl}")
-
                                 Glide.with(this@MainActivity)
                                     .load(userState.profileImageUrl)
                                     .circleCrop()
                                     .placeholder(R.drawable.ic_user)
                                     .error(R.drawable.ic_user)
                                     .override(72, 72)
-                                    .listener(object : com.bumptech.glide.request.RequestListener<android.graphics.drawable.Drawable> {
-                                        override fun onLoadFailed(
-                                            e: GlideException?,
-                                            model: Any?,
-                                            target: com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable>?,
-                                            isFirstResource: Boolean
-                                        ): Boolean {
-                                            Timber.tag(LogTags.UI).e(e, "Glide load failed")
-                                            return false
-                                        }
-
-                                        override fun onResourceReady(
-                                            resource: android.graphics.drawable.Drawable?,
-                                            model: Any?,
-                                            target: com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable>?,
-                                            dataSource: com.bumptech.glide.load.DataSource?,
-                                            isFirstResource: Boolean
-                                        ): Boolean {
-                                            Timber.tag(LogTags.UI).d("Glide load success")
-                                            return false
-                                        }
-                                    })
                                     .into(profileImageView)
                                 profileImageView.setColorFilter(null)
                             } else {
-                                Timber.tag(LogTags.UI).d("No profile image URL, using placeholder")
                                 profileImageView.setImageResource(R.drawable.ic_user)
                                 val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
                                         android.content.res.Configuration.UI_MODE_NIGHT_YES
@@ -284,12 +256,10 @@ class MainActivity : AppCompatActivity() {
                     true
                 }
                 R.id.nav_help -> {
-                    // Navigate to help fragment
                     navController.navigate(R.id.nav_help)
                     binding.drawerLayout.closeDrawer(GravityCompat.START)
                     true
                 }
-
                 else -> {
                     try {
                         if (navController.currentDestination?.id != menuItem.itemId) {
@@ -307,9 +277,19 @@ class MainActivity : AppCompatActivity() {
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
             when (destination.id) {
-                R.id.schoolOnboardingFragment,
+                // ✅ Updated to include new Province and School fragments
+                R.id.schoolOnboardingProvinceFragment,
+                R.id.schoolOnboardingSchoolFragment,
                 R.id.viewPagerFragment,
                 R.id.introFragment,
+                R.id.itemDetailFragment -> {  // ← ADD THIS
+                    supportActionBar?.hide()
+                    binding.appBarMain.fab.visibility = View.GONE
+                    binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                    window.statusBarColor = android.graphics.Color.BLACK
+                    @Suppress("DEPRECATION")
+                    window.decorView.systemUiVisibility = 0
+                }
                 R.id.loginFragment -> {
                     supportActionBar?.hide()
                     binding.appBarMain.fab.visibility = View.GONE
@@ -332,7 +312,7 @@ class MainActivity : AppCompatActivity() {
                 R.id.nav_help -> {
                     supportActionBar?.show()
                     binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
-                    binding.appBarMain.fab.visibility = View.GONE  // ← HIDE FAB
+                    binding.appBarMain.fab.visibility = View.GONE
                     binding.appBarMain.toolbar.menu.findItem(R.id.action_search)?.isVisible = false
                 }
                 else -> {
@@ -363,17 +343,12 @@ class MainActivity : AppCompatActivity() {
             }
         )
     }
+
     private fun setupPolicyFooter() {
         val navView = binding.navView
-
-        // Inflate the footer layout
         val footerLayout = layoutInflater.inflate(R.layout.nav_footer_policies, navView, false)
-
-        // Add at the END of the NavigationView (after header and menu)
-        // Get the current child count and add at the end
         navView.addView(footerLayout, navView.childCount)
 
-        // Set click listeners
         footerLayout.findViewById<TextView>(R.id.tv_privacy)?.setOnClickListener {
             openPolicyUrl("https://skoolswap.co.za/privacy")
             binding.drawerLayout.closeDrawer(GravityCompat.START)
@@ -399,6 +374,7 @@ class MainActivity : AppCompatActivity() {
             navController.navigate(destinationId)
         }
     }
+
     private fun openPolicyUrl(url: String) {
         try {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
@@ -408,6 +384,7 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Unable to open link", Toast.LENGTH_SHORT).show()
         }
     }
+
     private fun performLogout() {
         binding.drawerLayout.closeDrawer(GravityCompat.START)
 
@@ -544,31 +521,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun observeNavigation() {
-        Timber.tag(LogTags.UI).d("👀 observeNavigation called at ${System.currentTimeMillis()}")
-
         viewModel.navigationDestination.observe(this) { destination ->
-            Timber.tag(LogTags.UI).d("📡 navigationDestination observed: $destination at ${System.currentTimeMillis()}")
-
             val currentDest = navController.currentDestination?.id
             if (currentDest == R.id.introFragment) {
-                Timber.tag(LogTags.UI).d("⏸️ SKIPPING navigation - IntroFragment is handling routing")
                 return@observe
             }
 
             if (destination != null) {
                 navigateToDestination(destination)
                 viewModel.clearNavigationDestination()
-            } else {
-                Timber.tag(LogTags.UI).d("⏭️ Null destination - no navigation")
             }
         }
 
         viewModel.forceNavigation.observe(this) { destination ->
-            Timber.tag(LogTags.UI).d("📡 forceNavigation observed: $destination at ${System.currentTimeMillis()}")
-
             val currentDest = navController.currentDestination?.id
             if (currentDest == R.id.introFragment) {
-                Timber.tag(LogTags.UI).d("⏸️ SKIPPING force navigation - IntroFragment is handling routing")
                 return@observe
             }
 
@@ -583,84 +550,59 @@ class MainActivity : AppCompatActivity() {
         val currentDestId = navController.currentDestination?.id
 
         if (currentDestId == R.id.createItemFragment) {
-            Timber.tag(LogTags.UI).d("🛑 BLOCKING navigation - createItemFragment is active (camera return)")
             return
         }
 
         if (currentDestId == R.id.nav_profile) {
-            Timber.tag(LogTags.UI).d("🛑 BLOCKING navigation - ProfileFragment is active")
             return
         }
 
         when (destination) {
             NavigationDestination.HOME -> {
-                Timber.tag(LogTags.UI).d("🏠 Navigating to HOME")
-
                 if (currentDestId == R.id.nav_home) {
-                    Timber.tag(LogTags.UI).d("✅ Already on home, skipping")
                     return
                 }
-
                 val popped = navController.popBackStack(R.id.nav_home, false)
                 if (!popped) {
                     navController.navigate(R.id.action_introFragment_to_nav_home)
                 }
-
-                Timber.tag(LogTags.UI).d("✅ Navigated to HOME")
             }
-
             NavigationDestination.LOGIN -> {
-                Timber.tag(LogTags.UI).d("🔐 Navigating to LOGIN")
-
                 if (currentDestId == R.id.loginFragment) {
-                    Timber.tag(LogTags.UI).d("✅ Already on login, skipping")
                     return
                 }
-
                 navController.navigate(R.id.action_global_logout)
-                Timber.tag(LogTags.UI).d("✅ Navigated to LOGIN")
             }
-
             NavigationDestination.ONBOARDING -> {
-                Timber.tag(LogTags.UI).d("📋 Navigating to ONBOARDING")
-
                 if (currentDestId == R.id.viewPagerFragment) {
-                    Timber.tag(LogTags.UI).d("✅ Already on onboarding, skipping")
                     return
                 }
-
                 val popped = navController.popBackStack(R.id.viewPagerFragment, false)
                 if (!popped) {
                     navController.navigate(R.id.action_introFragment_to_onboarding)
                 }
-
-                Timber.tag(LogTags.UI).d("✅ Navigated to ONBOARDING")
             }
-
             else -> {
-                Timber.tag(LogTags.UI).d("⚠️ Unknown destination: $destination - falling back to LOGIN")
                 navController.navigate(R.id.action_global_logout)
             }
         }
     }
 
-
-    /** Call this whenever destination or theme changes */
     private fun applySystemBarsForDestination(destinationId: Int? = navController.currentDestination?.id) {
         val window = window
         val nightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
         val isDark = nightMode == Configuration.UI_MODE_NIGHT_YES
 
+        // ✅ Updated to include new Province and School fragments
         val isIntroLike = destinationId == R.id.introFragment ||
                 destinationId == R.id.loginFragment ||
                 destinationId == R.id.viewPagerFragment ||
-                destinationId == R.id.schoolOnboardingFragment
-
-        // Content layout: keep default (bars take space) unless you use edge-to-edge everywhere
+                destinationId == R.id.schoolOnboardingProvinceFragment ||
+                destinationId == R.id.schoolOnboardingSchoolFragment
+                destinationId == R.id.itemDetailFragment
         WindowCompat.setDecorFitsSystemWindows(window, true)
 
         if (isIntroLike) {
-            // Black bars, white icons (network / battery visible)
             window.statusBarColor = android.graphics.Color.BLACK
             window.navigationBarColor = android.graphics.Color.BLACK
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -672,7 +614,6 @@ class MainActivity : AppCompatActivity() {
                 isAppearanceLightNavigationBars = false
             }
         } else {
-            // App screens: white bars + dark icons in light mode
             window.statusBarColor = if (isDark) android.graphics.Color.BLACK else android.graphics.Color.WHITE
             window.navigationBarColor = if (isDark) android.graphics.Color.BLACK else android.graphics.Color.WHITE
             WindowInsetsControllerCompat(window, window.decorView).apply {
@@ -681,14 +622,21 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
     private fun refreshToolbarVisibility() {
         val currentDestination = navController.currentDestination?.id
         Timber.tag(LogTags.UI).d("🔄 Refreshing toolbar for destination: $currentDestination")
 
+        // ✅ Updated to include new Province and School fragments
         when (currentDestination) {
-            R.id.schoolOnboardingFragment,
+            R.id.schoolOnboardingProvinceFragment,
+            R.id.schoolOnboardingSchoolFragment,
             R.id.viewPagerFragment,
             R.id.introFragment,
+            R.id.itemDetailFragment -> {  // ← ADD THIS
+                supportActionBar?.hide()
+                binding.appBarMain.fab.visibility = View.GONE
+            }
             R.id.loginFragment -> {
                 supportActionBar?.hide()
                 binding.appBarMain.fab.visibility = View.GONE
@@ -704,25 +652,21 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         Timber.tag(LogTags.UI).d("🔄 onResume called")
 
-        // ✅ Only handle the camera/gallery return edge case
         if (viewModel.suppressNextResumeRefresh) {
             viewModel.suppressNextResumeRefresh = false
             Timber.tag(LogTags.UI).d("⏭️ Skipping toolbar refresh - returning from camera/gallery")
             applySystemBarsForDestination()
             refreshToolbarVisibility()
-           // updateStatusBar()
             return
         }
 
         applySystemBarsForDestination()
         refreshToolbarVisibility()
-       // updateStatusBar()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         applySystemBarsForDestination()
-        //updateStatusBar()
     }
 
     override fun onPause() {

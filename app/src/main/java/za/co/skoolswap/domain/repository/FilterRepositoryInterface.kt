@@ -9,6 +9,8 @@ interface FilterRepositoryInterface {
     suspend fun getFilterConfig(categoryId: Int): Result<FilterConfig>
     suspend fun getGlobalFilterConfig(): Result<FilterConfig>
     suspend fun preloadCategoryFilters(categoryIds: List<Int>)
+    suspend fun getFilterConfig(categoryId: Int, forceRefresh: Boolean = false): Result<FilterConfig>
+    suspend fun getGlobalFilterConfig(forceRefresh: Boolean = false): Result<FilterConfig>
 
     // ✅ Add this
     suspend fun warmUpCache()

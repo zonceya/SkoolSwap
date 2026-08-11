@@ -216,13 +216,15 @@ object AppModule {
         schoolApiService: SchoolApiService,
         provinceApiService: ProvinceApiService,
         provinceDao: ProvinceDao,
+        schoolDao:   SchoolDao,
         appPreferences: AppPreferences
     ): SchoolRepository {
         return SchoolRepository(
             schoolApiService = schoolApiService,
             provinceApiService = provinceApiService,
             appPreferences = appPreferences,
-            provinceDao = provinceDao
+            provinceDao = provinceDao,
+            schoolDao = schoolDao
         )
     }
     @Provides

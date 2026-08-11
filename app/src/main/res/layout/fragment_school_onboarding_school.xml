@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="#FFFFFF">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="120dp"
+        android:gravity="center_horizontal">
+
+        <!-- Illustration - Fixed 140dp, stays visible -->
+        <ImageView
+            android:id="@+id/onboardingImage"
+            android:layout_width="160dp"
+            android:layout_height="140dp"
+            android:src="@drawable/ic_school_onboarding"
+            android:contentDescription="Onboarding Illustration"
+            android:scaleType="centerInside"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/titleText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Select Your School"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="#1A1A1A"
+            android:gravity="center"
+            android:layout_marginBottom="4dp" />
+
+        <!-- Subtitle - Slightly smaller to save space -->
+        <TextView
+            android:id="@+id/subtitleText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Search and select your school to see uniforms and items from your community"
+            android:textSize="13sp"
+            android:textColor="#666666"
+            android:gravity="center"
+            android:layout_marginBottom="12dp"
+            android:lineSpacingExtra="2dp" />
+
+        <!-- Dots Indicator -->
+        <LinearLayout
+            android:id="@+id/dotsRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="12dp">
+
+            <ImageView
+                android:id="@+id/dotProvince"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:src="@drawable/dot_active" />
+
+            <View
+                android:id="@+id/lineProvinceSchool"
+                android:layout_width="48dp"
+                android:layout_height="2dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:background="#000000" />
+
+            <ImageView
+                android:id="@+id/dotSchool"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:src="@drawable/dot_inactive" />
+        </LinearLayout>
+
+        <!-- Search Label -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Search School"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="#1A1A1A"
+            android:layout_marginBottom="4dp" />
+
+        <!-- Search Field -->
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/schoolSearchLayout"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:startIconDrawable="@drawable/ic_search"
+            app:startIconTint="#666666"
+            app:endIconMode="clear_text"
+            app:endIconTint="#666666"
+            app:boxStrokeColor="#999999"
+            app:hintTextColor="#666666"
+            app:hintEnabled="false"
+            android:layout_marginBottom="4dp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/schoolSearch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="text"
+                android:paddingStart="48dp"
+                android:paddingEnd="48dp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:textColor="#1A1A1A"
+                android:textSize="16sp"
+                android:hint="Type school name" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Example hint -->
+        <TextView
+            android:id="@+id/exampleHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Example: Westville Primary School"
+            android:textSize="12sp"
+            android:textColor="#999999"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="4dp" />
+
+        <!-- School Loading -->
+        <ProgressBar
+            android:id="@+id/schoolProgressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="8dp"
+            android:visibility="gone" />
+
+        <!-- Search Results -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/schoolResultsRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxHeight="180dp"
+            android:visibility="gone"
+            android:layout_marginTop="4dp" />
+
+        <!-- No Results -->
+        <TextView
+            android:id="@+id/noResultsText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="No schools found"
+            android:textSize="14sp"
+            android:textColor="#999999"
+            android:gravity="center"
+            android:layout_marginTop="8dp"
+            android:visibility="gone" />
+
+        <!-- Selected School Card -->
+
+        <!-- Selected School Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/selectedSchoolCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            app:cardElevation="2dp"
+            app:cardCornerRadius="8dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp">
+
+                <!-- School Logo - LEFT SIDE -->
+                <ImageView
+                    android:id="@+id/schoolLogo"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="12dp"
+                    android:visibility="visible"
+                    android:contentDescription="School logo"
+                    android:scaleType="centerCrop"
+                    android:background="@drawable/circle_background"/>
+
+                <!-- School Info -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="✓ Selected School"
+                        android:textSize="12sp"
+                        android:textColor="#4CAF50" />
+
+                    <TextView
+                        android:id="@+id/selectedSchoolName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="#1A1A1A"
+                        android:layout_marginTop="4dp" />
+
+                    <!-- Optional: School type/location -->
+                    <TextView
+                        android:id="@+id/selectedSchoolType"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="12sp"
+                        android:textColor="#666666"
+                        android:visibility="gone" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Done Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/doneButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="DONE"
+            android:textStyle="bold"
+            android:enabled="false"
+            app:cornerRadius="12dp"
+            android:backgroundTint="#1A1A1A"
+            android:textColor="#FFFFFF"
+            android:layout_marginTop="8dp" />
+
+        <!-- Loading -->
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="16dp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+</ScrollView>

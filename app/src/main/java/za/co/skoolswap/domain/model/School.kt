@@ -6,6 +6,7 @@ data class School(
     val provinceId: Int?,
     val provinceName: String?,
     val locationId: Int?,
+    val logoUrl: String? = null,
     val schoolType: String?
 ) {
     val displayName: String

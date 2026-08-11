@@ -61,6 +61,19 @@ class HorizontalItemsAdapter(
             binding.productTitle.text = item.name
             binding.productPrice.text = formatPrice(item.price)
 
+            // ✅ SINGLE check using isSold property
+            val isSold = item.isSold || item.quantity <= 0
+
+            if (isSold) {
+                binding.soldBadge.visibility = View.VISIBLE
+                binding.productTitle.alpha = 0.6f
+                binding.productPrice.alpha = 0.6f
+            } else {
+                binding.soldBadge.visibility = View.GONE
+                binding.productTitle.alpha = 1f
+                binding.productPrice.alpha = 1f
+            }
+
             val imageUrl = item.resolveImageUrl()
             if (!imageUrl.isNullOrEmpty()) {
                 Glide.with(binding.root.context)
@@ -74,17 +87,6 @@ class HorizontalItemsAdapter(
                     .into(binding.productImage)
             } else {
                 binding.productImage.setImageResource(R.drawable.ic_create_item_placeholder)
-            }
-
-            val isSold = item.status == "sold" || item.quantity <= 0
-            if (isSold) {
-                binding.soldBadge.visibility = View.VISIBLE
-                binding.productTitle.alpha = 0.6f
-                binding.productPrice.alpha = 0.6f
-            } else {
-                binding.soldBadge.visibility = View.GONE
-                binding.productTitle.alpha = 1f
-                binding.productPrice.alpha = 1f
             }
         }
 

@@ -1,4 +1,3 @@
-// ui/products/PriceRangeDialogFragment.kt
 package za.co.skoolswap.ui.products
 
 import android.os.Bundle
