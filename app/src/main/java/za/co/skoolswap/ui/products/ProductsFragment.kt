@@ -496,68 +496,98 @@ class ProductsFragment : Fragment() {
     }
 
     private fun observeViewModel() {
-        // Products observer
+
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.products.collect { products ->
-                    if (isInSearchMode || _binding == null) return@collect
+                    Timber.tag(LogTags.UI).d("📦 Products collector received ${products.size} items")
 
+                    // Always update the UI, even if products is empty
+                    if (_binding == null) return@collect
+
+                    // Don't ignore empty products - this was the problem!
+                    // Only ignore if loading and empty AND it's not a forced refresh
                     if (products.isEmpty() && (viewModel.isLoading.value || viewModel.isNewSectionLoading.value)) {
-                        Timber.tag(LogTags.UI).d("⏳ Ignoring empty products list (still loading)")
+                        Timber.tag(LogTags.UI).d("⏳ Waiting for loading to complete...")
                         return@collect
                     }
 
-                    originalItems.clear()
-                    originalItems.addAll(products)
-                    clearFilterState()
-
+                    // Hide shimmer and error immediately
+                    binding.shimmerLayout.visibility = View.GONE
+                    binding.shimmerLayout.stopShimmer()
+                    binding.errorLayout.visibility = View.GONE
                     binding.swipeRefreshLayout.isRefreshing = false
 
                     val subCategoryName = arguments?.getString("SUB_CATEGORY_NAME")
-                        ?: arguments?.getString("SECTION_TITLE") ?: "this category"
+                        ?: arguments?.getString("SECTION_TITLE")
+                        ?: arguments?.getString("SECTION_TYPE")?.replaceFirstChar { it.uppercase() }
+                        ?: "this category"
+                    val subCategoryId = arguments?.getInt("SUB_CATEGORY_ID")
+                    val hasSubCategoryFilter = subCategoryId != null && subCategoryId > 0
 
                     if (products.isNotEmpty()) {
-                        binding.shimmerLayout.visibility = View.GONE
-                        binding.shimmerLayout.stopShimmer()
-                        binding.productsRecycler.visibility = View.VISIBLE
-                        binding.errorLayout.visibility = View.GONE
+                        // ✅ We have products - show them
+                        Timber.tag(LogTags.UI).d("✅ Showing ${products.size} products")
 
-                        // ✅ Submit list to adapter
+                        originalItems.clear()
+                        originalItems.addAll(products)
+                        clearFilterState()
+
+                        binding.productsRecycler.visibility = View.VISIBLE
                         productsAdapter.submitList(products)
                         rebuildLocalFilters()
 
-                        val subCategoryId = arguments?.getInt("SUB_CATEGORY_ID")
-                        val hasSubCategoryFilter = subCategoryId != null && subCategoryId > 0
-                        val hasSubCategoryItems = if (hasSubCategoryFilter) {
-                            products.any { it.subCategoryId == subCategoryId }
+                        // ✅ Check ViewModel banner first (from parent fallback)
+                        val similarMsg = viewModel.showingSimilarBanner.value
+                        if (!similarMsg.isNullOrBlank()) {
+                            Timber.tag(LogTags.UI).d("📢 Showing ViewModel banner: $similarMsg")
+                            binding.bannerMessage.text = similarMsg
+                           // binding.bannerSubMessage.text = "Showing items from the main category"
+                            binding.emptyBanner.visibility = View.VISIBLE
+                            binding.btnCloseBanner.setOnClickListener {
+                                binding.emptyBanner.visibility = View.GONE
+                                viewModel.clearSimilarBanner()
+                            }
                         } else {
-                            false
+                            // Check if ANY items match the sub-category
+                            val hasSubCategoryItems = if (hasSubCategoryFilter) {
+                                products.any { it.subCategoryId == subCategoryId }
+                            } else {
+                                true
+                            }
+
+                            if (hasSubCategoryFilter && !hasSubCategoryItems) {
+                                // Items exist but NONE match the sub-category
+                               // binding.bannerMessage.text = "Showing items similar to '$subCategoryName'"
+                                binding.bannerMessage.text = "No items found in this specific type"
+                                binding.emptyBanner.visibility = View.VISIBLE
+                                binding.btnCloseBanner.setOnClickListener {
+                                    binding.emptyBanner.visibility = View.GONE
+                                }
+                            } else {
+                                binding.emptyBanner.visibility = View.GONE
+                            }
                         }
 
-                        if (hasSubCategoryFilter && !hasSubCategoryItems) {
-                            Timber.tag(LogTags.UI).d("🔔 Showing fallback banner for '$subCategoryName'")
-                            binding.bannerMessage.text = "No items found for '$subCategoryName'. Similar items are displayed."
+                    } else {
+                        // ❌ NO products at all
+                        Timber.tag(LogTags.UI).d("❌ No products found")
+
+                        binding.productsRecycler.visibility = View.GONE
+
+                        // Check if this is a sub-category filter with no results
+                        if (hasSubCategoryFilter) {
+                            binding.bannerMessage.text = "No items available in '$subCategoryName' at the moment"
+                           // binding.bannerSubMessage.text = "Please check back later or try a different category"
                             binding.emptyBanner.visibility = View.VISIBLE
                             binding.btnCloseBanner.setOnClickListener {
                                 binding.emptyBanner.visibility = View.GONE
                             }
                         } else {
-                            binding.emptyBanner.visibility = View.GONE
+                            // No sub-category filter and no items - show error
+                            binding.errorLayout.visibility = View.VISIBLE
+                            binding.errorText.text = "No items found"
                         }
-
-                        Timber.tag(LogTags.UI).d("✅ Products displayed: ${products.size} items")
-
-                        if (subCategoryId != null && subCategoryId > 0) {
-                            val matchingCount = products.count { it.subCategoryId == subCategoryId }
-                            Timber.tag(LogTags.UI).d("🔍 Sub-category $subCategoryId: $matchingCount/${products.size} items match")
-                        }
-                    } else {
-                        binding.shimmerLayout.visibility = View.GONE
-                        binding.shimmerLayout.stopShimmer()
-                        binding.productsRecycler.visibility = View.GONE
-                        binding.emptyBanner.visibility = View.GONE
-                        binding.errorLayout.visibility = View.VISIBLE
-                        binding.errorText.text = "No items found for $subCategoryName"
                     }
                 }
             }
@@ -640,7 +670,8 @@ class ProductsFragment : Fragment() {
             }
         }
 
-        // Loading state observer
+        // In ProductsFragment.kt - observeViewModel() loading state
+
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.isLoading.collect { isLoading ->
@@ -649,14 +680,18 @@ class ProductsFragment : Fragment() {
 
                     Timber.tag(LogTags.UI).d("🔄 Loading state: isLoading=$isLoading, isNew=$isNew, itemCount=${productsAdapter.itemCount}")
 
-                    if (isLoading || isNew) {
-                        if (productsAdapter.itemCount == 0 && !isInSearchMode) {
-                            Timber.tag(LogTags.UI).d("✨ Showing shimmer (no data yet)")
-                            binding.shimmerLayout.visibility = View.VISIBLE
-                            binding.shimmerLayout.startShimmer()
-                            binding.productsRecycler.visibility = View.GONE
-                            binding.errorLayout.visibility = View.GONE
-                        }
+                    // Only show shimmer if loading AND we have no items yet
+                    if (isLoading && productsAdapter.itemCount == 0 && !isInSearchMode) {
+                        Timber.tag(LogTags.UI).d("✨ Showing shimmer")
+                        binding.shimmerLayout.visibility = View.VISIBLE
+                        binding.shimmerLayout.startShimmer()
+                        binding.productsRecycler.visibility = View.GONE
+                        binding.errorLayout.visibility = View.GONE
+                    } else if (!isLoading) {
+                        // If loading is done, hide shimmer regardless
+                        // The products observer will handle showing the content
+                        binding.shimmerLayout.visibility = View.GONE
+                        binding.shimmerLayout.stopShimmer()
                     }
                 }
             }

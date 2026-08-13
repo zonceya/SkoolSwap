@@ -117,7 +117,8 @@ class ProductsViewModel @Inject constructor(
 
     private val itemsCache = mutableMapOf<String, List<Item>>()
     private var _nearbySchoolIds: List<Int> = emptyList()
-    // ==================== Public Methods ====================
+    private val _showingSimilarBanner = MutableStateFlow<String?>(null)
+    val showingSimilarBanner: StateFlow<String?> = _showingSimilarBanner.asStateFlow()
 
     fun getSavedCategoryId(): Int? = savedCategoryId
     fun getSavedCategoryName(): String? = savedCategoryName
@@ -147,7 +148,9 @@ class ProductsViewModel @Inject constructor(
         savedCategoryName = null
         Timber.tag(LogTags.VIEW_MODEL).d("Cleared saved category")
     }
-
+    fun clearSimilarBanner() {
+        _showingSimilarBanner.value = null
+    }
     fun setUserSchoolContext(schoolId: Int, nearbyIds: List<Int>) {
         userSchoolId = schoolId
         nearbySchoolIds = nearbyIds
@@ -432,10 +435,15 @@ class ProductsViewModel @Inject constructor(
         }
     }
 
+
+
+    // Update loadProductsInternal with fallback logic
     private fun loadProductsInternal(categoryId: Int?, sectionType: String? = null) {
         val effectiveSubCategoryId = currentSubCategoryId
 
-        Timber.tag(LogTags.VIEW_MODEL).d("🚀 loadProductsInternal START → section=$sectionType, subCategoryId=$effectiveSubCategoryId, categoryId=$categoryId")
+        Timber.tag(LogTags.VIEW_MODEL).d(
+            "🚀 loadProductsInternal START → section=$sectionType, subCategoryId=$effectiveSubCategoryId, categoryId=$categoryId"
+        )
 
         loadProductsJob?.cancel()
 
@@ -444,6 +452,7 @@ class ProductsViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
             _products.value = emptyList()
+            _showingSimilarBanner.value = null
 
             val result: Result<PaginatedResponse<Item>> = when {
                 sectionType == "uniform" || sectionType == "uniforms" -> {
@@ -496,11 +505,61 @@ class ProductsViewModel @Inject constructor(
 
             when (val res = result) {
                 is Result.Success -> {
-                    val items = res.data.items
+                    var items = res.data.items
+
+                    // Sub-category empty → fall back to parent category and show banner
+                    val shouldFallbackToParent =
+                        items.isEmpty() &&
+                                effectiveSubCategoryId != null &&
+                                effectiveSubCategoryId > 0 &&
+                                (sectionType == "uniform" || sectionType == "uniforms" ||
+                                        sectionType == "sports" || sectionType == "sport")
+
+                    if (shouldFallbackToParent) {
+                        val subCategoryName = when {
+                            sectionType == "uniform" || sectionType == "uniforms" -> "Uniforms"
+                            else -> "Sports"
+                        }
+                        Timber.tag(LogTags.VIEW_MODEL).d(
+                            "📭 Sub-category $effectiveSubCategoryId empty → loading parent $subCategoryName"
+                        )
+                        val parentResult = productsRepository.getEssentialsAll(
+                            page = PAGE_DEFAULT,
+                            category = subCategoryName,
+                            subCategoryId = null, // parent only – no other categories
+                            perPage = PER_PAGE_DEFAULT,
+                            conditionId = _appliedFilters.value.condition,
+                            minPrice = _appliedFilters.value.minPrice,
+                            maxPrice = _appliedFilters.value.maxPrice
+                        )
+                        when (parentResult) {
+                            is Result.Success -> {
+                                items = parentResult.data.items
+                                if (items.isNotEmpty()) {
+                                    _showingSimilarBanner.value =
+                                        "No items in this type yet. Showing other $subCategoryName"
+                                }
+                            }
+                            is Result.Error -> {
+                                Timber.tag(LogTags.VIEW_MODEL).e(
+                                    parentResult.exception,
+                                    "Parent category fallback failed"
+                                )
+                            }
+                        }
+                    }
+
+                    // ✅ Clear loading flags FIRST
+                    _isLoading.value = false
+                    _isNewSectionLoading.value = false
+                    // ✅ Then emit products
                     _products.value = items
-                    Timber.tag(LogTags.VIEW_MODEL).d("✅ SUCCESS: Loaded ${items.size} items | section=$sectionType | subCategory=$effectiveSubCategoryId")
+                    Timber.tag(LogTags.VIEW_MODEL).d("✅ SUCCESS: Loaded ${items.size} items")
                 }
                 is Result.Error -> {
+                    // ✅ Clear loading flags FIRST
+                    _isLoading.value = false
+                    _isNewSectionLoading.value = false
                     _error.value = res.exception.message ?: "Failed to load items"
                     Timber.tag(LogTags.VIEW_MODEL).e(res.exception, "❌ Failed to load products")
                 }
