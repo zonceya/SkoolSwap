@@ -30,7 +30,7 @@ class UniformViewModel @Inject constructor(
     val error: StateFlow<String?> = _error.asStateFlow()
 
     // The REAL Uniform main category ID from the backend
-    private var uniformMainCategoryId: Int = 1  // Default is now 1
+    private var uniformMainCategoryId: Int = 1
 
     fun loadUniformCategories(forceRefresh: Boolean = false) {
         viewModelScope.launch {
@@ -46,8 +46,8 @@ class UniformViewModel @Inject constructor(
 
                     val typeGroup = filterConfig.filterGroups.find { it.id == "type" }
 
-                    // Only show these Uniform categories
-                    val allowedCategoryIds = setOf(1, 2, 3, 4, 5, 6, 7, 63, 81)
+                    // Only show Uniform categories (IDs 1-15)
+                    val allowedCategoryIds = (1..15).toSet()
 
                     val categories = typeGroup?.options
                         ?.filter { option -> option.id in allowedCategoryIds }
@@ -73,39 +73,43 @@ class UniformViewModel @Inject constructor(
         }
     }
 
-    // UniformViewModel.kt
-
     private fun getFallbackCategories(): List<UniformCategory> {
         return listOf(
-            UniformCategory(1, "Shirts & Golfers", 1, R.drawable.ic_uniform_shirt),
-            UniformCategory(2, "Jerseys & Pullovers", 1, R.drawable.ic_uniform_jersey),
-            UniformCategory(3, "Blazers & Jackets", 1, R.drawable.ic_uniform_blazer),
-            UniformCategory(4, "Trousers & Shorts", 1, R.drawable.ic_uniform_pants),
-            UniformCategory(5, "Skirts & Dresses", 1, R.drawable.ic_uniform_skirt),
-            UniformCategory(6, "Ties & Accessories", 1, R.drawable.ic_uniform_tie),
-            UniformCategory(7, "Socks", 1, R.drawable.ic_uniform_socks),
-            UniformCategory(63, "Jackets & Hoodies", 1, R.drawable.ic_uniform_blazer),
-            UniformCategory(81, "Shoes", 1, R.drawable.ic_uniform_shoes)  // ADD THIS - ID 81
+            UniformCategory(1, "Blazer", 1, R.drawable.ic_uniform_blazer),
+            UniformCategory(2, "Jersey", 1, R.drawable.ic_uniform_jersey),
+            UniformCategory(3, "Shirt", 1, R.drawable.ic_uniform_shirt),
+            UniformCategory(4, "Golf Shirt", 1, R.drawable.ic_uniform_shirt),
+            UniformCategory(5, "Skirt", 1, R.drawable.ic_uniform_skirt),
+            UniformCategory(6, "Dress", 1, R.drawable.ic_uniform_skirt),
+            UniformCategory(7, "Trousers", 1, R.drawable.ic_uniform_pants),
+            UniformCategory(8, "Shorts", 1, R.drawable.ic_uniform_pants),
+            UniformCategory(9, "Tracksuit", 1, R.drawable.ic_uniform_tracksuit),
+            UniformCategory(10, "PE Kit", 1, R.drawable.ic_uniform_tracksuit),
+            UniformCategory(11, "Sports Uniform", 1, R.drawable.ic_uniform_tracksuit),
+            UniformCategory(12, "Tie", 1, R.drawable.ic_uniform_tie),
+            UniformCategory(13, "Socks", 1, R.drawable.ic_uniform_socks),
+            UniformCategory(14, "Hat", 1, R.drawable.ic_uniform_hat),
+            UniformCategory(15, "Jacket", 1, R.drawable.ic_uniform_blazer)
         )
     }
 
     private fun getImageResId(categoryName: String): Int {
         return when {
-            categoryName.contains("Shirt", ignoreCase = true) ||
-                    categoryName.contains("Golfer", ignoreCase = true) -> R.drawable.ic_uniform_shirt
-            categoryName.contains("Jersey", ignoreCase = true) ||
-                    categoryName.contains("Pullover", ignoreCase = true) -> R.drawable.ic_uniform_jersey
             categoryName.contains("Blazer", ignoreCase = true) ||
-                    categoryName.contains("Jacket", ignoreCase = true) ||
-                    categoryName.contains("Hoodie", ignoreCase = true) -> R.drawable.ic_uniform_blazer
-            categoryName.contains("Trouser", ignoreCase = true) ||
-                    categoryName.contains("Short", ignoreCase = true) -> R.drawable.ic_uniform_pants
+                    categoryName.contains("Jacket", ignoreCase = true) -> R.drawable.ic_uniform_blazer
+            categoryName.contains("Jersey", ignoreCase = true) -> R.drawable.ic_uniform_jersey
+            categoryName.contains("Shirt", ignoreCase = true) ||
+                    categoryName.contains("Golf", ignoreCase = true) -> R.drawable.ic_uniform_shirt
             categoryName.contains("Skirt", ignoreCase = true) ||
                     categoryName.contains("Dress", ignoreCase = true) -> R.drawable.ic_uniform_skirt
-            categoryName.contains("Tie", ignoreCase = true) ||
-                    categoryName.contains("Accessory", ignoreCase = true) -> R.drawable.ic_uniform_tie
+            categoryName.contains("Trouser", ignoreCase = true) ||
+                    categoryName.contains("Short", ignoreCase = true) -> R.drawable.ic_uniform_pants
+            categoryName.contains("Tracksuit", ignoreCase = true) ||
+                    categoryName.contains("PE Kit", ignoreCase = true) ||
+                    categoryName.contains("Sports Uniform", ignoreCase = true) -> R.drawable.ic_uniform_tracksuit
+            categoryName.contains("Tie", ignoreCase = true) -> R.drawable.ic_uniform_tie
             categoryName.contains("Sock", ignoreCase = true) -> R.drawable.ic_uniform_socks
-            categoryName.contains("Shoe", ignoreCase = true) -> R.drawable.ic_uniform_shoes  // ADD THIS
+            categoryName.contains("Hat", ignoreCase = true) -> R.drawable.ic_uniform_hat
             else -> R.drawable.ic_uniform_placeholder
         }
     }
