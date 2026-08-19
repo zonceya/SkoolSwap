@@ -2,7 +2,7 @@ package za.co.skoolswap.domain.model
 
 data class Shop(
     val id: Long,
-    val name: String,
+    val name: String?,
     val displayName: String = "",
     val userId: Long,
     val sellerMobile: String?,

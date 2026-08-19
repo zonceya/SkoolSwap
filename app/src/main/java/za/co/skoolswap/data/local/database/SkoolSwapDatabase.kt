@@ -68,7 +68,7 @@ import za.co.skoolswap.data.local.database.entities.ProvinceEntity
         ProductsCacheEntity::class,
         PendingActionEntity::class
     ],
-    version = 23,
+    version = 24,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

@@ -353,6 +353,7 @@ class AuthRepository @Inject constructor(
         }
     }
 
+
     private suspend fun attemptSessionRecovery(): Boolean {
         val firebaseUser = firebaseAuth.currentUser ?: return false
 
@@ -368,8 +369,16 @@ class AuthRepository @Inject constructor(
                 maxRetries = 2
             )
 
+            // ✅ This caches the user with CORRECT schoolMapped from server
             cacheUserAfterFirebaseAuth(user, user.token)
-            Timber.tag(LogTags.AUTH).d("✅ Session recovery successful")
+
+            // ✅ Double-check AppPreferences is updated
+            appPreferences.setSchoolMapped(user.schoolMapped)
+            if (user.schoolMapped && user.schoolId != null) {
+                appPreferences.setSchoolInfo(user.schoolId, user.schoolName ?: "")
+            }
+
+            Timber.tag(LogTags.AUTH).d("✅ Session recovery successful: schoolMapped=${user.schoolMapped}")
             return true
 
         } catch (e: Exception) {
@@ -462,24 +471,47 @@ class AuthRepository @Inject constructor(
         return authResult.user ?: throw IllegalStateException("Firebase user is null")
     }
 
+    // AuthRepository.kt - FIXED restoreSession()
+
     override suspend fun restoreSession(): Boolean {
         return try {
             val token = appPreferences.authToken.first()
             val firebaseUser = firebaseAuth.currentUser
 
+            // ✅ If we have a Firebase user, ALWAYS fetch fresh profile from server
             if (firebaseUser != null && !token.isNullOrEmpty()) {
+                Timber.tag(LogTags.AUTH).d("🔄 Restoring session with fresh server data")
+
+                // ✅ Fetch fresh user profile from server
+                val profileResult = refreshUserProfile()
+                if (profileResult.isSuccess) {
+                    val user = profileResult.getOrNull()
+                    Timber.tag(LogTags.AUTH).d("✅ Session restored: ${user?.name}, schoolMapped=${user?.schoolMapped}")
+
+                    // ✅ Update AppPreferences to match
+                    if (user != null) {
+                        appPreferences.setSchoolMapped(user.schoolMapped)
+                        if (user.schoolMapped && user.schoolId != null) {
+                            appPreferences.setSchoolInfo(user.schoolId, user.schoolName ?: "")
+                        }
+                    }
+                    return true
+                }
+
+                // ✅ If refresh fails, try recovery
+                Timber.tag(LogTags.AUTH).w("⚠️ Profile refresh failed, attempting recovery")
+                return attemptSessionRecovery()
+            }
+
+            // ✅ No Firebase user, try token-based restore
+            if (!token.isNullOrEmpty()) {
                 val isValid = validateToken(token)
                 if (isValid) {
                     _authToken.value = token
                     loadCachedUser()
-                    Timber.tag(LogTags.AUTH).i("✅ Session restored successfully (valid token)")
+                    Timber.tag(LogTags.AUTH).i("✅ Session restored from token")
                     return true
                 }
-            }
-
-            if (firebaseUser != null) {
-                Timber.tag(LogTags.AUTH).i("🔄 Token invalid or missing → attempting recovery")
-                return attemptSessionRecovery()
             }
 
             Timber.tag(LogTags.AUTH).i("❌ No valid session found")

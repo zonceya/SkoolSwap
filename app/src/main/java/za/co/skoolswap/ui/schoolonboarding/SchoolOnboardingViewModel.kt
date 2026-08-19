@@ -131,18 +131,24 @@ class SchoolOnboardingViewModel @Inject constructor(
         }
     }
 
-    fun searchSchoolsLocally(query: String) {
+    fun searchSchools(query: String) {
         if (query.length < MIN_SEARCH_LENGTH) {
             _schools.value = emptyList()
             return
         }
 
-        val results = _cachedSchools.value.filter { school ->
-            school.name.contains(query, ignoreCase = true)
+        viewModelScope.launch {
+            val provinceId = _selectedProvince.value?.id ?: return@launch
+            when (val result = schoolRepository.searchSchools(provinceId, query)) {
+                is Result.Success -> {
+                    _schools.value = result.data
+                    Timber.tag(LogTags.VIEW_MODEL).d("🔍 API search found ${result.data.size} results for '$query'")
+                }
+                is Result.Error -> {
+                    _error.value = "Search failed: ${result.exception.message}"
+                }
+            }
         }
-
-        _schools.value = results
-        Timber.tag(LogTags.VIEW_MODEL).d("🔍 Local search found ${results.size} results for '$query'")
     }
 
     fun selectSchool(school: School) {

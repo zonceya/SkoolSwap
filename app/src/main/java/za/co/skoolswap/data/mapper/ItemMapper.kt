@@ -1,5 +1,6 @@
 package za.co.skoolswap.data.mapper
 
+
 import za.co.skoolswap.data.local.database.entities.ItemEntity
 import za.co.skoolswap.data.remote.models.response.home.RecommendationItemDto
 import za.co.skoolswap.data.remote.models.response.item.*
@@ -62,6 +63,7 @@ fun ItemDto.toDomain(): Item {
         images = allImages,
         coverImage = coverPhotoUrl,
         schoolName = school?.name,
+        schoolLogoUrl = school?.logoUrl,
         brandId = brand?.id,
         sizeId = size?.id,
         colorId = color?.id,
@@ -321,6 +323,8 @@ fun Item.toEntity(): ItemEntity {
         brandId = brandId,
         sizeId = sizeId,
         schoolId = schoolId,
+        schoolName = schoolName,
+        schoolLogoUrl = schoolLogoUrl,
         sizeName = sizeName,
         colorName = colorName,
         brandName = brandName,
@@ -360,8 +364,8 @@ fun Item.toEntity(): ItemEntity {
     return entity
 }
 // KEEP THIS VERSION
-fun RecommendationItemDto.toDomain(): za.co.skoolswap.domain.model.Item {
-    return za.co.skoolswap.domain.model.Item(
+fun RecommendationItemDto.toDomain(): Item {
+    return Item(
         id = id,
         shopId = shop?.id ?: 0L,
         name = name,
@@ -371,7 +375,7 @@ fun RecommendationItemDto.toDomain(): za.co.skoolswap.domain.model.Item {
         status = "active",
         createdAt = createdAt,
         images = listOfNotNull(coverPhoto ?: image).map { url ->
-            za.co.skoolswap.domain.model.ItemImage(
+            ItemImage(
                 id = 0,
                 url = url,
                 isCover = true
@@ -384,9 +388,14 @@ fun RecommendationItemDto.toDomain(): za.co.skoolswap.domain.model.Item {
         brandName = brandName,
         gender = gender,
         viewCount = viewCount,
+
+        // ✅ FIXED - these were missing
+        schoolId = schoolId,
         schoolName = school,
+        schoolLogoUrl = schoolLogoUrl,
+
         shop = shop?.let {
-            za.co.skoolswap.domain.model.Shop(
+            Shop(
                 id = it.id,
                 name = it.name,
                 displayName = "",
@@ -455,6 +464,8 @@ fun ItemEntity.toDomain(): Item {
         brandId = brandId,
         sizeId = sizeId,
         schoolId = schoolId,
+        schoolName = schoolName,          // ✅ ADD THIS
+        schoolLogoUrl = schoolLogoUrl,    // ✅ ADD THIS
         itemConditionId = itemConditionId,
         locationId = locationId,
         provinceId = provinceId,

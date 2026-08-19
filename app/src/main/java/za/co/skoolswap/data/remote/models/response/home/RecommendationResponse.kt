@@ -78,6 +78,7 @@ data class RecommendationItemDto(
     @SerializedName("image") val image: String?,
     @SerializedName("cover_photo") val coverPhoto: String?,
     @SerializedName("school_id") val schoolId: Int,
+    @SerializedName("school_logo_url") val schoolLogoUrl: String?,
     @SerializedName("category") val category: String?,
     @SerializedName("gender") val gender: String?,
     @SerializedName("reason") val reason: String?,
