@@ -20,6 +20,8 @@ data class ItemEntity(
     val brandId: Int?,
     val sizeId: Int?,
     val schoolId: Int?,
+    val schoolName: String? = null,
+    val schoolLogoUrl: String? = null,
     val sizeName: String?,
     val colorName: String?,
     val brandName: String?,

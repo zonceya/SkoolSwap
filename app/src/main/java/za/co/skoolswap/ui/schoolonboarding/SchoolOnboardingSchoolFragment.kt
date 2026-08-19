@@ -158,7 +158,7 @@ class SchoolOnboardingSchoolFragment : Fragment() {
     private fun performSearch() {
         val query = binding.schoolSearch.text?.toString()?.trim() ?: ""
         if (query.length >= 2) {
-            viewModel.searchSchoolsLocally(query)
+            viewModel.searchSchools(query)   // was searchSchoolsLocally(query)
             binding.schoolResultsRecyclerView.visibility = View.VISIBLE
             binding.noResultsText.visibility = View.GONE
             scrollToSearchField()

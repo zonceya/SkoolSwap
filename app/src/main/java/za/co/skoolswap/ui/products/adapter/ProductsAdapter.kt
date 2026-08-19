@@ -60,9 +60,6 @@ class ProductsAdapter(
         }
 
         fun bind(item: Item) {
-            Timber.tag("ProductsAdapter")
-                .d("Binding: ${item.name} | cover: ${item.coverImage} | images: ${item.images.size} | status: ${item.status}")
-
             binding.productTitle.text = item.name
             binding.productPrice.text = "R${String.format("%.2f", item.price)}"
 

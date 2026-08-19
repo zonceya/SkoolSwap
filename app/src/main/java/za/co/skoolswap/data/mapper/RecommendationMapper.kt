@@ -139,6 +139,7 @@ fun RankedItemDto.toDomain(): Item {
         coverImage = coverPhoto ?: images?.firstOrNull(),
         schoolId = schoolId,
         schoolName = schoolName,
+        schoolLogoUrl = schoolLogoUrl,
         mainCategoryId = mainCategoryId,
         subCategoryId = subCategoryId,
         genderId = genderId,

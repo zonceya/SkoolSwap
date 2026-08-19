@@ -166,9 +166,14 @@ class ItemDetailFragment : Fragment() {
         }
     }
 
+// ItemDetailFragment.kt
+
     private fun observeViewModel() {
         Timber.tag(LogTags.UI).d("observeViewModel called")
 
+        // ================================================================
+        // 1. MAIN ITEM STATE
+        // ================================================================
         lifecycleScope.launch {
             viewModel.itemState.collect { state ->
                 Timber.tag(LogTags.UI).d("ItemState received: $state")
@@ -191,28 +196,39 @@ class ItemDetailFragment : Fragment() {
             }
         }
 
+        // ================================================================
+        // 2. SIMILAR ITEMS SHIMMER - Single source of truth
+        // ================================================================
         lifecycleScope.launch {
             viewModel.similarItemsShimmer.collect { isShimmering ->
-                Timber.tag(LogTags.UI).d("Similar shimmer state: $isShimmering")
+                val items = viewModel.similarItems.value
+                val isLoading = viewModel.itemState.value is ItemDetailState.Loading
+
+                Timber.tag(LogTags.UI).d("Similar shimmer: $isShimmering, items: ${items.size}, loading: $isLoading")
+
                 if (isShimmering) {
+                    // Show shimmer
                     binding.similarShimmer.visibility = View.VISIBLE
                     startShimmer(binding.similarShimmer)
                     binding.similarRecycler.visibility = View.GONE
                     binding.similarSectionTitle.visibility = View.GONE
+                    binding.similarEmptyState.visibility = View.GONE
                 } else {
+                    // Hide shimmer
                     stopShimmer(binding.similarShimmer)
                     binding.similarShimmer.visibility = View.GONE
 
-                    val items = viewModel.similarItems.value
-                    val isLoading = viewModel.itemState.value is ItemDetailState.Loading
-
+                    // Show content ONLY if not loading main item
                     if (!isLoading) {
                         if (items.isEmpty()) {
                             binding.similarRecycler.visibility = View.GONE
                             binding.similarSectionTitle.visibility = View.GONE
+                            binding.similarEmptyState.visibility = View.VISIBLE
+                            binding.similarEmptyState.text = "No similar items available"
                         } else {
                             binding.similarRecycler.visibility = View.VISIBLE
                             binding.similarSectionTitle.visibility = View.VISIBLE
+                            binding.similarEmptyState.visibility = View.GONE
                             similarItemsAdapter.submitList(items)
                         }
                     }
@@ -220,35 +236,47 @@ class ItemDetailFragment : Fragment() {
             }
         }
 
+        // ================================================================
+        // 3. SIMILAR ITEMS - Only update when shimmer is done
+        // ================================================================
         lifecycleScope.launch {
             viewModel.similarItems.collect { items ->
+                val isShimmering = viewModel.similarItemsShimmer.value
                 val isLoading = viewModel.itemState.value is ItemDetailState.Loading
+
+                Timber.tag(LogTags.UI).d("Similar items updated: ${items.size} items, shimmer: $isShimmering, loading: $isLoading")
+
+                // Skip if shimmer is active - let shimmer collector handle it
+                if (isShimmering) {
+                    return@collect
+                }
+
+                // Skip if main item is still loading
                 if (isLoading) {
-                    binding.similarShimmer.visibility = View.VISIBLE
-                    startShimmer(binding.similarShimmer)
-                    binding.similarRecycler.visibility = View.GONE
-                    binding.similarSectionTitle.visibility = View.GONE
                     return@collect
                 }
 
-                if (viewModel.similarItemsShimmer.value) {
-                    return@collect
-                }
-
+                // Update UI when shimmer is done
                 stopShimmer(binding.similarShimmer)
                 binding.similarShimmer.visibility = View.GONE
 
                 if (items.isEmpty()) {
                     binding.similarRecycler.visibility = View.GONE
                     binding.similarSectionTitle.visibility = View.GONE
+                    binding.similarEmptyState.visibility = View.VISIBLE
+                    binding.similarEmptyState.text = "No similar items available"
                 } else {
                     binding.similarRecycler.visibility = View.VISIBLE
                     binding.similarSectionTitle.visibility = View.VISIBLE
+                    binding.similarEmptyState.visibility = View.GONE
                     similarItemsAdapter.submitList(items)
                 }
             }
         }
 
+        // ================================================================
+        // 4. SIZE
+        // ================================================================
         lifecycleScope.launch {
             viewModel.sizeName.collect { sizeName ->
                 if (!sizeName.isNullOrEmpty()) {
@@ -261,6 +289,9 @@ class ItemDetailFragment : Fragment() {
             }
         }
 
+        // ================================================================
+        // 5. SCHOOL NAME
+        // ================================================================
         lifecycleScope.launch {
             viewModel.schoolName.collect { schoolName ->
                 if (!schoolName.isNullOrEmpty()) {
@@ -271,6 +302,10 @@ class ItemDetailFragment : Fragment() {
                 }
             }
         }
+
+        // ================================================================
+        // 6. SCHOOL LOGO
+        // ================================================================
         lifecycleScope.launch {
             viewModel.schoolLogoUrl.collect { logoUrl ->
                 if (!logoUrl.isNullOrEmpty()) {
@@ -286,6 +321,10 @@ class ItemDetailFragment : Fragment() {
                 }
             }
         }
+
+        // ================================================================
+        // 7. COLOR
+        // ================================================================
         lifecycleScope.launch {
             viewModel.colorName.collect { colorName ->
                 if (!colorName.isNullOrEmpty()) {
@@ -299,6 +338,9 @@ class ItemDetailFragment : Fragment() {
             }
         }
 
+        // ================================================================
+        // 8. CONDITION
+        // ================================================================
         lifecycleScope.launch {
             viewModel.conditionName.collect { conditionName ->
                 if (!conditionName.isNullOrEmpty()) {
@@ -310,6 +352,9 @@ class ItemDetailFragment : Fragment() {
             }
         }
 
+        // ================================================================
+        // 9. BRAND
+        // ================================================================
         lifecycleScope.launch {
             viewModel.brandName.collect { brandName ->
                 if (!brandName.isNullOrEmpty()) {
@@ -321,12 +366,18 @@ class ItemDetailFragment : Fragment() {
             }
         }
 
+        // ================================================================
+        // 10. IMAGE URLS
+        // ================================================================
         lifecycleScope.launch {
             viewModel.imageUrls.collect { urls ->
                 currentImageUrls = urls
             }
         }
 
+        // ================================================================
+        // 11. FAVORITE STATUS
+        // ================================================================
         lifecycleScope.launch {
             viewModel.isFavorite.collect { isFavorite ->
                 updateFavoriteButtonIcon(isFavorite)
@@ -442,22 +493,30 @@ class ItemDetailFragment : Fragment() {
 
     private fun showLoading(show: Boolean) {
         if (show) {
+            // Main item shimmer
             binding.shimmerLayout.visibility = View.VISIBLE
             startShimmer(binding.shimmerLayout)
             binding.progressBar.visibility = View.GONE
             binding.scrollView.visibility = View.GONE
             binding.errorLayout.visibility = View.GONE
 
-            binding.similarShimmer.visibility = View.VISIBLE
-            startShimmer(binding.similarShimmer)
-            binding.similarRecycler.visibility = View.GONE
-            binding.similarSectionTitle.visibility = View.GONE
+            // Similar items shimmer - ONLY if ViewModel says so
+            if (viewModel.similarItemsShimmer.value) {
+                binding.similarShimmer.visibility = View.VISIBLE
+                startShimmer(binding.similarShimmer)
+                binding.similarRecycler.visibility = View.GONE
+                binding.similarSectionTitle.visibility = View.GONE
+                binding.similarEmptyState.visibility = View.GONE
+            }
         } else {
+            // Hide main shimmer
             stopShimmer(binding.shimmerLayout)
             binding.shimmerLayout.visibility = View.GONE
             binding.progressBar.visibility = View.GONE
             binding.scrollView.visibility = View.VISIBLE
             binding.errorLayout.visibility = View.GONE
+
+            // Let the similarItemsShimmer collector handle hiding similar shimmer
         }
     }
 

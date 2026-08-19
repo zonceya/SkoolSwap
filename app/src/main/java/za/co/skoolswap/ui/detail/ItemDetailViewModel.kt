@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import za.co.skoolswap.data.repository.SchoolRepository
 import javax.inject.Inject
 
 // Private constants
@@ -38,6 +39,7 @@ class ItemDetailViewModel @Inject constructor(
     private val favoriteRepository: FavoriteRepositoryInterface,
     private val authRepository: AuthRepositoryInterface,
     private val schoolDao: SchoolDao,
+    private val schoolRepository: SchoolRepository,
     private val colorDao: ColorDao,
     private val brandDao: BrandDao,
     private val productsCacheRepository: ProductsCacheRepositoryInterface
@@ -130,44 +132,101 @@ class ItemDetailViewModel @Inject constructor(
         }
     }
 
+
+
     private suspend fun loadSimilarItemsEarly(itemId: String) {
+        // ================================================================
+        // STEP 1: Show shimmer while checking cache
+        // ================================================================
+        _similarItemsShimmer.value = true  // ✅ Show shimmer immediately
+
+        // ================================================================
+        // STEP 2: Check memory cache
+        // ================================================================
         similarItemsCache[itemId]?.let { cached ->
-            Timber.tag(LogTags.VIEW_MODEL).d("Similar items served from cache: ${cached.size} items")
-            _similarItemsShimmer.value = false
+            Timber.tag(LogTags.VIEW_MODEL).d("✅ Similar items from MEMORY cache: ${cached.size} items")
+            _similarItemsShimmer.value = false  // ✅ Hide shimmer
             _similarItems.value = cached
             return
         }
 
+        // ================================================================
+        // STEP 3: Check Room database cache
+        // ================================================================
         val cachedSimilar = productsCacheRepository.getCachedSimilarItems(itemId)
         if (cachedSimilar != null && cachedSimilar.isNotEmpty()) {
-            Timber.tag(LogTags.VIEW_MODEL).d("📦 Similar items from Room cache: ${cachedSimilar.size}")
-            _similarItemsShimmer.value = false
+            Timber.tag(LogTags.VIEW_MODEL).d("✅ Similar items from ROOM cache: ${cachedSimilar.size} items")
+            _similarItemsShimmer.value = false  // ✅ Hide shimmer
             _similarItems.value = cachedSimilar
             similarItemsCache[itemId] = cachedSimilar
             return
         }
 
+        // ================================================================
+        // STEP 4: Check if we have the main item's category (but still keep shimmer)
+        // ================================================================
+        val currentItem = (itemState.value as? ItemDetailState.Success)?.item
+        if (currentItem?.mainCategoryId != null) {
+            Timber.tag(LogTags.VIEW_MODEL).d("📂 Using main item category: ${currentItem.mainCategoryId}")
+
+            // Try category-based items (but keep shimmer going)
+            val categoryItems = fetchItemsByCategory(currentItem.mainCategoryId!!, itemId)
+            if (categoryItems.isNotEmpty()) {
+                Timber.tag(LogTags.VIEW_MODEL).d("✅ Category-based items found: ${categoryItems.size}")
+                _similarSectionTitle.value = "Similar Items"
+                val result = categoryItems.take(SIMILAR_ITEMS_LIMIT)
+                similarItemsCache[itemId] = result
+                productsCacheRepository.cacheSimilarItems(itemId, result)
+                _similarItemsShimmer.value = false  // ✅ Hide shimmer
+                _similarItems.value = result
+                return
+            }
+        }
+
+        // ================================================================
+        // STEP 5: NO CACHE - Keep shimmer and fetch from network
+        // ================================================================
+        Timber.tag(LogTags.VIEW_MODEL).d("🔄 No cache found, fetching from network for: $itemId")
+
         _isLoadingSimilar.value = true
-        _similarItemsShimmer.value = true
+        // _similarItemsShimmer.value is already true ✅
 
-        Timber.tag(LogTags.VIEW_MODEL).d("🔄 Loading similar items for: $itemId")
+        try {
+            // Try trending first
+            var items = fetchTrendingItems(excludeItemId = itemId, period = TRENDING_PERIOD)
 
-        val items = fetchTrendingItems(excludeItemId = itemId, period = TRENDING_PERIOD)
-            .ifEmpty { fetchRecentItems(excludeItemId = itemId, period = RECENT_PERIOD) }
-            .ifEmpty { fetchAnyPopularItems(excludeItemId = itemId) }
+            // Fallback to recent
+            if (items.isEmpty()) {
+                Timber.tag(LogTags.VIEW_MODEL).d("No trending items, trying recent...")
+                items = fetchRecentItems(excludeItemId = itemId, period = RECENT_PERIOD)
+            }
 
-        Timber.tag(LogTags.VIEW_MODEL).d("📦 Found ${items.size} similar items")
+            // Final fallback to any popular items
+            if (items.isEmpty()) {
+                Timber.tag(LogTags.VIEW_MODEL).d("No recent items, trying any popular...")
+                items = fetchAnyPopularItems(excludeItemId = itemId)
+            }
 
-        _isLoadingSimilar.value = false
-        _similarItemsShimmer.value = false
+            Timber.tag(LogTags.VIEW_MODEL).d("📦 Found ${items.size} similar items from network")
 
-        if (items.isNotEmpty()) {
-            _similarSectionTitle.value = "Trending Today"
-            val result = items.take(SIMILAR_ITEMS_LIMIT)
-            similarItemsCache[itemId] = result
-            productsCacheRepository.cacheSimilarItems(itemId, result)
-            _similarItems.value = result
-        } else {
+            // Always turn off shimmer after network request
+            _similarItemsShimmer.value = false
+            _isLoadingSimilar.value = false
+
+            if (items.isNotEmpty()) {
+                _similarSectionTitle.value = "Similar Items"
+                val result = items.take(SIMILAR_ITEMS_LIMIT)
+                similarItemsCache[itemId] = result
+                productsCacheRepository.cacheSimilarItems(itemId, result)
+                _similarItems.value = result
+            } else {
+                _similarItems.value = emptyList()
+            }
+
+        } catch (e: Exception) {
+            Timber.tag(LogTags.VIEW_MODEL).e("Failed to fetch similar items: ${e.message}")
+            _similarItemsShimmer.value = false  // ✅ Always hide shimmer on error
+            _isLoadingSimilar.value = false
             _similarItems.value = emptyList()
         }
     }
@@ -219,23 +278,34 @@ class ItemDetailViewModel @Inject constructor(
     }
 
     private suspend fun loadReferenceData(item: Item) {
-        Timber.tag(LogTags.VIEW_MODEL).d("Images count: ${item.images.size}")
-        item.images.forEachIndexed { index, image ->
-            Timber.tag(LogTags.VIEW_MODEL).d("Image $index: ${image.url}")
-        }
-
+        // Set images and other basic info
         _imageUrls.value = item.images.map { it.url }
         _sizeName.value = item.sizeName
         _colorName.value = item.colorName
         _brandName.value = item.brandName
         _conditionName.value = item.conditionName
-        _schoolLogoUrl.value = item.schoolLogoUrl
 
-        item.schoolId?.let { schoolId ->
-            val school = schoolDao.getById(schoolId)
-            _schoolName.value = school?.name
-            _schoolLogoUrl.value = school?.logoUrl ?: item.schoolLogoUrl
+        // ================================================================
+        // ✅ GET SCHOOL INFO - Use schoolId from item
+        // ================================================================
+
+        var schoolName = item.schoolName
+        var schoolLogo = item.schoolLogoUrl
+
+        // If item doesn't have school info, try SchoolDao
+        if (schoolName.isNullOrBlank() || schoolLogo.isNullOrBlank()) {
+            item.schoolId?.let { schoolId ->
+                val school = schoolDao.getById(schoolId)
+                if (school != null) {
+                    schoolName = school.name
+                    schoolLogo = school.logoUrl
+                    Timber.tag(LogTags.VIEW_MODEL).d("🏫 School from Database → name: $schoolName | logo: $schoolLogo")
+                }
+            }
         }
+
+        _schoolName.value = schoolName
+        _schoolLogoUrl.value = schoolLogo
     }
 
     private suspend fun fetchItemsByCategory(categoryId: Int, excludeItemId: String): List<Item> {

@@ -28,6 +28,7 @@ data class RankedItemDto(
     @SerializedName("condition") val condition: String?,
     @SerializedName("brand") val brand: String?,
     @SerializedName("school_name") val schoolName: String?,
+    @SerializedName("school_logo_url") val schoolLogoUrl: String?,
     @SerializedName("school_id") val schoolId: Int,
     @SerializedName("relevance") val relevance: String,
     @SerializedName("images") val images: List<String>?,

@@ -537,7 +537,7 @@ class ProductsViewModel @Inject constructor(
                                 items = parentResult.data.items
                                 if (items.isNotEmpty()) {
                                     _showingSimilarBanner.value =
-                                        "No items in this type yet. Showing other $subCategoryName"
+                                        "No items yet. Showing other $subCategoryName"
                                 }
                             }
                             is Result.Error -> {

@@ -76,41 +76,49 @@ class IntroFragment : Fragment() {
     }
 
     // ==================== DESTINATION LOGIC ====================
-
     private fun determineDestination() {
         lifecycleScope.launch {
             try {
-                val isLoggedIn = appPreferences.isLoggedIn.first()
+                // ✅ Use sync getter for logged in state
+                val isLoggedIn = appPreferences.getLoggedInState()
                 val roomUser = authRepository.getRoomUser()
 
-                if (isLoggedIn && roomUser != null && !roomUser.token.isNullOrEmpty()) {
-                    Timber.tag(TAG).i("✅ User already logged in (Room + Preferences)")
+                Timber.tag(TAG).d("🔍 Session check: loggedIn=$isLoggedIn, user=${roomUser?.name}, schoolMapped=${roomUser?.schoolMapped}")
 
-                    val destination = if (roomUser.schoolMapped) {
-                        R.id.nav_home
-                    } else {
-                        Timber.tag(TAG).i("🏫 School not mapped — resuming school onboarding")
-                        R.id.schoolOnboardingProvinceFragment  // ✅ Updated to Province Fragment
-                    }
-                    onDestinationDetermined(destination)
+                // NOT logged in
+                if (!isLoggedIn) {
+                    Timber.tag(TAG).i("❌ Not logged in → login")
+                    onDestinationDetermined(R.id.loginFragment)
                     return@launch
                 }
 
-                // Fallback: Try full session recovery
+                // Logged in - check if user data exists
+                if (roomUser != null && !roomUser.token.isNullOrEmpty()) {
+                    // ✅ SCHOOL MAPPED → HOME
+                    if (roomUser.schoolMapped) {
+                        Timber.tag(TAG).i("🏠 School mapped → HOME")
+                        onDestinationDetermined(R.id.nav_home)
+                        return@launch
+                    }
+
+                    // ✅ SCHOOL NOT MAPPED → Onboarding
+                    Timber.tag(TAG).i("🏫 School NOT mapped → school onboarding")
+                    onDestinationDetermined(R.id.schoolOnboardingProvinceFragment)
+                    return@launch
+                }
+
+                // Try restore
                 val restored = authRepository.restoreSession()
                 if (restored) {
                     val updatedUser = authRepository.getRoomUser()
-                    val destination = if (updatedUser?.schoolMapped == true) {
-                        R.id.nav_home
+                    if (updatedUser?.schoolMapped == true) {
+                        onDestinationDetermined(R.id.nav_home)
                     } else {
-                        Timber.tag(TAG).i("🏫 School not mapped — resuming school onboarding")
-                        R.id.schoolOnboardingProvinceFragment  // ✅ Updated to Province Fragment
+                        onDestinationDetermined(R.id.schoolOnboardingProvinceFragment)
                     }
-                    onDestinationDetermined(destination)
                     return@launch
                 }
 
-                Timber.tag(TAG).i("❌ No valid session found → login")
                 onDestinationDetermined(R.id.loginFragment)
 
             } catch (e: Exception) {

@@ -9,7 +9,7 @@ import za.co.skoolswap.domain.model.Shop
 fun Shop.toEntity(): ShopEntity {
     return ShopEntity(
         id = id,
-        name = name,
+        name = name ?: "Unknown Shop",
         displayName = displayName,
         userId = userId,
         sellerName = sellerName,
