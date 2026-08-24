@@ -103,9 +103,6 @@ class CreateItemViewModel @Inject constructor(
                 referenceRepository.getMainCategories().collect {
                     _mainCategories.value = it
                     Timber.tag(LogTags.VIEW_MODEL).d("📦 Loaded ${it.size} main categories from DB")
-                    it.forEach { category ->
-                        Timber.tag(LogTags.VIEW_MODEL).d("  - Category: ${category.name} (ID: ${category.id})")
-                    }
                 }
             }
             launch {
@@ -175,7 +172,8 @@ class CreateItemViewModel @Inject constructor(
                 if (result.isSuccess) {
                     Timber.tag(LogTags.VIEW_MODEL).d("✅ Reference data refreshed successfully")
                 } else {
-                    Timber.tag(LogTags.VIEW_MODEL).w("⚠️ Refresh failed, using cached: ${result.exceptionOrNull()?.message}")
+                    Timber.tag(LogTags.VIEW_MODEL)
+                        .w("⚠️ Refresh failed, using cached: ${result.exceptionOrNull()?.message}")
                 }
             } catch (e: Exception) {
                 Timber.tag(LogTags.VIEW_MODEL).e(e, "⚠️ Refresh error: ${e.message}")
@@ -195,14 +193,12 @@ class CreateItemViewModel @Inject constructor(
             _selectedMainCategoryId
                 .filterNotNull()
                 .flatMapLatest { mainCategoryId ->
-                    Timber.tag(LogTags.VIEW_MODEL).d("observeSubCategories: Main category ID changed to $mainCategoryId")
+                    Timber.tag(LogTags.VIEW_MODEL)
+                        .d("observeSubCategories: Main category ID changed to $mainCategoryId")
                     referenceRepository.getSubCategories(mainCategoryId)
                 }
                 .collect { subCats ->
                     Timber.tag(LogTags.VIEW_MODEL).d("📦 Received ${subCats.size} subcategories")
-                    subCats.forEach { subCat ->
-                        Timber.tag(LogTags.VIEW_MODEL).d("  - Subcategory: ${subCat.name} (ID: ${subCat.id})")
-                    }
                     _subCategories.value = subCats
                 }
         }
@@ -214,14 +210,13 @@ class CreateItemViewModel @Inject constructor(
             _selectedProvinceId
                 .filterNotNull()
                 .collect { provinceId ->
-                    Timber.tag(LogTags.VIEW_MODEL).d("🔍 Province selected: $provinceId, refreshing towns")
+                    Timber.tag(LogTags.VIEW_MODEL)
+                        .d("🔍 Province selected: $provinceId, refreshing towns")
                     referenceRepository.refreshTowns(provinceId)
                     referenceRepository.getTowns(provinceId).collect { townList ->
                         _towns.value = townList
-                        Timber.tag(LogTags.VIEW_MODEL).d("Loaded ${townList.size} towns for province $provinceId")
-                        townList.forEach { town ->
-                            Timber.tag(LogTags.VIEW_MODEL).d("  - Town: ${town.name} (ID: ${town.id})")
-                        }
+                        Timber.tag(LogTags.VIEW_MODEL)
+                            .d("Loaded ${townList.size} towns for province $provinceId")
                     }
                 }
         }
@@ -236,14 +231,17 @@ class CreateItemViewModel @Inject constructor(
     fun onProvinceSelected(provinceId: Int?) {
         Timber.tag(LogTags.VIEW_MODEL).d("onProvinceSelected: $provinceId")
         _selectedProvinceId.value = provinceId
+        if (provinceId != null) {
+            viewModelScope.launch {
+                referenceRepository.refreshTowns(provinceId)
+            }
+        }
     }
 
     // ============ IMAGE METHODS ============
     fun addImage(uri: Uri) {
         Timber.tag(LogTags.VIEW_MODEL).d("addImage: $uri")
         val currentImages = _images.value.toMutableList()
-        Timber.tag(LogTags.VIEW_MODEL).d("Current images count: ${currentImages.size}")
-
         if (currentImages.size < 3) {
             currentImages.add(uri)
             _images.value = currentImages
@@ -258,12 +256,27 @@ class CreateItemViewModel @Inject constructor(
         val currentImages = _images.value.toMutableList()
         val removed = currentImages.remove(uri)
         _images.value = currentImages
-        Timber.tag(LogTags.VIEW_MODEL).d("Image removed: $removed. Remaining count: ${currentImages.size}")
+        Timber.tag(LogTags.VIEW_MODEL)
+            .d("Image removed: $removed. Remaining count: ${currentImages.size}")
     }
 
     fun clearImages() {
         Timber.tag(LogTags.VIEW_MODEL).d("clearImages: Clearing all images")
         _images.value = emptyList()
+    }
+
+    fun removeImageAt(index: Int) {
+        Timber.tag(LogTags.VIEW_MODEL).d("removeImageAt: index=$index")
+        val currentImages = _images.value.toMutableList()
+        if (index < currentImages.size) {
+            val removed = currentImages.removeAt(index)
+            _images.value = currentImages
+            Timber.tag(LogTags.VIEW_MODEL)
+                .d("✅ Removed image at index $index. Remaining: ${currentImages.size}")
+        } else {
+            Timber.tag(LogTags.VIEW_MODEL)
+                .w("Invalid index $index, current size: ${currentImages.size}")
+        }
     }
 
     suspend fun hasContactNumber(): Boolean {
@@ -275,18 +288,6 @@ class CreateItemViewModel @Inject constructor(
         } catch (e: Exception) {
             Timber.tag(LogTags.VIEW_MODEL).e(e, "Error checking contact number")
             false
-        }
-    }
-
-    fun removeImageAt(index: Int) {
-        Timber.tag(LogTags.VIEW_MODEL).d("removeImageAt: index=$index")
-        val currentImages = _images.value.toMutableList()
-        if (index < currentImages.size) {
-            val removed = currentImages.removeAt(index)
-            _images.value = currentImages
-            Timber.tag(LogTags.VIEW_MODEL).d("✅ Removed image at index $index: $removed. Remaining: ${currentImages.size}")
-        } else {
-            Timber.tag(LogTags.VIEW_MODEL).w("Invalid index $index, current size: ${currentImages.size}")
         }
     }
 
@@ -313,8 +314,12 @@ class CreateItemViewModel @Inject constructor(
             try {
                 _uiState.value = CreateItemUiState.Loading
 
-                val currentImageUris = _images.value
+                // ✅ Capture current images BEFORE any operations
+                val currentImageUris = _images.value.toList()
+                Timber.tag(LogTags.VIEW_MODEL)
+                    .d("📸 Captured ${currentImageUris.size} images for upload")
 
+                // 1. Save locally with images
                 val result = itemRepository.createItemOfflineFirst(
                     context = context,
                     name = name,
@@ -332,7 +337,7 @@ class CreateItemViewModel @Inject constructor(
                     sizeId = sizeId,
                     colorId = colorId,
                     tagIds = tagIds,
-                    imageUris = currentImageUris
+                    imageUris = currentImageUris  // ← Pass captured images
                 )
 
                 if (result.isFailure) {
@@ -342,13 +347,26 @@ class CreateItemViewModel @Inject constructor(
                     return@launch
                 }
 
-                _uiState.value = CreateItemUiState.Success("Item saved, uploading in background")
-                clearImages()
-
                 val localItem = result.getOrNull()!!
-                val worker = ItemCreationWorker.createOneTimeRequest(localItem.id)
-                WorkManager.getInstance(context).enqueue(worker)
+                Timber.tag(LogTags.VIEW_MODEL).d("✅ Item saved locally with ID: ${localItem.id}")
 
+                // 2. ✅ ENQUEUE WORKER WITH IMAGES FIRST
+                val worker = if (currentImageUris.isNotEmpty()) {
+                    Timber.tag(LogTags.VIEW_MODEL)
+                        .d("📸 Creating worker with ${currentImageUris.size} images")
+                    ItemCreationWorker.createOneTimeRequest(localItem.id, currentImageUris)
+                } else {
+                    Timber.tag(LogTags.VIEW_MODEL).d("📸 No images to pass to worker")
+                    ItemCreationWorker.createOneTimeRequest(localItem.id)
+                }
+                WorkManager.getInstance(context).enqueue(worker)
+                Timber.tag(LogTags.VIEW_MODEL).d("✅ Worker enqueued")
+
+                // 3. ✅ CLEAR IMAGES AFTER worker is enqueued
+                clearImages()
+                Timber.tag(LogTags.VIEW_MODEL).d("✅ Images cleared from UI")
+
+                _uiState.value = CreateItemUiState.Success("Item saved, uploading in background")
                 Timber.tag(LogTags.VIEW_MODEL).d("✅ Item saved locally, worker enqueued")
 
             } catch (e: Exception) {

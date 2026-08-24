@@ -8,8 +8,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
-import android.widget.ArrayAdapter
-import android.widget.AutoCompleteTextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -23,6 +21,7 @@ import za.co.skoolswap.common.constants.AppConstants.LogTags
 import za.co.skoolswap.databinding.FragmentProfileBinding
 import za.co.skoolswap.domain.repository.AuthRepositoryInterface
 import za.co.skoolswap.utils.extensions.MobileValidator
+import za.co.skoolswap.ui.component.ProvincePickerBottomSheet
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
@@ -34,6 +33,7 @@ import androidx.activity.OnBackPressedCallback
 import za.co.skoolswap.utils.DialogAction
 import za.co.skoolswap.utils.DialogHelper
 import timber.log.Timber
+import za.co.skoolswap.domain.model.Province
 
 @AndroidEntryPoint
 class ProfileFragment : Fragment() {
@@ -97,6 +97,46 @@ class ProfileFragment : Fragment() {
                 }
             }
         })
+    }
+
+    private fun setupProvinceDropdown() {
+        // Province Spinner click - open bottom sheet
+        binding.provinceSpinner.setOnClickListener {
+            val provinces = viewModel.provinces.value
+            if (provinces.isNotEmpty()) {
+                showProvincePicker(provinces)
+            } else {
+                Toast.makeText(requireContext(), "Loading provinces...", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun showProvincePicker(provinces: List<Province>) {
+        val selectedProvince = viewModel.selectedProvince.value
+        val bottomSheet = ProvincePickerBottomSheet(
+            provinces = provinces,
+            selectedProvinceId = selectedProvince?.id,
+            onProvinceSelected = { province ->
+                val shouldClear = viewModel.selectedSchool.value == null
+                viewModel.selectProvince(province, shouldClearSchool = shouldClear)
+
+                binding.provinceSpinner.setText(province.name, false)
+
+                if (shouldClear) {
+                    binding.selectedSchoolCard.visibility = View.GONE
+                    binding.selectedSchoolText.visibility = View.VISIBLE
+                    binding.schoolSearch.text?.clear()
+                }
+
+                binding.provinceTextInputLayout.error = null
+                binding.schoolSearch.isEnabled = true
+                binding.schoolSearchLayout.hint = getString(R.string.profile_search_in_province, province.name)
+                binding.schoolSearchLayout.placeholderText = getString(R.string.profile_search_hint)
+
+                showUnsavedIndicator()
+            }
+        )
+        bottomSheet.show(parentFragmentManager, "ProvincePickerBottomSheet")
     }
 
     private fun setupMobileInput() {
@@ -183,39 +223,6 @@ class ProfileFragment : Fragment() {
         }
     }
 
-    private fun setupProvinceDropdown() {
-        val provinceAdapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_dropdown_item_1line,
-            mutableListOf<String>()
-        )
-
-        (binding.provinceSpinner as? AutoCompleteTextView)?.apply {
-            setAdapter(provinceAdapter)
-            threshold = 1
-        }
-
-        binding.provinceSpinner.setOnItemClickListener { _, _, position, _ ->
-            val province = viewModel.provinces.value[position]
-            val shouldClear = viewModel.selectedSchool.value == null
-            viewModel.selectProvince(province, shouldClearSchool = shouldClear)
-
-            binding.provinceSpinner.setText(province.name, false)
-
-            if (shouldClear) {
-                binding.selectedSchoolText.visibility = View.GONE
-                binding.schoolSearch.text?.clear()
-            }
-
-            binding.provinceTextInputLayout.error = null
-            binding.schoolSearch.isEnabled = true
-            binding.schoolSearchLayout.hint = getString(R.string.profile_search_in_province, province.name)
-            binding.schoolSearchLayout.placeholderText = getString(R.string.profile_search_hint)
-
-            showUnsavedIndicator()
-        }
-    }
-
     private fun setupSchoolSearch() {
         binding.schoolSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -260,6 +267,9 @@ class ProfileFragment : Fragment() {
             binding.selectedSchoolLocation.text = school.provinceName ?: getString(R.string.profile_selected_school)
             binding.selectedSchoolText.visibility = View.GONE
 
+            // Load school logo
+            loadSchoolLogo(school)
+
             binding.schoolResultsRecyclerView.visibility = View.GONE
             isSettingTextProgrammatically = true
             binding.schoolSearch.setText(school.name)
@@ -271,6 +281,22 @@ class ProfileFragment : Fragment() {
         binding.schoolResultsRecyclerView.apply {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = schoolAdapter
+        }
+    }
+
+    private fun loadSchoolLogo(school: za.co.skoolswap.domain.model.School) {
+        if (!school.logoUrl.isNullOrEmpty()) {
+            Glide.with(requireContext())
+                .load(school.logoUrl)
+                .placeholder(R.drawable.ic_school_placeholder)
+                .error(R.drawable.ic_school_placeholder)
+                .fallback(R.drawable.ic_school_placeholder)
+                .circleCrop()
+                .into(binding.schoolLogo)
+            binding.schoolLogo.visibility = View.VISIBLE
+        } else {
+            binding.schoolLogo.setImageResource(R.drawable.ic_school_placeholder)
+            binding.schoolLogo.visibility = View.VISIBLE
         }
     }
 
@@ -307,33 +333,9 @@ class ProfileFragment : Fragment() {
             viewModel.provinces.collectLatest { provinces ->
                 Timber.tag(LogTags.UI).d("📋 Provinces loaded: ${provinces.size}")
 
-                val provinceNames = provinces.map { it.name }
-                val adapter = ArrayAdapter(
-                    requireContext(),
-                    android.R.layout.simple_dropdown_item_1line,
-                    provinceNames
-                )
-
-                (binding.provinceSpinner as? AutoCompleteTextView)?.apply {
-                    setAdapter(adapter)
-
-                    var provinceSet = false
-
-                    viewModel.selectedProvince.value?.let { province ->
-                        setText(province.name, false)
-                        provinceSet = true
-                    }
-
-                    if (!provinceSet) {
-                        viewModel.selectedSchool.value?.let { school ->
-                            if (school.provinceId != null) {
-                                val matchingProvince = provinces.find { it.id == school.provinceId }
-                                matchingProvince?.let {
-                                    setText(it.name, false)
-                                }
-                            }
-                        }
-                    }
+                // Update spinner text if province is selected
+                viewModel.selectedProvince.value?.let { province ->
+                    binding.provinceSpinner.setText(province.name, false)
                 }
             }
         }
@@ -373,6 +375,8 @@ class ProfileFragment : Fragment() {
                     binding.selectedSchoolName.text = school.name
                     binding.selectedSchoolLocation.text = school.provinceName ?: getString(R.string.profile_selected_school)
                     binding.selectedSchoolText.visibility = View.GONE
+
+                    loadSchoolLogo(school)
 
                     isSettingTextProgrammatically = true
                     binding.schoolSearch.setText(school.name)

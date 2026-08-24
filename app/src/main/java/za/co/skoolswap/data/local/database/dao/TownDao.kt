@@ -24,7 +24,9 @@ interface TownDao {
 
     @Query("DELETE FROM towns WHERE provinceId = :provinceId")
     suspend fun deleteByProvinceId(provinceId: Int)
-
+    // In TownDao.kt - add this method
+    @Query("SELECT * FROM towns WHERE provinceId = :provinceId ORDER BY name")
+    suspend fun getByProvinceIdSync(provinceId: Int): List<TownEntity>
     @Query("DELETE FROM towns")
     suspend fun clearAll()
 }

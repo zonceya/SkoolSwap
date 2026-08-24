@@ -51,6 +51,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import kotlinx.coroutines.withTimeoutOrNull
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -237,14 +238,23 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupNavigationListener() {
         val navView: NavigationView = binding.navView
-        binding.appBarMain.fab.setOnClickListener {
+        binding.appBarMain.fab.setOnClickListener { fab ->
+            fab.isEnabled = false
             lifecycleScope.launch {
-                authRepository.refreshUserProfile()
-                val hasContactNumber = viewModel.hasContactNumber()
-                if (hasContactNumber) {
-                    navController.navigate(R.id.createItemFragment)
-                } else {
-                    showMissingContactDialog()
+                try {
+                    // Don't block navigation on this — fire and forget, or timeout it
+                    withTimeoutOrNull(3000) { authRepository.refreshUserProfile() }
+                    val hasContactNumber = viewModel.hasContactNumber()
+                    if (hasContactNumber) {
+                        navController.navigate(R.id.createItemFragment)
+                    } else {
+                        showMissingContactDialog()
+                    }
+                } catch (e: Exception) {
+                    Timber.tag(LogTags.UI).e(e, "FAB click flow failed")
+                    Snackbar.make(binding.root, "Something went wrong, please try again", Snackbar.LENGTH_SHORT).show()
+                } finally {
+                    fab.isEnabled = true
                 }
             }
         }
@@ -598,7 +608,7 @@ class MainActivity : AppCompatActivity() {
                 destinationId == R.id.loginFragment ||
                 destinationId == R.id.viewPagerFragment ||
                 destinationId == R.id.schoolOnboardingProvinceFragment ||
-                destinationId == R.id.schoolOnboardingSchoolFragment
+                destinationId == R.id.schoolOnboardingSchoolFragment ||
                 destinationId == R.id.itemDetailFragment
         WindowCompat.setDecorFitsSystemWindows(window, true)
 

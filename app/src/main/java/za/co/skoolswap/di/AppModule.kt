@@ -57,6 +57,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import retrofit2.Retrofit
+import za.co.skoolswap.domain.repository.SchoolRepositoryInterface
 import javax.inject.Singleton
 
 @Module
@@ -216,9 +217,9 @@ object AppModule {
         schoolApiService: SchoolApiService,
         provinceApiService: ProvinceApiService,
         provinceDao: ProvinceDao,
-        schoolDao:   SchoolDao,
+        schoolDao: SchoolDao,
         appPreferences: AppPreferences
-    ): SchoolRepository {
+    ): SchoolRepositoryInterface {
         return SchoolRepository(
             schoolApiService = schoolApiService,
             provinceApiService = provinceApiService,

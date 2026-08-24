@@ -7,14 +7,15 @@
     android:scrollbars="vertical"
     android:fadeScrollbars="true"
     android:scrollbarSize="4dp"
-    android:scrollbarStyle="outsideOverlay">
+    android:scrollbarStyle="outsideOverlay"
+    android:windowSoftInputMode="adjustResize">
 
     <LinearLayout
         android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <!-- Images Section (keep as is) -->
+        <!-- ========== 1. IMAGES ========== -->
         <TextView
             android:id="@+id/images_heading"
             android:layout_width="wrap_content"
@@ -154,7 +155,7 @@
             </FrameLayout>
         </LinearLayout>
 
-        <!-- Item Name -->
+        <!-- ========== 2. ITEM NAME ========== -->
         <TextView
             android:id="@+id/item_name_label"
             android:layout_width="wrap_content"
@@ -170,7 +171,7 @@
             android:hint="Enter item name"
             android:paddingBottom="8dp"/>
 
-        <!-- Main Category -->
+        <!-- ========== 3. MAIN CATEGORY ========== -->
         <TextView
             android:id="@+id/main_category_label"
             android:layout_width="wrap_content"
@@ -197,7 +198,7 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Sub Category -->
+        <!-- ========== 4. SUB CATEGORY ========== -->
         <TextView
             android:id="@+id/sub_category_label"
             android:layout_width="wrap_content"
@@ -238,7 +239,7 @@
 
         </FrameLayout>
 
-        <!-- Description -->
+        <!-- ========== 5. DESCRIPTION ========== -->
         <TextView
             android:id="@+id/description_label"
             android:layout_width="wrap_content"
@@ -256,7 +257,7 @@
             android:gravity="top"
             android:paddingBottom="8dp"/>
 
-        <!-- Condition -->
+        <!-- ========== 6. CONDITION ========== -->
         <TextView
             android:id="@+id/condition_label"
             android:layout_width="wrap_content"
@@ -283,7 +284,7 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Size -->
+        <!-- ========== 7. SIZE ========== -->
         <TextView
             android:id="@+id/size_label"
             android:layout_width="wrap_content"
@@ -310,7 +311,7 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Brand -->
+        <!-- ========== 8. BRAND ========== -->
         <TextView
             android:id="@+id/brand_label"
             android:layout_width="wrap_content"
@@ -337,7 +338,7 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Color -->
+        <!-- ========== 9. COLOR ========== -->
         <TextView
             android:id="@+id/color_label"
             android:layout_width="wrap_content"
@@ -364,7 +365,7 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Quantity (Keep as Spinner) -->
+        <!-- ========== 10. QUANTITY ========== -->
         <TextView
             android:id="@+id/quantity_label"
             android:layout_width="wrap_content"
@@ -379,7 +380,7 @@
             android:layout_height="wrap_content"
             android:paddingBottom="8dp"/>
 
-        <!-- Province -->
+        <!-- ========== 11. PROVINCE ========== -->
         <TextView
             android:id="@+id/province_label"
             android:layout_width="wrap_content"
@@ -406,7 +407,7 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Town/City -->
+        <!-- ========== 12. TOWN/CITY ========== -->
         <TextView
             android:id="@+id/town_label"
             android:layout_width="wrap_content"
@@ -426,14 +427,39 @@
                 android:id="@+id/town_input"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Select Town/City"
                 android:focusable="false"
                 android:clickable="true"
                 android:inputType="none" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Gender -->
+        <!-- ========== 13. SCHOOL ========== -->
+        <TextView
+            android:id="@+id/school_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="School"
+            android:textStyle="bold"
+            android:paddingTop="8dp"/>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:endIconMode="custom"
+            app:endIconDrawable="@drawable/ic_arrow_drop_down">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/school_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:focusable="false"
+                android:clickable="true"
+                android:inputType="none" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- ========== 14. GENDER ========== -->
         <TextView
             android:id="@+id/gender_label"
             android:layout_width="wrap_content"
@@ -460,34 +486,7 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- School -->
-        <TextView
-            android:id="@+id/school_label"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="School"
-            android:textStyle="bold"
-            android:paddingTop="8dp"/>
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            app:endIconMode="custom"
-            app:endIconDrawable="@drawable/ic_arrow_drop_down">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/school_input"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Select School"
-                android:focusable="false"
-                android:clickable="true"
-                android:inputType="none" />
-
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- Price -->
+        <!-- ========== 15. PRICE ========== -->
         <TextView
             android:id="@+id/price_label"
             android:layout_width="wrap_content"
@@ -504,7 +503,7 @@
             android:inputType="numberDecimal"
             android:paddingBottom="8dp"/>
 
-        <!-- Progress Bar -->
+        <!-- ========== 16. PROGRESS BAR & SUBMIT ========== -->
         <ProgressBar
             android:id="@+id/progressBar"
             android:layout_width="wrap_content"
@@ -513,22 +512,21 @@
             android:visibility="gone"
             android:paddingBottom="16dp"/>
 
-        <!-- Submit Button -->
-
         <com.google.android.material.button.MaterialButton
             android:id="@+id/submitButton"
             android:layout_width="match_parent"
             android:layout_height="76dp"
-        android:textStyle="bold"
-        android:textSize="22sp"
-        android:textColor="@color/white"
-        app:backgroundTint="@color/black"
-        app:cornerRadius="8dp"
-        android:gravity="center"
-        android:layout_marginTop="16dp"
-        android:layout_marginBottom="32dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"/>
+            android:text="Create Item"
+            android:textStyle="bold"
+            android:textSize="22sp"
+            android:textColor="@color/white"
+            app:backgroundTint="@color/black"
+            app:cornerRadius="8dp"
+            android:gravity="center"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="32dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"/>
 
     </LinearLayout>
 </ScrollView>
