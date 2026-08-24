@@ -13,9 +13,6 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
-
-// ItemCreationWorker.kt - Fixed version
-
 class ItemCreationWorker(
     context: Context,
     params: WorkerParameters
@@ -27,11 +24,8 @@ class ItemCreationWorker(
     )
 
     private val itemDao = entryPoint.itemDao()
-    private val itemImageDao = entryPoint.itemImageDao()  // ✅ Make sure this exists in EntryPoint
+    private val itemImageDao = entryPoint.itemImageDao()
     private val itemRepository = entryPoint.itemRepository()
-    private val imageUploadRepository = entryPoint.imageUploadRepository()
-
-    // ItemCreationWorker.kt - Update doWork() to handle image URIs
 
     override suspend fun doWork(): ListenableWorker.Result {
         Timber.tag(TAG).d("🚀 ItemCreationWorker.doWork() START")
@@ -100,36 +94,8 @@ class ItemCreationWorker(
             Timber.tag(TAG).d("   SyncStatus: ${localItem.syncStatus}")
             Timber.tag(TAG).d("   RetryCount: ${localItem.retryCount}")
 
-            // 2. Upload images to R2
-            var uploadedUrls = emptyList<String>()
-            if (imageUris.isNotEmpty()) {
-                Timber.tag(TAG).d("📤 Step 2: Uploading ${imageUris.size} images to R2...")
-                val startTime = System.currentTimeMillis()
-
-                try {
-                    uploadedUrls = imageUploadRepository.uploadImages(
-                        context = applicationContext,
-                        imageUris = imageUris
-                    )
-                    val duration = System.currentTimeMillis() - startTime
-                    Timber.tag(TAG).d("✅ Image upload completed in ${duration}ms")
-                    Timber.tag(TAG).d("   Uploaded ${uploadedUrls.size}/${imageUris.size} images")
-
-                    uploadedUrls.forEachIndexed { index, url ->
-                        Timber.tag(TAG).d("   Uploaded URL[$index]: $url")
-                    }
-
-                } catch (e: Exception) {
-                    Timber.tag(TAG).e(e, "❌ Image upload failed after ${System.currentTimeMillis() - startTime}ms")
-                    Timber.tag(TAG).d("   Error: ${e.message}")
-                    uploadedUrls = emptyList()
-                }
-            } else {
-                Timber.tag(TAG).d("📤 Step 2: No images to upload, skipping")
-            }
-
-            // 3. Create item on server
-            Timber.tag(TAG).d("🔄 Step 3: Creating item on server...")
+            // 2. Create item on server (without images)
+            Timber.tag(TAG).d("🔄 Step 2: Creating item on server...")
             Timber.tag(TAG).d("   Request parameters:")
             Timber.tag(TAG).d("   name: ${localItem.name}")
             Timber.tag(TAG).d("   description: ${localItem.description}")
@@ -171,9 +137,7 @@ class ItemCreationWorker(
                 val error = createResult.exceptionOrNull()?.message ?: "Unknown error"
                 Timber.tag(TAG).e("❌ API creation failed after ${createDuration}ms")
                 Timber.tag(TAG).d("   Error: $error")
-                Timber.tag(TAG).d("   ⚠️ This may be a retryable error")
                 updateItemStatus(itemId, "FAILED", error)
-                Timber.tag(TAG).d("📊 Returning RETRY for worker")
                 return ListenableWorker.Result.retry()
             }
 
@@ -187,33 +151,43 @@ class ItemCreationWorker(
             Timber.tag(TAG).d("   Server CreatedAt: ${serverItem.createdAt}")
             Timber.tag(TAG).d("   Server UpdatedAt: ${serverItem.updatedAt}")
 
-            // 4. Attach images if any
-            if (uploadedUrls.isNotEmpty()) {
-                Timber.tag(TAG).d("🔄 Step 4: Attaching ${uploadedUrls.size} images to item on server...")
-                val attachStartTime = System.currentTimeMillis()
+            // 3. ✅ UPLOAD IMAGES DIRECTLY USING addItemImages
+            if (imageUris.isNotEmpty()) {
+                Timber.tag(TAG).d("📤 Step 3: Uploading ${imageUris.size} images directly to item...")
+                val uploadStartTime = System.currentTimeMillis()
 
-                val attachResult = itemRepository.attachImagesToItem(
-                    itemId = serverItem.id,
-                    imageUrls = uploadedUrls
-                )
-                val attachDuration = System.currentTimeMillis() - attachStartTime
-                Timber.tag(TAG).d("   Image attachment completed in ${attachDuration}ms")
+                try {
+                    val imageResult = itemRepository.addItemImages(
+                        context = applicationContext,
+                        itemId = serverItem.id,  // ← Use server item ID
+                        imageUris = imageUris
+                    )
 
-                if (attachResult.isFailure) {
-                    val error = attachResult.exceptionOrNull()?.message ?: "Unknown error"
-                    Timber.tag(TAG).w("⚠️ Failed to attach images: $error")
-                    Timber.tag(TAG).d("   This is a warning - item was created but images may not be visible")
-                } else {
-                    Timber.tag(TAG).d("✅ Images attached successfully!")
-                    val attachedUrls = attachResult.getOrNull()
-                    Timber.tag(TAG).d("   Attached URLs: ${attachedUrls?.size ?: 0}")
+                    val uploadDuration = System.currentTimeMillis() - uploadStartTime
+                    Timber.tag(TAG).d("   Upload completed in ${uploadDuration}ms")
+
+                    if (imageResult.isSuccess) {
+                        val images = imageResult.getOrNull() ?: emptyList()
+                        Timber.tag(TAG).d("✅ Uploaded ${images.size} images successfully!")
+                        images.forEachIndexed { index, image ->
+                            Timber.tag(TAG).d("   Image[$index]: ${image.url}")
+                        }
+                    } else {
+                        val error = imageResult.exceptionOrNull()?.message ?: "Unknown error"
+                        Timber.tag(TAG).w("⚠️ Image upload failed: $error")
+                        Timber.tag(TAG).d("   This is a warning - item was created but images may not be visible")
+                    }
+                } catch (e: Exception) {
+                    Timber.tag(TAG).e(e, "❌ Image upload exception")
+                    Timber.tag(TAG).d("   Item was created, images can be added later")
+                    // Don't fail - item was created successfully
                 }
             } else {
-                Timber.tag(TAG).d("🔄 Step 4: No images to attach, skipping")
+                Timber.tag(TAG).d("📤 Step 3: No images to upload, skipping")
             }
 
-            // 5. Update local item
-            Timber.tag(TAG).d("🔄 Step 5: Updating local item with server data...")
+            // 4. Update local item with server data
+            Timber.tag(TAG).d("🔄 Step 4: Updating local item with server data...")
             val updatedEntity = localItem.copy(
                 id = serverItem.id,
                 shopId = serverItem.shopId,
@@ -234,14 +208,14 @@ class ItemCreationWorker(
             Timber.tag(TAG).d("   RetryCount: ${updatedEntity.retryCount}")
             Timber.tag(TAG).d("   LastSyncAttempt: ${updatedEntity.lastSyncAttempt}")
 
-            // 6. Delete placeholder
+            // 5. Delete placeholder
             if (itemId != serverItem.id) {
-                Timber.tag(TAG).d("🔄 Step 6: Deleting placeholder item (ID: $itemId)...")
+                Timber.tag(TAG).d("🔄 Step 5: Deleting placeholder item (ID: $itemId)...")
                 itemDao.deleteItemById(itemId)
                 itemImageDao.deleteImagesForItem(itemId)
                 Timber.tag(TAG).d("✅ Placeholder deleted")
             } else {
-                Timber.tag(TAG).d("🔄 Step 6: No placeholder to delete (IDs match)")
+                Timber.tag(TAG).d("🔄 Step 5: No placeholder to delete (IDs match)")
             }
 
             Timber.tag(TAG).d("✅ Item creation completed: ${serverItem.id}")
@@ -264,28 +238,22 @@ class ItemCreationWorker(
             when {
                 e.message?.contains("network", ignoreCase = true) == true -> {
                     Timber.tag(TAG).d("🔁 Network error detected - will retry")
-                    Timber.tag(TAG).d("📊 Returning RETRY for worker")
                     ListenableWorker.Result.retry()
                 }
                 e.message?.contains("timeout", ignoreCase = true) == true -> {
                     Timber.tag(TAG).d("🔁 Timeout detected - will retry")
-                    Timber.tag(TAG).d("📊 Returning RETRY for worker")
                     ListenableWorker.Result.retry()
                 }
                 e.message?.contains("401", ignoreCase = true) == true -> {
                     Timber.tag(TAG).d("🔑 Authentication error (401) - may need new token")
-                    Timber.tag(TAG).d("📊 Returning RETRY for worker")
                     ListenableWorker.Result.retry()
                 }
                 e.message?.contains("422", ignoreCase = true) == true -> {
                     Timber.tag(TAG).d("❌ Validation error (422) - non-retryable")
-                    Timber.tag(TAG).d("   Check the request parameters")
-                    Timber.tag(TAG).d("📊 Returning FAILURE for worker")
                     ListenableWorker.Result.failure()
                 }
                 else -> {
                     Timber.tag(TAG).d("❌ Non-retryable error")
-                    Timber.tag(TAG).d("📊 Returning FAILURE for worker")
                     ListenableWorker.Result.failure()
                 }
             }
@@ -309,7 +277,6 @@ class ItemCreationWorker(
                     )
                     itemDao.insertItem(updated)
                     Timber.tag(TAG).d("📝 Updated item status: $status (retry: $newRetryCount)")
-
                     if (error != null) {
                         Timber.tag(TAG).d("   Error message: $error")
                     }
@@ -322,14 +289,12 @@ class ItemCreationWorker(
         }
     }
 
-    // ItemCreationWorker.kt - Update companion object
-
     companion object {
         private const val TAG = "ItemCreationWorker"
         const val KEY_ITEM_ID = "item_id"
         const val KEY_IMAGE_URIS = "image_uris"
 
-        // ✅ Option 1: Keep single parameter version
+        // ✅ Single parameter version (for retries or items without images)
         fun createOneTimeRequest(itemId: String): OneTimeWorkRequest {
             Timber.tag(TAG).d("📦 createOneTimeRequest called (single param)")
             Timber.tag(TAG).d("   Item ID: $itemId")
@@ -355,12 +320,10 @@ class ItemCreationWorker(
 
             Timber.tag(TAG).d("✅ Worker created with ID: ${request.id}")
             Timber.tag(TAG).d("   Tags: ${request.tags}")
-
-
             return request
         }
 
-        // ✅ Option 2: Add version with image URIs
+        // ✅ Version with image URIs
         fun createOneTimeRequest(itemId: String, imageUris: List<Uri>): OneTimeWorkRequest {
             Timber.tag(TAG).d("📦 createOneTimeRequest called (with images)")
             Timber.tag(TAG).d("   Item ID: $itemId")
@@ -394,7 +357,8 @@ class ItemCreationWorker(
             Timber.tag(TAG).d("✅ Worker created with ID: ${request.id}")
             Timber.tag(TAG).d("   Tags: ${request.tags}")
 
-            Timber.tag(TAG).d("   Image URIs in data: ${inputData.getStringArray(KEY_IMAGE_URIS)?.size ?: 0}")
+            val imageCount = inputData.getStringArray(KEY_IMAGE_URIS)?.size ?: 0
+            Timber.tag(TAG).d("   Image URIs in data: $imageCount")
 
             return request
         }

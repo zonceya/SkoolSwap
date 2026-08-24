@@ -12,19 +12,18 @@ import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
 
-// ImageApiService.kt - Add upload endpoint
-
 interface ImageApiService {
 
-    // ✅ ADD THIS - Upload images to R2
+    // ✅ CORRECTED - Use {item_id} with @Path
     @Multipart
-    @POST("api/v1/uploads")
-    suspend fun uploadImage(
+    @POST("api/v1/items/{item_id}/images")
+    suspend fun addItemImages(
         @Header("Authorization") authHeader: String,
-        @Part image: MultipartBody.Part
-    ): Response<ImageUploadResponse>
+        @Path("item_id") itemId: String,  // ← @Path matches {item_id}
+        @Part images: List<MultipartBody.Part>  // ← Supports multiple images
+    ): Response<AddImagesResponse>
 
-    // ✅ Keep this
+    // ✅ Keep this - attach by URL (alternative flow)
     @POST("api/v1/items/{item_id}/attach_images_by_url")
     suspend fun attachImagesByUrl(
         @Header("Authorization") authHeader: String,

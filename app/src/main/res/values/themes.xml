@@ -44,6 +44,11 @@
         <!-- Action Bar Theme - CONNECT THE OVERLAY -->
         <item name="actionBarTheme">@style/Theme.SkoolSwap.AppBarOverlay</item>
     </style>
+    <style name="roundedImageView" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
     <!-- Dialog Animation -->
     <style name="DialogAnimation" parent="android:Animation">
         <item name="android:windowEnterAnimation">@anim/dialog_enter</item>

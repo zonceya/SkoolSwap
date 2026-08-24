@@ -68,4 +68,5 @@ interface ReferenceDataApiService {
     suspend fun getAllReferenceData(
         @Header("Authorization") authToken: String? = null
     ): Response<AllReferenceDataResponse>
+
 }

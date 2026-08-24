@@ -70,4 +70,16 @@ interface ReferenceDataRepositoryInterface {
     fun getLocations(): Flow<List<Location>>
     suspend fun refreshLocations(): Result<Unit>
     suspend fun getLocationById(id: Int): Location?
+    // In ReferenceDataRepositoryInterface.kt
+    suspend fun searchSchools(
+        provinceId: Int,
+        query: String
+    ): za.co.skoolswap.utils.Result<List<za.co.skoolswap.domain.model.School>>
+    suspend fun searchTowns(provinceId: Int, query: String): za.co.skoolswap.utils.Result<List<Town>>
+
+    suspend fun searchSchoolsByTown(
+        provinceId: Int,
+        townName: String,
+        schoolQuery: String? = null
+    ): za.co.skoolswap.utils.Result<List<za.co.skoolswap.domain.model.School>>
 }

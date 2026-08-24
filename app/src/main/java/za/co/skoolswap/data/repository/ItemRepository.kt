@@ -521,16 +521,21 @@ class ItemRepository @Inject constructor(
     ): Result<List<ItemImage>> {
         return try {
             val token = authRepository.getAuthToken().value
-            if (token == null) {
-                return Result.failure(Exception("Not authenticated"))
-            }
+                ?: return Result.failure(Exception("Not authenticated"))
 
+            // ✅ Create multipart parts from URIs
             val imageParts = ImageMultipartHelper.createImageParts(context, imageUris)
+
             if (imageParts.isEmpty()) {
                 return Result.failure(Exception("No valid images provided"))
             }
 
-            val response = itemApiService.addItemImages("Bearer $token", itemId, imageParts)
+            // ✅ Call the fixed endpoint
+            val response = itemApiService.addItemImages(
+                authHeader = "Bearer $token",
+                itemId = itemId,
+                images = imageParts  // ← List of MultipartBody.Part
+            )
 
             if (!response.isSuccessful) {
                 val errorMsg = "Server error: ${response.code()}"
@@ -550,6 +555,7 @@ class ItemRepository @Inject constructor(
                         isCover = false
                     )
                 } ?: emptyList()
+
                 Timber.tag(LogTags.REPOSITORY).i("Added ${images.size} images to item $itemId")
                 Result.success(images)
             } else {

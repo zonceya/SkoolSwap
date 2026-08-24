@@ -1,4 +1,3 @@
-// data/mapper/SchoolMapper.kt
 package za.co.skoolswap.data.mapper
 
 import za.co.skoolswap.data.local.database.entities.SchoolEntity
@@ -11,8 +10,10 @@ fun SchoolMappingResponse.toSchoolEntity(): SchoolEntity {
     return SchoolEntity(
         id = this.id,
         name = this.name,
-        provinceId = this.province_id,  // Use province_id, not location_id
-        schoolType = this.school_type
+        provinceId = this.province_id,
+        locationId = null,  // ✅ Add missing field
+        schoolType = this.school_type,
+        logoUrl = null       // ✅ Add missing field
     )
 }
 
@@ -21,8 +22,10 @@ fun SchoolResponse.toSchoolEntity(): SchoolEntity {
     return SchoolEntity(
         id = this.id,
         name = this.name,
-        provinceId = this.province_id,  // Use province_id
-        schoolType = this.school_type
+        provinceId = this.province_id,
+        locationId = this.location_id,  // ✅ Add missing field
+        schoolType = this.school_type,
+        logoUrl = this.logo_url          // ✅ Add missing field
     )
 }
 
@@ -32,8 +35,9 @@ fun SchoolEntity.toDomainSchool(): School {
         id = this.id,
         name = this.name,
         provinceId = this.provinceId,
-        provinceName = null, // Would need to join with province table
-        locationId = null,   // Schools don't have direct location_id
-        schoolType = this.schoolType
+        provinceName = null,
+        locationId = this.locationId,
+        schoolType = this.schoolType,
+        logoUrl = this.logoUrl
     )
 }

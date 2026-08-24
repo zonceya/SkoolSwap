@@ -21,6 +21,7 @@ import za.co.skoolswap.domain.repository.ReferenceDataRepositoryInterface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -38,12 +39,16 @@ import za.co.skoolswap.data.local.database.dao.SizeDao
 import za.co.skoolswap.data.local.database.dao.SubCategoryDao
 import za.co.skoolswap.data.local.database.dao.TagDao
 import za.co.skoolswap.data.local.database.dao.TownDao
+import za.co.skoolswap.data.local.datastore.AppPreferences
+import za.co.skoolswap.data.remote.api.SchoolApiService
 import javax.inject.Inject
 import javax.inject.Singleton
+import za.co.skoolswap.utils.Result as AppResult
 
 @Singleton
 class ReferenceDataRepository @Inject constructor(
     private val referenceApiService: ReferenceDataApiService,
+    private val schoolApiService : SchoolApiService,
     private val authRepository: AuthRepository,
     private val mainCategoryDao: MainCategoryDao,
     private val subCategoryDao: SubCategoryDao,
@@ -57,7 +62,8 @@ class ReferenceDataRepository @Inject constructor(
     private val genderDao: GenderDao,
     private val tagDao: TagDao,
     private val locationDao: LocationDao,
-    private val sharedPreferences: SharedPreferences
+    private val sharedPreferences: SharedPreferences,
+    private val appPreferences: AppPreferences
 ) : ReferenceDataRepositoryInterface {
 
     // Constants - internal use only
@@ -92,7 +98,181 @@ class ReferenceDataRepository @Inject constructor(
         }
     }
 
-    // ============ RETRY HELPER ============
+    override suspend fun searchSchoolsByTown(
+        provinceId: Int,
+        townName: String,
+        schoolQuery: String?
+    ): AppResult<List<za.co.skoolswap.domain.model.School>> {
+        return try {
+            val token = appPreferences.authToken.firstOrNull()
+                ?: return AppResult.Error(Exception("No auth token"))
+
+            val response = schoolApiService.searchSchoolsByTown(
+                authHeader = "Bearer $token",
+                provinceId = provinceId,
+                townName = townName,
+                schoolQuery = schoolQuery
+            )
+
+            if (response.isSuccessful) {
+                val body = response.body()
+                val schools = body?.schools?.map { schoolResponse ->
+                    za.co.skoolswap.domain.model.School(
+                        id = schoolResponse.id,
+                        name = schoolResponse.name,
+                        provinceId = schoolResponse.province_id,
+                        provinceName = schoolResponse.province?.name,
+                        locationId = schoolResponse.location_id,
+                        schoolType = schoolResponse.school_type,
+                        logoUrl = schoolResponse.logo_url
+                    )
+                } ?: emptyList()
+
+                val entities = schools.map { school ->
+                    SchoolEntity(
+                        id = school.id,
+                        name = school.name,
+                        provinceId = school.provinceId,
+                        locationId = school.locationId,
+                        schoolType = school.schoolType,
+                        logoUrl = school.logoUrl
+                    )
+                }
+                if (entities.isNotEmpty()) {
+                    schoolDao.insertAll(entities)
+                }
+
+                val filterInfo = if (schoolQuery != null) "town '$townName' + query '$schoolQuery'" else "town '$townName'"
+                Timber.tag(LogTags.REPOSITORY).d("🔍 Found ${schools.size} schools for $filterInfo")
+                AppResult.Success(schools)
+            } else {
+                AppResult.Error(Exception("Search failed: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Timber.tag(LogTags.REPOSITORY).e(e, "❌ Error searching schools by town")
+            AppResult.Error(e)
+        }
+    }
+    override suspend fun searchSchools(
+        provinceId: Int,
+        query: String
+    ): AppResult<List<za.co.skoolswap.domain.model.School>> {
+        return try {
+            val token = appPreferences.authToken.firstOrNull()
+                ?: return AppResult.Error(Exception("No auth token"))
+
+            val response = schoolApiService.searchSchools(
+                authHeader = "Bearer $token",
+                provinceId = provinceId,
+                query = query
+            )
+
+            if (response.isSuccessful) {
+                val body = response.body()
+                val schools = body?.schools?.map { schoolResponse ->
+                    za.co.skoolswap.domain.model.School(
+                        id = schoolResponse.id,
+                        name = schoolResponse.name,
+                        provinceId = schoolResponse.province_id,
+                        provinceName = schoolResponse.province?.name,
+                        locationId = schoolResponse.location_id,
+                        schoolType = schoolResponse.school_type,
+                        logoUrl = schoolResponse.logo_url
+                    )
+                } ?: emptyList()
+
+                val entities = schools.map { school ->
+                    SchoolEntity(
+                        id = school.id,
+                        name = school.name,
+                        provinceId = school.provinceId,
+                        locationId = school.locationId,
+                        schoolType = school.schoolType,
+                        logoUrl = school.logoUrl
+                    )
+                }
+                if (entities.isNotEmpty()) {
+                    schoolDao.insertAll(entities)
+                }
+
+                Timber.tag(LogTags.REPOSITORY).d("🔍 Found ${schools.size} schools for query: '$query'")
+                AppResult.Success(schools)
+            } else {
+                AppResult.Error(Exception("Search failed: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Timber.tag(LogTags.REPOSITORY).e(e, "❌ Error searching schools")
+            AppResult.Error(e)
+        }
+    }// ============ RETRY HELPER ============
+
+// In ReferenceDataRepository.kt - add this method
+
+    override suspend fun searchTowns(provinceId: Int, query: String): AppResult<List<Town>> {
+        return try {
+            // 1. Try to get from database cache first
+            val cachedTowns = townDao.getByProvinceIdSync(provinceId)
+
+            // 2. If cache has data, filter locally
+            if (cachedTowns.isNotEmpty()) {
+                val filtered = if (query.isEmpty()) {
+                    cachedTowns.map { ReferenceDataMapper.toDomain(it) }
+                } else {
+                    cachedTowns
+                        .filter { it.name.lowercase().contains(query.lowercase()) }
+                        .map { ReferenceDataMapper.toDomain(it) }
+                }
+                Timber.tag(LogTags.REPOSITORY).d("🔍 Town search: ${filtered.size} results for '$query'")
+                return AppResult.Success(filtered)
+            }
+
+            // 3. If cache empty, load from API
+            val token = appPreferences.authToken.firstOrNull()
+                ?: return AppResult.Error(Exception("No auth token"))
+
+            val response = referenceApiService.getTowns(
+                provinceId = provinceId,
+                authToken = "Bearer $token"
+            )
+
+            if (response.isSuccessful) {
+                val townDtos = response.body() ?: emptyList()
+                val towns = townDtos.map { townDto ->
+                    Town(
+                        id = townDto.id,
+                        name = townDto.name,
+                        provinceId = townDto.provinceId
+                    )
+                }
+
+                // Cache towns
+                val entities = towns.map { town ->
+                    TownEntity(
+                        id = town.id,
+                        name = town.name,
+                        provinceId = town.provinceId
+                    )
+                }
+                townDao.insertAll(entities)
+
+                // Filter locally
+                val filtered = if (query.isEmpty()) {
+                    towns
+                } else {
+                    towns.filter { it.name.lowercase().contains(query.lowercase()) }
+                }
+
+                Timber.tag(LogTags.REPOSITORY).d("🔍 Loaded ${towns.size} towns, filtered to ${filtered.size}")
+                AppResult.Success(filtered)
+            } else {
+                AppResult.Error(Exception("Failed to load towns: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Timber.tag(LogTags.REPOSITORY).e(e, "❌ Error searching towns")
+            AppResult.Error(e)
+        }
+    }
+
     private suspend fun <T> retryWithBackoff(
         maxRetries: Int = MAX_RETRIES,
         initialDelayMs: Long = INITIAL_RETRY_DELAY_MS,

@@ -4,8 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
-import android.widget.AutoCompleteTextView
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -15,6 +14,7 @@ import androidx.navigation.fragment.findNavController
 import za.co.skoolswap.R
 import za.co.skoolswap.databinding.FragmentSchoolOnboardingProvinceBinding
 import za.co.skoolswap.domain.model.Province
+import za.co.skoolswap.ui.component.ProvincePickerBottomSheet
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -45,12 +45,22 @@ class SchoolOnboardingProvinceFragment : Fragment() {
 
     private fun setupUI() {
         binding.continueButton.isEnabled = false
+
+        // Province Spinner click - open bottom sheet
+        binding.provinceSpinner.setOnClickListener {
+            val provinces = viewModel.provinces.value
+            if (provinces.isNotEmpty()) {
+                showProvincePicker(provinces)
+            } else {
+                Toast.makeText(requireContext(), "Loading provinces...", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         binding.continueButton.setOnClickListener {
             val province = viewModel.selectedProvince.value
             if (province != null) {
                 Timber.d("✅ Navigating to School screen with province: ${province.name} (ID: ${province.id})")
 
-                // ✅ Pass province data as arguments
                 val bundle = Bundle().apply {
                     putInt("province_id", province.id)
                     putString("province_name", province.name)
@@ -67,13 +77,31 @@ class SchoolOnboardingProvinceFragment : Fragment() {
         }
     }
 
+    private fun showProvincePicker(provinces: List<Province>) {
+        val selectedProvince = viewModel.selectedProvince.value
+        val bottomSheet = ProvincePickerBottomSheet(
+            provinces = provinces,
+            selectedProvinceId = selectedProvince?.id,
+            onProvinceSelected = { province ->
+                viewModel.selectProvince(province)
+                binding.provinceSpinner.setText(province.name, false)
+                binding.errorMessage.visibility = View.GONE
+                Timber.tag("ProvinceFragment").d("Province selected: ${province.name}")
+            }
+        )
+        bottomSheet.show(parentFragmentManager, "ProvincePickerBottomSheet")
+    }
+
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     viewModel.provinces.collect { provinces ->
                         if (provinces.isNotEmpty()) {
-                            setupProvinceSpinner(provinces)
+                            // Update the spinner text if a province is selected
+                            viewModel.selectedProvince.value?.let { province ->
+                                binding.provinceSpinner.setText(province.name, false)
+                            }
                         }
                     }
                 }
@@ -83,6 +111,7 @@ class SchoolOnboardingProvinceFragment : Fragment() {
                         binding.continueButton.isEnabled = province != null
                         if (province != null) {
                             binding.errorMessage.visibility = View.GONE
+                            binding.provinceSpinner.setText(province.name, false)
                             Timber.tag("ProvinceFragment").d("Province selected: ${province.name}")
                         }
                     }
@@ -105,27 +134,6 @@ class SchoolOnboardingProvinceFragment : Fragment() {
                     }
                 }
             }
-        }
-    }
-
-    private fun setupProvinceSpinner(provinces: List<Province>) {
-        val provinceNames = provinces.map { it.name }
-        val adapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_dropdown_item_1line,
-            provinceNames
-        )
-
-        val autoCompleteTextView = binding.provinceSpinner
-        autoCompleteTextView.setAdapter(adapter)
-        autoCompleteTextView.threshold = 1
-        autoCompleteTextView.hint = "Select your province"
-
-        autoCompleteTextView.setOnItemClickListener { _, _, position, _ ->
-            val selectedProvince = provinces[position]
-            viewModel.selectProvince(selectedProvince)
-            // Hide error when user selects
-            binding.errorMessage.visibility = View.GONE
         }
     }
 

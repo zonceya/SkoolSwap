@@ -398,7 +398,13 @@ class ItemDetailFragment : Fragment() {
     private fun bindItem(item: Item) {
         binding.productTitle.text = item.name
         binding.productPrice.text = "R${String.format("%.2f", item.price)}"
-
+        // ✅ Show raw data for debugging
+        val priceDisplay = if (item.price > 0) {
+            "R${String.format("%.2f", item.price)}"
+        } else {
+            "Price: ${item.price}"  // Shows the actual value
+        }
+        binding.productPrice.text = priceDisplay
         if (item.viewCount > VIEW_COUNT_ZERO) {
             binding.viewCountContainer.visibility = View.VISIBLE
             binding.viewCount.text = item.viewCount.formatViewCount()

@@ -27,6 +27,9 @@ import za.co.skoolswap.databinding.FragmentCreateItemBinding
 import za.co.skoolswap.domain.model.reference.*
 import za.co.skoolswap.ui.component.ColorPickerBottomSheet
 import za.co.skoolswap.ui.component.OptionsPickerBottomSheet
+import za.co.skoolswap.ui.component.SearchableOptionsPickerBottomSheet
+import za.co.skoolswap.ui.component.TownPickerBottomSheet
+import za.co.skoolswap.ui.component.SchoolPickerBottomSheet
 import za.co.skoolswap.ui.main.MainActivity
 import za.co.skoolswap.ui.main.MainViewModel
 import za.co.skoolswap.utils.DialogAction
@@ -180,6 +183,10 @@ class CreateItemFragment : Fragment() {
         binding.deleteCover.visibility = View.GONE
         binding.deleteAngle2.visibility = View.GONE
         binding.deleteAngle3.visibility = View.GONE
+
+        // ✅ Set initial lock states
+        lockTown("Select province first")
+        lockSchool("Select town first")
     }
 
     private fun setupStrings() {
@@ -348,14 +355,42 @@ class CreateItemFragment : Fragment() {
         }
     }
 
+    // ============ LOCK/UNLOCK HELPERS ============
+
+    private fun lockTown(hint: String) {
+        binding.townInput.isEnabled = false
+        binding.townInput.alpha = 0.5f
+        binding.townInput.hint = hint
+        binding.townInput.setText("")
+        Timber.tag(LogTags.UI).d("🔒 Town locked: $hint")
+    }
+
+    private fun unlockTown() {
+        binding.townInput.isEnabled = true
+        binding.townInput.alpha = 1.0f
+        binding.townInput.hint = getString(R.string.create_item_select_town)
+        Timber.tag(LogTags.UI).d("🔓 Town unlocked")
+    }
+
+    private fun lockSchool(hint: String) {
+        binding.schoolInput.isEnabled = false
+        binding.schoolInput.alpha = 0.5f
+        binding.schoolInput.hint = hint
+        binding.schoolInput.setText("")
+        Timber.tag(LogTags.UI).d("🔒 School locked: $hint")
+    }
+
+    private fun unlockSchool() {
+        binding.schoolInput.isEnabled = true
+        binding.schoolInput.alpha = 1.0f
+        binding.schoolInput.hint = getString(R.string.create_item_select_school)
+        Timber.tag(LogTags.UI).d("🔓 School unlocked")
+    }
+
     // ============ BOTTOM SHEET PICKER METHODS ============
 
     private fun setupMainCategoryPicker(categories: List<MainCategory>) {
         Timber.tag(LogTags.UI).d("🎯 setupMainCategoryPicker called with ${categories.size} categories")
-
-        categories.forEachIndexed { index, category ->
-            Timber.tag(LogTags.UI).d("  Category $index: ${category.name} (ID: ${category.id})")
-        }
 
         if (categories.isEmpty()) {
             Timber.tag(LogTags.UI).w("Categories list is empty, hiding picker")
@@ -385,7 +420,6 @@ class CreateItemFragment : Fragment() {
                 binding.mainCategoryInput.setText(selectedName)
                 viewModel.onMainCategorySelected(selectedCategory.id)
                 Timber.tag(LogTags.UI).d("✅ MAIN CATEGORY SELECTED → ID: ${selectedCategory.id} | Name: ${selectedCategory.name}")
-                viewModel.onMainCategorySelected(selectedCategory.id)
             }.show(childFragmentManager, "category_picker")
         }
 
@@ -425,6 +459,12 @@ class CreateItemFragment : Fragment() {
                 return@setOnClickListener
             }
 
+            if (subCategories.isEmpty()) {
+                Toast.makeText(requireContext(), "No subcategories available for this category", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // ✅ Use OptionsPickerBottomSheet (NO search for subcategories)
             OptionsPickerBottomSheet(
                 title = getString(R.string.create_item_select_subcategory),
                 options = subCategories.map { it.name }
@@ -458,7 +498,50 @@ class CreateItemFragment : Fragment() {
             }.show(childFragmentManager, "condition_picker")
         }
     }
+    private fun setupProvincePicker(provinces: List<Province>) {
+        Timber.tag(LogTags.UI).d("Setting up province picker with ${provinces.size} items")
 
+        selectedProvinceId?.let { id ->
+            provinces.find { it.id == id }?.let {
+                binding.provinceInput.setText(it.name)
+                Timber.tag(LogTags.UI).d("Restored province: ${it.name}")
+                // ✅ If province is restored, unlock town
+                unlockTown()
+            }
+        }
+
+        // ✅ Set initial state - lock town if no province selected
+        if (selectedProvinceId == null) {
+            lockTown("Select province first")
+        }
+
+        binding.provinceInput.setOnClickListener {
+            // ✅ Use OptionsPickerBottomSheet (NO search)
+            OptionsPickerBottomSheet(
+                title = getString(R.string.create_item_select_province),
+                options = provinces.map { it.name }
+            ) { selectedName, position ->
+                val selectedProvince = provinces[position]
+                selectedProvinceId = selectedProvince.id
+                binding.provinceInput.setText(selectedName)
+
+                // ✅ Clear old selections and unlock town
+                selectedTownId = null
+                binding.townInput.setText("")
+                selectedSchoolId = null
+                binding.schoolInput.setText("")
+
+                // ✅ Unlock town
+                unlockTown()
+
+                // ✅ Lock school until town is selected
+                lockSchool("Select town first")
+
+                Timber.tag(LogTags.UI).d("Selected province: ${selectedProvince.name} (ID: ${selectedProvince.id})")
+                viewModel.onProvinceSelected(selectedProvince.id)
+            }.show(childFragmentManager, "province_picker")
+        }
+    }
     private fun setupSizePicker(sizes: List<Size>) {
         Timber.tag(LogTags.UI).d("Setting up size picker with ${sizes.size} items")
 
@@ -492,7 +575,7 @@ class CreateItemFragment : Fragment() {
         }
 
         binding.brandInput.setOnClickListener {
-            OptionsPickerBottomSheet(
+            SearchableOptionsPickerBottomSheet(
                 title = getString(R.string.create_item_select_brand),
                 options = brands.map { it.name }
             ) { selectedName, position ->
@@ -530,64 +613,63 @@ class CreateItemFragment : Fragment() {
         }
     }
 
-    private fun setupProvincePicker(provinces: List<Province>) {
-        Timber.tag(LogTags.UI).d("Setting up province picker with ${provinces.size} items")
 
-        selectedProvinceId?.let { id ->
-            provinces.find { it.id == id }?.let {
-                binding.provinceInput.setText(it.name)
-                Timber.tag(LogTags.UI).d("Restored province: ${it.name}")
-            }
-        }
-
-        binding.provinceInput.setOnClickListener {
-            OptionsPickerBottomSheet(
-                title = getString(R.string.create_item_select_province),
-                options = provinces.map { it.name }
-            ) { selectedName, position ->
-                val selectedProvince = provinces[position]
-                selectedProvinceId = selectedProvince.id
-                binding.provinceInput.setText(selectedName)
-                Timber.tag(LogTags.UI).d("Selected province: ${selectedProvince.name} (ID: ${selectedProvince.id})")
-                viewModel.onProvinceSelected(selectedProvince.id)
-            }.show(childFragmentManager, "province_picker")
-        }
-    }
 
     private fun setupTownPicker(towns: List<Town>) {
-        Timber.tag(LogTags.UI).d("Setting up town picker with ${towns.size} items")
+        Timber.tag(LogTags.UI).d("Setting up town picker with ${towns.size} towns")
 
-        if (towns.isEmpty()) {
-            Timber.tag(LogTags.UI).w("Towns empty, hiding picker")
-            binding.townInput.visibility = View.GONE
-            binding.townLabel.visibility = View.GONE
-            return
-        }
-
+        // ✅ Always show town input, never hide it
         binding.townInput.visibility = View.VISIBLE
         binding.townLabel.visibility = View.VISIBLE
 
+        // ✅ Restore selected town if exists
         selectedTownId?.let { id ->
             towns.find { it.id == id }?.let {
                 binding.townInput.setText(it.name)
-                Timber.tag(LogTags.UI).d("Restored town: ${it.name}")
+                Timber.tag(LogTags.UI).d("Restored town: ${it.name} (ID: ${it.id})")
+                unlockSchool()
             }
+        }
+
+        // ✅ Set initial state based on province selection
+        if (selectedProvinceId == null) {
+            binding.townInput.isEnabled = false
+            binding.townInput.alpha = 0.5f
+            binding.townInput.hint = "Select province first"
+            binding.townInput.setText("")
+        } else if (towns.isEmpty()) {
+            binding.townInput.isEnabled = false
+            binding.townInput.alpha = 0.5f
+            binding.townInput.hint = "Loading towns..."
+            binding.townInput.setText("")
+        } else {
+            binding.townInput.isEnabled = true
+            binding.townInput.alpha = 1.0f
+            binding.townInput.hint = "Search towns..."
         }
 
         binding.townInput.setOnClickListener {
             if (selectedProvinceId == null) {
-                Timber.tag(LogTags.UI).w("Town clicked but no province selected")
-                Toast.makeText(requireContext(), getString(R.string.create_item_select_province_first), Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Please select a province first", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            OptionsPickerBottomSheet(
-                title = getString(R.string.create_item_select_town),
-                options = towns.map { it.name }
-            ) { selectedName, position ->
-                selectedTownId = towns[position].id
-                binding.townInput.setText(selectedName)
-                Timber.tag(LogTags.UI).d("Selected town: $selectedName (ID: $selectedTownId)")
+            if (towns.isEmpty()) {
+                Toast.makeText(requireContext(), "Loading towns, please wait...", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            TownPickerBottomSheet(
+                provinceId = selectedProvinceId!!
+            ) { selectedTown ->
+                selectedTownId = selectedTown.id
+                binding.townInput.setText(selectedTown.name)
+                Timber.tag(LogTags.UI).d("Selected town: ${selectedTown.name} (ID: ${selectedTown.id})")
+
+                // ✅ Clear school and unlock it
+                selectedSchoolId = null
+                binding.schoolInput.setText("")
+                unlockSchool()
             }.show(childFragmentManager, "town_picker")
         }
     }
@@ -614,24 +696,37 @@ class CreateItemFragment : Fragment() {
         }
     }
 
+    // CreateItemFragment.kt - setupSchoolPicker
     private fun setupSchoolPicker(schools: List<School>) {
-        Timber.tag(LogTags.UI).d("Setting up school picker with ${schools.size} items")
-
-        selectedSchoolId?.let { id ->
-            schools.find { it.id == id }?.let {
-                binding.schoolInput.setText(it.name)
-                Timber.tag(LogTags.UI).d("Restored school: ${it.name}")
-            }
-        }
-
+        // ...
         binding.schoolInput.setOnClickListener {
-            OptionsPickerBottomSheet(
-                title = getString(R.string.create_item_select_school),
-                options = schools.map { it.name }
-            ) { selectedName, position ->
-                selectedSchoolId = schools[position].id
-                binding.schoolInput.setText(selectedName)
-                Timber.tag(LogTags.UI).d("Selected school: $selectedName (ID: $selectedSchoolId)")
+            if (selectedProvinceId == null) {
+                Toast.makeText(requireContext(), "Please select a province first", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            if (selectedTownId == null) {
+                Toast.makeText(requireContext(), "Please select a town first", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // ✅ Get town name with better error handling
+            val townName = viewModel.towns.value.find { it.id == selectedTownId }?.name
+            if (townName == null) {
+                Timber.tag(LogTags.UI).e("❌ Town not found in list for ID: $selectedTownId")
+                Toast.makeText(requireContext(), "Error: Town not found. Please re-select town.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            Timber.tag(LogTags.UI).d("🔍 Searching schools in town: $townName (ID: $selectedTownId)")
+
+            SchoolPickerBottomSheet(
+                provinceId = selectedProvinceId!!,
+                townName = townName  // ✅ Now guaranteed non-null
+            ) { selectedSchool ->
+                selectedSchoolId = selectedSchool.id
+                binding.schoolInput.setText(selectedSchool.name)
+                Timber.tag(LogTags.UI).d("Selected school: ${selectedSchool.name} (ID: ${selectedSchool.id})")
             }.show(childFragmentManager, "school_picker")
         }
     }
@@ -1094,6 +1189,10 @@ class CreateItemFragment : Fragment() {
         binding.townInput.setText("")
         binding.genderInput.setText("")
         binding.schoolInput.setText("")
+
+        // ✅ Reset lock states
+        lockTown("Select province first")
+        lockSchool("Select town first")
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -1127,6 +1226,19 @@ class CreateItemFragment : Fragment() {
             selectedGenderId = savedInstanceState.getInt("selectedGenderId").takeIf { it != -1 }
             selectedQuantity = savedInstanceState.getInt("selectedQuantity", 1)
             Timber.tag(LogTags.FRAGMENT).d("Restored quantity: $selectedQuantity")
+
+            // ✅ Restore lock states
+            if (selectedProvinceId != null) {
+                unlockTown()
+                if (selectedTownId != null) {
+                    unlockSchool()
+                } else {
+                    lockSchool("Select town first")
+                }
+            } else {
+                lockTown("Select province first")
+                lockSchool("Select town first")
+            }
         }
     }
 

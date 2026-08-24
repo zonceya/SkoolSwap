@@ -15,12 +15,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import za.co.skoolswap.domain.repository.SchoolRepositoryInterface
+import za.co.skoolswap.domain.repository.UserSchoolRepositoryInterface
 import javax.inject.Inject
 
 @HiltViewModel
 class SchoolOnboardingViewModel @Inject constructor(
-    private val schoolRepository: SchoolRepository,
-    private val userSchoolRepository: UserSchoolRepository,
+    private val schoolRepository: SchoolRepositoryInterface,
+    private val userSchoolRepository: UserSchoolRepositoryInterface,
     private val authRepository: AuthRepositoryInterface
 ) : ViewModel() {
 
