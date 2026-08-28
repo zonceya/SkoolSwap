@@ -40,6 +40,9 @@ import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import za.co.skoolswap.ui.component.SchoolPickerBottomSheet
+import za.co.skoolswap.ui.component.SearchableOptionsPickerBottomSheet
+import za.co.skoolswap.ui.component.TownPickerBottomSheet
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -450,21 +453,36 @@ class EditItemFragment : Fragment() {
         }
     }
 
+    // ============================================================
+// STEP 2: Replace setupBrandPicker method
+// ============================================================
+
     private fun setupBrandPicker(brands: List<Brand>) {
+        Timber.tag(LogTags.UI).d("Setting up brand picker with ${brands.size} items")
+
         if (brands.isEmpty()) {
             binding.brandInput.isEnabled = false
             return
         }
         binding.brandInput.isEnabled = true
 
+        // ✅ Restore selected brand if exists
+        selectedBrandId?.let { id ->
+            brands.find { it.id == id }?.let {
+                binding.brandInput.setText(it.name)
+                Timber.tag(LogTags.UI).d("Restored brand: ${it.name} (ID: ${it.id})")
+            }
+        }
+
         binding.brandInput.setOnClickListener {
-            OptionsPickerBottomSheet(
+            // ✅ Use SearchableOptionsPickerBottomSheet (with search!)
+            SearchableOptionsPickerBottomSheet(
                 title = getString(R.string.edit_item_select_brand_title),
                 options = brands.map { it.name }
             ) { selectedName, position ->
                 selectedBrandId = brands[position].id
                 binding.brandInput.setText(selectedName)
-                Timber.tag(LogTags.UI).d("Selected brand: $selectedName")
+                Timber.tag(LogTags.UI).d("✅ Selected brand: $selectedName (ID: $selectedBrandId)")
             }.show(childFragmentManager, "brand_picker")
         }
     }
@@ -506,26 +524,78 @@ class EditItemFragment : Fragment() {
         }
     }
 
+    // ============================================================
+// STEP 3: Replace setupTownPicker method
+// ============================================================
+
     private fun setupTownPicker(towns: List<Town>) {
-        if (towns.isEmpty()) {
-            binding.townInput.isEnabled = false
-            return
+        Timber.tag(LogTags.UI).d("Setting up town picker with ${towns.size} towns")
+
+        // ✅ Always show town input
+        binding.townInput.visibility = View.VISIBLE
+        binding.townLabel.visibility = View.VISIBLE
+
+        // ✅ Restore selected town if exists
+        selectedTownId?.let { id ->
+            towns.find { it.id == id }?.let {
+                binding.townInput.setText(it.name)
+                Timber.tag(LogTags.UI).d("Restored town: ${it.name} (ID: ${it.id})")
+                // ✅ Unlock school if town is restored
+                if (selectedProvinceId != null) {
+                    binding.schoolInput.isEnabled = true
+                    binding.schoolInput.alpha = 1.0f
+                    binding.schoolInput.hint = "Search schools..."
+                }
+            }
         }
-        binding.townInput.isEnabled = true
+
+        // ✅ Set initial state based on province selection
+        when {
+            selectedProvinceId == null -> {
+                binding.townInput.isEnabled = false
+                binding.townInput.alpha = 0.5f
+                binding.townInput.hint = "Select province first"
+                binding.townInput.setText("")
+            }
+            towns.isEmpty() -> {
+                binding.townInput.isEnabled = false
+                binding.townInput.alpha = 0.5f
+                binding.townInput.hint = "Loading towns..."
+                binding.townInput.setText("")
+            }
+            else -> {
+                binding.townInput.isEnabled = true
+                binding.townInput.alpha = 1.0f
+                binding.townInput.hint = "Search towns..."
+            }
+        }
 
         binding.townInput.setOnClickListener {
             if (selectedProvinceId == null) {
-                Toast.makeText(requireContext(), getString(R.string.create_item_select_province_first), Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Please select a province first", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            OptionsPickerBottomSheet(
-                title = getString(R.string.edit_item_select_town_title),
-                options = towns.map { it.name }
-            ) { selectedName, position ->
-                selectedTownId = towns[position].id
-                binding.townInput.setText(selectedName)
-                Timber.tag(LogTags.UI).d("Selected town: $selectedName")
+            if (towns.isEmpty()) {
+                Toast.makeText(requireContext(), "Loading towns, please wait...", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // ✅ Use TownPickerBottomSheet (with search)
+            TownPickerBottomSheet(
+                provinceId = selectedProvinceId!!
+            ) { selectedTown ->
+                selectedTownId = selectedTown.id
+                binding.townInput.setText(selectedTown.name)
+                Timber.tag(LogTags.UI)
+                    .d("✅ Selected town: ${selectedTown.name} (ID: ${selectedTown.id})")
+
+                // ✅ Clear school and unlock it
+                selectedSchoolId = null
+                binding.schoolInput.setText("")
+                binding.schoolInput.isEnabled = true
+                binding.schoolInput.alpha = 1.0f
+                binding.schoolInput.hint = "Search schools..."
             }.show(childFragmentManager, "town_picker")
         }
     }
@@ -549,27 +619,91 @@ class EditItemFragment : Fragment() {
         }
     }
 
+    // ============================================================
+// STEP 4: Replace setupSchoolPicker method
+// ============================================================
+
     private fun setupSchoolPicker(schools: List<School>) {
-        if (schools.isEmpty()) {
-            binding.schoolInput.isEnabled = false
-            return
+        Timber.tag(LogTags.UI).d("Setting up school picker with ${schools.size} schools")
+
+        // ✅ Show school input always
+        binding.schoolInput.visibility = View.VISIBLE
+        binding.schoolLabel.visibility = View.VISIBLE
+
+        // ✅ Restore selected school if exists
+        selectedSchoolId?.let { id ->
+            schools.find { it.id == id }?.let {
+                binding.schoolInput.setText(it.name)
+                Timber.tag(LogTags.UI).d("Restored school: ${it.name} (ID: ${it.id})")
+            }
         }
-        binding.schoolInput.isEnabled = true
+
+        // ✅ Set initial state based on province and town selection
+        when {
+            selectedProvinceId == null -> {
+                binding.schoolInput.isEnabled = false
+                binding.schoolInput.alpha = 0.5f
+                binding.schoolInput.hint = "Select province first"
+                binding.schoolInput.setText("")
+            }
+            selectedTownId == null -> {
+                binding.schoolInput.isEnabled = false
+                binding.schoolInput.alpha = 0.5f
+                binding.schoolInput.hint = "Select town first"
+                binding.schoolInput.setText("")
+            }
+            else -> {
+                binding.schoolInput.isEnabled = true
+                binding.schoolInput.alpha = 1.0f
+                binding.schoolInput.hint = "Search schools..."
+                // ✅ If we have a school name already, keep it
+            }
+        }
 
         binding.schoolInput.setOnClickListener {
-            OptionsPickerBottomSheet(
-                title = getString(R.string.edit_item_select_school_title),
-                options = schools.map { it.name }
-            ) { selectedName, position ->
-                selectedSchoolId = schools[position].id
-                binding.schoolInput.setText(selectedName)
-                Timber.tag(LogTags.UI).d("Selected school: $selectedName")
+            // ✅ Check if province is selected
+            if (selectedProvinceId == null) {
+                Toast.makeText(requireContext(), "Please select a province first", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // ✅ Check if town is selected
+            if (selectedTownId == null) {
+                Toast.makeText(requireContext(), "Please select a town first", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // ✅ Get town name with better error handling
+            val townName = viewModel.towns.value.find { it.id == selectedTownId }?.name
+            if (townName == null) {
+                Timber.tag(LogTags.UI).e("❌ Town not found in list for ID: $selectedTownId")
+                Toast.makeText(requireContext(), "Error: Town not found. Please re-select town.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            Timber.tag(LogTags.UI).d("🔍 Searching schools in town: $townName (ID: $selectedTownId)")
+
+            // ✅ Use SchoolPickerBottomSheet (with search)
+            SchoolPickerBottomSheet(
+                provinceId = selectedProvinceId!!,
+                townName = townName
+            ) { selectedSchool ->
+                selectedSchoolId = selectedSchool.id
+                binding.schoolInput.setText(selectedSchool.name)
+                Timber.tag(LogTags.UI)
+                    .d("✅ Selected school: ${selectedSchool.name} (ID: ${selectedSchool.id})")
             }.show(childFragmentManager, "school_picker")
         }
     }
 
     private fun renderImageGrid(images: List<EditImage>) {
         binding.imageGrid.removeAllViews()
+
+        // ✅ If no images, show empty state
+        if (images.isEmpty() || images.all { it is EditImage.Empty }) {
+            showEmptyImageState()
+            return
+        }
 
         images.forEachIndexed { index, editImage ->
             val imageView = LayoutInflater.from(requireContext())
@@ -585,25 +719,42 @@ class EditItemFragment : Fragment() {
                     addButton.visibility = View.GONE
                     deleteButton.visibility = View.VISIBLE
                     loadingBar.visibility = View.GONE
+                    itemImage.visibility = View.VISIBLE
+
+                    // ✅ Show dimmed if marked for deletion
                     itemImage.alpha = if (editImage.isMarkedForDeletion) 0.5f else 1.0f
 
-                    Glide.with(requireContext())
-                        .load(editImage.url)
-                        .placeholder(R.drawable.ic_create_item_placeholder)
-                        .error(R.drawable.ic_create_item_placeholder)
-                        .centerCrop()
-                        .into(itemImage)
+                    // ✅ LOAD IMAGE WITH GLIDE
+                    if (editImage.url.isNotEmpty()) {
+                        try {
+                            Glide.with(requireContext())
+                                .load(editImage.url)
+                                .placeholder(R.drawable.ic_create_item_placeholder)
+                                .error(R.drawable.ic_create_item_placeholder)
+                                .centerCrop()
+                                .into(itemImage)
+                            Timber.tag(LogTags.UI).d("✅ Loaded existing image: ${editImage.url.take(50)}...")
+                        } catch (e: Exception) {
+                            Timber.tag(LogTags.UI).e(e, "❌ Failed to load image")
+                            itemImage.setImageResource(R.drawable.ic_create_item_placeholder)
+                        }
+                    } else {
+                        itemImage.setImageResource(R.drawable.ic_create_item_placeholder)
+                    }
 
                     itemImage.setOnClickListener { showImageSourceOptions(index, isReplace = true) }
                     deleteButton.setOnClickListener {
                         MaterialAlertDialogBuilder(requireContext())
                             .setTitle(getString(R.string.edit_item_remove_image_title))
                             .setMessage(getString(R.string.edit_item_remove_image_message))
-                            .setPositiveButton(getString(R.string.edit_item_remove)) { _, _ -> viewModel.removeImage(index) }
+                            .setPositiveButton(getString(R.string.edit_item_remove)) { _, _ ->
+                                viewModel.removeImage(index)
+                            }
                             .setNegativeButton(getString(R.string.edit_item_cancel), null)
                             .show()
                     }
                 }
+
                 is EditImage.New -> {
                     addButton.visibility = View.GONE
                     deleteButton.visibility = View.VISIBLE
@@ -614,32 +765,72 @@ class EditItemFragment : Fragment() {
                     } else {
                         loadingBar.visibility = View.GONE
                         itemImage.visibility = View.VISIBLE
-                        Glide.with(requireContext())
-                            .load(editImage.uri)
-                            .placeholder(R.drawable.ic_create_item_placeholder)
-                            .error(R.drawable.ic_create_item_placeholder)
-                            .centerCrop()
-                            .into(itemImage)
+
+                        // ✅ LOAD NEW IMAGE FROM URI
+                        try {
+                            Glide.with(requireContext())
+                                .load(editImage.uri)
+                                .placeholder(R.drawable.ic_create_item_placeholder)
+                                .error(R.drawable.ic_create_item_placeholder)
+                                .centerCrop()
+                                .into(itemImage)
+                            Timber.tag(LogTags.UI).d("✅ Loaded new image from URI")
+                        } catch (e: Exception) {
+                            Timber.tag(LogTags.UI).e(e, "❌ Failed to load new image")
+                            itemImage.setImageResource(R.drawable.ic_create_item_placeholder)
+                        }
                     }
+
                     itemImage.setOnClickListener { showImageSourceOptions(index, isReplace = true) }
                     deleteButton.setOnClickListener { viewModel.removeImage(index) }
                 }
+
                 EditImage.Empty -> {
                     addButton.visibility = View.VISIBLE
                     deleteButton.visibility = View.GONE
                     itemImage.setImageResource(R.drawable.ic_create_item_placeholder)
+                    itemImage.visibility = View.VISIBLE
+                    loadingBar.visibility = View.GONE
+
+
                     addButton.setOnClickListener { showImageSourceOptions(index, isReplace = false) }
+                    itemImage.setOnClickListener { showImageSourceOptions(index, isReplace = false) }
                 }
             }
             binding.imageGrid.addView(imageView)
         }
-    }
 
+        updateImageCountText()
+    }
+    private fun showEmptyImageState() {
+        binding.imageGrid.removeAllViews()
+
+        val emptyView = LayoutInflater.from(requireContext())
+            .inflate(R.layout.item_editable_image, binding.imageGrid, false)
+
+        val addButton = emptyView.findViewById<View>(R.id.addButton)
+        val itemImage = emptyView.findViewById<ImageView>(R.id.itemImage)
+        val deleteButton = emptyView.findViewById<ImageView>(R.id.deleteButton)
+        val loadingBar = emptyView.findViewById<ProgressBar>(R.id.imageLoading)
+
+        addButton.visibility = View.VISIBLE
+        deleteButton.visibility = View.GONE
+        loadingBar.visibility = View.GONE
+             itemImage.setImageResource(R.drawable.ic_create_item_placeholder)
+
+        addButton.setOnClickListener { showImageSourceOptions(0, isReplace = false) }
+        itemImage.setOnClickListener { showImageSourceOptions(0, isReplace = false) }
+
+        binding.imageGrid.addView(emptyView)
+        Timber.tag(LogTags.UI).d("📸 Showing empty image state")
+    }
     private fun updateImageCountText() {
         val images = viewModel.images.value
         val imageCount = images.count { it !is EditImage.Empty }
         binding.imagesCount.text = getString(R.string.edit_item_images_count, imageCount)
+        Timber.tag(LogTags.UI).d("📸 Image count: $imageCount/3")
     }
+
 
     private fun showImageSourceOptions(position: Int, isReplace: Boolean) {
         pendingImagePosition = position
@@ -727,9 +918,12 @@ class EditItemFragment : Fragment() {
         }
     }
 
+
+
     private fun populateItemData(item: Item) {
         Timber.tag(LogTags.UI).d("=== POPULATING ITEM DATA ===")
         Timber.tag(LogTags.UI).d("Item: ${item.name}, Price: ${item.price}")
+        Timber.tag(LogTags.UI).d("📸 Images: ${item.images.size}")
 
         originalName = item.name
         originalDescription = item.description
@@ -756,17 +950,24 @@ class EditItemFragment : Fragment() {
         selectedSchoolId = item.schoolId
         selectedGenderId = item.genderId
 
-        Timber.tag(LogTags.UI).d("📍 Selected Town ID from locationId: $selectedTownId")
-        Timber.tag(LogTags.UI).d("Selected IDs - MainCat: $selectedMainCategoryId, SubCat: $selectedSubCategoryId, Size: $selectedSizeId")
-
+        // ✅ Set selection in ViewModel
         selectedMainCategoryId?.let { viewModel.onMainCategorySelected(it) }
         selectedProvinceId?.let { viewModel.onProvinceSelected(it) }
 
         restoreSelectionTexts()
 
-        val existingImages = item.images.map { image ->
-            EditImage.Existing(image.id, image.url)
+        // ✅ SET EXISTING IMAGES - CRITICAL FIX
+        val existingImages = if (item.images.isNotEmpty()) {
+            Timber.tag(LogTags.UI).d("📸 Setting ${item.images.size} existing images")
+            item.images.map { image ->
+                EditImage.Existing(image.id, image.url)
+            }
+        } else {
+            Timber.tag(LogTags.UI).d("📸 No existing images, showing empty state")
+            emptyList()
         }
+
+        // ✅ This will trigger the image grid update
         viewModel.setExistingImages(existingImages)
     }
 
