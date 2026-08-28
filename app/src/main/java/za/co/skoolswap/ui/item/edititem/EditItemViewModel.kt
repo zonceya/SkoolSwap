@@ -23,7 +23,6 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
-// Private constants - internal to this file only
 private const val MAX_IMAGES = 3
 
 @HiltViewModel
@@ -276,15 +275,29 @@ class EditItemViewModel @Inject constructor(
     }
 
     // ============ UNIFIED IMAGE METHODS ============
+    // ============================================================
+// STEP 5.2: Replace setExistingImages method
+// ============================================================
+
     fun setExistingImages(existingImages: List<EditImage>) {
         Timber.tag(LogTags.VIEW_MODEL).d("setExistingImages called with ${existingImages.size} images")
-        existingImages.forEachIndexed { index, image ->
-            if (image is EditImage.Existing) {
-                Timber.tag(LogTags.VIEW_MODEL).d("Image $index: ID=${image.id}, URL=${image.url.take(100)}...")
+
+        // Filter out any that are marked for deletion
+        val validImages = existingImages.filter {
+            when (it) {
+                is EditImage.Existing -> !it.isMarkedForDeletion
+                else -> true
             }
         }
 
-        val imageList = existingImages.toMutableList()
+        Timber.tag(LogTags.VIEW_MODEL).d("After filtering: ${validImages.size} images")
+        validImages.forEachIndexed { index, image ->
+            if (image is EditImage.Existing) {
+                Timber.tag(LogTags.VIEW_MODEL).d("Image $index: ID=${image.id}, URL=${image.url.take(50)}...")
+            }
+        }
+
+        val imageList = validImages.toMutableList()
         while (imageList.size < MAX_IMAGES) {
             imageList.add(EditImage.Empty)
         }
@@ -318,18 +331,40 @@ class EditItemViewModel @Inject constructor(
         }
     }
 
+    // ============================================================
+// STEP 5: Replace removeImage method in EditItemViewModel
+// ============================================================
+
     fun removeImage(position: Int) {
         Timber.tag(LogTags.VIEW_MODEL).d("removeImage - position: $position")
         val currentList = _images.value.toMutableList()
         if (position in 0 until currentList.size) {
             val image = currentList[position]
-            if (image is EditImage.Existing && !image.isMarkedForDeletion) {
-                _imagesToDelete.value += image.id
-                Timber.tag(LogTags.VIEW_MODEL).d("Marked image ${image.id} for deletion")
+            when (image) {
+                is EditImage.Existing -> {
+                    // ✅ Mark for deletion (add to deletion set)
+                    if (!image.isMarkedForDeletion) {
+                        _imagesToDelete.value += image.id
+                        Timber.tag(LogTags.VIEW_MODEL).d("✅ Marked existing image ${image.id} for deletion")
+                    }
+                    // ✅ Replace with empty slot
+                    currentList[position] = EditImage.Empty
+                    _images.value = currentList
+                }
+                is EditImage.New -> {
+                    // ✅ Just remove new image (no server deletion needed)
+                    Timber.tag(LogTags.VIEW_MODEL).d("✅ Removed new image at position $position")
+                    currentList[position] = EditImage.Empty
+                    _images.value = currentList
+                }
+                EditImage.Empty -> {
+                    Timber.tag(LogTags.VIEW_MODEL).d("Position $position already empty, ignoring")
+                    return
+                }
             }
-            currentList[position] = EditImage.Empty
-            _images.value = currentList
             Timber.tag(LogTags.VIEW_MODEL).d("Image removed at position $position")
+        } else {
+            Timber.tag(LogTags.VIEW_MODEL).w("Invalid position: $position, size: ${currentList.size}")
         }
     }
 
