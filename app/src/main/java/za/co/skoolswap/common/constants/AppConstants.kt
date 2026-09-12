@@ -1,10 +1,12 @@
 package za.co.skoolswap.common.constants
+import za.co.skoolswap.BuildConfig
+
 
 object AppConstants {
     // ============ BASE CONFIGURATION ============
-    const val BASE_URL = "https://api.skoolswap.co.za/"
+    val BASE_URL = BuildConfig.API_BASE_URL
     const val API_VERSION = "v1"
-    const val FULL_BASE_URL = "$BASE_URL$API_VERSION/"
+    val FULL_BASE_URL = "$BASE_URL/api/$API_VERSION/"
     const val CACHE_DURATION_MS = 24 * 60 * 60 * 1000L // 24 hour
     // ============ TIMEOUTS ============
     const val CONNECT_TIMEOUT = 30L

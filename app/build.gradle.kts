@@ -15,19 +15,48 @@ android {
         applicationId = "za.co.skoolswap"
         minSdk = 25
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.1"
+        versionCode = 2
+        versionName = "1.0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-
+    signingConfigs {
+        create("release") {
+            storeFile = file("C:/Users/zonce/keystores/skoolswap-new.jks")
+            storePassword = "onceya23"
+            keyAlias = "skoolswapkey"
+            keyPassword = "onceya23"
+        }
+    }
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
+            )
+        }
+    }
+    flavorDimensions += "environment"
+
+    productFlavors {
+        create("local") {
+            dimension = "environment"
+            buildConfigField(
+                "String",
+                "API_BASE_URL",
+                "\"https://api.skoolswap.co.za\""
+            )
+        }
+
+        create("staging") {
+            dimension = "environment"
+            buildConfigField(
+                "String",
+                "API_BASE_URL",
+                "\"https://api-staging.skoolswap.co.za\""
             )
         }
     }
