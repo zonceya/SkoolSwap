@@ -1,7 +1,7 @@
 // data/remote/api/RetrofitClient.kt
 package za.co.skoolswap.data.remote.api
 
-import za.co.skoolswap.common.constants.AppConstants.BASE_URL
+import za.co.skoolswap.common.constants.AppConstants.FULL_BASE_URL
 import za.co.skoolswap.common.constants.AppConstants.TIMEOUT
 import com.google.gson.GsonBuilder
 import okhttp3.OkHttpClient
@@ -32,7 +32,7 @@ object RetrofitClient {
     // ✅ Return Retrofit instance, not UserApiService
     val instance: Retrofit by lazy {
         Retrofit.Builder()
-            .baseUrl(BASE_URL)
+            .baseUrl(FULL_BASE_URL)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
