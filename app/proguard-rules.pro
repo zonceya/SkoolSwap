@@ -47,7 +47,7 @@
 -keep class kotlin.coroutines.Continuation
 
 # ============================================
-# Gson (if used) — reflection-based serialization
+# Gson (reflection-based serialization)
 # ============================================
 -keepattributes Signature
 -keep class com.google.gson.** { *; }
@@ -55,12 +55,13 @@
 -keep class * implements com.google.gson.JsonSerializer
 -keep class * implements com.google.gson.JsonDeserializer
 
-# Keep your model/data classes used with Gson
-# Replace with your actual package
--keep class com.yourpackage.model.** { <fields>; }
+# Your actual Gson-parsed models
+-keep class za.co.skoolswap.data.remote.models.** { *; }
+-keep class za.co.skoolswap.domain.model.** { *; }
+-keep class za.co.skoolswap.data.local.entity.** { *; }
 
 # ============================================
-# Retrofit / OkHttp (if used)
+# Retrofit / OkHttp
 # ============================================
 -dontwarn okhttp3.**
 -dontwarn okio.**
@@ -72,16 +73,32 @@
 }
 
 # ============================================
-# Room (if used)
+# Room
 # ============================================
 -keep class * extends androidx.room.RoomDatabase
 -dontwarn androidx.room.paging.**
 
 # ============================================
-# Firebase / Crashlytics (if used)
+# Firebase / Crashlytics
 # ============================================
 -keepattributes SourceFile, LineNumberTable
 -keep public class * extends java.lang.Exception
+-keep class com.google.firebase.auth.** { *; }
+
+# ============================================
+# Credential Manager / Google Identity (CLIENT-SIDE ONLY)
+# ============================================
+-keep class androidx.credentials.** { *; }
+-keep class com.google.android.libraries.identity.googleid.** { *; }
+-keep class com.google.android.gms.auth.api.identity.** { *; }
+-keep class com.google.android.gms.auth.api.credentials.** { *; }
+-keep class com.google.android.gms.auth.api.signin.** { *; }
+-keep class com.google.android.gms.common.api.** { *; }
+
+# NOTE: Do NOT keep CredentialProviderBaseController unless you are
+# building a credential *provider* service. If you ever need it, the
+# correct package is:
+#   androidx.credentials.playservices.controllers.CredentialProviderBaseController
 
 # ============================================
 # Aggressive shrinking / optimization
@@ -90,13 +107,14 @@
 -optimizationpasses 5
 -allowaccessmodification
 -repackageclasses ''
+
 # FirebaseUI-auth references old deprecated Smart Lock Credentials API
-# These classes were removed from play-services-auth; safe to ignore
 -dontwarn com.google.android.gms.auth.api.credentials.**
 
 # Crashlytics buildtools reference compile-time-only annotation classes
 -dontwarn com.google.firebase.crashlytics.buildtools.reloc.afu.org.checkerframework.**
 -dontwarn com.google.firebase.crashlytics.buildtools.reloc.org.checkerframework.**
+
 # Remove logging in release builds
 -assumenosideeffects class android.util.Log {
     public static boolean isLoggable(java.lang.String, int);
