@@ -1,13 +1,13 @@
 // data/remote/api/RetrofitClient.kt
 package za.co.skoolswap.data.remote.api
 
-import za.co.skoolswap.common.constants.AppConstants.FULL_BASE_URL
 import za.co.skoolswap.common.constants.AppConstants.TIMEOUT
 import com.google.gson.GsonBuilder
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import za.co.skoolswap.common.constants.AppConstants.BASE_URL
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
@@ -32,7 +32,7 @@ object RetrofitClient {
     // ✅ Return Retrofit instance, not UserApiService
     val instance: Retrofit by lazy {
         Retrofit.Builder()
-            .baseUrl(FULL_BASE_URL)
+            .baseUrl(BASE_URL)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()

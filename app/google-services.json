@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "63644777044-ufbq4jdu7gq4glq0s0lvqshm1iq5aue6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.skoolswap",
+            "certificate_hash": "45dab26ff02711cef8a4ade0e6e4a3e7d1af00b6"
+          }
+        },
+        {
           "client_id": "63644777044-5ttve1jvt4nr35s31b2gp2b48ev2tp3h.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -56,6 +64,14 @@
           "android_info": {
             "package_name": "za.co.skoolswap",
             "certificate_hash": "a9afc64f873cd5953cfc55ce7f675c15ddd4e59d"
+          }
+        },
+        {
+          "client_id": "63644777044-98ruin91hdtri1htkrcss3dab5mmdgc9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "za.co.skoolswap",
+            "certificate_hash": "45dab26ff02711cef8a4ade0e6e4a3e7d1af00b6"
           }
         },
         {
