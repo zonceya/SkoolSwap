@@ -1,6 +1,5 @@
 package za.co.skoolswap.ui.main
 
-
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -20,39 +19,20 @@ class MainViewModel @Inject constructor(
     private val preferences: AppPreferences,
     private val authRepository: AuthRepositoryInterface
 ) : ViewModel() {
+
     var suppressNextResumeRefresh = false
+
+    // Used ONLY for forced logout / auth-invalidation overrides.
+    // Initial routing (onboarding → login → home) is decided exclusively by
+    // IntroFragment.determineDestination(). Do NOT add a second initial-routing
+    // decider here — it races with IntroFragment and crashes the nav graph.
     private val _forceNavigation = MutableLiveData<NavigationDestination?>()
     val forceNavigation: MutableLiveData<NavigationDestination?> = _forceNavigation
-
-    private val _navigationDestination = MutableLiveData<NavigationDestination?>()
-    val navigationDestination: MutableLiveData<NavigationDestination?> = _navigationDestination
-
-    // Guard — only emit initial navigation once
-    private var initialNavigationEmitted = false
 
     init {
         viewModelScope.launch {
             checkAuthState()
-            emitInitialNavigation()
         }
-    }
-
-    // Called ONCE on startup to determine where to go
-    private suspend fun emitInitialNavigation() {
-        if (initialNavigationEmitted) return
-        initialNavigationEmitted = true
-
-        val onboardingFinished = preferences.isOnboardingFinished.firstOrNull() ?: false
-        val user = authRepository.getServerUser().firstOrNull()
-
-        val destination = when {
-            !onboardingFinished -> NavigationDestination.ONBOARDING
-            user == null -> NavigationDestination.LOGIN
-            user.schoolMapped -> NavigationDestination.HOME
-            else -> NavigationDestination.LOGIN
-        }
-
-        _navigationDestination.value = destination
     }
 
     fun checkAuthState() {
@@ -70,10 +50,6 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             preferences.setOnboardingFinished(true)
         }
-    }
-
-    fun clearNavigationDestination() {
-        _navigationDestination.value = null
     }
 
     fun clearForceNavigation() {

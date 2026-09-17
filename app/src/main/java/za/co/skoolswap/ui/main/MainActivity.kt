@@ -37,7 +37,6 @@ import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import androidx.navigation.fragment.NavHostFragment
-import com.bumptech.glide.load.engine.GlideException
 import za.co.skoolswap.data.local.datastore.AppPreferences
 import za.co.skoolswap.domain.repository.AuthRepositoryInterface
 import za.co.skoolswap.ui.home.HomeViewModel
@@ -71,6 +70,10 @@ class MainActivity : AppCompatActivity() {
     @Inject
     lateinit var workerManager: WorkerManager
 
+    // ✅ Sticky guard: once we've ever left intro, the intro routing decision is final.
+    // Reflects "has intro already routed", not "am I currently on intro".
+    private var introHasRouted = false
+
     companion object {
         private const val TAG = "MainActivity"
         private const val STATUS_BAR_LIGHT = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
@@ -84,8 +87,8 @@ class MainActivity : AppCompatActivity() {
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
         val nightMode = resources.configuration.uiMode and
-                android.content.res.Configuration.UI_MODE_NIGHT_MASK
-        val isDark = nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES
+                Configuration.UI_MODE_NIGHT_MASK
+        val isDark = nightMode == Configuration.UI_MODE_NIGHT_YES
         updateStatusBar()
 
         window.statusBarColor = if (isDark) {
@@ -117,6 +120,12 @@ class MainActivity : AppCompatActivity() {
         binding.appBarMain.fab.visibility = View.GONE
         supportActionBar?.hide()
         binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+
+        // If we're restoring and current destination is not intro, mark intro as routed
+        if (savedInstanceState != null &&
+            navController.currentDestination?.id != R.id.introFragment) {
+            introHasRouted = true
+        }
 
         if (savedInstanceState == null) {
             when (intent.getStringExtra("destination")) {
@@ -194,8 +203,8 @@ class MainActivity : AppCompatActivity() {
                                 profileImageView.setColorFilter(null)
                             } else {
                                 profileImageView.setImageResource(R.drawable.ic_user)
-                                val isDarkMode = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-                                        android.content.res.Configuration.UI_MODE_NIGHT_YES
+                                val isDarkMode = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                                        Configuration.UI_MODE_NIGHT_YES
                                 val tintColor = if (isDarkMode) {
                                     ContextCompat.getColor(this@MainActivity, R.color.white)
                                 } else {
@@ -242,7 +251,6 @@ class MainActivity : AppCompatActivity() {
             fab.isEnabled = false
             lifecycleScope.launch {
                 try {
-                    // Don't block navigation on this — fire and forget, or timeout it
                     withTimeoutOrNull(3000) { authRepository.refreshUserProfile() }
                     val hasContactNumber = viewModel.hasContactNumber()
                     if (hasContactNumber) {
@@ -286,13 +294,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
+            // ✅ Sticky guard: once we've left intro, mark it as routed
+            if (destination.id != R.id.introFragment) {
+                introHasRouted = true
+            }
+
             when (destination.id) {
-                // ✅ Updated to include new Province and School fragments
                 R.id.schoolOnboardingProvinceFragment,
                 R.id.schoolOnboardingSchoolFragment,
                 R.id.viewPagerFragment,
                 R.id.introFragment,
-                R.id.itemDetailFragment -> {  // ← ADD THIS
+                R.id.itemDetailFragment -> {
                     supportActionBar?.hide()
                     binding.appBarMain.fab.visibility = View.GONE
                     binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
@@ -332,8 +344,8 @@ class MainActivity : AppCompatActivity() {
                     binding.appBarMain.toolbar.menu.findItem(R.id.action_search)?.isVisible = true
 
                     val nightMode = resources.configuration.uiMode and
-                            android.content.res.Configuration.UI_MODE_NIGHT_MASK
-                    val isDark = nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES
+                            Configuration.UI_MODE_NIGHT_MASK
+                    val isDark = nightMode == Configuration.UI_MODE_NIGHT_YES
                     updateStatusBar()
                     window.statusBarColor = if (isDark) android.graphics.Color.BLACK else android.graphics.Color.WHITE
                     @Suppress("DEPRECATION")
@@ -513,8 +525,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateStatusBar() {
         val nightMode = resources.configuration.uiMode and
-                android.content.res.Configuration.UI_MODE_NIGHT_MASK
-        val isDark = nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES
+                Configuration.UI_MODE_NIGHT_MASK
+        val isDark = nightMode == Configuration.UI_MODE_NIGHT_YES
 
         window.statusBarColor = if (isDark) {
             android.graphics.Color.BLACK
@@ -530,22 +542,33 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ============================================================================
+    // NAVIGATION OBSERVER — FIXED
+    // ============================================================================
+    // - Removed the `navigationDestination` observer entirely.
+    //   IntroFragment is now the SINGLE source of truth for initial routing.
+    // - Kept `forceNavigation` — used for forced logout from checkAuthState().
+    // - Added `introHasRouted` sticky guard so a late forceNavigation event
+    //   cannot fire after intro has already routed (e.g. on slow networks).
+    // ============================================================================
     private fun observeNavigation() {
-        viewModel.navigationDestination.observe(this) { destination ->
+        viewModel.forceNavigation.observe(this) { destination ->
             val currentDest = navController.currentDestination?.id
+
+            // Old transient guard — kept for backward safety, but now backed up
+            // by the sticky `introHasRouted` flag below.
             if (currentDest == R.id.introFragment) {
                 return@observe
             }
 
-            if (destination != null) {
-                navigateToDestination(destination)
-                viewModel.clearNavigationDestination()
-            }
-        }
-
-        viewModel.forceNavigation.observe(this) { destination ->
-            val currentDest = navController.currentDestination?.id
-            if (currentDest == R.id.introFragment) {
+            // ✅ Sticky guard: if intro has already routed (we've ever left it),
+            // a late forceNavigation from a slow network call must be ignored.
+            // This prevents the exact race that caused the crash.
+            if (introHasRouted) {
+                Timber.tag(LogTags.UI).d(
+                    "⏭️ Ignoring forceNavigation($destination) — intro already routed"
+                )
+                viewModel.clearForceNavigation()
                 return@observe
             }
 
@@ -556,6 +579,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ============================================================================
+    // NAVIGATE TO DESTINATION — FIXED
+    // ============================================================================
+    // - Uses DESTINATION IDs (R.id.nav_home, R.id.viewPagerFragment) instead of
+    //   introFragment-scoped ACTION IDs.
+    // - Actions like `action_introFragment_to_onboarding` only exist on the
+    //   introFragment node. Once we've navigated away, calling them throws
+    //   IllegalArgumentException. Destination IDs resolve globally and are safe
+    //   from any graph state.
+    // - `action_global_logout` is a global action, so it's safe to keep.
+    // ============================================================================
     private fun navigateToDestination(destination: NavigationDestination) {
         val currentDestId = navController.currentDestination?.id
 
@@ -574,13 +608,15 @@ class MainActivity : AppCompatActivity() {
                 }
                 val popped = navController.popBackStack(R.id.nav_home, false)
                 if (!popped) {
-                    navController.navigate(R.id.action_introFragment_to_nav_home)
+                    // ✅ Destination ID, not action_introFragment_to_nav_home
+                    navController.navigate(R.id.nav_home)
                 }
             }
             NavigationDestination.LOGIN -> {
                 if (currentDestId == R.id.loginFragment) {
                     return
                 }
+                // action_global_logout is a global action — safe from anywhere
                 navController.navigate(R.id.action_global_logout)
             }
             NavigationDestination.ONBOARDING -> {
@@ -589,7 +625,8 @@ class MainActivity : AppCompatActivity() {
                 }
                 val popped = navController.popBackStack(R.id.viewPagerFragment, false)
                 if (!popped) {
-                    navController.navigate(R.id.action_introFragment_to_onboarding)
+                    // ✅ Destination ID, not action_introFragment_to_onboarding
+                    navController.navigate(R.id.viewPagerFragment)
                 }
             }
             else -> {
@@ -603,7 +640,6 @@ class MainActivity : AppCompatActivity() {
         val nightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
         val isDark = nightMode == Configuration.UI_MODE_NIGHT_YES
 
-        // ✅ Updated to include new Province and School fragments
         val isIntroLike = destinationId == R.id.introFragment ||
                 destinationId == R.id.loginFragment ||
                 destinationId == R.id.viewPagerFragment ||
@@ -637,13 +673,12 @@ class MainActivity : AppCompatActivity() {
         val currentDestination = navController.currentDestination?.id
         Timber.tag(LogTags.UI).d("🔄 Refreshing toolbar for destination: $currentDestination")
 
-        // ✅ Updated to include new Province and School fragments
         when (currentDestination) {
             R.id.schoolOnboardingProvinceFragment,
             R.id.schoolOnboardingSchoolFragment,
             R.id.viewPagerFragment,
             R.id.introFragment,
-            R.id.itemDetailFragment -> {  // ← ADD THIS
+            R.id.itemDetailFragment -> {
                 supportActionBar?.hide()
                 binding.appBarMain.fab.visibility = View.GONE
             }
