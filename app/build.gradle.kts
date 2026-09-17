@@ -15,8 +15,8 @@ android {
         applicationId = "za.co.skoolswap"
         minSdk = 25
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.0.4"
+        versionCode = 7
+        versionName = "1.0.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

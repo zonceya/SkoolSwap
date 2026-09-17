@@ -75,6 +75,22 @@
           }
         },
         {
+          "client_id": "63644777044-ehatlr5b515cdgp4sr20bldgr8ul7die.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "za.co.skoolswap",
+            "certificate_hash": "ffd716477663076fb8ddd086b9f44eed5f6bdc81"
+          }
+        },
+        {
+          "client_id": "63644777044-h89ugfh9c2dssr75lcp5b6ek5doa0271.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "za.co.skoolswap",
+            "certificate_hash": "390587399530b3d8576c3c56d4d9fac598998157"
+          }
+        },
+        {
           "client_id": "63644777044-5ttve1jvt4nr35s31b2gp2b48ev2tp3h.apps.googleusercontent.com",
           "client_type": 3
         }
