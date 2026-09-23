@@ -100,14 +100,23 @@ class ProfileFragment : Fragment() {
     }
 
     private fun setupProvinceDropdown() {
-        // Province Spinner click - open bottom sheet
-        binding.provinceSpinner.setOnClickListener {
+        val openPicker = {
             val provinces = viewModel.provinces.value
             if (provinces.isNotEmpty()) {
                 showProvincePicker(provinces)
             } else {
                 Toast.makeText(requireContext(), "Loading provinces...", Toast.LENGTH_SHORT).show()
+                viewModel.loadProvinces()
             }
+        }
+
+        binding.provinceSpinner.setOnClickListener { openPicker() }
+        binding.provinceTextInputLayout.setEndIconOnClickListener { openPicker() }
+
+        // Prevent the system from trying to show an empty dropdown
+        binding.provinceSpinner.keyListener = null
+        binding.provinceSpinner.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) openPicker()
         }
     }
 
@@ -117,7 +126,8 @@ class ProfileFragment : Fragment() {
             provinces = provinces,
             selectedProvinceId = selectedProvince?.id,
             onProvinceSelected = { province ->
-                val shouldClear = viewModel.selectedSchool.value == null
+                val currentSchool = viewModel.selectedSchool.value
+                val shouldClear = currentSchool != null && currentSchool.provinceId != province.id
                 viewModel.selectProvince(province, shouldClearSchool = shouldClear)
 
                 binding.provinceSpinner.setText(province.name, false)
@@ -548,8 +558,13 @@ class ProfileFragment : Fragment() {
     }
 
     private fun completeProfile() {
+        // Always allow exit when nothing changed
         if (!viewModel.checkForChanges()) {
-            Toast.makeText(requireContext(), getString(R.string.profile_no_changes), Toast.LENGTH_SHORT).show()
+            if (viewModel.hasExistingSchool.value) {
+                findNavController().navigateUp()
+            } else {
+                Toast.makeText(requireContext(), getString(R.string.profile_no_changes), Toast.LENGTH_SHORT).show()
+            }
             return
         }
 

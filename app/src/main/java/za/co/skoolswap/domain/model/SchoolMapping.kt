@@ -4,6 +4,7 @@ data class SchoolMapping(
     val mappingId: String,        // UUID from user_schools table
     val schoolId: Int,
     val schoolName: String,
+    val provinceName: String? = null,
     val provinceId: Int?,
     val locationId: Int?,
     val schoolType: String?,

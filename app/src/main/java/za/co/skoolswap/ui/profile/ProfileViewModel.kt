@@ -100,13 +100,16 @@ class ProfileViewModel @Inject constructor(
                 is Result.Success -> {
                     _provinces.value = result.data
                     Timber.tag(LogTags.VIEW_MODEL).d("✅ Loaded ${result.data.size} provinces")
+
+                    // CRITICAL: re-apply province now that the list exists
+                    _currentSchoolMapping.value?.provinceId?.let { applyProvinceFromMapping(it) }
+                    // also works if only selectedSchool has the id
+                    _selectedSchool.value?.provinceId?.let { applyProvinceFromMapping(it) }
                 }
                 is Result.Error -> {
                     _error.value = "Failed to load provinces: ${result.exception.message}"
-                    Timber.tag(LogTags.VIEW_MODEL).e(result.exception, "❌ Failed to load provinces")
                 }
             }
-
             _isLoading.value = false
         }
     }
@@ -170,32 +173,52 @@ class ProfileViewModel @Inject constructor(
     fun confirmAndSave() {
         viewModelScope.launch {
             _isLoading.value = true
+            _error.value = null
+            var hadFailure = false
 
             _pendingMobile.value?.let { mobile ->
                 if (mobile != _originalMobile.value && mobile.isNotBlank()) {
-                    authRepository.updateMobile(mobile)
-                    _originalMobile.value = mobile
+                    val result = authRepository.updateMobile(mobile)
+                    if (result.isSuccess) {
+                        _originalMobile.value = mobile
+                    } else {
+                        hadFailure = true
+                        _error.value = result.exceptionOrNull()?.message ?: "Failed to update mobile"
+                    }
                 }
             }
 
-            _pendingSchool.value?.let { school ->
-                if (school.id != _originalSchool.value?.id) {
-                    if (_hasExistingSchool.value && _currentSchoolMapping.value != null) {
-                        userSchoolRepository.updateSchoolMapping(
-                            _currentSchoolMapping.value!!.mappingId,
-                            school.id
-                        )
-                    } else {
-                        userSchoolRepository.assignSchool(school.id)
+            if (!hadFailure) {
+                _pendingSchool.value?.let { school ->
+                    if (school.id != _originalSchool.value?.id) {
+                        val result = if (_hasExistingSchool.value && _currentSchoolMapping.value != null) {
+                            userSchoolRepository.updateSchoolMapping(
+                                _currentSchoolMapping.value!!.mappingId,
+                                school.id
+                            )
+                        } else {
+                            userSchoolRepository.assignSchool(school.id)
+                        }
+                        if (result is Result.Success) {
+                            _originalSchool.value = school
+                            if (result is Result.Success && result.data != null) {
+                                _currentSchoolMapping.value = result.data as SchoolMapping?
+                            }
+                        } else {
+                            hadFailure = true
+                            _error.value = (result as? Result.Error)?.exception?.message ?: "Failed to update school"
+                        }
                     }
-                    _originalSchool.value = school
                 }
             }
 
             _isLoading.value = false
             _showConfirmationDialog.value = false
-            _updateSuccess.value = true
-            _profileComplete.value = true
+
+            if (!hadFailure) {
+                _updateSuccess.value = true
+                _profileComplete.value = true
+            }
         }
     }
 
@@ -209,21 +232,17 @@ class ProfileViewModel @Inject constructor(
 
     fun checkExistingSchoolMapping() {
         viewModelScope.launch {
-            Timber.tag(LogTags.VIEW_MODEL).d("🔍 Checking existing school mapping")
-
             when (val result = userSchoolRepository.getCurrentSchoolMapping()) {
                 is Result.Success -> {
                     if (result.data != null) {
                         _currentSchoolMapping.value = result.data
                         _hasExistingSchool.value = true
 
-                        Timber.tag(LogTags.VIEW_MODEL).d("✅ Found existing school: ${result.data.schoolName}")
-
                         val school = School(
                             id = result.data.schoolId,
                             name = result.data.schoolName,
                             provinceId = result.data.provinceId,
-                            provinceName = null,
+                            provinceName = result.data.provinceName,   // keep if the API gives it
                             locationId = null,
                             schoolType = result.data.schoolType
                         )
@@ -232,29 +251,31 @@ class ProfileViewModel @Inject constructor(
                         _originalSchool.value = school
                         _pendingSchool.value = school
 
-                        result.data.provinceId?.let { provinceId ->
-                            val province = _provinces.value.find { it.id == provinceId }
-                            if (province != null) {
-                                _selectedProvince.value = province
-                                Timber.tag(LogTags.VIEW_MODEL).d("✅ Set province: ${province.name}")
-                            }
-                        }
+                        // Try immediately + the loadProvinces callback will retry if needed
+                        applyProvinceFromMapping(result.data.provinceId)
                     } else {
                         _hasExistingSchool.value = false
-                        Timber.tag(LogTags.VIEW_MODEL).d("ℹ️ No existing school found")
                     }
                     _isInitialized.value = true
                 }
                 is Result.Error -> {
                     _error.value = "Failed to check school status"
                     _hasExistingSchool.value = false
-                    Timber.tag(LogTags.VIEW_MODEL).e(result.exception, "❌ Error checking school")
                     _isInitialized.value = true
                 }
             }
         }
     }
-
+    private fun applyProvinceFromMapping(provinceId: Int?) {
+        if (provinceId == null) return
+        val province = _provinces.value.find { it.id == provinceId }
+        if (province != null) {
+            _selectedProvince.value = province
+            Timber.tag(LogTags.VIEW_MODEL).d("✅ Province restored: ${province.name}")
+        } else {
+            Timber.tag(LogTags.VIEW_MODEL).d("⏳ Province $provinceId not loaded yet – will retry")
+        }
+    }
     fun selectProvince(province: Province, shouldClearSchool: Boolean = false) {
         Timber.tag(LogTags.VIEW_MODEL).d("📍 selectProvince: ${province.name}, clearSchool: $shouldClearSchool")
 
@@ -400,6 +421,21 @@ class ProfileViewModel @Inject constructor(
                     if (result.data != null) {
                         _currentSchoolMapping.value = result.data
                         _hasExistingSchool.value = true
+
+                        val school = School(
+                            id = result.data.schoolId,
+                            name = result.data.schoolName,
+                            provinceId = result.data.provinceId,
+                            provinceName = result.data.provinceName,   // keep if the API gives it
+                            locationId = null,
+                            schoolType = result.data.schoolType
+                        )
+
+                        _selectedSchool.value = school
+                        _originalSchool.value = school
+                        _pendingSchool.value = school
+
+                        applyProvinceFromMapping(result.data.provinceId)
                     }
                 }
                 is Result.Error -> {

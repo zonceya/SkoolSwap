@@ -88,56 +88,55 @@ class UserSchoolRepository @Inject constructor(
 
     override suspend fun getCurrentSchoolMapping(): Result<SchoolMapping?> {
         return try {
-            Timber.tag(LogTags.REPOSITORY).d("🔍 Getting current school mapping")
+            Timber.tag(LogTags.REPOSITORY).d("🔍 getCurrentSchoolMapping() start")
 
             val userId = appPreferences.getUserId()
+            Timber.tag(LogTags.REPOSITORY).d("   userId=$userId")
 
             if (userId != null) {
                 val cachedMapping = userSchoolDao.getCurrentForUserSync(userId)
                 if (cachedMapping != null) {
-                    if (cachedMapping.id.startsWith("temp_")) {
-                        Timber.tag(LogTags.REPOSITORY).d("⚠️ Using TEMP cache, refreshing in background")
+                    Timber.tag(LogTags.REPOSITORY).d(
+                        "📦 CACHE hit: mappingId=${cachedMapping.id}, schoolId=${cachedMapping.schoolId}, schoolName=${cachedMapping.schoolName}"
+                    )
 
-                        val mapping = SchoolMapping(
-                            mappingId = cachedMapping.id,
-                            schoolId = cachedMapping.schoolId,
-                            schoolName = cachedMapping.schoolName,
-                            provinceId = null,
-                            locationId = null,
-                            schoolType = null,
-                            mappedAt = cachedMapping.mappedAt,
-                            updatedAt = cachedMapping.updatedAt
-                        )
+                    val schoolEntity = schoolDao.getById(cachedMapping.schoolId)
+                    Timber.tag(LogTags.REPOSITORY).d(
+                        "🏫 schoolDao: found=${schoolEntity != null}, provinceId=${schoolEntity?.provinceId}, name=${schoolEntity?.name}"
+                    )
 
-                        refreshInBackground(userId)
-                        return Result.Success(mapping)
-                    } else {
-                        Timber.tag(LogTags.REPOSITORY).d("✅ Using REAL cache: ${cachedMapping.schoolName}")
-
-                        val mapping = SchoolMapping(
-                            mappingId = cachedMapping.id,
-                            schoolId = cachedMapping.schoolId,
-                            schoolName = cachedMapping.schoolName,
-                            provinceId = null,
-                            locationId = null,
-                            schoolType = null,
-                            mappedAt = cachedMapping.mappedAt,
-                            updatedAt = cachedMapping.updatedAt
-                        )
-
-                        refreshInBackground(userId)
-                        return Result.Success(mapping)
+                    val provinceName = schoolEntity?.provinceId?.let { pid ->
+                        provinceDao.getById(pid)?.name
                     }
+                    Timber.tag(LogTags.REPOSITORY).d("📍 resolved provinceName=$provinceName")
+
+                    val mapping = SchoolMapping(
+                        mappingId = cachedMapping.id,
+                        schoolId = cachedMapping.schoolId,
+                        schoolName = cachedMapping.schoolName,
+                        provinceId = schoolEntity?.provinceId,
+                        provinceName = provinceName,
+                        locationId = schoolEntity?.locationId,
+                        schoolType = schoolEntity?.schoolType,
+                        mappedAt = cachedMapping.mappedAt,
+                        updatedAt = cachedMapping.updatedAt
+                    )
+
+                    Timber.tag(LogTags.REPOSITORY).d(
+                        "✅ Returning CACHE mapping: school=${mapping.schoolName}, provinceId=${mapping.provinceId}, provinceName=${mapping.provinceName}"
+                    )
+
+                    refreshInBackground(userId)
+                    return Result.Success(mapping)
                 } else {
-                    Timber.tag(LogTags.REPOSITORY).d("⚠️ No cache found for user $userId")
+                    Timber.tag(LogTags.REPOSITORY).d("📦 CACHE miss for userId=$userId")
                 }
             }
 
-            Timber.tag(LogTags.REPOSITORY).d("📡 Fetching from API")
+            Timber.tag(LogTags.REPOSITORY).d("📡 Falling through to API")
             return fetchFromApi()
-
         } catch (e: Exception) {
-            Timber.tag(LogTags.REPOSITORY).e(e, "❌ Error getting school mapping")
+            Timber.tag(LogTags.REPOSITORY).e(e, "❌ getCurrentSchoolMapping failed")
             Result.Error(e)
         }
     }
@@ -180,11 +179,15 @@ class UserSchoolRepository @Inject constructor(
                         schoolId = school.id,
                         schoolName = school.name,
                         provinceId = school.province_id,
+                        provinceName = null,
                         locationId = school.location_id,
                         schoolType = school.school_type,
                         mappedAt = school.mapped_at,
                         updatedAt = school.updated_at
                     )
+                )
+                Timber.tag(LogTags.REPOSITORY).d(
+                    "📡 API mapping: school=${school.name}, provinceId=${school.province_id}, mappingId=${school.mapping_id}"
                 )
             } else {
                 appPreferences.setSchoolMapped(false)
@@ -252,6 +255,7 @@ class UserSchoolRepository @Inject constructor(
                         schoolId = school.id,
                         schoolName = school.name,
                         provinceId = school.province_id,
+                        provinceName = null,
                         locationId = school.location_id,
                         schoolType = school.school_type,
                         mappedAt = school.mapped_at,

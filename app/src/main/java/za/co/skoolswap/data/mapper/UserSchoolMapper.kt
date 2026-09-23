@@ -2,6 +2,7 @@ package za.co.skoolswap.data.mapper
 
 import za.co.skoolswap.data.local.database.entities.UserSchoolEntity
 import za.co.skoolswap.data.remote.models.response.school.SchoolMappingResponse
+import za.co.skoolswap.domain.model.School
 import za.co.skoolswap.domain.model.SchoolMapping
 
 fun SchoolMappingResponse.toEntity(userId: Int): UserSchoolEntity {
@@ -20,22 +21,24 @@ fun UserSchoolEntity.toDomain(): SchoolMapping {
         mappingId = this.id,
         schoolId = this.schoolId,
         schoolName = this.schoolName,
-        provinceId = null,  // These would need to be joined from schools table
-        locationId = null,   // or fetched separately
+        provinceId = null,      // filled below when school is available
+        provinceName = null,
+        locationId = null,
         schoolType = null,
         mappedAt = this.mappedAt,
         updatedAt = this.updatedAt
     )
 }
 
-fun UserSchoolEntity.toDomainWithSchool(school: za.co.skoolswap.domain.model.School): SchoolMapping {
+fun UserSchoolEntity.toDomainWithSchool(school: School?): SchoolMapping {
     return SchoolMapping(
         mappingId = this.id,
         schoolId = this.schoolId,
         schoolName = this.schoolName,
-        provinceId = school.provinceId,
-        locationId = school.locationId,
-        schoolType = school.schoolType,
+        provinceId = school?.provinceId,
+        provinceName = school?.provinceName,
+        locationId = school?.locationId,
+        schoolType = school?.schoolType ?: null,
         mappedAt = this.mappedAt,
         updatedAt = this.updatedAt
     )
