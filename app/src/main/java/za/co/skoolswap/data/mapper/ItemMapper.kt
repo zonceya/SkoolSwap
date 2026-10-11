@@ -82,7 +82,75 @@ fun ItemDto.toDomain(): Item {
         label = label
     )
 }
+// ============ ITEMS INDEX DTO TO DOMAIN ============
+fun ItemsIndexItemDto.toDomain(): Item {
+    val imageList = mutableListOf<ItemImage>()
 
+    // Cover image first
+    image?.takeIf { it.isNotBlank() }?.let { url ->
+        imageList.add(ItemImage(id = 0, url = url, isCover = true))
+    }
+
+    // Then the rest of `images`, skipping anything that duplicates the cover
+    images?.forEach { url ->
+        if (url.isNotBlank() && url != image && imageList.none { it.url == url }) {
+            imageList.add(ItemImage(id = 0, url = url, isCover = false))
+        }
+    }
+
+    return Item(
+        id = id,
+        shopId = shop?.id ?: 0L,
+        name = name,
+        description = description,
+        price = price,
+        quantity = quantity,
+        status = status,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        images = imageList,
+        coverImage = image ?: imageList.firstOrNull()?.url,
+
+        // Flat fields — this endpoint doesn't nest category/school objects
+        mainCategoryId = mainCategoryId,
+        subCategoryId = subCategoryId,
+        genderId = genderId,
+        schoolId = schoolId,
+        brandId = brandId,
+        itemConditionId = conditionId,
+        provinceId = provinceId,
+        locationId = townId,
+        sizeId = sizeId,
+        colorId = colorId,
+
+        // Display names
+        sizeName = size,
+        colorName = color,
+        brandName = brand,
+        conditionName = condition,
+        schoolName = school,
+
+        shop = shop?.let {
+            Shop(
+                id = it.id ?: 0L,
+                name = it.name ?: "",
+                displayName = it.displayName ?: "",
+                userId = 0L,
+                sellerName = it.sellerName ?: "",
+                profilePictureUrl = "",
+                createdAt = "",
+                sellerMobile = it.sellerMobile,
+                itemsCount = 0
+            )
+        },
+
+        meta = null,
+        label = null,
+        reserved = quantity - availableQuantity,
+        itemTypeId = null,
+        viewCount = 0
+    )
+}
 // ============ ITEM IMAGE DTO TO DOMAIN ============
 fun ItemImageDto.toDomain(): ItemImage {
     return ItemImage(

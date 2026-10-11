@@ -920,7 +920,7 @@ class ItemRepository @Inject constructor(
                 return Result.failure(Exception("Server error: ${response.code()}"))
             }
 
-            val items = response.body()?.mapNotNull { it.toDomain() } ?: emptyList()
+            val items = response.body()?.items?.map { it.toDomain() } ?: emptyList()
             itemDao.insertItems(items.map { it.toEntity() })
             _currentItems.value = items
 

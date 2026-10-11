@@ -16,12 +16,14 @@ interface ItemApiService {
         @Header("Authorization") authHeader: String,
         @Body request: CreateItemRequest
     ): Response<CreateItemResponse>
+
     @PUT("api/v1/items/{item_id}/updateItem")
     suspend fun updateItem(
         @Header("Authorization") authHeader: String,
         @Path("item_id") itemId: String,
         @Body request: UpdateItemRequest
     ): Response<UpdateItemResponse>
+
     @Multipart
     @POST("api/v1/items/{item_id}/images")
     suspend fun addItemImages(
@@ -42,6 +44,10 @@ interface ItemApiService {
         @Path("item_id") itemId: String
     ): Response<ItemDetailResponse>
 
+    // ── CHANGED: return type was Response<List<CreateItemResponse>>,
+    //             but ItemsController#index actually returns
+    //             { success, items, total_count, filters_applied }.
+    //             Gson would throw "Expected BEGIN_ARRAY but was BEGIN_OBJECT".
     @GET("api/v1/items")
     suspend fun getItems(
         @Query("sort") sort: String? = null,
@@ -50,29 +56,30 @@ interface ItemApiService {
         @Query("sub_category_id") subCategoryId: Int? = null,
         @Query("province_id") provinceId: Int? = null,
         @Query("town_id") townId: Int? = null
-    ): Response<List<CreateItemResponse>>
+    ): Response<ItemsIndexResponse>
 
-    @GET("api/v1/items/shop_items")  // ✅ CORRECT
+    @GET("api/v1/items/shop_items")
     suspend fun getMyShopItems(
         @Header("Authorization") authToken: String
     ): Response<ShopItemsResponse>
+
     @GET("api/v1/shops/{shop_id}/items")
     suspend fun getShopItems(
         @Path("shop_id") shopId: Long
     ): Response<PublicShopItemsResponse>
+
     @GET("api/v1/items/{item_id}/viewShopItem")
     suspend fun getShopItemForEdit(
         @Header("Authorization") authHeader: String,
         @Path("item_id") itemId: String
     ): Response<ViewShopItemResponse>
-    // NEW: Delete item (soft delete)
+
     @DELETE("api/v1/items/{item_id}/deleteItem")
     suspend fun deleteItem(
         @Header("Authorization") authHeader: String,
         @Path("item_id") itemId: String
     ): Response<DeleteItemResponse>
 
-    // NEW: Mark item as sold
     @PATCH("api/v1/items/{item_id}/mark_as_sold")
     suspend fun markItemAsSold(
         @Header("Authorization") authHeader: String,
@@ -85,6 +92,4 @@ interface ItemApiService {
         @Path("item_id") itemId: String,
         @Body request: AttachImagesByUrlRequest
     ): Response<AddImagesResponse>
-
 }
-

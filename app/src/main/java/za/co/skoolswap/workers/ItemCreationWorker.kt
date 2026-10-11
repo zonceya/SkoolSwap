@@ -151,36 +151,42 @@ class ItemCreationWorker(
             Timber.tag(TAG).d("   Server CreatedAt: ${serverItem.createdAt}")
             Timber.tag(TAG).d("   Server UpdatedAt: ${serverItem.updatedAt}")
 
-            // 3. ✅ UPLOAD IMAGES DIRECTLY USING addItemImages
+            // ── 3. UPLOAD IMAGES — FAIL LOUDLY so WorkManager retries
             if (imageUris.isNotEmpty()) {
                 Timber.tag(TAG).d("📤 Step 3: Uploading ${imageUris.size} images directly to item...")
                 val uploadStartTime = System.currentTimeMillis()
 
-                try {
-                    val imageResult = itemRepository.addItemImages(
+                // ── Fully qualified kotlin.Result to avoid clashing with
+                //    ListenableWorker.Result inside this method's scope.
+                val imageResult: kotlin.Result<List<za.co.skoolswap.domain.model.ItemImage>> = try {
+                    itemRepository.addItemImages(
                         context = applicationContext,
                         itemId = serverItem.id,  // ← Use server item ID
                         imageUris = imageUris
                     )
-
-                    val uploadDuration = System.currentTimeMillis() - uploadStartTime
-                    Timber.tag(TAG).d("   Upload completed in ${uploadDuration}ms")
-
-                    if (imageResult.isSuccess) {
-                        val images = imageResult.getOrNull() ?: emptyList()
-                        Timber.tag(TAG).d("✅ Uploaded ${images.size} images successfully!")
-                        images.forEachIndexed { index, image ->
-                            Timber.tag(TAG).d("   Image[$index]: ${image.url}")
-                        }
-                    } else {
-                        val error = imageResult.exceptionOrNull()?.message ?: "Unknown error"
-                        Timber.tag(TAG).w("⚠️ Image upload failed: $error")
-                        Timber.tag(TAG).d("   This is a warning - item was created but images may not be visible")
-                    }
                 } catch (e: Exception) {
                     Timber.tag(TAG).e(e, "❌ Image upload exception")
-                    Timber.tag(TAG).d("   Item was created, images can be added later")
-                    // Don't fail - item was created successfully
+                    kotlin.Result.failure(e)
+                }
+
+                val uploadDuration = System.currentTimeMillis() - uploadStartTime
+                Timber.tag(TAG).d("   Upload completed in ${uploadDuration}ms")
+
+                val uploadedImages = imageResult.getOrNull()
+                val uploadSucceeded = imageResult.isSuccess && !uploadedImages.isNullOrEmpty()
+
+                if (uploadSucceeded) {
+                    Timber.tag(TAG).d("✅ Uploaded ${uploadedImages!!.size} images successfully!")
+                    uploadedImages.forEachIndexed { index, image ->
+                        Timber.tag(TAG).d("   Image[$index]: ${image.url}")
+                    }
+                } else {
+                    // ── CHANGED: mark IMAGES_FAILED and retry instead of silently succeeding
+                    val error = imageResult.exceptionOrNull()?.message
+                        ?: "Upload returned no images"
+                    Timber.tag(TAG).e("❌ Image upload failed: $error")
+                    updateItemStatus(serverItem.id, "IMAGES_FAILED", error)
+                    return ListenableWorker.Result.retry()
                 }
             } else {
                 Timber.tag(TAG).d("📤 Step 3: No images to upload, skipping")
