@@ -110,8 +110,6 @@ fun ItemsIndexItemDto.toDomain(): Item {
         updatedAt = updatedAt,
         images = imageList,
         coverImage = image ?: imageList.firstOrNull()?.url,
-
-        // Flat fields — this endpoint doesn't nest category/school objects
         mainCategoryId = mainCategoryId,
         subCategoryId = subCategoryId,
         genderId = genderId,
@@ -122,8 +120,6 @@ fun ItemsIndexItemDto.toDomain(): Item {
         locationId = townId,
         sizeId = sizeId,
         colorId = colorId,
-
-        // Display names
         sizeName = size,
         colorName = color,
         brandName = brand,
@@ -135,7 +131,7 @@ fun ItemsIndexItemDto.toDomain(): Item {
                 id = it.id ?: 0L,
                 name = it.name ?: "",
                 displayName = it.displayName ?: "",
-                userId = 0L,
+                userId = it.userId ?: 0L,
                 sellerName = it.sellerName ?: "",
                 profilePictureUrl = "",
                 createdAt = "",
@@ -197,10 +193,10 @@ fun ItemShopDto.toDomain(): Shop {
     return Shop(
         id = id,
         name = name,
-        displayName = "",
-        userId = 0L,
-        sellerName = "",
-        sellerMobile = "",
+        displayName = displayName ?: "",
+        userId = userId ?: 0L,
+        sellerName = sellerName ?: "",
+        sellerMobile = sellerMobile ?: "",
         profilePictureUrl = "",
         createdAt = "",
         itemsCount = 0
@@ -456,8 +452,6 @@ fun RecommendationItemDto.toDomain(): Item {
         brandName = brandName,
         gender = gender,
         viewCount = viewCount,
-
-        // ✅ FIXED - these were missing
         schoolId = schoolId,
         schoolName = school,
         schoolLogoUrl = schoolLogoUrl,
@@ -467,7 +461,7 @@ fun RecommendationItemDto.toDomain(): Item {
                 id = it.id,
                 name = it.name,
                 displayName = "",
-                userId = 0L,
+                userId = it.userId ?: 0L,
                 sellerName = it.sellerName ?: "",
                 sellerMobile = it.sellerMobile,
                 profilePictureUrl = "",

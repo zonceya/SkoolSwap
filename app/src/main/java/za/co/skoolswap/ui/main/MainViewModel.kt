@@ -3,12 +3,15 @@ package za.co.skoolswap.ui.main
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.messaging.FirebaseMessaging
 import za.co.skoolswap.common.constants.AppConstants.LogTags
 import za.co.skoolswap.data.local.datastore.AppPreferences
 import za.co.skoolswap.domain.repository.AuthRepositoryInterface
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -45,7 +48,30 @@ class MainViewModel @Inject constructor(
             }
         }
     }
+    // Inside MainViewModel
+    fun syncFcmTokenOnStartup() {
+        viewModelScope.launch {
+            try {
+                // Check if user is logged in
+                val isLoggedIn = preferences.isLoggedIn.first()
+                if (!isLoggedIn) return@launch
 
+                // Fetch fresh FCM token from Firebase
+                val fcmToken = FirebaseMessaging.getInstance().token.await()
+
+                // Save to Rails
+                val result = authRepository.saveFcmToken(fcmToken)
+
+                if (result.isSuccess) {
+                    Timber.tag("MainViewModel").d("✅ FCM token synced on app startup")
+                } else {
+                    Timber.tag("MainViewModel").w("⚠️ FCM token sync failed: ${result.exceptionOrNull()?.message}")
+                }
+            } catch (e: Exception) {
+                Timber.tag("MainViewModel").e(e, "❌ Startup FCM token sync failed")
+            }
+        }
+    }
     fun finishOnboarding() {
         viewModelScope.launch {
             preferences.setOnboardingFinished(true)

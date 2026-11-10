@@ -67,6 +67,11 @@ object NetworkConstants {
             // School
             const val ASSIGN_SCHOOL = "$USERS/assign_school"
             const val VERIFY_SCHOOL = "$USERS/verify_school"
+            // 🆕 FCM Token
+            const val UPDATE_FCM_TOKEN = "$USERS/fcm_token"
+
+            // 🆕 Chat Notifications
+            const val SEND_CHAT_NOTIFICATION = "$BASE_PATH/chat_notifications/send"
         }
 
         // ===== Shop Endpoints =====

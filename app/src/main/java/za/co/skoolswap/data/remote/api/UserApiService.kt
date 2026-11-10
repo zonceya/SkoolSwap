@@ -22,9 +22,14 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
+import za.co.skoolswap.data.remote.models.request.ChatNotificationRequest
+import za.co.skoolswap.data.remote.models.request.FcmTokenRequest
+import za.co.skoolswap.data.remote.models.response.user.ChatResponse
+
 
 interface UserApiService {
 
@@ -107,4 +112,16 @@ interface UserApiService {
         @Header("Authorization") authToken: String,
         @Body request: AssignSchoolRequest
     ): Response<AssignSchoolResponse>
+
+    @PATCH(Endpoints.User.UPDATE_FCM_TOKEN)
+    suspend fun updateFcmToken(
+        @Header("Authorization") authToken: String,
+        @Body request: FcmTokenRequest
+    ): Response<ChatResponse>
+
+    @POST(Endpoints.User.SEND_CHAT_NOTIFICATION)
+    suspend fun sendChatNotification(
+        @Header("Authorization") authToken: String,
+        @Body request: ChatNotificationRequest
+    ): Response<ChatResponse>
 }

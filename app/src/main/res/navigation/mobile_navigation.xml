@@ -99,8 +99,6 @@
 
     </fragment>
 
-    <!-- ❌ REMOVED: schoolOnboardingFragment (replaced by two separate fragments) -->
-
     <!-- Onboarding Flow -->
     <fragment
         android:id="@+id/viewPagerFragment"
@@ -201,7 +199,9 @@
         android:name="za.co.skoolswap.ui.home.HomeFragment"
         android:label="@string/menu_home"
         tools:layout="@layout/fragment_home">
-
+        <action
+            android:id="@+id/action_homeFragment_to_conversationListFragment"
+            app:destination="@id/conversationListFragment" />
         <action
             android:id="@+id/action_home_to_shop"
             app:destination="@id/nav_shop" />
@@ -449,6 +449,53 @@
             app:nullable="true"
             android:defaultValue="@null" />
 
+        <!-- 🆕 ADD THIS — action to open chat from item detail -->
+        <action
+            android:id="@+id/action_itemDetailFragment_to_chatFragment"
+            app:destination="@id/chatFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+
+    </fragment>
+
+    <!-- 🆕 ADD THIS — Chat Fragment destination -->
+    <fragment
+        android:id="@+id/chatFragment"
+        android:name="za.co.skoolswap.ui.chat.ChatFragment"
+        android:label="Chat">
+
+        <argument
+            android:name="conversationId"
+            app:argType="string" />
+
+        <argument
+            android:name="sellerId"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+
+        <argument
+            android:name="itemName"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+
+    </fragment>
+    <!-- 🆕 CONVERSATION LIST -->
+    <fragment
+        android:id="@+id/conversationListFragment"
+        android:name="za.co.skoolswap.ui.chatlist.ConversationListFragment"
+        android:label="Messages">
+
+        <action
+            android:id="@+id/action_conversationListFragment_to_chatFragment"
+            app:destination="@id/chatFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
     </fragment>
 
 </navigation>

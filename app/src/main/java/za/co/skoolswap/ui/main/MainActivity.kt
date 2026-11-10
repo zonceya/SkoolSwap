@@ -120,7 +120,7 @@ class MainActivity : AppCompatActivity() {
         binding.appBarMain.fab.visibility = View.GONE
         supportActionBar?.hide()
         binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
-
+        viewModel.syncFcmTokenOnStartup()
         // If we're restoring and current destination is not intro, mark intro as routed
         if (savedInstanceState != null &&
             navController.currentDestination?.id != R.id.introFragment) {

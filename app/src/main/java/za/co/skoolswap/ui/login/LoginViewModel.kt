@@ -5,6 +5,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.messaging.FirebaseMessaging
 import za.co.skoolswap.common.constants.AppConstants
 import za.co.skoolswap.common.constants.ErrorConstantsHelper
 import za.co.skoolswap.data.local.datastore.AppPreferences
@@ -12,6 +13,7 @@ import za.co.skoolswap.domain.model.User
 import za.co.skoolswap.domain.repository.AuthRepositoryInterface
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -65,7 +67,26 @@ class LoginViewModel @Inject constructor(
             false
         }
     }
+    /**
+     * ✅ Save FCM token to Rails after successful login
+     *
+     * Uses the repository (clean architecture) — no direct API access.
+     */
+    private suspend fun saveFcmTokenToRails() {
+        try {
+            val fcmToken = FirebaseMessaging.getInstance().token.await()
 
+            authRepository.saveFcmToken(fcmToken)
+                .onSuccess {
+                    Timber.tag(TAG).d("✅ FCM token saved to Rails after login")
+                }
+                .onFailure { error ->
+                    Timber.tag(TAG).w("⚠️ FCM save failed: ${error.message}")
+                }
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "❌ Failed to save FCM token to Rails")
+        }
+    }
     // ==================== GOOGLE SIGN-IN ====================
     fun signInWithGoogle(activity: Activity) {
         viewModelScope.launch {
@@ -79,6 +100,7 @@ class LoginViewModel @Inject constructor(
             result.onSuccess { user ->
                 Timber.tag(TAG).d("✅ SUCCESS! User received")
                 saveUserToPreferences(user)
+                saveFcmTokenToRails()
                 _loginSuccess.value = user
             }.onFailure { throwable ->
                 Timber.tag(TAG).e("❌ FAILURE! ${throwable.message}")
@@ -103,6 +125,7 @@ class LoginViewModel @Inject constructor(
             result.onSuccess { user ->
                 Timber.tag(TAG).d("✅ Email sign in successful!")
                 saveUserToPreferences(user)
+                saveFcmTokenToRails()
                 _loginSuccess.value = user
             }.onFailure { throwable ->
                 Timber.tag(TAG).e("❌ Email sign in failed: ${throwable.message}")

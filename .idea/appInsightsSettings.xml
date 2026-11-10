@@ -23,8 +23,8 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="com.example.skoolswap" />
-                  <option name="mobileSdkAppId" value="1:63644777044:android:ba395cbc36819277884bc1" />
+                  <option name="appId" value="za.co.skoolswap" />
+                  <option name="mobileSdkAppId" value="1:63644777044:android:fa0bcfa4c9e491ad884bc1" />
                   <option name="projectId" value="skoolswap-7e387" />
                   <option name="projectNumber" value="63644777044" />
                 </ConnectionSetting>

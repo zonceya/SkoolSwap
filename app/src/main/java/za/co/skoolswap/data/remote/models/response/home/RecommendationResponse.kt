@@ -99,5 +99,6 @@ data class ShopInfoDto(
     @SerializedName("id") val id: Long,
     @SerializedName("name") val name: String,
     @SerializedName("seller_name") val sellerName: String?,
+    @SerializedName("user_id") val userId: Long? = null,
     @SerializedName("seller_mobile") val sellerMobile: String?
 )

@@ -48,6 +48,8 @@ import com.google.firebase.auth.UserProfileChangeRequest
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.withLock
+import za.co.skoolswap.data.remote.models.request.ChatNotificationRequest
+import za.co.skoolswap.data.remote.models.request.FcmTokenRequest
 
 @Singleton
 class AuthRepository @Inject constructor(
@@ -111,6 +113,8 @@ class AuthRepository @Inject constructor(
 
             val user = syncWithRailsApiWithRetry(idToken, firebaseUser, email)
             cacheUserAfterFirebaseAuth(user, user.token)
+            val fcmToken = com.google.firebase.messaging.FirebaseMessaging.getInstance().token.await()
+            saveFcmToken(fcmToken)
             Result.success(user)
 
         } catch (e: Exception) {
@@ -125,7 +129,70 @@ class AuthRepository @Inject constructor(
     private fun isRecentlyRefreshed(): Boolean {
         return System.currentTimeMillis() - lastRefreshTime < REFRESH_DEBOUNCE_MS
     }
+    override suspend fun saveFcmToken(token: String): Result<Boolean> {
+        return try {
+            val authToken = getCurrentToken()
 
+            // ✅ ADD THIS LINE
+            Timber.tag("FCM_DEBUG").d("Attempting save. Token: ${token.take(10)}... | Auth: ${authToken?.take(5)}...")
+
+            if (authToken.isNullOrBlank()) {
+                Timber.tag(LogTags.AUTH).w("⚠️ No auth token — cannot save FCM token")
+                return Result.failure(Exception("Not authenticated"))
+            }
+
+            val response = userApiService.updateFcmToken(
+                authToken = "Bearer $authToken",
+                request = FcmTokenRequest(fcmToken = token)
+            )
+
+            // ✅ ADD THIS LINE
+            Timber.tag("FCM_DEBUG").d("Server responded: ${response.code()} | body: ${response.body()?.success} | error: ${response.errorBody()?.string()}")
+
+            if (response.isSuccessful) {
+                Timber.tag(LogTags.AUTH).d("✅ FCM token saved to Rails")
+                Result.success(true)
+            } else {
+                val errorMsg = "FCM save failed: ${response.code()}"
+                Timber.tag(LogTags.AUTH).w("⚠️ $errorMsg")
+                Result.failure(Exception(errorMsg))
+            }
+        } catch (e: Exception) {
+            Timber.tag("FCM_DEBUG").e(e, "❌ Failed to save FCM token to Rails")
+            Result.failure(e)
+        }
+    }
+    override suspend fun sendChatNotification(
+        recipientId: String,
+        messageBody: String,
+        conversationId: String
+    ): Result<Boolean> {
+        return try {
+            val authToken = getCurrentToken()
+            if (authToken.isNullOrBlank()) {
+                return Result.failure(Exception("Not authenticated"))
+            }
+
+            val response = userApiService.sendChatNotification(
+                authToken = "Bearer $authToken",
+                request = ChatNotificationRequest(
+                    recipientId = recipientId,
+                    messageBody = messageBody,
+                    conversationId = conversationId
+                )
+            )
+
+            if (response.isSuccessful) {
+                Timber.tag(LogTags.AUTH).d("✅ Chat notification sent via Rails")
+                Result.success(true)
+            } else {
+                Result.failure(Exception("Notification failed: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Timber.tag(LogTags.AUTH).e(e, "❌ Chat notification failed")
+            Result.failure(e)
+        }
+    }
     private suspend fun updateTokenAcrossAllLayers(newToken: String) {
         lastRefreshTime = System.currentTimeMillis()
 
@@ -165,6 +232,8 @@ class AuthRepository @Inject constructor(
 
             val user = syncWithRailsApiWithRetry(idToken, firebaseUser, email, name)
             cacheUserAfterFirebaseAuth(user, user.token)
+            val fcmToken = com.google.firebase.messaging.FirebaseMessaging.getInstance().token.await()
+            saveFcmToken(fcmToken)
             Result.success(user)
 
         } catch (e: Exception) {

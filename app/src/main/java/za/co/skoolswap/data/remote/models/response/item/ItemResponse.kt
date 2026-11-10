@@ -73,7 +73,12 @@ data class ItemMetaDto(
 
 data class ItemShopDto(
     @SerializedName("id") val id: Long,
-    @SerializedName("name") val name: String
+    @SerializedName("name") val name: String,
+    @SerializedName("display_name") val displayName: String? = null,
+    @SerializedName("user_id") val userId: Long? = null,
+    @SerializedName("seller_name") val sellerName: String? = null,
+    @SerializedName("seller_mobile") val sellerMobile: String? = null
+
 )
 
 data class ConditionDto(

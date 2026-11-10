@@ -66,5 +66,6 @@ data class ItemsIndexShopDto(
     @SerializedName("name") val name: String? = null,
     @SerializedName("display_name") val displayName: String? = null,
     @SerializedName("seller_name") val sellerName: String? = null,
-    @SerializedName("seller_mobile") val sellerMobile: String? = null
+    @SerializedName("seller_mobile") val sellerMobile: String? = null,
+    @SerializedName("user_id") val userId: Long? = null
 )

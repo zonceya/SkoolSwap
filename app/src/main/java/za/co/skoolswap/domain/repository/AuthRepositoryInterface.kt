@@ -36,4 +36,6 @@ interface AuthRepositoryInterface {
     suspend fun getCurrentUserId(): Int?
     suspend fun refreshToken(): Result<String>
     suspend fun updateUserInRoom(user: UserEntity)
+    suspend fun saveFcmToken(token: String): Result<Boolean>
+    suspend fun sendChatNotification(recipientId: String,messageBody: String,conversationId: String): Result<Boolean>
 }

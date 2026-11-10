@@ -1,5 +1,8 @@
 package za.co.skoolswap.ui.detail
 
+import za.co.skoolswap.data.local.datastore.AppPreferences
+import za.co.skoolswap.data.repository.ChatRepository
+import za.co.skoolswap.ui.chat.ChatFragment
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -50,6 +53,11 @@ class ItemDetailFragment : Fragment() {
 
     @Inject
     lateinit var workerManager: WorkerManager
+    @Inject
+    lateinit var chatRepository: ChatRepository
+
+    @Inject
+    lateinit var appPreferences: AppPreferences
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -147,7 +155,7 @@ class ItemDetailFragment : Fragment() {
 
         binding.buyButton.setOnClickListener {
             Timber.tag(LogTags.UI).d("Buy button clicked")
-            onBuyClick()
+            openChat()
         }
     }
 
@@ -165,8 +173,110 @@ class ItemDetailFragment : Fragment() {
             binding.shippingAnimation.playAnimation()
         }
     }
+    /**
+     * ✅ OPEN CHAT
+     *
+     * Creates or finds a Firestore conversation between the current user
+     * and the seller for this item, then navigates to ChatFragment.
+     */
+    /**
+     * ✅ OPEN CHAT
+     *
+     * Creates or finds a Firestore conversation between the current user
+     * and the seller for this item, then navigates to ChatFragment.
+     */
+    private fun openChat() {
+        val currentState = viewModel.itemState.value
 
-// ItemDetailFragment.kt
+        // Guard: item must be loaded
+        if (currentState !is ItemDetailState.Success) {
+            Toast.makeText(requireContext(), "Item not loaded yet", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val item = currentState.item
+
+        // ✅ FIXED: Use shop.userId (not shop.sellerId)
+        val sellerId = item.shop?.userId?.toString()
+
+        // Guard: seller must be known
+        if (sellerId.isNullOrBlank()) {
+            Toast.makeText(requireContext(), "Seller info unavailable", Toast.LENGTH_SHORT).show()
+            Timber.tag(LogTags.UI).e("openChat: sellerId is null for item ${item.id}")
+            return
+        }
+
+        // Disable button + show progress
+        binding.buyButton.isEnabled = false
+        binding.buyButton.text = "Opening chat..."
+
+        lifecycleScope.launch {
+            try {
+                // 1. Get current user ID
+                val currentUserId = appPreferences.getUserId()?.toString() ?: ""
+
+                if (currentUserId.isBlank()) {
+                    Toast.makeText(requireContext(), "Please log in again", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
+                Timber.tag(LogTags.UI).d(
+                    "openChat: currentUser=$currentUserId, seller=$sellerId, item=${item.id}"
+                )
+
+                // ✅ FIXED: Use item.resolveImageUrl() (not item.coverPhoto)
+                val itemImageUrl = item.resolveImageUrl() ?: ""
+
+                // 2. Get or create conversation in Firestore
+                val result = chatRepository.getOrCreateConversation(
+                    currentUserId = currentUserId,
+                    otherUserId = sellerId,
+                    itemId = item.id,
+                    itemName = item.name,
+                    itemPrice = item.price,
+                    itemImageUrl = itemImageUrl
+                )
+
+                result
+                    .onSuccess { conversationId ->
+                        Timber.tag(LogTags.UI).d("openChat: conversationId=$conversationId")
+
+                        // 3. Navigate to ChatFragment
+                        val bundle = bundleOf(
+                            ChatFragment.ARG_CONVERSATION_ID to conversationId,
+                            ChatFragment.ARG_SELLER_ID to sellerId,
+                            ChatFragment.ARG_ITEM_NAME to item.name
+                        )
+
+                        findNavController().navigate(
+                            R.id.action_itemDetailFragment_to_chatFragment,
+                            bundle
+                        )
+                    }
+                    .onFailure { error ->
+                        Timber.tag(LogTags.UI).e(error, "openChat: failed")
+                        Toast.makeText(
+                            requireContext(),
+                            "Could not open chat: ${error.message}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+
+            } catch (e: Exception) {
+                Timber.tag(LogTags.UI).e(e, "openChat: unexpected error")
+                Toast.makeText(
+                    requireContext(),
+                    "Unexpected error: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } finally {
+                // Restore button regardless of outcome
+                binding.buyButton.isEnabled = true
+                binding.buyButton.text = "💬  Contact Seller"
+            }
+        }
+    }
+
 
     private fun observeViewModel() {
         Timber.tag(LogTags.UI).d("observeViewModel called")
@@ -468,27 +578,6 @@ class ItemDetailFragment : Fragment() {
                 type = "text/plain"
             }
             startActivity(android.content.Intent.createChooser(shareIntent, "Share via"))
-        }
-    }
-
-    private fun onBuyClick() {
-        val currentState = viewModel.itemState.value
-        if (currentState is ItemDetailState.Success) {
-            val item = currentState.item
-            val sellerMobile = viewModel.sellerMobile.value
-
-            if (sellerMobile.isNullOrBlank()) {
-                Toast.makeText(
-                    requireContext(),
-                    "Seller contact information not available",
-                    Toast.LENGTH_SHORT
-                ).show()
-                return
-            }
-
-            // ✅ Fixed: Use constructor directly
-            val bottomSheet = ContactOptionsBottomSheet(item, sellerMobile)
-            bottomSheet.show(parentFragmentManager, "contact_options")
         }
     }
 

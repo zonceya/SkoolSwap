@@ -5,16 +5,17 @@ plugins {
     id("kotlin-kapt")
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.firebase.crashlytics)
+    alias(libs.plugins.kotlin.compose)
 }
 
 android {
     namespace = "za.co.skoolswap"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "za.co.skoolswap"
         minSdk = 25
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 7
         versionName = "1.0.7"
 
@@ -47,7 +48,7 @@ android {
             buildConfigField(
                 "String",
                 "API_BASE_URL",
-                "\"https://api.skoolswap.co.za\""
+                "\"https://api.skoolswap.co.za/\""
             )
         }
 
@@ -97,6 +98,7 @@ android {
       viewBinding = true
       dataBinding = true
       buildConfig = true
+      compose = true
     }
 }
 
@@ -117,10 +119,12 @@ dependencies {
     implementation(libs.timber)
 
     // Firebase
-    implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.ui.auth)
     implementation(libs.firebase.crashlytics)
+    implementation(libs.firebase.firestore)
+    implementation(platform(libs.firebase.bom))
+    implementation("com.google.firebase:firebase-messaging")
     // Authentication
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
@@ -149,14 +153,23 @@ dependencies {
     kapt(libs.room.compiler)
     implementation(libs.kotlinx.datetime)
     implementation(libs.play.services.cast.framework)
-
+    implementation(libs.kotlinx.coroutines.play.services)
     // Dependency Injection
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
     implementation(libs.hilt.navigation.fragment)
     implementation(libs.androidx.hilt.work)
     kapt(libs.hilt.compiler)
+    implementation(libs.hilt.navigation.compose)
 
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.compose.navigation)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.coil.compose)
 
     // Work Manager
     implementation(libs.work.runtime)
@@ -165,4 +178,5 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    debugImplementation(libs.androidx.compose.ui.tooling)
 }
